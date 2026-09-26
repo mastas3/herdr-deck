@@ -9,8 +9,9 @@ import { claimsDone, onCheck, resultFor, setApproval, verify, detectCheck, appro
 import { inventory, inventoryText, loadConnConf, saveConnConf, usage, type Item as ConnItem } from "./connections";
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
-import { buildDecision, judge, recordOutcome, needsYou, type Decision } from "./decisions";
-import { jevAvailable, jevUsage } from "./jev";
+import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
+import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap } from "./jev";
+import { statsFor } from "./jevstats";
 import { appendAudit, handleMcp, mcpToken, readAudit, type McpCtx } from "./mcp";
 import { Deck, type Row } from "./deck";
 import { call } from "./herdr";
@@ -204,7 +205,10 @@ async function rebuildDecisions() {
   decisions.clear();
   for (const [k, v] of next) decisions.set(k, v);
   if (JSON.stringify([...decisions.values()]) !== before) broadcast("decisions", [...decisions.values()]);
+  const u = jevUsage();
+  if (u.calls !== lastJevCalls) { lastJevCalls = u.calls; broadcast("jev", u); }
 }
+let lastJevCalls = jevUsage().calls;
 deck.onPatch(scheduleDecisions);
 setInterval(scheduleDecisions, 10_000);
 
@@ -1014,6 +1018,13 @@ async function handle(req: Request): Promise<Response> {
     }
     const body: any = await req.json().catch(() => ({}));
     try {
+      // An answer typed in the reply box or pressed in the terminal answers the decision on screen too:
+      // record it for Jev before the input goes anywhere (the inbox's own /api/decide then finds it done).
+      if ((url.pathname === "/api/send" || url.pathname === "/api/keys") && body.key) {
+        const d = decisions.get(String(body.key));
+        const choice = d && choiceFromInput(d, { text: body.text, keys: body.keys });
+        if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
+      }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
@@ -1198,9 +1209,18 @@ async function handle(req: Request): Promise<Response> {
         }
         case "/api/decide": {
           // You acted on a decision in the inbox: record it for Jev, and mark the session seen.
-          recordOutcome(String(body.key), String(body.action ?? ""), body.choice != null ? String(body.choice) : undefined);
+          recordOutcome(String(body.key), String(body.action ?? ""), body.choice != null ? String(body.choice) : undefined, decisions.get(String(body.key)));
           scheduleDecisions();
           return json({ ok: true });
+        }
+        case "/api/jev/stats": {
+          const u = jevUsage();
+          return json(statsFor(RECEIPTS_FILE, { cap: u.cap, used: u.calls, capSource: u.capSource, available: u.available, labels: cachedById() }));
+        }
+        case "/api/jev/cap": {
+          try { setJevCap(Number(body.cap)); } catch (e: any) { return json({ error: e.message }, 400); }
+          broadcast("jev", jevUsage());
+          return json({ ok: true, jev: jevUsage() });
         }
         case "/api/mcp-info":
           return json({ url: `http://127.0.0.1:${PORT}/mcp`, token: MCP_TOKEN, audit: readAudit(30), claude: `claude mcp add --scope user --transport http herdr-deck http://127.0.0.1:${PORT}/mcp --header "Authorization: Bearer ${MCP_TOKEN}"` });
