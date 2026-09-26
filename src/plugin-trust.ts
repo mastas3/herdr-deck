@@ -37,10 +37,11 @@ export const serviceName = (server: string) => server.replace(/^claude_ai_/, "")
 export function grantSentence(g: GrantDef): string {
   const parts = new Map<string, string[]>();
   const add = (head: string, what?: string) => { const l = parts.get(head) ?? []; if (what && !l.includes(what)) l.push(what); parts.set(head, l); };
+  const all = g.writes === true || g.tools.some((t) => toolClass(t).writes);
   for (const t of g.tools) {
     const mcp = /^mcp__(.+?)__(.+)$/.exec(t);
     const scoped = /^Bash\((.+):\*\)$/.exec(t);
-    if (mcp) add(`${toolClass(t).writes ? "Change things in" : "Read"} ${serviceName(mcp[1])}`, mcp[2].replace(/[_-]+/g, " "));
+    if (mcp) add(`${all || toolClass(t).writes ? "Change things in" : "Read"} ${serviceName(mcp[1])}`, mcp[2].replace(/[_-]+/g, " "));
     else if (scoped) add("Run commands on this machine", scoped[1].trim());
     else if (t === "Bash") add("Run any command on this machine");
     else if (t === "Write" || t === "Edit") add("Change files on this machine");
@@ -122,9 +123,9 @@ export function diffBundles(old: Bundle, next: Bundle): Diff {
     if (!same(x.grants, y.grants) || !same(x.machine, y.machine)) return { text: `Source "${y.id}" now uses ${and(y.grants)}${y.machine === "other" ? " on your other machine" : ""}`, approve: true };
     return pa(x.prompt) !== pb(y.prompt) ? { text: `Source "${y.id}": prompt changed`, approve: false } : null;
   });
-  walk(a.actions, b.actions, (x) => `action "${x.label}"`, (y) => y.mode === "draft", (x, y) => {
+  walk(a.actions, b.actions, (x) => `action "${x.label}"`, () => true, (x, y) => {
     if (x.mode !== y.mode || !same(x.grants, y.grants)) return { text: `Action "${y.label}" now ${y.mode === "draft" ? `sends with ${and(y.grants ?? [])}` : "opens a session"}`, approve: true };
-    return pa(x.prompt) !== pb(y.prompt) ? { text: `Action "${y.label}": prompt changed`, approve: false } : null;
+    return pa(x.prompt) !== pb(y.prompt) ? { text: `Action "${y.label}": prompt changed`, approve: y.mode === "session" } : null;
   });
   walk(a.views, b.views, (v) => `view ${v.title}`, () => false, () => null);
   walk(a.recipes, b.recipes, (r) => `recipe ${r.title}`, () => false, (x, y) => (pa(x.prompt) !== pb(y.prompt) ? { text: `Recipe ${y.title}: prompt changed`, approve: false } : null));

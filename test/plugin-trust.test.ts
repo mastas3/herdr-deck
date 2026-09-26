@@ -18,6 +18,10 @@ const base = () => ({
   projects: [{ id: "studio", name: "Studio", folder: "demo-studio", repo: { url: "https://github.com/acme/studio", ref: "a".repeat(40) } }],
   roles: [{ id: "writer", project: "studio", title: "Writer", agent: "claude", model: "sonnet", prompt: "prompts/writer.md" }],
   schedules: [{ id: "daily", every: "weekday 09:00", role: "writer", prompt: "Plan the day" }],
+  actions: [
+    { id: "draft-send", label: "Send", mode: "draft", draftSchema: { type: "object" }, grants: ["mail.send"], prompt: "Compose a reply" },
+    { id: "session-compose", label: "Compose", mode: "session", prompt: "Help me draft a mail" },
+  ],
 });
 
 describe("wording", () => {
@@ -38,6 +42,7 @@ describe("wording", () => {
     expect(grantSentence({ tools: ["mcp__claude_ai_Gmail__reply"] })).toBe("Change things in Gmail (reply)");
     expect(grantSentence({ tools: ["Bash(gh search prs:*)"] })).toBe("Run commands on this machine (gh search prs)");
     expect(grantSentence({ tools: ["WebFetch", "Read"] })).toBe("Fetch web pages; Read files on this machine");
+    expect(grantSentence({ tools: ["mcp__claude_ai_acme_service__get_report"], writes: true })).toBe("Change things in acme service (get report)");
   });
 });
 
@@ -83,10 +88,29 @@ describe("diffBundles", () => {
     b.schedules[0].every = "day 06:00";
     b.projects[0].repo.ref = "b".repeat(40);
     delete b.grants["mail.send"];
+    b.actions = b.actions.filter((a: any) => a.label !== "Send"); // remove the draft action that references mail.send
     const d = diffBundles(bundle(base(), files), bundle(b, files));
     expect(d.changes).toContainEqual({ text: `No longer asks to: Change things in Gmail (reply)`, approve: false });
     expect(d.changes).toContainEqual({ text: `Schedule "daily" changes: when (every day at 06:00)`, approve: true });
     expect(d.changes).toContainEqual({ text: `Project Studio now clones https://github.com/acme/studio at bbbbbbbbbbbb`, approve: true });
     expect(d.needsApproval).toBe(true);
+  });
+  test("session action whose prompt changes needs approval", () => {
+    const b: any = base(); b.version = "1.0.1"; b.actions[1].prompt = "Help me draft a mail carefully";
+    const d = diffBundles(bundle(base(), files), bundle(b, files));
+    expect(d.changes).toContainEqual({ text: `Action "Compose": prompt changed`, approve: true });
+    expect(d.needsApproval).toBe(true);
+  });
+  test("a newly added session action needs approval", () => {
+    const b: any = base(); b.actions.push({ id: "new-session", label: "Review", mode: "session", prompt: "Review the draft" });
+    const d = diffBundles(bundle(base(), files), bundle(b, files));
+    expect(d.changes).toContainEqual({ text: `New action "Review"`, approve: true });
+    expect(d.needsApproval).toBe(true);
+  });
+  test("draft action whose prompt changes doesn't need approval", () => {
+    const b: any = base(); b.actions[0].prompt = "Compose a better reply";
+    const d = diffBundles(bundle(base(), files), bundle(b, files));
+    expect(d.changes).toContainEqual({ text: `Action "Send": prompt changed`, approve: false });
+    expect(d.needsApproval).toBe(false);
   });
 });
