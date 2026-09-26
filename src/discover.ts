@@ -7,7 +7,9 @@
 // Network work never blocks a request for long: cached data is returned at once and refreshed in the background.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { collectIngredients, createMixer, forYouIngredients, KIND_LABEL, sanitizeIngredient, type ConnLite, type Engine, type Ingredient, type Mix, type MixerDeps } from "./mix";
+import { collectIngredients, createMixer, KIND_LABEL, sanitizeIngredient, type ConnLite, type Engine, type Ingredient, type Mix, type MixerDeps } from "./mix";
+import { createStudio, type StudioDeps } from "./studio";
+import { createFeed, type FeedDeps } from "./feed";
 
 const HOME = homedir();
 const DAY = 86_400_000;
@@ -648,7 +650,7 @@ const TREND_TTL = 12 * 3600_000;
 const SEARCH_GAP = 350;
 
 export type ItemsDep = () => Promise<{ items: ConnLite[]; categories?: { id: string; label: string }[] }>;
-export function createDiscover(paths: DiscoverPaths, deps: { connections?: () => Promise<string[]>; items?: ItemsDep; rows?: () => RowLite[]; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; gap?: number; mixer?: Partial<MixerDeps> } = {}) {
+export function createDiscover(paths: DiscoverPaths, deps: { connections?: () => Promise<string[]>; items?: ItemsDep; rows?: () => RowLite[]; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; gap?: number; mixer?: Partial<MixerDeps>; studio?: Partial<StudioDeps>; feed?: Partial<FeedDeps> } = {}) {
   const run = deps.gh ?? gh;
   const GAP = deps.gap ?? SEARCH_GAP;
   const CONF = `${paths.dataDir}/discover.json`;
@@ -768,6 +770,10 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     return { list: collectIngredients({ profile: p, gems, trending, saved: conf.saved, items: items?.items, catLabels: items?.labels }), connLoading: !!deps.items && !items };
   }
   const byId = (xs: Ingredient[]) => new Map(xs.map((x) => [x.id, x]));
+  // Studio: the chat that assembles builds out of all of it (src/studio.ts). Conversations in <dataDir>/studio/.
+  // "Ideas for you": the feed of ready-to-execute ideas on For you (src/feed.ts), cached for the day in <dataDir>/feed.json.
+  const feed = createFeed({ file: `${paths.dataDir}/feed.json`, ingredients: async (w) => (await ingredients(w)).list, ...deps.feed });
+  const studio = createStudio({ dir: `${paths.dataDir}/studio`, projectsDir: paths.projectsDir, ingredients: async (w) => (await ingredients(w)).list, engines: () => mixer.engines(), ...deps.studio });
 
   async function state(body: { refresh?: boolean; shuffle?: number } = {}) {
     const p = await profile(!!body.refresh);
@@ -779,12 +785,9 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     if (body.refresh || stale || missing || retry) refresh(!!body.refresh);
     const { gems, trending } = ranked(p);
     const day = Math.floor(Date.now() / DAY);
-    // "Mixes for you": templates at once, a model's mixes once a day (started here, i.e. only when Discover is open).
-    await Promise.race([loadItems(), Bun.sleep(1500)]);
-    const ings = collectIngredients({ profile: p, gems, trending, saved: conf.saved, items: items?.items, catLabels: items?.labels });
-    const forYou = mixer.daily(forYouIngredients(ings, day), Date.now(), !!deps.items && !items);
+    // "Ideas for you" is its own route (/api/discover/feed): generated in batches, at most once a day, only when Discover is open.
     return {
-      mixes: { forYou, saved: conf.mixes ?? [] },
+      mixes: { saved: conf.mixes ?? [] },
       profile: { interests: p.interests, removed: p.removed.map(({ id, label }) => ({ id, label })), languages: p.languages, connections: p.connections, recent: p.recent, counts: p.counts, projects: p.projects.slice(0, 40).map(({ name, status }) => ({ name, status })) },
       gems, trending, sparks: sparks(p, gems, day + (Number(body.shuffle) || 0)),
       saved: conf.saved, dismissed: conf.dismissed.length, ideas: listIdeas(IDEAS, deps.rows?.() ?? [], conf.ideas),
@@ -836,6 +839,17 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     return { keywords, groups: groupByRole(repos), topics: c.topics, related, connections: conns.slice(0, 8), slug, cachedAt: c.at, prompt: researchPrompt(text, slug, { ...pctx, repos, projects: related, keywords }), cwd: paths.projectsDir };
   }
 
+  /** The execution-ready plan fields of a saved build, cleaned (only what's there). */
+  function planOf(m: any) {
+    const str = (v: unknown, n: number) => (v == null || v === "" ? undefined : String(v).slice(0, n));
+    const arr = (v: unknown, n: number, max: number) => (Array.isArray(v) && v.length ? v.slice(0, max).map((x) => String(x).slice(0, n)) : undefined);
+    const out: Record<string, unknown> = {
+      customer: str(m.customer, 200), problem: str(m.problem, 220), offer: str(m.offer, 220), price: str(m.price, 120), model: str(m.model, 60), cost: str(m.cost, 100), first_dollar: str(m.first_dollar, 80),
+      money: str(m.money, 160), project: str(m.project, 80), row: str(m.row, 20), mvp: arr(m.mvp, 160, 6), launch: arr(m.launch, 220, 5), week: arr(m.week, 180, 7), risks: arr(m.risks, 180, 4), extra: arr(m.extra, 60, 3),
+    };
+    for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+    return out;
+  }
   async function handle(path: string, body: any): Promise<any> {
     switch (path) {
       case "/api/discover": return state(body);
@@ -903,6 +917,21 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
         const model = engine === "ollama" && body.model ? String(body.model).slice(0, 80) : undefined;
         return body.peek ? mixer.peek(uniq, direction, engine, model) : mixer.mix(uniq, direction, engine, model, !!body.force);
       }
+      case "/api/discover/feed": {
+        if (body.op === "more") feed.more(body.row ? String(body.row) : undefined);
+        else if (body.op === "refresh") feed.refresh();
+        else feed.ensure();
+        return feed.state();
+      }
+      case "/api/discover/studio": return studio.home(body);
+      case "/api/discover/studio/convo": return studio.get(String(body.id ?? ""));
+      case "/api/discover/studio/send": return studio.send(body);
+      case "/api/discover/studio/status": return studio.status(String(body.job ?? ""));
+      case "/api/discover/studio/stop": return studio.stop(String(body.job ?? ""));
+      case "/api/discover/studio/rename": return studio.rename(String(body.id ?? ""), String(body.title ?? ""));
+      case "/api/discover/studio/delete": return studio.remove(String(body.id ?? ""));
+      case "/api/discover/studio/dice": return studio.dice(Number(body.seed), !!body.wild);
+      case "/api/discover/studio/build-prompt": return studio.buildPrompt(body.build ?? {});
       case "/api/discover/mix-status": return mixer.status(String(body.id ?? ""));
       case "/api/discover/mix-cancel": return mixer.cancel(String(body.id ?? ""));
       case "/api/discover/mix-save": {
@@ -912,10 +941,12 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
         if (body.op === "save") {
           const clean = (v: unknown, n: number) => String(v ?? "").slice(0, n);
           const keep = {
-            id, title: clean(m.title, 90), pitch: clean(m.pitch, 260), ingredients: (m.ingredients ?? []).slice(0, 4).map((x: unknown) => clean(x, 80)), ids: (m.ids ?? []).slice(0, 4).map((x: unknown) => clean(x, 160)),
-            how: (m.how ?? []).slice(0, 4).map((h: any) => ({ name: clean(h?.name, 80), role: clean(h?.role, 200) })), why_novel: clean(m.why_novel, 260), first_steps: (m.first_steps ?? []).slice(0, 3).map((x: unknown) => clean(x, 200)),
+            id, title: clean(m.title, 90), pitch: clean(m.pitch, 260), ingredients: (m.ingredients ?? []).slice(0, 6).map((x: unknown) => clean(x, 80)), ids: (m.ids ?? []).slice(0, 6).map((x: unknown) => clean(x, 160)),
+            how: (m.how ?? []).slice(0, 6).map((h: any) => ({ name: clean(h?.name, 80), role: clean(h?.role, 200) })), why_novel: clean(m.why_novel, 260), first_steps: (m.first_steps ?? []).slice(0, 3).map((x: unknown) => clean(x, 200)),
             difficulty: ["weekend", "week", "month"].includes(m.difficulty) ? m.difficulty : "week", wow: Math.max(1, Math.min(5, Number(m.wow) || 3)), source: ["claude", "ollama", "template"].includes(m.source) ? m.source : "template",
             direction: body.direction ? clean(body.direction, 200) : undefined, savedAt: Date.now(),
+            // A Studio or feed build keeps its plan (customer, price, MVP, launch, first week…), so it stays ready to execute.
+            ...planOf(m),
           } as DiscoverConf["mixes"] extends (infer T)[] | undefined ? T : never;
           conf.mixes = [keep, ...(conf.mixes ?? []).filter((x) => x.id !== id)].slice(0, 200);
         } else if (body.op === "unsave") conf.mixes = (conf.mixes ?? []).filter((x) => x.id !== id);
@@ -941,5 +972,5 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     }
     return undefined;
   }
-  return { handle, refresh, profile, state, ingredients, mixer, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
+  return { handle, refresh, profile, state, ingredients, mixer, studio, feed, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); feed.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
 }

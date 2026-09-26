@@ -232,21 +232,38 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
     New session dialog with a prompt to clone it and judge how to build on it; Save and Dismiss are remembered.
     A **Trending in your areas** row shows new repos climbing fast. Results are cached for hours
     (`~/.config/herdr-deck/discover-cache.json`), refreshed in the background, and marked when stale.
-    **Mixes for you** (near the top): 4–6 ideas combined from your strongest interests, liveliest projects, a
-    couple of gems and ready connections. Quick template mixes show at once; a model mixes a better set in the
-    background at most once a day, and only when you open Discover. **Open in mixer** or **Research & plan it**.
-  - **Mix:** pick ingredients (your projects, gems and trending repos, connections and services by store
-    category, tools and skills, interests; ready ones by default, a toggle shows all) with search, **Surprise me**
-    and Clear, add an optional direction ("make money", "for my HD audience", "weekend hack"…) and press **Mix**.
-    Six mixes stream in as cards: title, pitch, colored ingredient chips, what each part contributes, why it's new,
-    first three steps, size (weekend/week/month) and a wow score. **Research & plan it** opens the same prefilled
-    research dialog as the Idea lab; **Remix** mixes the card's ingredients again; **Save** keeps it under Saved;
-    **Copy**. Gem cards have **Mix this** and the Connections store has **Mix these** for what you selected.
-    Engines: Claude Code headless (`claude -p`, Haiku, no tools, 60 s limit), any local Ollama model (nothing leaves
-    the machine), or instant templates. When a model is missing, slow or unreadable, template mixes fill in.
-    Only the names and one-line descriptions of what you picked, plus your direction, go to the model. Results are
-    cached by selection + direction + engine (`~/.config/herdr-deck/mix-cache.json`); your last pick is remembered
-    per device. Code: `src/mix.ts`.
+    **Ideas for you** (near the top): a feed of ready-to-execute businesses, apps and services made from what you
+    have, in rows: Make money this month, SaaS for your audience, Automations that sell, Content engines, Built from
+    your projects, Remix a gem, Weekend builds, Wild combos. Headless Claude (Haiku) writes it in batches, six calls in
+    parallel on the first view of the day, each seeded with different combinations of your things; ideas stream in
+    as they complete. Every idea passes a quality gate (a specific customer, a real price, an MVP your real inventory
+    can build, a launch plan, a first week of tasks, nothing generic), then a cheap critic pass scores them and drops
+    the weak ones; duplicates (same ingredients or nearly the same title) are dropped too. **More like this** asks
+    for one row again; **More ideas** (or reaching the end) asks for the next batch. A card shows the name, pitch,
+    price, time to first dollar and the stack; **Open plan** shows the whole plan: customer, problem, offer, pricing,
+    MVP scope, the stack mapped to your projects and connections, the first 10 customers, the first week, cost to run
+    and risks, with **Build it now**, **Research & plan it**, **Find users for it**, **Open in Studio**, Save and Copy.
+    Cached for the day in `~/.config/herdr-deck/feed.json`; templates only when no model answers at all. Code:
+    `src/feed.ts`.
+  - **Studio:** a chat that assembles things out of everything you have. Ask anything ("something for my HD audience
+    that makes money on autopilot", "what can I build this weekend?"); it answers in a sentence or two plus
+    execution-ready build cards (the same plan as the feed), a clarifying question with tappable answers when your
+    ask is ambiguous, and follow-up chips. Inventory names in an answer are chips: tap one to add it to your picks.
+    The first screen shows how much you have, **Dice** (a sensible random combo) and **Wildcard** (somewhere
+    unexpected), and a deck of starter prompts by intent (Make money, Grow an audience, Automate my life, Weird &
+    wonderful, Weekend hack, For my HD community, Ship something today, Remix a gem, Cross-machine power, Local &
+    private), filled with your real projects and connections; **Shuffle** deals new ones. **Ingredients** opens a
+    searchable picker (a side rail when there's room, a bottom sheet on a phone); what you pick rides along with your
+    next message. Every build has **Build it now** (the New session dialog, prefilled with a complete implementation
+    brief, in the project's folder or a new `~/Documents/Projects/<slug>`), **Research & plan it**, **Find users**,
+    **Riff on this**, Save and Copy. Nothing starts until you confirm the dialog. Conversations are kept in
+    `~/.config/herdr-deck/studio/` (the title menu lists, renames and deletes them). Engines: Claude Haiku (fast,
+    default), Claude Sonnet (deeper), any local Ollama model (private), or instant templates; answers stream, **Stop**
+    keeps what arrived, every run has a time limit and falls back to template combinations. Enter sends, Shift+Enter
+    starts a new line. The model sees a compact catalog of your inventory (names and one-liners, secrets redacted),
+    the recent turns and your message: no wiki pages, no secrets, no session content. "Mix this" on a gem, "Mix
+    these" in Connections and "Open in Studio" land in the Studio's picks. Code: `src/studio.ts`,
+    `src/studio-prompts.ts` (the prompts, the starter deck, Dice) and `src/mix.ts` (the engines and the combiner).
   - **Idea lab:** describe any idea. Enter searches GitHub for its building blocks (grouped by the role each
     could play) and topics, and shows which of your projects and connections fit. **Research & plan it** opens a
     new Claude Code session, prefilled, that researches what exists and writes a plan (architecture, the exact
@@ -254,7 +271,7 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
     **Sparks** are "what if" ideas combined from your interests, projects, connections and gems.
   - **Ideas:** the plans, rendered, with the session that wrote them and **Start building**.
   - Only interest keywords and the words of your idea go to GitHub. Nothing starts until you confirm the
-    dialog. Your chips, saves (repos and mixes) and dismissals live in `~/.config/herdr-deck/discover.json`.
+    dialog. Your chips, saves (repos, mixes and builds, with their plans) and dismissals live in `~/.config/herdr-deck/discover.json`.
 - **Simple mode** (Settings, or ⌘K): big type, only the essentials (no terminal, tool calls, meters or
   tabs), friendly status words, and cheerful colors tuned for every theme.
 - **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin

@@ -3056,7 +3056,7 @@ async function suggestProjects() {
 ICON.compass = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="m10.7 5.3-1.6 3.8-3.8 1.6 1.6-3.8z"/></svg>';
 ICON.bulb = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4h4M6.6 14.4h2.8M8 1.7a4.4 4.4 0 0 0-2.6 8c.4.3.6.8.6 1.3v.4h4V11c0-.5.2-1 .6-1.3A4.4 4.4 0 0 0 8 1.7z"/></svg>';
 S.disc = { data: null, loading: false, tab: load("discTab", "you"), filter: null, idea: load("discIdea", ""), ideaRes: null, ideaBusy: false, open: null, plans: new Map(), shuffle: 0, pending: null, more: false };
-const DTABS = [["you", "For you"], ["mix", "Mix"], ["lab", "Idea lab"], ["ideas", "Ideas"], ["saved", "Saved"]];
+const DTABS = [["you", "For you"], ["mix", "Studio"], ["lab", "Idea lab"], ["ideas", "Ideas"], ["saved", "Saved"]];
 const kfmt = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
 function dHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
@@ -3070,7 +3070,7 @@ async function loadDiscover(opts = {}) {
   S.disc.loading = false;
   if (S.mode !== "discover") return;
   // The mixer keeps its own regions up to date; a background refresh doesn't rebuild it (and the phone keyboard) mid-typing.
-  if (S.disc.tab !== "mix" || !$("dbody").querySelector("#mixtray")) renderDiscover();
+  if (S.disc.tab !== "mix" || !$("dbody").querySelector("#studio")) renderDiscover();
   // While GitHub is being searched, or today's mixes are being made, check back every few seconds.
   const fy = S.disc.data?.mixes?.forYou;
   if (S.disc.data?.refreshing || fy?.running || fy?.waiting) loadDiscover.t = setTimeout(() => { if (S.mode === "discover") loadDiscover(); }, 3000);
@@ -3110,8 +3110,8 @@ function renderDiscover() {
   const tab = S.disc.tab;
   const nIdeas = d?.ideas?.length ?? 0, nSaved = (d?.saved?.length ?? 0) + (d?.mixes?.saved?.length ?? 0);
   const tabs = DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("");
-  // The mixer, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
-  if (tab === "mix" && d && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #mixtray")) {
+  // The Studio, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
+  if (tab === "mix" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #studio")) {
     const nav = $("dbody").querySelector(".dtabs");
     if (nav) setHTML(nav, tabs);
     return mixPatch();
@@ -3119,14 +3119,14 @@ function renderDiscover() {
   const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Repos worth forking, picked for what you build. Any idea, searched against what already exists and planned by an agent.</p>
     <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
-  if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
+  if (tab === "mix") body = discMix(); // the Studio paints at once from its own cache; it doesn't wait for Discover's data
+  else if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
-  else if (tab === "mix") body = discMix();
   else if (tab === "ideas") body = discIdeas(d);
   else if (tab === "saved") body = discSaved(d, nSaved);
   else body = discForYou(d);
-  const ta = document.activeElement?.matches?.("[data-didea], [data-mixdir], [data-mixq]") ? document.activeElement : null;
-  const taSel = ta ? [...["didea", "mixdir", "mixq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
+  const ta = document.activeElement?.matches?.("[data-didea], [data-stq], [data-stdq]") ? document.activeElement : null;
+  const taSel = ta ? [...["didea", "stq", "stdq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
   // Cards animate in when a tab (or a new idea result) first appears, not on every background update.
   const animKey = `${tab}|${S.disc.ideaRes?.text ?? ""}|${!!d}`;
   const calm = S.disc.animKey === animKey && $("dbody")._mode === "discover";
@@ -3139,7 +3139,7 @@ function renderDiscover() {
   $("dbody").querySelectorAll(".dstrip").forEach((x, i) => { if (strips[i]) x.scrollLeft = strips[i]; });
   $("dbody").querySelector(":scope > .view")?.classList.toggle("calm", calm);
   if (taSel) { const t = $("dbody").querySelector(taSel[0]); t?.focus(); try { t?.setSelectionRange(taSel[1], taSel[2]); } catch {} }
-  if (tab === "mix" && d && !S.disc.mix.ings && !S.disc.mix.loading) mixEnter();
+  if (tab === "mix") { mixPatch("log", "drawer"); if (!S.disc.mix.ings && !S.disc.mix.loading) mixEnter(); }
 }
 function discForYou(d) {
   const p = d.profile;
@@ -3302,7 +3302,7 @@ $("dbody").addEventListener("click", async (e) => {
   const g = gemBy(card.dataset.gfull);
   if (!g) return;
   if (t.closest("[data-gfork]")) return discStart("fork", { repo: g }, `Fork & explore ${g.full}`);
-  if (t.closest("[data-gmix]")) return mixOpenWith([{ id: `r:${g.full}`, kind: "repo", name: g.full, desc: g.desc ?? "" }], { add: true, toastText: `Added ${g.full} to the mixer` });
+  if (t.closest("[data-gmix]")) return mixOpenWith([{ id: `r:${g.full}`, kind: "repo", name: g.full, desc: g.desc ?? "" }], { add: true, toastText: `Added ${g.full} to your Studio picks` });
   if (t.closest("[data-gsave]")) { await discRepo(isSaved(g.full) ? "unsave" : "save", g); toast(isSaved(g.full) ? `Saved ${g.full}` : `Removed ${g.full} from Saved`); return renderDiscover(); }
   if (t.closest("[data-gdis]")) {
     card.classList.add("gone");
@@ -3322,41 +3322,72 @@ $("dbody").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ideaResearch(e.target.value); }
   else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ideaSearch(e.target.value); }
 });
-// ── Mixer: pick projects, repos, connections, tools and interests; get ideas only that mix makes possible ──
-// Server side: src/mix.ts. The model sees only the names and one-line descriptions you pick, plus your direction.
-S.disc.mix = { sel: load("mixSel", []), dir: load("mixDir", ""), engine: load("mixEngine", "claude"), q: "", all: false, ings: null, engines: null, connLoading: false, loading: false, job: null, res: null, open: new Set(), seen: new Set(), more: new Set(), peeked: "" };
+// ── Studio: a chat that assembles builds out of everything you have ──────────────────────────
+// Server side: src/studio.ts (conversations, jobs, block parsing) and src/studio-prompts.ts (the assembler prompt,
+// the starter deck, Dice). The tray of picked ingredients is the Mixer's selection (S.disc.mix.sel), so "Mix this" on
+// a gem, "Mix these" in Connections and "Open in Studio" on a mix all land here. The model sees names and one-liners.
+S.disc.mix = { sel: load("mixSel", []), q: "", all: false, ings: null, engines: null, connLoading: false, loading: false, open: new Set(), seen: new Set(), more: new Set() };
 const MIX_KINDS = [["project", "Your projects"], ["repo", "Gems & trending"], ["conn", "Connections & services"], ["tool", "Tools & skills"], ["interest", "Interests"]];
 const MIX_PREFIX = { p: "project", r: "repo", c: "conn", t: "tool", i: "interest" };
 const mixKindOf = (id) => MIX_PREFIX[String(id)[0]] ?? "conn";
-const MIX_DIRS = ["make money", "for my HD audience", "weekend hack", "privacy-first", "wow on a phone", "runs itself"];
 const MIX_DIFF = { weekend: "Weekend", week: "A week", month: "A month" };
 const MIX_TOOL_CATS = new Set(["ai", "mcp", "skills"]);
 const ingLite = (x) => ({ id: String(x.id), kind: x.kind, name: String(x.name), desc: String(x.desc ?? "").slice(0, 140) });
 const mixIsSel = (id) => S.disc.mix.sel.some((x) => x.id === id);
 function mixSetSel(sel) { S.disc.mix.sel = sel.slice(0, 16); store("mixSel", S.disc.mix.sel); }
-function mixEngineParts() { const e = S.disc.mix.engine; return e.startsWith("ollama:") ? ["ollama", e.slice(7)] : [e, undefined]; }
 function mixEngineLabel(engine, model) { return engine === "ollama" ? `Ollama · ${model ?? "local"}` : engine === "template" ? "templates" : `Claude${model ? ` ${model[0].toUpperCase()}${model.slice(1)}` : ""}`; }
-/** The mixer regions update in place, so typing in the direction or search box never loses the keyboard. */
+
+Object.assign(ICON, {
+  dice: TI2('<rect x="2.5" y="2.5" width="11" height="11" rx="2.6"/><circle cx="5.6" cy="5.6" r=".55" fill="currentColor"/><circle cx="8" cy="8" r=".55" fill="currentColor"/><circle cx="10.4" cy="10.4" r=".55" fill="currentColor"/>'),
+  wild: TI2('<path d="M8 1.8 9.3 6.7 14.2 8 9.3 9.3 8 14.2 6.7 9.3 1.8 8 6.7 6.7z"/><path d="M13 1.8v2.4M11.8 3h2.4"/>'),
+  send: TI2('<path d="M8 13.2V3M3.6 7.4 8 3l4.4 4.4"/>'),
+  stop: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.6"/></svg>',
+  shuffle: TI2('<path d="M2 4.6h2.3c3.6 0 3.8 6.8 7.4 6.8H14M2 11.4h2.3c1.3 0 2.1-.9 2.8-2.1M9 6.7c.7-1.2 1.5-2.1 2.8-2.1H14M12.2 2.8 14 4.6l-1.8 1.8M12.2 9.6l1.8 1.8-1.8 1.8"/>'),
+  chat: TI2('<path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 13.5 4v5.5A1.5 1.5 0 0 1 12 11H7l-3 2.5V11a1.5 1.5 0 0 1-1.5-1.5z"/>'),
+  pencil: TI2('<path d="m10.2 2.8 3 3-7.7 7.7H2.5v-3z"/>'),
+  trash: TI2('<path d="M2.8 4.3h10.4M6.3 4.3V2.8h3.4v1.5M4.2 4.3l.6 9h6.4l.6-9"/>'),
+  copy: TI2('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.9a1.4 1.4 0 0 0-1.4-1.4H3.9a1.4 1.4 0 0 0-1.4 1.4v5.2a1.4 1.4 0 0 0 1.4 1.4h1.6"/>'),
+  coin: TI2('<circle cx="8" cy="8" r="5.8"/><path d="M9.9 6.1c-.3-.7-1-1.1-1.9-1.1-1.1 0-1.9.6-1.9 1.5 0 2.1 3.9 1.1 3.9 3.1 0 .9-.9 1.5-2 1.5-.9 0-1.7-.4-2-1.2M8 4v1M8 11v1"/>'),
+});
+S.studio = {
+  home: load("studioHome", null), cur: load("studioConvo", null), job: null, engine: load("studioEngine", "claude:haiku"),
+  intent: load("studioIntent", "all"), seed: load("studioSeed", 0), dk: load("studioKind", "project"),
+  drawer: false, menu: false, more: false, wide: false, savedIds: new Map(), t: {}, homeLoading: false,
+};
+const ST_SHORT = { project: "Projects", repo: "Gems", conn: "Services", tool: "Tools", interest: "Interests" };
+const stEngineParts = () => { const e = S.studio.engine; const i = e.indexOf(":"); return i < 0 ? [e, undefined] : [e.slice(0, i), e.slice(i + 1)]; };
+const stView = () => $("dbody").querySelector(":scope > .view");
+const stReduce = () => reduceMotion.matches;
+const stSaved = (id) => (S.studio.savedIds.has(id) ? S.studio.savedIds.get(id) : mixSaved(id));
+
+/** Studio is patched region by region once on screen, so the message box and the drawer's search are never rebuilt under your fingers. */
 function mixPatch(...ids) {
   if (S.mode !== "discover" || S.disc.tab !== "mix") return;
-  const view = $("dbody").querySelector(":scope > .view");
-  const f = { mixtray: mixTrayHTML, mixopts: mixOptsHTML, mixres: mixResHTML, mixlist: mixListHTML };
-  let n = 0;
-  for (const id of ids.length ? ids : Object.keys(f)) {
-    const el = view?.querySelector(`#${id}`);
-    if (!el) continue;
-    n++;
-    const prog = id === "mixres" && S.disc.mix.job && el.querySelector(".mixprog");
-    if (prog) { const st = prog.querySelector(".mstage"); if (st.textContent !== (S.disc.mix.job.stage ?? "")) st.textContent = S.disc.mix.job.stage ?? ""; setHTML(el.querySelector("#mixgrid"), mixGridHTML(S.disc.mix.job.mixes ?? [])); }
-    else setHTML(el, f[id]());
-  }
-  if (!n) return renderDiscover();
-  if (view) view._h = null; // the whole-view cache no longer matches what's on screen
+  const view = stView();
+  const root = view?.querySelector("#studio");
+  if (!root) return renderDiscover();
+  stSizes(root);
+  const all = !ids.length, has = (k) => all || ids.includes(k);
+  if (has("bar")) setHTML(root.querySelector("#stbar"), stBarHTML());
+  if (has("log")) stRenderLog(root.querySelector("#stlog"));
+  if (has("tray")) setHTML(root.querySelector("#sttray"), stTrayHTML());
+  if (has("act")) setHTML(root.querySelector("#stact"), stActHTML());
+  if (has("drawer")) stRenderDrawer(root);
+  view._h = null; // the whole-view cache no longer matches what's on screen
 }
-async function mixEnter() {
+/** The chat fills the visible height (the composer sits at the bottom even when the log is short); the rail is as tall as the view. */
+function stSizes(root) {
+  const box = $("dbody");
+  const top = root.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  root.style.setProperty("--stmin", `${Math.max(320, Math.round(box.clientHeight - top))}px`);
+  root.style.setProperty("--dbh", `${box.clientHeight}px`);
+}
+function mixEnter() {
   const m = S.disc.mix;
   if (!m.ings && !m.loading) loadMixIngs();
-  mixPeek();
+  loadStudioHome();
+  const cur = S.studio.cur;
+  if (cur?.id && !S.studio.job) stOpen(cur.id, { quiet: true });
 }
 async function loadMixIngs(wait) {
   const m = S.disc.mix;
@@ -3368,132 +3399,75 @@ async function loadMixIngs(wait) {
     // Fresher descriptions for what's already picked.
     const by = new Map(m.ings.map((x) => [x.id, x]));
     mixSetSel(m.sel.map((x) => (by.has(x.id) ? ingLite(by.get(x.id)) : x)));
-    if (m.engine === "claude" && !m.engines.claude) m.engine = m.engines.ollama[0] ? `ollama:${m.engines.ollama[0]}` : "template";
   } catch (e) { toast(e.message, true); }
   m.loading = false;
-  mixPatch();
+  mixPatch("drawer", "bar");
   // The connections scan wasn't done yet: ask once more, waiting longer.
   if (m.connLoading && !wait) setTimeout(() => { if (S.mode === "discover") { m.ings && (m.connLoading = false); loadMixIngs(9000); } }, 800);
 }
-/** Show the cached result for this exact selection, direction and engine, if there is one. */
-async function mixPeek() {
-  const m = S.disc.mix;
-  if (m.sel.length < 2 || m.job) return;
-  const [engine, model] = mixEngineParts();
-  const sig = JSON.stringify([m.sel.map((x) => x.id).sort(), m.dir.trim().toLowerCase(), m.engine]);
-  if (m.peeked === sig) return;
-  m.peeked = sig;
-  try { const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, peek: true }, 8000); if (r.cached && !m.job) { m.res = { ...r.result, cached: true }; mixPatch("mixres"); } } catch {}
-}
-async function mixStart(force = false) {
-  const m = S.disc.mix;
-  if (m.sel.length < 2) { toast("Pick at least two ingredients", true); return; }
-  if (m.job) return;
-  const [engine, model] = mixEngineParts();
-  m.job = { status: "running", stage: "Starting…", mixes: [], engine, model, t0: Date.now() };
-  mixPatch("mixres", "mixtray");
-  const res = $("dbody").querySelector("#mixres");
-  if (res && res.getBoundingClientRect().top > innerHeight * 0.6) res.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+async function loadStudioHome(wait) {
+  const st = S.studio;
+  if (st.homeLoading) return;
+  st.homeLoading = true;
+  let again = false;
   try {
-    const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, force }, 15_000);
-    if (r.cached) { m.job = null; m.res = { ...r.result, cached: true }; }
-    else { m.job = { ...r.job, t0: m.job.t0 }; m.peeked = ""; mixPoll(); }
-  } catch (e) { m.job = null; toast(e.message, true); }
-  mixPatch("mixres", "mixtray");
+    const r = await api("/api/discover/studio", { seed: st.seed || undefined, wait }, 25_000);
+    // The connections scan wasn't done: keep the cached deck on screen and ask once more, waiting longer.
+    if (!r.partial || !st.home || st.home.partial) { st.home = r; store("studioHome", r); } else if (st.home) st.home.convos = r.convos;
+    again = r.partial && !wait;
+  } catch (e) { if (!st.home) toast(e.message, true); }
+  st.homeLoading = false;
+  stView()?.querySelector(".stdeck.shuf")?.classList.remove("shuf");
+  mixPatch("bar", "log");
+  if (again) loadStudioHome(12_000);
 }
-async function mixPoll() {
-  const m = S.disc.mix;
-  clearTimeout(mixPoll.t);
-  if (!m.job?.id) return;
-  const id = m.job.id;
-  try {
-    const j = await api("/api/discover/mix-status", { id }, 8000);
-    if (m.job?.id !== id) return;
-    if (j.status === "running") m.job = { ...j, t0: m.job.t0 };
-    else {
-      if (j.mixes.length) m.res = { mixes: j.mixes, note: j.status === "cancelled" ? "Stopped: these arrived before you cancelled." : j.note, engine: j.engine, model: j.model, ms: j.elapsed };
-      else if (j.status === "cancelled") toast("Mix cancelled");
-      m.job = null;
-    }
-  } catch (e) { if (m.job?.id === id) { toast(e.message, true); m.job = null; } }
-  mixPatch("mixres", "mixtray");
-  if (m.job) mixPoll.t = setTimeout(mixPoll, 650);
-}
-async function mixCancel() {
-  const m = S.disc.mix;
-  const id = m.job?.id;
-  if (!id) { m.job = null; return mixPatch("mixres", "mixtray"); }
-  try { await api("/api/discover/mix-cancel", { id }, 5000); } catch {}
-  mixPoll();
-}
-function mixSurprise() {
-  const m = S.disc.mix;
-  if (!m.ings) return;
-  const pick = (xs) => xs[Math.floor(Math.random() * xs.length)];
-  const of = (k, n) => m.ings.filter((x) => x.kind === k && x.ready).slice(0, n);
-  const pools = [of("project", 12), of("repo", 16), of("conn", 60), Math.random() < 0.5 ? of("tool", 60) : of("interest", 14)];
-  if (Math.random() < 0.4) pools.push(of("interest", 14));
-  const out = [];
-  for (const p of pools) { const x = p.length && pick(p); if (x && !out.some((y) => y.id === x.id)) out.push(ingLite(x)); }
-  mixSetSel(out);
-  m.res = null; m.peeked = "";
-  mixPatch("mixtray", "mixopts", "mixlist", "mixres");
-  mixPeek();
-}
-/** Put ingredients in the mixer (added to, or instead of, what's there) and open it. */
-function mixOpenWith(xs, { add = false, toastText } = {}) {
+/** Put ingredients in the Studio's tray (added to, or instead of, what's there) and open it; optionally with a message ready to send. */
+function mixOpenWith(xs, { add = false, toastText, text } = {}) {
   const m = S.disc.mix;
   const cur = add ? [...m.sel] : [];
   for (const x of xs) if (!cur.some((y) => y.id === x.id)) cur.push(ingLite(x));
   mixSetSel(cur);
-  m.peeked = "";
-  if (!add) m.res = null;
+  if (!add && S.studio.cur?.messages?.length) { S.studio.cur = null; S.studio.job = null; store("studioConvo", null); }
+  if (text != null) stSetDraft(text);
   S.disc.tab = "mix"; store("discTab", "mix");
   if (S.mode !== "discover") setMode("discover"); else { renderDiscover(); $("dbody").scrollTop = 0; }
-  mixSyncDir();
   mixEnter();
   if (toastText) toast(toastText);
 }
 const mixFromCard = (x) => x.ids.map((id, i) => { const k = S.disc.mix.ings?.find((y) => y.id === id); return k ? ingLite(k) : { id, kind: mixKindOf(id), name: x.ingredients[i] ?? id, desc: "" }; });
 function mixText(x) {
-  return [`${x.title}: ${x.pitch}`, "", `Ingredients: ${x.ingredients.join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`), x.why_novel ? `Why it’s new: ${x.why_novel}` : "", x.first_steps?.length ? `First steps:\n${x.first_steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", `Size: ${MIX_DIFF[x.difficulty] ?? x.difficulty} · wow ${x.wow}/5`].filter(Boolean).join("\n");
+  const plan = [x.customer ? `Customer: ${x.customer}` : "", x.problem ? `Problem: ${x.problem}` : "", x.offer ? `Offer: ${x.offer}` : "", x.price ? `Pricing: ${[x.price, x.model].filter(Boolean).join(" · ")}` : "", x.cost ? `Cost to run: ${x.cost}` : "", x.first_dollar ? `First dollar: ${x.first_dollar}` : "",
+    x.mvp?.length ? `MVP:\n${x.mvp.map((s) => `- ${s}`).join("\n")}` : "", x.launch?.length ? `First 10 customers:\n${x.launch.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", x.week?.length ? `First week:\n${x.week.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", x.risks?.length ? `Risks:\n${x.risks.map((s) => `- ${s}`).join("\n")}` : ""].filter(Boolean);
+  if (plan.length) return [`${x.title}: ${x.pitch}`, "", ...plan, "", `Stack: ${[...x.ingredients, ...(x.extra ?? []).map((e) => `${e} (new)`)].join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`)].join("\n");
+  return [`${x.title}: ${x.pitch}`, "", `Ingredients: ${[...x.ingredients, ...(x.extra ?? []).map((e) => `${e} (new)`)].join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`), x.why_novel ? `Why it’s worth it: ${x.why_novel}` : "", x.money ? `How it earns: ${x.money}` : "", x.first_steps?.length ? `First steps:\n${x.first_steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", `Size: ${MIX_DIFF[x.difficulty] ?? x.difficulty} · wow ${x.wow}/5`].filter(Boolean).join("\n");
 }
-/** "Research & plan it": the same research flow as the Idea lab, with the mix as the idea (the dialog opens prefilled; nothing starts before you confirm). */
+/** "Research & plan it": the same research flow as the Idea lab, with the build as the idea (the dialog opens prefilled; nothing starts before you confirm). */
 function mixResearch(x) {
-  const dir = x.direction ?? S.disc.mix.dir;
-  const text = `${x.title}: ${x.pitch} Combine ${x.how.map((h) => `${h.name} (${h.role})`).join("; ")}.${x.why_novel ? ` Why it’s new: ${x.why_novel}` : ""}${dir?.trim() ? ` Direction: ${dir.trim()}.` : ""} First steps I have in mind: ${x.first_steps.join("; ")}.`;
+  const how = (x.how ?? []).length ? x.how.map((h) => `${h.name} (${h.role})`).join("; ") : x.ingredients.join(", ");
+  const text = `${x.title}: ${x.pitch}${x.customer ? ` For: ${x.customer}.` : ""}${x.price ? ` Pricing: ${x.price}.` : ""}${x.mvp?.length ? ` MVP: ${x.mvp.join("; ")}.` : ""} Combine ${how}.${x.extra?.length ? ` New pieces: ${x.extra.join(", ")}.` : ""}${x.why_novel ? ` Why it’s worth it: ${x.why_novel}` : ""}${x.money ? ` How it earns: ${x.money}.` : ""}${x.direction?.trim() ? ` Direction: ${x.direction.trim()}.` : ""}${x.first_steps?.length ? ` First steps I have in mind: ${x.first_steps.join("; ")}.` : ""}`;
   const repos = x.ids.filter((id) => id.startsWith("r:")).map((id) => gemBy(id.slice(2)) ?? { full: id.slice(2), stars: "?" });
   const projects = x.ids.filter((id) => id.startsWith("p:")).map((id) => id.slice(2));
-  return discStart("research", { text, slug: x.title, repos, projects }, "Research & plan this mix");
+  return discStart("research", { text, slug: x.title, repos, projects }, "Research & plan this");
 }
-const allMixes = () => [...(S.disc.mix.res?.mixes ?? []), ...(S.disc.mix.job?.mixes ?? []), ...(S.disc.data?.mixes?.forYou?.mixes ?? []), ...(S.disc.data?.mixes?.saved ?? [])];
+const allMixes = () => [...(S.disc.data?.mixes?.forYou?.mixes ?? []), ...(S.disc.data?.mixes?.saved ?? [])];
 const mixSaved = (id) => (S.disc.data?.mixes?.saved ?? []).some((x) => x.id === id);
 async function mixSave(x) {
-  const op = mixSaved(x.id) ? "unsave" : "save";
+  const op = stSaved(x.id) ? "unsave" : "save";
   try {
-    const r = await api("/api/discover/mix-save", { op, mix: x, direction: x.direction ?? S.disc.mix.dir });
+    const r = await api("/api/discover/mix-save", { op, mix: x, direction: x.direction });
     if (S.disc.data) S.disc.data.mixes = { ...(S.disc.data.mixes ?? {}), saved: r.mixes };
+    S.studio.savedIds.set(x.id, op === "save");
     toast(op === "save" ? `Saved “${x.title}”` : `Removed “${x.title}” from Saved`);
   } catch (e) { toast(e.message, true); }
-}
-
-/** The direction box lives outside the patched regions: set it (and the suggestion chips) directly. */
-function mixSyncDir() {
-  const m = S.disc.mix;
-  const inp = $("dbody").querySelector("[data-mixdir]");
-  if (inp && inp.value !== m.dir) inp.value = m.dir;
-  for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
-  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
 }
 function mixCard(x, i, ctx) {
   const m = S.disc.mix;
   const seenKey = `${ctx}:${x.id}`;
   const fresh = !m.seen.has(seenKey);
   m.seen.add(seenKey);
-  const saved = mixSaved(x.id);
-  const acts = ctx === "fy" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>`
-    : ctx === "sv" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-mcopy>Copy</button><button class="btn ghost" data-msave aria-pressed="true">Remove</button>`
-    : `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mremix title="Keep these ingredients selected and mix again">Remix</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-mcopy>Copy</button>`;
+  const saved = stSaved(x.id);
+  const acts = ctx === "fy" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in Studio</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>`
+    : `${x.customer ? '<button class="btn primary" data-mview>Open plan</button><button class="btn ghost" data-mplan>Research &amp; plan it</button>' : '<button class="btn primary" data-mplan>Research &amp; plan it</button>'}<button class="btn ghost" data-mopen>Open in Studio</button><button class="btn ghost" data-mcopy>Copy</button><button class="btn ghost" data-msave aria-pressed="true">Remove</button>`;
   return `<article class="mixcard${fresh ? "" : " still"}" data-mix="${esc(x.id)}" style="--h:${dHue(x.title)};--i:${Math.min(i, 8)}">
     <h4>${esc(x.title)}</h4>
     <div class="mbadges"><span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" role="img" aria-label="Wow ${x.wow} of 5" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span>${x.source === "template" ? '<span class="msrc" title="From the quick template combiner, not a model">template</span>' : ""}</div>
@@ -3507,95 +3481,522 @@ function mixCard(x, i, ctx) {
     <div class="gacts">${acts}</div>
   </article>`;
 }
-function mixesForYou(d) {
-  const fy = d.mixes?.forYou;
-  if (!fy?.mixes?.length) return "";
-  const status = fy.running ? '<span class="spin"></span> mixing today’s set with Claude… these are quick picks meanwhile'
-    : fy.generated ? `from your top interests, projects, gems and connections · ${esc(mixEngineLabel(fy.engine, fy.model))}, ${esc(agoText(fy.at))}`
-    : "quick picks from your top interests, projects, gems and connections";
-  return `<h3 class="dsub">Mixes for you <span class="hint mfyst">${status}</span> <button class="link" data-dtab="mix">Open the mixer</button></h3>
-    <div class="dstrip mstrip">${fy.mixes.map((x, i) => mixCard(x, i, "fy")).join("")}</div>`;
+// ── "Ideas for you": the feed of ready-to-execute ideas on For you (server: src/feed.ts) ──────────────
+S.feed = { data: load("feedCache", null), loading: false, at: 0, auto: 0, t: null };
+const feedIdeas = () => (S.feed.data?.rows ?? []).flatMap((r) => r.ideas);
+async function loadFeed(op, row) {
+  const f = S.feed;
+  clearTimeout(f.t);
+  if (f.loading && !op) return;
+  f.loading = true;
+  try {
+    f.data = await api("/api/discover/feed", op ? { op, row } : {}, 20_000);
+    f.at = Date.now();
+    try { store("feedCache", f.data); } catch {}
+  } catch (e) { if (op) toast(e.message, true); }
+  f.loading = false;
+  feedPatch();
+  if (f.data?.running?.length) f.t = setTimeout(() => { if (S.mode === "discover") loadFeed(); }, 2500);
 }
-function mixChip(x) {
-  return `<button class="mchip k-${x.kind}${x.ready ? "" : " off"}" data-ing="${esc(x.id)}" aria-pressed="${mixIsSel(x.id)}" title="${esc([x.desc, x.ready ? "" : "not ready on this machine"].filter(Boolean).join(" · "))}">${esc(x.name)}</button>`;
+/** Only the feed's own region is redrawn while ideas stream in (the rest of For you, and where you swiped the rows to, stay put). */
+function feedPatch() {
+  if (S.mode !== "discover" || S.disc.tab !== "you") return;
+  const el = $("dbody").querySelector("#feed");
+  if (!el) return;
+  const strips = [...el.querySelectorAll(".fstrip")].map((x) => [x.dataset.row, x.scrollLeft]);
+  setHTML(el, feedInner());
+  for (const [row, left] of strips) { const x = el.querySelector(`.fstrip[data-row="${row}"]`); if (x && left) x.scrollLeft = left; }
+  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+  feedWatchEnd(el);
 }
-function mixTrayHTML() {
-  const m = S.disc.mix;
-  const n = m.sel.length;
-  // Only a chip that was just added animates in; redraws of the tray don't replay the others.
-  const fresh = m.justAdded; m.justAdded = null;
-  return `<div class="mtray" aria-label="Picked">${n ? m.sel.map((x) => `<span class="mpick k-${esc(x.kind)}${x.id === fresh ? " fresh" : ""}"><span>${esc(x.name)}</span><button data-mixrm="${esc(x.id)}" aria-label="Remove ${esc(x.name)}">${ICON.x}</button></span>`).join("") : '<span class="hint">Nothing picked yet: tap things below, or <button class="link" data-mixsurprise>Surprise me</button></span>'}</div>
-    <button class="btn primary mgo" data-mixgo ${n < 2 || m.job ? "disabled" : ""} title="${n < 2 ? "Pick at least two" : "Mix them"}">${m.job ? '<span class="spin"></span>Mixing' : `Mix${n ? ` ${n}` : ""}`}</button>`;
+function mixesForYou() {
+  const f = S.feed;
+  if (!f.loading && (!f.at || Date.now() - f.at > 60_000)) setTimeout(() => loadFeed(), 0);
+  setTimeout(() => feedWatchEnd($("dbody").querySelector("#feed")), 0);
+  return `<section class="feed" id="feed">${feedInner()}</section>`;
 }
-const mixGridHTML = (got) => `${got.map((x, i) => mixCard(x, i, "res")).join("")}${Array.from({ length: Math.max(0, 6 - got.length) }, () => '<div class="mixcard skel"></div>').join("")}`;
-function mixResHTML() {
-  const m = S.disc.mix;
-  const j = m.job;
-  // While mixing, the progress bar is drawn once and then only its words and clock change (mixPatch), so Cancel is always tappable.
-  if (j) return `<div class="mixprog" role="status"><span class="spin"></span><b>Mixing with ${esc(mixEngineLabel(j.engine, j.model))}</b><span class="hint mstage">${esc(j.stage ?? "")}</span><span class="mclock" data-since="${j.t0}">${clock(Date.now() - j.t0)}</span><span class="spacer"></span><button class="btn ghost" data-mixcancel>Cancel</button></div>
-      <div class="mgrid" id="mixgrid">${mixGridHTML(j.mixes ?? [])}</div>`;
-  const r = m.res;
-  if (!r) return `<p class="hint mempty">${m.sel.length < 2 ? "Pick two or more things below, add a direction if you like, then press <b>Mix</b>." : "Ready: press <b>Mix</b>."} Only the names and one-line descriptions of what you pick, and your direction, go to the model.</p>`;
-  const secs = r.ms ? `${(r.ms / 1000).toFixed(r.ms < 10_000 ? 1 : 0)}s` : "";
-  return `<div class="mixhead"><span><b>${r.mixes.length} mixes</b> · ${esc(mixEngineLabel(r.engine, r.model))}${r.cached ? ` · from cache${r.at ? `, ${esc(agoText(r.at))}` : ""}` : secs ? ` · ${secs}` : ""}</span><span class="spacer"></span><button class="btn ghost" data-mixagain ${m.sel.length < 2 ? "disabled" : ""}>Mix again</button></div>
-    ${r.note ? `<p class="mnote">${ICON.warn}${esc(r.note)}</p>` : ""}
-    <div class="mgrid">${r.mixes.map((x, i) => mixCard(x, i, "res")).join("")}</div>`;
+const feedKeys = (x) => `${x.price ? `<span class="fk price">${ICON.coin}${esc(x.price)}</span>` : ""}${x.first_dollar ? `<span class="fk first">First $ in ${esc(x.first_dollar.replace(/^(in|within)\s+/i, ""))}</span>` : ""}`;
+function feedCard(x, i) {
+  const saved = stSaved(x.id);
+  return `<article class="fcard" data-fid="${esc(x.id)}" style="--h:${dHue(x.title)};--i:${Math.min(i, 8)}" tabindex="0">
+    <h4>${esc(x.title)}</h4>
+    <p class="fpitch">${esc(x.pitch)}</p>
+    <div class="fkeys">${feedKeys(x)}${x.source === "template" ? '<span class="msrc">template</span>' : ""}</div>
+    <div class="mings">${x.ids.slice(0, 4).map((id, k) => `<span class="ming k-${mixKindOf(id)}">${esc(x.ingredients[k] ?? id)}</span>`).join("")}${x.ids.length > 4 ? `<span class="ming new">+${x.ids.length - 4}</span>` : ""}</div>
+    <div class="gacts"><button class="btn primary sm" data-fopen>Open plan</button><button class="btn ghost sm" data-fbuild>Build it now</button><button class="btn ghost sm" data-fsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button></div>
+  </article>`;
 }
-function mixListHTML() {
-  const m = S.disc.mix;
-  if (!m.ings) return `<div class="mchips">${Array.from({ length: 14 }, (_, i) => `<span class="mchip skel" style="width:${60 + ((i * 37) % 70)}px"></span>`).join("")}</div>`;
-  const q = m.q.trim().toLowerCase();
-  const match = (x) => !q || `${x.name} ${x.desc} ${x.group ?? ""}`.toLowerCase().includes(q);
-  const limit = (key, xs, n) => (q || m.more.has(key) || xs.length <= n + 2 ? xs : xs.slice(0, n));
-  const more = (key, xs, shown) => (xs.length > shown.length ? `<button class="mchip moremix" data-mixmore="${esc(key)}">+${xs.length - shown.length} more</button>` : "");
-  const out = [];
-  for (const [k, label] of MIX_KINDS) {
-    const all = m.ings.filter((x) => x.kind === k);
-    const xs = all.filter((x) => (m.all || x.ready || !["conn", "tool"].includes(k)) && match(x));
-    if (!xs.length && q) continue;
-    let body;
-    if (k === "conn" || k === "tool") {
-      const groups = new Map();
-      for (const x of xs) groups.set(x.group ?? "Other", [...(groups.get(x.group ?? "Other") ?? []), x]);
-      body = [...groups].map(([g, ys]) => { const shown = limit(`${k}:${g}`, ys, 10); return `<div class="mgrp"><span class="mgl">${esc(g)} <span class="n">${ys.length}</span></span><div class="mchips">${shown.map(mixChip).join("")}${more(`${k}:${g}`, ys, shown)}</div></div>`; }).join("");
-    } else { const shown = limit(k, xs, 18); body = `<div class="mchips">${shown.map(mixChip).join("")}${more(k, xs, shown)}</div>`; }
-    const nsel = m.sel.filter((x) => x.kind === k).length;
-    out.push(`<section class="mkind k-${k}"><h4><span class="kdot"></span>${esc(label)} <span class="n">${xs.length}${xs.length !== all.length && !q ? ` of ${all.length}` : ""}</span>${nsel ? `<span class="msel">${nsel} picked</span>` : ""}</h4>${xs.length ? body : `<p class="hint">${k === "repo" ? "No gems found yet: open For you and let it search GitHub." : (k === "conn" || k === "tool") && (m.connLoading || m.loading) ? '<span class="spin"></span> Scanning your connections…' : "Nothing here yet."}</p>`}</section>`);
-  }
-  return out.join("") || `<p class="hint">Nothing matches “${esc(m.q)}”.</p>`;
+function feedInner() {
+  const d = S.feed.data;
+  const running = d?.running?.length ?? 0;
+  const skel = (n) => Array.from({ length: n }, () => '<div class="fcard skel"></div>').join("");
+  const status = !d ? '<span class="spin"></span> Reading what you have…'
+    : running ? `<span class="spin"></span> Writing ideas from new combinations… ${d.total} so far`
+    : `${d.total} ready-to-build ideas${d.model ? ` · Claude ${esc(d.model[0].toUpperCase() + d.model.slice(1))}` : ""}${d.at ? ` · ${esc(agoText(d.at))}` : ""}${d.dropped ? ` · ${d.dropped} weak ones left out` : ""}`;
+  const rows = (d?.rows ?? []).filter((r) => r.ideas.length || r.pending || running);
+  return `<div class="fdh"><h3>Ideas for you</h3><span class="hint">${status}</span><span class="spacer"></span><button class="btn ghost sm" data-frefresh ${running ? "disabled" : ""} title="A fresh set of ideas from new combinations">${ICON.shuffle}Fresh set</button><button class="btn ghost sm" data-dtab="mix">${ICON.wild}Studio</button></div>
+    ${d?.errors?.length && !d.total ? `<p class="mnote">${ICON.warn}${esc(d.errors[0])}</p>` : ""}
+    ${!d ? Array.from({ length: 3 }, () => `<div class="frow"><div class="frh"><h4><span class="stsk w40"></span></h4></div><div class="dstrip fstrip">${skel(3)}</div></div>`).join("")
+      : rows.map((r) => `<div class="frow" style="--rh:${r.hue}"><div class="frh"><h4><i></i>${esc(r.label)} <span class="n">${r.ideas.length}</span></h4><span class="spacer"></span><button class="btn ghost sm" data-fmore="${esc(r.id)}" ${r.pending || running >= 5 ? "disabled" : ""}>${r.pending ? '<span class="spin"></span>Writing…' : "More like this"}</button></div>
+        <div class="dstrip fstrip" data-row="${esc(r.id)}">${r.ideas.map(feedCard).join("")}${r.pending ? skel(r.ideas.length ? 1 : 3) : ""}</div></div>`).join("")}
+    ${d ? `<div class="fend" id="fend"><button class="btn" data-fmore="" ${running >= 5 ? "disabled" : ""}>${running ? '<span class="spin"></span>Writing more ideas…' : `${ICON.plus}More ideas`}</button><span class="hint">Every batch is about a dozen new ideas from new combinations of what you have.</span></div>` : ""}`;
 }
-function mixOptsHTML() {
-  const m = S.disc.mix;
-  const e = m.engines;
-  const opts = [["claude", "Claude (fast, default)", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} (private, local)`]), ["template", "Templates (instant, offline)"]];
-  if (!opts.some(([v]) => v === m.engine)) opts.push([m.engine, m.engine]);
-  return `<label class="mixeng"><span class="hint">Engine</span><select class="inp" data-mixeng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === m.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select></label>
-    <span class="spacer"></span><button class="btn ghost" data-mixsurprise>Surprise me</button><button class="btn ghost" data-mixclear ${m.sel.length ? "" : "disabled"}>Clear</button>`;
+/** Endless: reaching the end asks for the next batch (a few times per visit at most: each batch is a model call). */
+let feedObs;
+function feedWatchEnd(el) {
+  const end = el?.querySelector("#fend");
+  if (!end || !("IntersectionObserver" in window)) return;
+  feedObs?.disconnect();
+  feedObs = new IntersectionObserver((es) => {
+    const f = S.feed;
+    if (!es.some((e) => e.isIntersecting) || f.loading || f.data?.running?.length || f.auto >= 3 || (f.data?.total ?? 0) >= 250 || $("dbody").scrollTop < 200) return;
+    f.auto++;
+    loadFeed("more");
+  }, { root: $("dbody"), rootMargin: "0px 0px 200px 0px" });
+  feedObs.observe(end);
 }
-function discMix() {
-  const m = S.disc.mix;
-  // The picked tray is a direct child of the view, so it stays stuck to the top the whole way down.
-  return `<p class="hint dlead mixlead">Pick things you have or found: projects, repos, connections, tools, interests. Get ideas only that combination makes possible.</p>
-      <div class="mixbar" id="mixtray">${mixTrayHTML()}</div>
-      <div class="mixctl">
-        <input class="inp mixdir" data-mixdir type="text" enterkeyhint="go" maxlength="200" placeholder="Optional direction, e.g. “make money” or “for my HD audience”" value="${esc(m.dir)}" aria-label="Direction (optional)">
-        <div class="mixsugg">${MIX_DIRS.map((x) => `<button class="dtag" data-mixdirpick="${esc(x)}" aria-pressed="${m.dir.trim().toLowerCase() === x}">${esc(x)}</button>`).join("")}</div>
-        <div class="mixrow" id="mixopts">${mixOptsHTML()}</div>
-      </div>
-    <div id="mixres" class="mixres">${mixResHTML()}</div>
-    <section class="mixpick"><div class="mixsearch"><input class="inp" data-mixq type="search" placeholder="Search ingredients" value="${esc(m.q)}" autocomplete="off" aria-label="Search ingredients">
-      <label class="mixall"><input type="checkbox" data-mixall ${m.all ? "checked" : ""}> Show all connections, not only ready ones</label></div>
-      <div id="mixlist">${mixListHTML()}</div></section>`;
+/** The full plan: who it's for, the offer and price, the MVP, the stack on your things, the first 10 customers, the first week, the risks. */
+function planBodyHTML(x) {
+  const fact = (k, v) => (v ? `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>` : "");
+  const list = (h, xs, ol) => (xs?.length ? `<h5>${h}</h5><${ol ? "ol" : "ul"} class="plist">${xs.map((s) => `<li>${esc(s)}</li>`).join("")}</${ol ? "ol" : "ul"}>` : "");
+  const facts = [fact("Customer", x.customer), fact("Problem", x.problem), fact("Offer", x.offer), fact("Pricing", [x.price, x.model].filter(Boolean).join(" · ")), fact("Cost to run", x.cost), fact("First dollar", x.first_dollar), fact("How it earns", !x.price ? x.money : "")].join("");
+  const stack = x.how?.length || x.extra?.length ? `<h5>Stack: what you already have</h5><ul class="mhow">${(x.how ?? []).map((h) => `<li><span class="ming k-${mixKindOf(x.ids[x.ingredients.indexOf(h.name)] ?? "")}">${esc(h.name)}</span> ${esc(h.role)}</li>`).join("")}${(x.extra ?? []).map((e) => `<li><span class="ming new">+ new</span> ${esc(e)}</li>`).join("")}</ul>` : "";
+  return `<div class="plan">${facts ? `<dl class="pfacts">${facts}</dl>` : ""}
+    ${list("MVP scope", x.mvp)}${stack}${list("First 10 customers", x.launch, true)}${list("First week", x.week?.length ? x.week : x.first_steps, true)}${list("Risks", x.risks)}
+    ${x.why_novel ? `<p class="mwhy"><b>Why now</b> ${esc(x.why_novel)}</p>` : ""}</div>`;
+}
+function openPlan(x, from = "feed") {
+  const saved = stSaved(x.id);
+  const d = document.createElement("dialog");
+  d.className = "plandlg";
+  d.innerHTML = `<div class="pdh" style="--h:${dHue(x.title)}"><div class="pdt"><h3>${esc(x.title)}</h3><p>${esc(x.pitch)}</p><div class="fkeys">${feedKeys(x)}<span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span></div>
+      <div class="mings">${x.ids.map((id, k) => `<span class="ming k-${mixKindOf(id)}">${esc(x.ingredients[k] ?? id)}</span>`).join("")}</div></div><button class="ib" data-plx aria-label="Close">${ICON.x}</button></div>
+    <div class="pdb">${planBodyHTML(x)}</div>
+    <div class="pdf"><button class="btn primary" data-plbuild>${ICON.bolt}Build it now</button><button class="btn" data-plplan>${ICON.bulb}Research &amp; plan it</button><button class="btn ghost" data-plusers>Find users for it</button>${from !== "studio" ? `<button class="btn ghost" data-plstudio>${ICON.wild}Open in Studio</button>` : ""}<button class="btn ghost" data-plsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-plcopy>${ICON.copy}Copy</button></div>`;
+  document.body.append(d);
+  d.addEventListener("close", () => d.remove());
+  d.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t === d || t.closest("[data-plx]")) return d.close();
+    if (t.closest("[data-plbuild]")) { d.close(); return stBuildNow(x); }
+    if (t.closest("[data-plplan]")) { d.close(); return mixResearch(x); }
+    if (t.closest("[data-plusers]")) { d.close(); return stFindUsers(x); }
+    if (t.closest("[data-plstudio]")) { d.close(); return mixOpenWith(mixFromCard(x), { text: `Take “${x.title}” further: ${x.pitch}`, toastText: "Opened in the Studio" }); }
+    if (t.closest("[data-plcopy]")) return copy(mixText(x), "the plan");
+    const sv = t.closest("[data-plsave]");
+    if (sv) mixSave(x).then(() => { const s = stSaved(x.id); sv.setAttribute("aria-pressed", String(s)); sv.textContent = s ? "Saved" : "Save"; feedPatch(); });
+  });
+  d.showModal();
+  d.querySelector(".pdb").scrollTop = 0;
 }
 function discSaved(d, n) {
-  if (!n) return `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem or a mix to keep it here.</div>`;
+  if (!n) return `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem, a mix or a Studio build to keep it here.</div>`;
   const mixes = d.mixes?.saved ?? [];
-  return `${mixes.length ? `<h3 class="dsub">Mixes <span class="hint">ideas you kept from the mixer</span></h3><div class="mgrid">${mixes.map((x, i) => mixCard(x, i, "sv")).join("")}</div>` : ""}
+  return `${mixes.length ? `<h3 class="dsub">Builds &amp; mixes <span class="hint">ideas you kept from the Studio</span></h3><div class="mgrid">${mixes.map((x, i) => mixCard(x, i, "sv")).join("")}</div>` : ""}
     ${d.saved.length ? `<h3 class="dsub">Repos <span class="hint">they stay here until you remove them</span></h3><div class="dgrid">${d.saved.map((g, i) => gemCard(g, i, { saved: true })).join("")}</div>` : ""}`;
 }
-/** Clicks inside the mixer and on mix cards. Returns true when it handled the click. */
-function mixClick(t) {
+
+// ── Studio: the page ────────────────────────────────────────────────────────────
+function discMix() {
+  return `<div class="studio" id="studio">
+    <div class="stmain">
+      <div class="stbar" id="stbar">${stBarHTML()}</div>
+      <div class="stlog" id="stlog" aria-live="polite"></div>
+      <div class="stcomp" id="stcomp"><div class="stbox">
+        <div class="sttray" id="sttray">${stTrayHTML()}</div>
+        <textarea class="stq" data-stq rows="1" enterkeyhint="send" maxlength="4000" placeholder="Ask for anything, or roll the dice…" aria-label="Message the Studio">${esc(load("studioDraft", ""))}</textarea>
+        <div class="strow">
+          <button type="button" class="stpill" data-stadd title="Pick from everything you have">${ICON.plus}<span>Ingredients</span></button>
+          <button type="button" class="stic" data-stdice title="Dice: a sensible random combo" aria-label="Dice">${ICON.dice}</button>
+          <button type="button" class="stic" data-stwild title="Wildcard: somewhere unexpected" aria-label="Wildcard">${ICON.wild}</button>
+          <span class="spacer"></span><span class="hint stkeys">Enter to send · Shift+Enter for a new line</span>
+          <span id="stact">${stActHTML()}</span>
+        </div>
+      </div></div>
+    </div>
+    <aside class="strail" id="strail" aria-label="Ingredients"></aside>
+    <div class="stsheet" id="stsheet" hidden><div class="stscrim" data-stdone></div><div class="stsp" role="dialog" aria-label="Ingredients"></div></div>
+  </div>`;
+}
+function stBarHTML() {
+  const st = S.studio, cur = st.cur;
+  const convos = st.home?.convos ?? [];
+  const title = cur?.messages?.length ? cur.title || "Untitled" : "New conversation";
+  const e = S.disc.mix.engines ?? st.home?.engines;
+  const opts = [["claude:haiku", "Claude Haiku · fast", e && !e.claude], ["claude:sonnet", "Claude Sonnet · deeper", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} · private`]), ["template", "Templates · instant, offline"]];
+  if (!opts.some(([v]) => v === st.engine)) opts.push([st.engine, st.engine]);
+  return `<div class="stconv"><button class="stconvb" data-stmenu aria-expanded="${st.menu}" aria-haspopup="menu" title="Your conversations">${ICON.chat}<span class="stct">${esc(title)}</span>${convos.length ? `<span class="n">${convos.length}</span>` : ""}${ICON.chev}</button>${st.menu ? stMenuHTML(convos) : ""}</div>
+    <span class="spacer"></span>
+    <label class="steng"><span class="sr">Engine</span><select data-steng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === st.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select>${ICON.chev}</label>
+    <button class="btn sm stnew" data-stnew ${cur?.messages?.length ? "" : "disabled"} title="Start a new conversation">${ICON.plus}<span>New</span></button>`;
+}
+function stMenuHTML(convos) {
+  const cur = S.studio.cur?.id;
+  return `<div class="stmenu" role="menu"><button class="stmi new" data-stnew role="menuitem">${ICON.plus}New conversation</button>
+    ${convos.length ? convos.slice(0, 40).map((c) => `<div class="stmi${c.id === cur ? " on" : ""}"><button class="stmo" data-stopen="${esc(c.id)}" role="menuitem"><span class="stmt">${esc(c.title || "Untitled")}</span><span class="hint">${c.turns} message${c.turns === 1 ? "" : "s"} · ${esc(agoText(c.updated))}${c.running ? " · answering…" : ""}</span></button><button class="ib" data-stren="${esc(c.id)}" title="Rename" aria-label="Rename ${esc(c.title)}">${ICON.pencil}</button><button class="ib" data-stdel="${esc(c.id)}" title="Delete" aria-label="Delete ${esc(c.title)}">${ICON.trash}</button></div>`).join("")
+      : '<p class="hint stmh">Your conversations are kept here.</p>'}</div>`;
+}
+function stTrayHTML() {
   const m = S.disc.mix;
+  const fresh = m.justAdded; m.justAdded = null;
+  if (!m.sel.length) return "";
+  return `<span class="sttl">Use</span>${m.sel.map((x) => `<span class="mpick k-${esc(x.kind)}${x.id === fresh ? " fresh" : ""}"><span>${esc(x.name)}</span><button type="button" data-mixrm="${esc(x.id)}" aria-label="Remove ${esc(x.name)}">${ICON.x}</button></span>`).join("")}<button type="button" class="link sttclear" data-mixclear>Clear</button>`;
+}
+const stActHTML = () => (S.studio.job ? `<span class="mclock stclock" data-since="${S.studio.job.t0}">${clock(Date.now() - S.studio.job.t0)}</span><button type="button" class="stsend stop" data-ststop title="Stop" aria-label="Stop">${ICON.stop}</button>` : `<button type="button" class="stsend" data-stsend title="Send (Enter)" aria-label="Send">${ICON.send}</button>`);
+
+// ── the conversation log: keyed items, so streaming only touches what changed ─────────────
+function stRenderLog(el) {
+  if (!el) return;
+  const items = stLogItems();
+  const have = new Map([...el.children].map((c) => [c.dataset.k, c]));
+  let prev = null;
+  for (const it of items) {
+    let c = have.get(it.k);
+    if (!c) { c = document.createElement("div"); c.dataset.k = it.k; if (S.studio.calm) c.classList.add("calm"); }
+    have.delete(it.k);
+    const cls = `stitem ${it.cls ?? ""}${c.classList.contains("calm") ? " calm" : ""}`;
+    if (c.className !== cls) c.className = cls;
+    if (c._h !== it.html) { c.innerHTML = it.html; c._h = it.html; }
+    const want = prev ? prev.nextSibling : el.firstChild;
+    if (c !== want) el.insertBefore(c, want);
+    prev = c;
+  }
+  for (const c of have.values()) c.remove();
+  S.studio.calm = false;
+}
+function stLogItems() {
+  const st = S.studio, msgs = st.cur?.messages ?? [];
+  if (!msgs.length && !st.job) return [{ k: "home", cls: "sthomei", html: stHomeHTML() }];
+  const items = [];
+  let lastA = -1;
+  msgs.forEach((m, i) => { if (m.role === "assistant") lastA = i; });
+  msgs.forEach((m, i) => { if (m.role === "user") items.push({ k: `u${i}`, cls: "stu", html: stUserHTML(m) }); else stBotItems(m, i, i === lastA && !st.job, items); });
+  if (st.job) stBotItems({ blocks: st.job.blocks ?? [], refs: st.job.refs ?? {}, live: true }, msgs.length, true, items);
+  return items;
+}
+function stUserHTML(m) {
+  return `<div class="stbubble">${esc(m.text || "Assemble something out of these.")}</div>${m.use?.length ? `<div class="stuse">${m.use.map((x) => `<button class="ming k-${esc(x.kind)}" data-sting="${esc(x.id)}" title="Add to your picks">${esc(x.name)}</button>`).join("")}</div>` : ""}`;
+}
+function stBotItems(m, i, last, items) {
+  let nb = 0;
+  (m.blocks ?? []).forEach((b, j) => {
+    if (b.t === "next" && !last) return;
+    items.push({ k: `a${i}b${j}`, cls: `sta t-${b.t}${j === 0 ? " first" : ""}`, html: stBlockHTML(b, m, i, j, b.t === "build" ? nb++ : 0, last) });
+  });
+  items.push({ k: `a${i}m`, cls: "sta t-meta", html: m.live ? stLiveHTML(!(m.blocks ?? []).length) : stMetaHTML(m, last) });
+}
+/** Markdown, with [[inventory names]] as chips you can tap to add (swapped out before md(), which reads [[x]] as a wiki link). */
+function stMd(text, refs = {}) {
+  const names = [];
+  const src = String(text ?? "").replace(/\[\[([^\]\n]{1,80})\]\]/g, (_, n) => `STREF${names.push(n) - 1}Z`);
+  return md(src).replace(/STREF(\d+)Z/g, (_, i) => { const n = names[+i], r = refs[n]; return r ? `<button class="ming k-${esc(r.kind)} stref" data-sting="${esc(r.id)}" title="Add to your picks">${esc(n)}</button>` : `<b>${esc(n)}</b>`; });
+}
+function stBlockHTML(b, m, i, j, nb, last) {
+  const who = j === 0 ? `<div class="stwho">${ICON.wild}<span>Studio</span></div>` : "";
+  if (b.t === "text") return `${who}<div class="sttext md">${stMd(b.md, m.refs)}</div>`;
+  if (b.t === "build") return `${who}${stBuildHTML(b.b, `${i}:${j}`, nb)}`;
+  if (b.t === "ask") return `${who}<div class="stask"><p>${esc(b.q)}</p><div class="stopts">${b.options.map((o) => `<button class="stopt" data-stsay="${esc(o)}"${last ? "" : " disabled"}>${esc(o)}</button>`).join("")}${last ? '<button class="stopt ghost" data-stfocus>Something else…</button>' : ""}</div></div>`;
+  if (b.t === "next") return `<div class="stnext"><span class="stlbl">Keep going</span>${b.items.map((o) => `<button class="stchip" data-stsay="${esc(o)}">${esc(o)}</button>`).join("")}<button class="stchip dice" data-stdice>${ICON.dice}Roll the dice</button></div>`;
+  if (b.t === "pending") return `${who}${b.kind === "build" ? `<div class="stbuild skel"><span class="stsk w60"></span><span class="stsk w90"></span><span class="stsk w40"></span><span class="hint stsk-l"><span class="spin"></span>Assembling a build…</span></div>` : '<div class="stsk w50"></div>'}`;
+  return "";
+}
+function stBuildHTML(x, key, nb) {
+  const saved = stSaved(x.id);
+  const dkey = `st:${key}:${x.id}`;
+  const open = S.disc.mix.open.has(dkey);
+  return `<article class="stbuild" data-sb="${esc(key)}" style="--h:${dHue(x.title)};--i:${nb}">
+    <div class="stbh"><h4>${esc(x.title)}</h4><div class="mbadges"><span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" role="img" aria-label="Wow ${x.wow} of 5" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span>${x.source === "template" ? '<span class="msrc" title="From the instant template combiner, not a model">template</span>' : ""}</div></div>
+    ${x.pitch ? `<p class="mpitch">${esc(x.pitch)}</p>` : ""}
+    <div class="mings">${x.ids.map((id, k) => `<button class="ming k-${mixKindOf(id)}" data-sting="${esc(id)}" title="Add to your picks">${esc(x.ingredients[k] ?? id)}</button>`).join("")}${(x.extra ?? []).map((e) => `<span class="ming new" title="${esc(e)}: not something you have yet">+ ${esc(e.replace(/\s*\(.*$/, ""))}</span>`).join("")}</div>
+    ${x.price || x.first_dollar ? `<div class="fkeys">${feedKeys(x)}</div>` : x.money ? `<p class="stmoney">${ICON.coin}<span>${esc(x.money)}</span></p>` : ""}
+    ${x.customer ? `<p class="stfor"><b>For</b> ${esc(x.customer)}</p>` : ""}
+    <details class="mmore" data-mdet="${esc(dkey)}"${open ? " open" : ""}><summary>${x.customer ? "The full plan" : "How it fits &amp; first steps"}</summary>${planBodyHTML(x)}</details>
+    <div class="stacts"><button class="btn primary" data-sbplan>${ICON.bulb}Research &amp; plan it</button><button class="btn" data-sbbuild>${ICON.bolt}Build it now</button>
+      <span class="stacts2"><button class="btn ghost sm" data-sbusers>Find users</button><button class="btn ghost sm" data-sbriff>Riff on this</button><button class="btn ghost sm" data-sbsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost sm" data-sbcopy title="Copy" aria-label="Copy">${ICON.copy}</button></span></div>
+  </article>`;
+}
+function stLiveHTML(empty) {
+  const j = S.studio.job;
+  return `${empty ? `<div class="stwho">${ICON.wild}<span>Studio</span></div><div class="stthink"><span class="stsk w70"></span><span class="stsk w45"></span></div>` : ""}<div class="stlive" role="status"><span class="stdots" aria-hidden="true"><i></i><i></i><i></i></span><b>${esc(j?.stage && j.stage !== "Writing…" ? j.stage : j?.blocks?.length ? "Assembling" : "Thinking")}</b><span class="hint">${esc(mixEngineLabel(...stEngineParts()))}</span><span class="mclock" data-since="${j?.t0 ?? Date.now()}">${clock(Date.now() - (j?.t0 ?? Date.now()))}</span><span class="spacer"></span><button class="btn ghost sm" data-ststop>Stop</button></div>`;
+}
+function stMetaHTML(m, last) {
+  const secs = (ms) => `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+  const bits = [mixEngineLabel(m.engine, m.model), m.ms ? secs(m.ms) : "", m.firstMs && m.engine !== "template" ? `first words in ${secs(m.firstMs)}` : ""].filter(Boolean);
+  return `<div class="stmeta"><span>${esc(bits.join(" · "))}</span>${m.note ? `<span class="stnote">${ICON.warn}${esc(m.note)}</span>` : ""}${last && (m.error || m.note) ? '<button class="link" data-stretry>Try again</button>' : ""}</div>`;
+}
+
+// ── the first screen: what you have, the dice, the deck ───────────────────────────────────
+function stHomeHTML() {
+  const h = S.studio.home;
+  const c = h?.counts;
+  const total = c ? Object.values(c).reduce((a, b) => a + b, 0) : 0;
+  const combos = total >= 3 ? Math.round((total * (total - 1) * (total - 2)) / 6) : 0;
+  const stat = (k, n) => `<button class="ststat k-${k}" data-stdk="${k}" data-stadd><b>${n}</b>${esc(ST_SHORT[k].toLowerCase())}</button>`;
+  const intents = h?.intents ?? [];
+  const pick = S.studio.intent;
+  const deck = stDeck(h?.starters ?? [], intents, pick);
+  const recent = (h?.convos ?? []).slice(0, 3);
+  return `<section class="sthome">
+    <div class="sthero"><div class="sthl"><p class="steye">${ICON.wild}Studio</p><h3>What shall we build?</h3>
+      <p class="stsub">${c ? `Everything you have, in one place.${combos ? ` That’s <b>${combos.toLocaleString()}</b> three-way combinations.` : ""}` : "Reading everything you have…"}</p>
+      <div class="ststats">${c ? ["project", "repo", "conn", "tool", "interest"].map((k) => stat(k, c[k] ?? 0)).join("") : Array.from({ length: 5 }, () => '<span class="ststat skel"></span>').join("")}</div></div>
+      <div class="stdice"><button class="stdie" data-stdice>${ICON.dice}<span><b>Dice</b><small>a sensible combo</small></span></button><button class="stdie wild" data-stwild>${ICON.wild}<span><b>Wildcard</b><small>somewhere nobody’s been</small></span></button></div></div>
+    <div class="stdeckh"><nav class="stints" aria-label="What for">${[["all", "All ideas", 215], ...intents.map((x) => [x.id, x.label, x.hue])].map(([id, label, hue]) => `<button data-stint="${esc(id)}" aria-pressed="${pick === id}" style="--h:${hue}"><i></i>${esc(label)}</button>`).join("")}</nav>
+      <button class="btn ghost sm stshuf" data-stshuffle title="New ideas from the same inventory">${ICON.shuffle}Shuffle</button></div>
+    <div class="stdeck">${h ? deck.cards || '<p class="hint">Nothing to suggest yet: add some interests on For you.</p>' : Array.from({ length: 6 }, () => '<div class="ststart skel"></div>').join("")}</div>
+    ${deck.more ? `<p class="stmore"><button class="btn" data-stmoreideas>Show ${deck.more} more ideas</button></p>` : ""}
+    ${recent.length ? `<h4 class="stsec">Pick up where you left off</h4><div class="strecent">${recent.map((x) => `<button class="strec" data-stopen="${esc(x.id)}">${ICON.chat}<span>${esc(x.title || "Untitled")}</span><span class="hint">${esc(agoText(x.updated))}</span></button>`).join("")}</div>` : ""}
+  </section>`;
+}
+/** The deck for an intent; "All" deals the intents round-robin so the first screen shows the whole range. */
+function stDeck(starters, intents, pick) {
+  const hue = Object.fromEntries(intents.map((x) => [x.id, x]));
+  let list = pick === "all" ? [] : starters.filter((s) => s.intent === pick);
+  if (pick === "all") {
+    const by = intents.map((x) => starters.filter((s) => s.intent === x.id));
+    for (let r = 0; by.some((xs) => xs[r]); r++) for (const xs of by) if (xs[r]) list.push(xs[r]);
+  }
+  const limit = S.studio.more || pick !== "all" ? list.length : isPhone() ? 6 : 9;
+  const cards = list.slice(0, limit).map((s, n) => `<button class="ststart" data-ststart="${esc(s.id)}" style="--h:${hue[s.intent]?.hue ?? 215};--i:${Math.min(n, 12)}"><span class="stint"><i></i>${esc(hue[s.intent]?.label ?? "")}</span><span class="stpt">${s.parts.map((p) => (p.ing ? `<span class="ming k-${esc(p.ing.kind)}">${esc(p.ing.name)}</span>` : esc(p.text))).join("")}</span><span class="stgo" aria-hidden="true">${ICON.send}</span></button>`).join("");
+  return { cards, more: Math.max(0, list.length - limit) };
+}
+
+// ── the ingredient drawer: a side rail when there's room, a bottom sheet when there isn't ─────
+function stRenderDrawer(root) {
+  const st = S.studio;
+  const wide = root.clientWidth >= 940;
+  if (wide !== st.wide) { st.wide = wide; root.classList.toggle("wide", wide); }
+  const rail = root.querySelector("#strail"), sheet = root.querySelector("#stsheet"), sp = sheet.querySelector(".stsp");
+  const open = wide || st.drawer;
+  sheet.hidden = wide || !st.drawer;
+  const host = wide ? rail : sp, other = wide ? sp : rail;
+  if (other.firstChild) other.replaceChildren();
+  if (!open) return;
+  if (!host.querySelector(".stdrawer")) host.innerHTML = `<div class="stdrawer"><div class="stdhd" id="stdh"></div><div class="stdsearch"><input class="inp" type="search" data-stdq placeholder="Search everything you have" value="${esc(S.disc.mix.q)}" autocomplete="off" enterkeyhint="search" aria-label="Search ingredients"></div><nav class="stdtabs" id="stdt" aria-label="Kinds"></nav><div class="stdl" id="stdl"></div></div>`;
+  setHTML(host.querySelector("#stdh"), stDrawerHead(!wide));
+  setHTML(host.querySelector("#stdt"), stDrawerTabs());
+  setHTML(host.querySelector("#stdl"), stDrawerList());
+}
+function stDrawerHead(sheet) {
+  const n = S.disc.mix.sel.length;
+  return `<b>Ingredients</b><span class="hint">${n ? `${n} picked` : "tap to pick"}</span><span class="spacer"></span><button class="link" data-stdall aria-pressed="${S.disc.mix.all}" title="Also list things that aren't set up on this machine">${S.disc.mix.all ? "Only ready ones" : "Show all"}</button>${sheet ? `<button class="btn primary sm" data-stdone>Done</button>` : ""}`;
+}
+const stNoise = (x) => /^(Background|Homebrew) service|SSH host|profile$/i.test(x.desc ?? "");
+function stPool(k) {
+  const m = S.disc.mix, q = m.q.trim().toLowerCase();
+  const xs = (m.ings ?? []).filter((x) => x.kind === k && (m.all || x.ready) && (!q || `${x.name} ${x.desc} ${x.group ?? ""}`.toLowerCase().includes(q)));
+  return [...xs.filter((x) => !stNoise(x)), ...xs.filter(stNoise)];
+}
+function stDrawerTabs() {
+  const m = S.disc.mix, q = m.q.trim();
+  return MIX_KINDS.map(([k]) => { const sel = m.sel.filter((x) => x.kind === k).length; return `<button class="k-${k}" data-stdk="${k}" aria-pressed="${!q && S.studio.dk === k}"><span class="kdot"></span>${ST_SHORT[k]} <span class="n">${m.ings ? stPool(k).length : "…"}</span>${sel ? `<b class="stdsel">${sel}</b>` : ""}</button>`; }).join("");
+}
+const stRow = (x) => `<button class="stdrow k-${esc(x.kind)}${x.ready ? "" : " off"}" data-ing="${esc(x.id)}" aria-pressed="${mixIsSel(x.id)}"><span class="kdot"></span><span class="stdt"><span class="stdn">${esc(x.name)}</span>${x.desc && !/^[>|]-?$/.test(x.desc.trim()) ? `<span class="stdd">${esc(x.desc)}</span>` : ""}</span><span class="stdck" aria-hidden="true">${ICON.check}</span></button>`;
+function stDrawerList() {
+  const m = S.disc.mix;
+  if (!m.ings) return Array.from({ length: 8 }, () => '<div class="stdrow skel"></div>').join("");
+  const q = m.q.trim();
+  const more = (key, xs, n) => (m.more.has(key) || xs.length <= n + 2 ? xs : xs.slice(0, n));
+  const moreBtn = (key, xs, shown) => (xs.length > shown.length ? `<button class="stdmore" data-mixmore="${esc(key)}">Show ${xs.length - shown.length} more</button>` : "");
+  const flat = (key, xs, n) => { const s = more(key, xs, n); return s.map(stRow).join("") + moreBtn(key, xs, s); };
+  const grouped = (k, xs, n) => { const g = new Map(); for (const x of xs) g.set(x.group ?? "Other", [...(g.get(x.group ?? "Other") ?? []), x]); return [...g].map(([name, ys]) => `<h5>${esc(name)} <span class="n">${ys.length}</span></h5>${flat(`${k}:${name}`, ys, n)}`).join(""); };
+  if (q) {
+    const out = MIX_KINDS.map(([k, label]) => { const xs = stPool(k); return xs.length ? `<h5 class="k-${k}"><span class="kdot"></span>${esc(label)} <span class="n">${xs.length}</span></h5>${flat(`q:${k}`, xs, 8)}` : ""; }).join("");
+    return out || `<p class="hint stdempty">Nothing matches “${esc(q)}”.${m.all ? "" : ' <button class="link" data-stdall>Include things not set up</button>'}</p>`;
+  }
+  const k = S.studio.dk;
+  const xs = stPool(k);
+  if (!xs.length) return `<p class="hint stdempty">${k === "repo" ? "No gems found yet: open For you and let it search GitHub." : (k === "conn" || k === "tool") && (m.connLoading || m.loading) ? '<span class="spin"></span> Scanning your connections…' : "Nothing here yet."}</p>`;
+  return k === "conn" || k === "tool" ? grouped(k, xs, 5) : flat(k, xs, 14);
+}
+function stOpenDrawer(kind) {
+  const st = S.studio;
+  if (kind) { st.dk = kind; store("studioKind", kind); S.disc.mix.q = ""; }
+  const root = stView()?.querySelector("#studio");
+  if (root && root.clientWidth >= 940) { mixPatch("drawer"); const s = root.querySelector("[data-stdq]"); if (kind && s) s.value = ""; s?.focus({ preventScroll: true }); return; }
+  st.drawer = true;
+  mixPatch("drawer");
+  const s = root?.querySelector("#stsheet [data-stdq]");
+  if (s && kind) s.value = "";
+  if (s && !isPhone()) s.focus({ preventScroll: true });
+}
+function stCloseDrawer() { S.studio.drawer = false; mixPatch("drawer"); }
+
+// ── actions ────────────────────────────────────────────────────────────────────────
+const stTa = () => stView()?.querySelector("[data-stq]");
+function stSetDraft(text) {
+  store("studioDraft", text);
+  const ta = stTa();
+  if (ta) { ta.value = text; stGrow(ta); }
+}
+function stGrow(ta) { ta.style.height = "auto"; ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`; }
+function stCache() {
+  const c = S.studio.cur;
+  store("studioConvo", c ? { ...c, messages: c.messages.slice(-40) } : null);
+}
+async function stSend(text, use) {
+  const st = S.studio, m = S.disc.mix;
+  if (st.job) { toast("Still answering: Stop it first, or wait a moment"); return; }
+  text = String(text ?? "").trim();
+  const fromTray = use === undefined;
+  use = (use ?? m.sel).map((x) => ({ id: x.id, kind: x.kind, name: x.name }));
+  if (!text && !use.length) { stTa()?.focus(); toast("Say what you want to make, or roll the dice"); return; }
+  const [engine, model] = stEngineParts();
+  const cur = st.cur ?? { id: null, title: "", messages: [] };
+  const draft = stTa()?.value ?? "", tray = [...m.sel];
+  cur.messages.push({ role: "user", text, use, at: Date.now() });
+  st.cur = cur;
+  st.job = { status: "running", stage: "Sending…", blocks: [], refs: {}, t0: Date.now() };
+  if (fromTray || draft.trim() === text) { stSetDraft(""); if (fromTray) mixSetSel([]); }
+  st.menu = false;
+  mixPatch("log", "tray", "act", "bar", "drawer");
+  const ta = stTa();
+  if (isPhone()) ta?.blur();
+  stScrollTo(`u${cur.messages.length - 1}`);
+  try {
+    const r = await api("/api/discover/studio/send", { id: cur.id, text, use, engine, model }, 20_000);
+    cur.id = r.convo.id; cur.title = r.convo.title;
+    st.job = { ...r.job, t0: st.job.t0 };
+    stCache();
+    stPoll();
+  } catch (e) {
+    cur.messages.pop();
+    st.job = null;
+    if (!cur.messages.length) st.cur = cur.id ? cur : null;
+    if (fromTray) mixSetSel(tray);
+    if (!stTa()?.value) stSetDraft(draft || text);
+    toast(e.message, true);
+  }
+  mixPatch("log", "tray", "act", "bar");
+}
+async function stPoll() {
+  const st = S.studio;
+  clearTimeout(st.t.poll);
+  const id = st.job?.id;
+  if (!id) return;
+  try {
+    const j = await api("/api/discover/studio/status", { job: id }, 8000);
+    if (st.job?.id !== id) return;
+    if (j.status === "running") st.job = { ...j, t0: st.job.t0 };
+    else {
+      st.job = null;
+      if (j.message && st.cur?.id === j.convo) st.cur.messages.push(j.message);
+      stCache();
+      loadStudioHome();
+    }
+  } catch (e) { if (st.job?.id === id) { st.job = null; toast(e.message, true); if (st.cur?.id) stOpen(st.cur.id, { quiet: true }); } }
+  mixPatch("log", "act");
+  if (st.job) st.t.poll = setTimeout(stPoll, 250);
+}
+async function stStop() {
+  const id = S.studio.job?.id;
+  if (!id) return;
+  try { await api("/api/discover/studio/stop", { job: id }, 5000); } catch {}
+  stPoll();
+}
+async function stOpen(id, { quiet = false } = {}) {
+  const st = S.studio;
+  try {
+    const r = await api("/api/discover/studio/convo", { id }, 10_000);
+    if (quiet && st.cur?.id && st.cur.id !== id) return; // you moved on meanwhile
+    const same = st.cur?.id === id && st.cur.messages.length === r.messages.length;
+    st.cur = { id: r.id, title: r.title, messages: r.messages };
+    if (r.job && !st.job) { st.job = { ...r.job, t0: Date.now() - (r.job.elapsed ?? 0) }; stPoll(); }
+    st.menu = false;
+    stCache();
+    if (!same) st.calm = true;
+    mixPatch("log", "bar", "act");
+    if (!quiet && !same) requestAnimationFrame(() => { const log = stView()?.querySelector("#stlog"); log?.lastElementChild?.scrollIntoView({ block: "end" }); });
+  } catch (e) {
+    if (st.cur?.id === id) { st.cur = null; stCache(); mixPatch("log", "bar"); }
+    if (!quiet) toast(e.message, true);
+  }
+}
+function stNew() {
+  const st = S.studio;
+  st.cur = null; st.job = null; st.menu = false;
+  clearTimeout(st.t.poll);
+  stCache();
+  mixPatch("log", "bar", "act");
+  $("dbody").scrollTop = 0;
+  if (!isPhone()) stTa()?.focus();
+}
+function stScrollTo(k) {
+  requestAnimationFrame(() => {
+    const el = stView()?.querySelector(`#stlog > [data-k="${k}"]`);
+    if (!el) return;
+    const box = $("dbody");
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+    box.scrollTo({ top, behavior: stReduce() ? "auto" : "smooth" });
+  });
+}
+async function stDice(wild, btn) {
+  btn?.classList.remove("rolling"); void btn?.offsetWidth; btn?.classList.add("rolling");
+  try {
+    const d = await api("/api/discover/studio/dice", { seed: Math.floor(Math.random() * 1e9), wild }, 10_000);
+    const by = new Map((S.disc.mix.ings ?? []).map((x) => [x.id, x]));
+    mixSetSel(d.parts.filter((p) => p.ing).map((p) => ingLite(by.get(p.ing.id) ?? p.ing)));
+    stSetDraft(d.text);
+    mixPatch("tray", "drawer");
+    const send = stView()?.querySelector("[data-stsend]");
+    send?.classList.remove("nudge"); void send?.offsetWidth; send?.classList.add("nudge");
+    if (!isPhone()) stTa()?.focus();
+  } catch (e) { toast(e.message, true); }
+}
+function stBuildAt(key) {
+  const [i, j] = String(key).split(":").map(Number);
+  const msgs = S.studio.cur?.messages ?? [];
+  const m = i < msgs.length ? msgs[i] : S.studio.job;
+  return m?.blocks?.[j]?.b;
+}
+async function stBuildNow(b) {
+  try {
+    const r = await api("/api/discover/studio/build-prompt", { build: b }, 10_000);
+    await openNew({ machine: S.self, cwd: r.cwd, project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
+    promptTop();
+  } catch (e) { toast(e.message, true); }
+}
+function stFindUsers(b) {
+  const text = `${b.title}: ${b.pitch}`;
+  if (typeof leadsFor === "function") return leadsFor(text);
+  S.disc.idea = text; store("discIdea", text);
+  S.disc.tab = "lab"; store("discTab", "lab");
+  renderDiscover(); $("dbody").scrollTop = 0;
+  ideaSearch(text);
+}
+function stAddIng(id, name) {
+  const m = S.disc.mix;
+  if (mixIsSel(id)) { toast(`${name} is already picked`); return; }
+  const x = m.ings?.find((y) => y.id === id) ?? { id, kind: mixKindOf(id), name, desc: "" };
+  mixSetSel([...m.sel, ingLite(x)]); m.justAdded = id;
+  mixPatch("tray", "drawer");
+  toast(`Added ${name}: it goes with your next message`);
+}
+async function stRename(id) {
+  const c = S.studio.home?.convos?.find((x) => x.id === id);
+  const t = await askDialog({ title: "Rename conversation", input: c?.title ?? S.studio.cur?.title ?? "", ok: "Rename" });
+  if (!t?.trim()) return;
+  try {
+    const r = await api("/api/discover/studio/rename", { id, title: t });
+    if (S.studio.home) S.studio.home.convos = r.convos;
+    if (S.studio.cur?.id === id) { S.studio.cur.title = t.trim(); stCache(); }
+    mixPatch("bar", "log");
+  } catch (e) { toast(e.message, true); }
+}
+async function stDelete(id) {
+  const c = S.studio.home?.convos?.find((x) => x.id === id);
+  if (!(await askDialog({ title: `Delete “${c?.title ?? "this conversation"}”?`, text: "Its messages are removed from this machine. Saved builds stay saved.", ok: "Delete", danger: true }))) return;
+  try {
+    const r = await api("/api/discover/studio/delete", { id });
+    if (S.studio.home) S.studio.home.convos = r.convos;
+    if (S.studio.cur?.id === id) stNew(); else mixPatch("bar", "log");
+  } catch (e) { toast(e.message, true); }
+}
+
+/** Clicks in the Studio and on mix cards. Returns true when it handled the click. */
+function mixClick(t) {
+  const m = S.disc.mix, st = S.studio;
+  if (st.menu && !t.closest(".stconv")) { st.menu = false; mixPatch("bar"); }
   const ing = t.closest("[data-ing]")?.dataset.ing;
   if (ing) {
     const x = m.ings?.find((y) => y.id === ing);
@@ -3603,65 +4004,109 @@ function mixClick(t) {
     if (mixIsSel(ing)) mixSetSel(m.sel.filter((y) => y.id !== ing));
     else if (m.sel.length >= 16) { toast("That’s plenty: 16 at most", true); return true; }
     else { mixSetSel([...m.sel, ingLite(x)]); m.justAdded = x.id; }
-    mixPatch("mixtray", "mixopts", "mixlist");
-    $("dbody").querySelector(`[data-ing="${CSS.escape(ing)}"]`)?.focus({ preventScroll: true });
-    mixPeek();
+    mixPatch("tray", "drawer");
+    stView()?.querySelector(`[data-ing="${CSS.escape(ing)}"]`)?.focus({ preventScroll: true });
     return true;
   }
   const rm = t.closest("[data-mixrm]")?.dataset.mixrm;
-  if (rm) { mixSetSel(m.sel.filter((y) => y.id !== rm)); mixPatch("mixtray", "mixopts", "mixlist"); return true; }
-  if (t.closest("[data-mixgo]")) { mixStart(false); return true; }
-  if (t.closest("[data-mixagain]")) { mixStart(true); return true; }
-  if (t.closest("[data-mixcancel]")) { mixCancel(); return true; }
-  if (t.closest("[data-mixsurprise]")) { mixSurprise(); return true; }
-  if (t.closest("[data-mixclear]")) { mixSetSel([]); m.res = null; mixPatch(); return true; }
+  if (rm) { mixSetSel(m.sel.filter((y) => y.id !== rm)); mixPatch("tray", "drawer"); return true; }
+  if (t.closest("[data-mixclear]")) { mixSetSel([]); mixPatch("tray", "drawer"); return true; }
   const more = t.closest("[data-mixmore]")?.dataset.mixmore;
-  if (more) { m.more.add(more); mixPatch("mixlist"); return true; }
-  const dp = t.closest("[data-mixdirpick]")?.dataset.mixdirpick;
-  if (dp != null) {
-    m.dir = m.dir.trim().toLowerCase() === dp ? "" : dp; store("mixDir", m.dir);
-    mixSyncDir();
-    mixPeek();
+  if (more) { m.more.add(more); mixPatch("drawer"); return true; }
+  const sting = t.closest("[data-sting]");
+  if (sting) { stAddIng(sting.dataset.sting, sting.textContent.trim()); return true; }
+  const dk = t.closest("[data-stdk]")?.dataset.stdk;
+  if (dk) { if (t.closest("[data-stadd]")) { stOpenDrawer(dk); return true; } st.dk = dk; store("studioKind", dk); m.q = ""; const s = stView()?.querySelector("[data-stdq]"); if (s) s.value = ""; mixPatch("drawer"); return true; }
+  if (t.closest("[data-stadd]")) { stOpenDrawer(); return true; }
+  if (t.closest("[data-stdone]")) { stCloseDrawer(); return true; }
+  if (t.closest("[data-stdall]")) { m.all = !m.all; mixPatch("drawer"); return true; }
+  if (t.closest("[data-stsend]")) { stSend(stTa()?.value ?? ""); return true; }
+  if (t.closest("[data-ststop]")) { stStop(); return true; }
+  if (t.closest("[data-stdice]")) { stDice(false, t.closest("[data-stdice]")); return true; }
+  if (t.closest("[data-stwild]")) { stDice(true, t.closest("[data-stwild]")); return true; }
+  const say = t.closest("[data-stsay]")?.dataset.stsay;
+  if (say != null) { stSend(say, []); return true; }
+  if (t.closest("[data-stfocus]")) { stTa()?.focus(); return true; }
+  if (t.closest("[data-stretry]")) { const u = [...(st.cur?.messages ?? [])].reverse().find((x) => x.role === "user"); if (u) stSend(u.text, u.use ?? []); return true; }
+  const start = t.closest("[data-ststart]")?.dataset.ststart;
+  if (start) {
+    const s = st.home?.starters?.find((x) => x.id === start);
+    if (s) { const ings = s.parts.filter((p) => p.ing).map((p) => p.ing); stSend(s.text, [...ings, ...m.sel.filter((x) => !ings.some((y) => y.id === x.id))]); if (m.sel.length) { mixSetSel([]); mixPatch("tray", "drawer"); } }
     return true;
   }
+  const intent = t.closest("[data-stint]")?.dataset.stint;
+  if (intent) { st.intent = intent; st.more = false; store("studioIntent", intent); mixPatch("log"); return true; }
+  if (t.closest("[data-stshuffle]")) { st.seed = Math.floor(Math.random() * 1e9); store("studioSeed", st.seed); t.closest(".sthome")?.querySelector(".stdeck")?.classList.add("shuf"); loadStudioHome(); return true; }
+  if (t.closest("[data-stmoreideas]")) { st.more = true; mixPatch("log"); return true; }
+  if (t.closest("[data-stmenu]")) { st.menu = !st.menu; mixPatch("bar"); return true; }
+  if (t.closest("[data-stnew]")) { stNew(); return true; }
+  const open = t.closest("[data-stopen]")?.dataset.stopen;
+  if (open) { if (st.cur?.id !== open) { st.job = null; clearTimeout(st.t.poll); } stOpen(open); return true; }
+  const ren = t.closest("[data-stren]")?.dataset.stren;
+  if (ren) { st.menu = false; mixPatch("bar"); stRename(ren); return true; }
+  const del = t.closest("[data-stdel]")?.dataset.stdel;
+  if (del) { st.menu = false; mixPatch("bar"); stDelete(del); return true; }
+  const sb = t.closest("[data-sb]");
+  if (sb && !t.closest("summary")) {
+    const b = stBuildAt(sb.dataset.sb);
+    if (!b) return true;
+    if (t.closest("[data-sbplan]")) mixResearch(b);
+    else if (t.closest("[data-sbbuild]")) stBuildNow(b);
+    else if (t.closest("[data-sbusers]")) stFindUsers(b);
+    else if (t.closest("[data-sbriff]")) stSend(`Riff on “${b.title}”: three variations, one wilder, one cheaper, one I can ship this weekend.`, mixFromCard(b));
+    else if (t.closest("[data-sbsave]")) mixSave(b).then(() => mixPatch("log"));
+    else if (t.closest("[data-sbcopy]")) copy(mixText(b), "the build");
+    return true;
+  }
+  const fc = t.closest("[data-fid]");
+  if (fc) {
+    const x = feedIdeas().find((y) => y.id === fc.dataset.fid);
+    if (!x) return true;
+    if (t.closest("[data-fbuild]")) stBuildNow(x);
+    else if (t.closest("[data-fsave]")) mixSave(x).then(feedPatch);
+    else if (!t.closest("a")) openPlan(x);
+    return true;
+  }
+  const fm = t.closest("[data-fmore]");
+  if (fm) { loadFeed("more", fm.dataset.fmore || undefined); return true; }
+  if (t.closest("[data-frefresh]")) { loadFeed("refresh"); return true; }
   const card = t.closest("[data-mix]");
   if (!card || t.closest("summary")) return false;
   const x = allMixes().find((y) => y.id === card.dataset.mix);
   if (!x) return false;
   if (t.closest("[data-mplan]")) { mixResearch(x); return true; }
+  if (t.closest("[data-mview]")) { openPlan(x, "saved"); return true; }
   if (t.closest("[data-mcopy]")) { copy(mixText(x), "the mix"); return true; }
-  if (t.closest("[data-mopen]")) { if (x.direction != null) { m.dir = x.direction; store("mixDir", m.dir); } mixOpenWith(mixFromCard(x), { toastText: "Opened in the mixer" }); return true; }
-  if (t.closest("[data-mremix]")) { mixSetSel(mixFromCard(x)); m.peeked = ""; mixPatch("mixtray", "mixopts", "mixlist"); mixStart(true); return true; }
-  if (t.closest("[data-msave]")) { mixSave(x).then(() => { if (S.disc.tab === "mix") mixPatch("mixres"); else renderDiscover(); }); return true; }
+  if (t.closest("[data-mopen]")) { mixOpenWith(mixFromCard(x), { text: `Take “${x.title}” further: ${x.pitch}`, toastText: "Opened in the Studio" }); return true; }
+  if (t.closest("[data-msave]")) { mixSave(x).then(() => renderDiscover()); return true; }
   return false;
 }
 $("dbody").addEventListener("toggle", (e) => {
   const k = e.target.dataset?.mdet;
   if (!k) return;
   if (e.target.open) S.disc.mix.open.add(k); else S.disc.mix.open.delete(k);
-  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+  const item = e.target.closest(".stitem"); if (item) item._h = null; // its html now differs from what's cached
+  const v = stView(); if (v) v._h = null;
 }, true);
 $("dbody").addEventListener("input", (e) => {
   if (S.mode !== "discover") return;
   const m = S.disc.mix;
-  if (e.target.matches("[data-mixq]")) { m.q = e.target.value; mixPatch("mixlist"); }
-  else if (e.target.matches("[data-mixdir]")) {
-    m.dir = e.target.value;
-    for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
-    clearTimeout(m.saveT); m.saveT = setTimeout(() => { store("mixDir", m.dir); mixPeek(); }, 400);
-    const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
-  }
+  if (e.target.matches("[data-stq]")) { stGrow(e.target); clearTimeout(S.studio.t.draft); S.studio.t.draft = setTimeout(() => store("studioDraft", e.target.value), 300); }
+  else if (e.target.matches("[data-stdq]")) { m.q = e.target.value; clearTimeout(S.studio.t.q); S.studio.t.q = setTimeout(() => mixPatch("drawer"), 60); }
 });
 $("dbody").addEventListener("change", (e) => {
-  if (S.mode !== "discover") return;
-  const m = S.disc.mix;
-  if (e.target.matches("[data-mixeng]")) { m.engine = e.target.value; store("mixEngine", m.engine); m.res = null; mixPatch("mixres"); mixPeek(); }
-  else if (e.target.matches("[data-mixall]")) { m.all = e.target.checked; mixPatch("mixlist"); }
+  if (S.mode !== "discover" || !e.target.matches("[data-steng]")) return;
+  S.studio.engine = e.target.value; store("studioEngine", S.studio.engine);
 });
 $("dbody").addEventListener("keydown", (e) => {
-  if (S.mode !== "discover" || !e.target.matches("[data-mixdir]") || e.key !== "Enter" || e.isComposing) return;
-  e.preventDefault(); store("mixDir", S.disc.mix.dir); mixStart(false);
+  if (S.mode === "discover" && e.key === "Enter" && e.target.matches?.(".fcard")) { e.preventDefault(); const x = feedIdeas().find((y) => y.id === e.target.dataset.fid); if (x) openPlan(x); return; }
+  if (S.mode !== "discover" || S.disc.tab !== "mix") return;
+  if (e.key === "Escape" && (S.studio.drawer || S.studio.menu)) { e.preventDefault(); e.stopPropagation(); S.studio.menu = false; if (S.studio.drawer) stCloseDrawer(); else mixPatch("bar"); stTa()?.focus({ preventScroll: true }); return; }
+  if (e.target.matches("[data-stq]") && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); stSend(e.target.value); }
+  else if (e.target.matches("[data-stdq]") && e.key === "Enter") { e.preventDefault(); const first = stView()?.querySelector("#stdl [data-ing]"); first?.click(); }
 });
+// The layout follows the Studio's own width (the side rail needs room), not the window's.
+new ResizeObserver(() => { const r = S.mode === "discover" && S.disc.tab === "mix" && stView()?.querySelector("#studio"); if (!r) return; if ((r.clientWidth >= 940) !== S.studio.wide) mixPatch("drawer"); else stSizes(r); }).observe($("dbody"));
 // Connections → "Mix these": the picked store cards go to the mixer (key names stay out).
 $("dbody").addEventListener("click", (e) => {
   if (S.mode !== "connections" || !e.target.closest("[data-cmix]")) return;
