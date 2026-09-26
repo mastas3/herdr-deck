@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { promptFromTail } from "../src/decisions";
 
 // The key mapping lives in the browser script between <inbox-keys> markers; run exactly that block.
-const src = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../public/js/inbox-cards.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("// <inbox-keys>"), src.indexOf("// </inbox-keys>"));
 const { yesNoOption, inboxKey } = new Function(`"use strict";${block};return { yesNoOption, inboxKey };`)();
 

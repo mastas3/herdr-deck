@@ -1,7 +1,7 @@
 // ══ Library ══════════════════════════════════════════════════════════════════
 // Discover → Library: how real builders built and got customers, from YouTube channels (Starter Story and similar)
 // and pages you add. Ask it a question, browse founder cards, read the playbooks, and manage the sources and the
-// background worker. Server: src/library.ts. This file ships appended to app.js (see appAsset in src/server.ts).
+// background worker. Server: src/library.ts. Loaded after the deck's own files, sharing their globals.
 // Every claim on screen links to the moment in the video where it was said; numbers are marked as claims.
 ICON.book = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.2c1.8-.8 3.8-.8 5.5.5v9.6c-1.7-1.3-3.7-1.3-5.5-.5zM13.5 3.2c-1.8-.8-3.8-.8-5.5.5v9.6c1.7-1.3 3.7-1.3 5.5-.5z"/></svg>';
 ICON.play = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5v9l7-4.5z"/></svg>';

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 // The client is one classic script; its pure detail-pane logic sits in a marked block we evaluate on its own.
-const src = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../public/js/core.js", import.meta.url), "utf8");
 const a = src.indexOf("// ── detail-pane logic (pure");
 const b = src.indexOf("// ── end detail-pane logic");
 const L = new Function(`${src.slice(a, b)}; return { effTab, tabAfterSelect, escAction, permChoices, ctxInfo, checkInfo, dirtyText };`)();

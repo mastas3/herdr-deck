@@ -6,7 +6,7 @@ import { test } from 'bun:test';
 import { createOpportunityService } from '../src/opportunity-service';
 
 test('Opportunity forms integrate with persistence, economics, provenance and demand gates', async () => {
-const source = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../public/js/opportunities.js', import.meta.url), 'utf8');
 const block = source.slice(source.indexOf('// ── Opportunities:'), source.indexOf('// ── end Opportunities'));
 const dir = mkdtempSync(join(tmpdir(), 'op-ui-contract-')); const service = createOpportunityService({dir});
 const root:any = {innerHTML:'', querySelector:()=>null, querySelectorAll:()=>[]};

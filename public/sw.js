@@ -1,9 +1,9 @@
 // herdr deck service worker: makes the app installable, keeps static assets instant,
 // shows a clear offline page when the Mac can't be reached, and shows push notifications from the hub.
 // Live data is never cached.
-const CACHE = "deck-v7";
-// Served under a content hash (?v=…, src/assets.ts): app.js and everything public/assets.json names.
-const HASHED = /^\/(?:app\.js|js\/[\w.-]+\.js|css\/[\w.-]+\.css)$/;
+const CACHE = "deck-v8"; // v8 drops v7's copy of the old app.js
+// Served under a content hash (?v=…, src/assets.ts): everything public/assets.json names.
+const HASHED = /^\/(?:js\/[\w.-]+\.js|css\/[\w.-]+\.css)$/;
 const ASSETS = [
   "/offline.html", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png", "/icon-180.png",
   "/fonts/BarlowSemiCondensed-400.woff2", "/fonts/BarlowSemiCondensed-600.woff2", "/fonts/SourceSerif4-400.woff2",

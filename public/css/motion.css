@@ -1,0 +1,20 @@
+/* ── micro-animations ── */
+.row { transition: background .12s, box-shadow .15s; }
+.row:active { transform: scale(.985); }
+/* Only a row that is new to the list slides in; re-inserting rows on a reorder must not replay it (FLIP moves those). */
+@starting-style { .row.born, .dcard, .toast { opacity: 0; transform: translateY(4px); } }
+.row, .dcard { transition: background .12s, box-shadow .15s, opacity .25s var(--ease), transform .25s var(--ease); }
+@media (prefers-reduced-motion: reduce) { .row { transition: none; } .row:active { transform: none; } .row.flash::after { animation: none; } .rows .sec-b { animation: none; } }
+.toast { transition: opacity .2s var(--ease), transform .25s var(--ease); }
+.btn { transition: background .12s, border-color .12s, color .12s, transform .1s; }
+.btn:active { transform: scale(.96); }
+.btn.primary:hover { filter: brightness(1.07); }
+.sec-b { animation: enter .16s var(--ease); }
+.rows.settled .sec-b { animation: none; }
+.views button { transition: background .12s, color .12s, border-color .15s, transform .1s; }
+.views button:active { transform: scale(.95); }
+.views button b { animation: tick .3s var(--ease); }
+.msg.user.pending { animation: sendup .28s var(--ease); }
+@keyframes sendup { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+dialog[open]::backdrop { animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; } }
