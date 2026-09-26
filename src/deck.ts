@@ -8,6 +8,7 @@ import { cleanTail, isShellOnly } from "./tail";
 
 export type Row = {
   key: string;
+  machine?: string; // set by the server: which machine this pane lives on
   herdr: string;
   workspaceId: string;
   workspace: string;

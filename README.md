@@ -10,6 +10,25 @@ bun run dev             # or run it in the foreground (DECK_PORT=4748 to use ano
 bun test
 ```
 
+## Machines
+
+Every machine with herdr can run its own deck (a node), and one deck (the hub) shows them all as tabs.
+
+```bash
+bin/deploy-node.sh conductor-linux      # copies the deck over SSH, runs it as a systemd --user (or launchd) service
+```
+
+Then list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
+
+```json
+{ "self": { "id": "mac", "label": "MacBook" },
+  "remotes": [{ "id": "linux", "label": "Linux · work", "ssh": "conductor-linux" }] }
+```
+
+The hub opens an SSH tunnel to each node's loopback port. It authenticates with the node's
+`~/.config/herdr-deck/api.token` (file mode 600, read once over SSH), mirrors the node's event stream, and forwards actions.
+Tunnels pick a free port and close when the hub exits. Remote sessions get briefs from the hub's own local model.
+
 ## Layout
 
 ```
@@ -25,6 +44,17 @@ bun test
 
 The list collapses (`[`) to a column of coloured squares and resizes by dragging its edge; the terminal
 collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
+
+## Daily use
+
+- **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
+  Stale and Empty start collapsed. Empty has a "Close all" link.
+- **⌘K** searches sessions on every machine, recipes, projects and commands in one place.
+- **Reply** (`r`): a message box under the terminal. Enter sends it to the agent.
+- **Recipes** (`.`): saved prompts. The defaults are status, run tests, review diff, commit, handoff note,
+  wrap up, step back, continue and /compact, and all of them are editable. They go to the current session or to every
+  selected session (⌘-click or `s`). **Standup** asks every idle agent for a one-line status.
+- **Briefs** write themselves when you stay on a session for a moment (local Ollama, cached).
 
 ## The list
 

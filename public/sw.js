@@ -1,6 +1,6 @@
 // herdr deck service worker: makes the app installable, keeps static assets instant,
 // and shows a clear offline page when the Mac can't be reached. Live data is never cached.
-const CACHE = "deck-v3";
+const CACHE = "deck-v4";
 const ASSETS = [
   "/offline.html", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png", "/icon-180.png",
   "/fonts/BarlowSemiCondensed-400.woff2", "/fonts/BarlowSemiCondensed-600.woff2", "/fonts/SourceSerif4-400.woff2",

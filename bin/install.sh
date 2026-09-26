@@ -38,7 +38,7 @@ else
   launchctl bootstrap "gui/$(id -u)" "$PLIST"
 fi
 up=""
-for _ in $(seq 1 40); do
+for _ in $(seq 1 100); do
   curl -s -o /dev/null "http://127.0.0.1:$PORT/health" && { up=1; break; }
   sleep 0.25
 done
