@@ -166,12 +166,28 @@ describe("validate", () => {
     has(validate(raw, files), "sources[0].grants[1]", "sources may only read");
   });
   test("a source can't both read your accounts and reach the web", () => {
+    // Every read-only grant lands in the same read worker, so two sources on different grants still mix.
     const { raw, files } = mail();
     raw.grants.web = { tools: ["WebFetch"] };
-    raw.sources[0].grants = ["mail.read", "web"];
-    has(validate(raw, files), "sources[0].grants", "could leak them");
-    raw.sources[0].grants = ["web"]; // web alone is fine
-    expect(validate(raw, files)).toEqual([]);
+    raw.sources.push({ ...raw.sources[0], id: "news", prompt: "Top news today", grants: ["web"] });
+    const ps = validate(raw, files);
+    has(ps, "grants", "could leak them");
+    expect(ps.filter((p) => p.message.includes("could leak them")).length).toBe(1);
+    // An unused web grant beside a mail grant is the same worker.
+    const unused = mail();
+    unused.raw.grants.web = { tools: ["WebFetch"] };
+    has(validate(unused.raw, unused.files), "grants", "could leak them");
+    // Web alone is fine.
+    const solo = mail();
+    delete solo.raw.grants["mail.read"];
+    solo.raw.grants.web = { tools: ["WebFetch"] };
+    solo.raw.sources[0].grants = ["web"];
+    expect(validate(solo.raw, solo.files)).toEqual([]);
+  });
+  test("a source's prompt can't pull in another source", () => {
+    const { raw, files } = mail();
+    raw.sources[0].prompt = "Summarise {source:inbox}";
+    has(validate(raw, files), "sources[0].prompt", "a source can't use another source's data");
   });
   test("sources: schema shape, refresh, missing grant", () => {
     const { raw, files } = mail();

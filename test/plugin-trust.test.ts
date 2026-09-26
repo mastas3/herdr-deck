@@ -61,6 +61,9 @@ describe("trustSummary", () => {
   test("any Bash tool needs the extra tick", () => {
     const raw: any = base();
     raw.grants["gh.read"] = { tools: ["Bash(gh search prs:*)"] };
+    // Scoped Bash reaches the web, so it can't share the read worker with the mail grant.
+    delete raw.grants["mail.read"];
+    raw.sources[0].grants = ["gh.read"];
     expect(trustSummary(bundle(raw, { "prompts/writer.md": "x" })).needsTick).toBe(true);
   });
 });

@@ -276,6 +276,11 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
       }
     }
   }
+  // Every read-only grant goes to one read worker (sources, and the first half of draft actions), used or not.
+  // If that worker could read your accounts or files and also reach the web, a prompt injection could leak them.
+  const readTools = [...grants.values()].filter((g) => !grantClass(g).writes).flatMap((g) => g.tools);
+  const webTools = readTools.filter((t) => toolClass(t).web).length;
+  if (webTools && webTools < readTools.length) c.bad("grants", "the plugin's read-only grants can't both read your accounts or files and reach the web: its agent would hold both at once and could leak them");
   const grantRefs = (v: unknown, path: string, want: "read" | "write") => c.list(v, path, 10, (gid, p) => {
     if (typeof gid !== "string" || !grants.has(gid)) return c.bad(p, `there's no grant named ${String(gid).slice(0, 40)}`);
     const w = grantClass(grants.get(gid)!).writes;
@@ -296,11 +301,9 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
     if (!c.shape(s, sp, ["id", "prompt", "grants", "schema"], ["refresh", "model", "machine"])) return;
     c.str(s.id, at(sp, "id"), { re: LOCAL_ID, hint: ID_HINT });
     c.prompt(s.prompt, at(sp, "prompt"), files);
+    // Sources refresh on their own, so one feeding another would carry data between them without anyone looking.
+    if (typeof s.prompt === "string" && /\{source:[^}]*\}/.test(promptText(files, s.prompt))) c.bad(at(sp, "prompt"), "a source can't use another source's data");
     grantRefs(s.grants, at(sp, "grants"), "read");
-    // A run that can read your accounts or files and also reach the web could be talked into leaking them.
-    const tools = (Array.isArray(s.grants) ? s.grants : []).flatMap((g: unknown) => (typeof g === "string" ? grants.get(g)?.tools ?? [] : []));
-    const web = tools.filter((t: string) => toolClass(t).web).length;
-    if (web && web < tools.length) c.bad(at(sp, "grants"), "a source can't both read your accounts or files and reach the web: that could leak them");
     if (c.schema(s.schema, at(sp, "schema"))) {
       if (s.schema.type !== "array" || s.schema.items?.type !== "object") c.bad(at(sp, "schema"), "must be a list of objects (type array, items of type object)");
       else itemProps.set(s.id, s.schema.items.properties);
