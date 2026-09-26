@@ -1,6 +1,6 @@
 # Plugins: installable abilities, integrations and whole businesses
 
-Date: 2026-09-26 · Branch: `deck-plugins` · Status: design approved in chat, spec awaiting review
+Date: 2026-09-26 · Branch: `deck-plugins` · Status: approved (2026-09-26); step 1 plan in docs/superpowers/plans/2026-09-26-plugins-1-format-and-install.md
 
 ## Why
 
