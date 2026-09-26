@@ -3697,7 +3697,7 @@ async function discStart(kind, extra, title) {
   try {
     const r = await api("/api/discover/prompt", { kind, ...extra });
     S.disc.pending = r.slug ? { slug: r.slug, text: extra.text } : null;
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Discover", prompt: r.prompt, kind: "claude", label: r.label, title });
+    await openNew({ machine: S.self, ...ownFolder(r, r.slug || extra.repo?.name || extra.title || r.label), project: "Discover", prompt: r.prompt, kind: "claude", label: r.label, title });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -3722,7 +3722,7 @@ async function ideaResearch(text) {
   if (!r && text.length >= 4) { try { r = await api("/api/discover/prompt", { kind: "research", text }, 10_000); } catch (e) { toast(e.message, true); } }
   if (!r) return;
   S.disc.pending = { slug: r.slug, text };
-  await openNew({ machine: S.self, cwd: r.cwd, project: "Idea lab", prompt: r.prompt, kind: "claude", label: `Plan: ${text.slice(0, 28)}`, title: "Research & plan this idea" });
+  await openNew({ machine: S.self, ...ownFolder(r, r.slug || text), project: "Idea lab", prompt: r.prompt, kind: "claude", label: `Plan: ${text.slice(0, 28)}`, title: "Research & plan this idea" });
   promptTop();
 }
 // A research session that actually started gets listed under Ideas right away (as "Researching").
@@ -4563,7 +4563,7 @@ function stBuildAt(key) {
 async function stBuildNow(b) {
   try {
     const r = await api("/api/discover/studio/build-prompt", { build: b }, 10_000);
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
+    await openNew({ machine: S.self, ...ownFolder(r, b.title), project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -4971,7 +4971,7 @@ async function leadsDeep() {
   try {
     const r = await api("/api/leads/prompt", { kind: "deep", text, dir: L.dir }, 10_000);
     L.pendingReport = { slug: r.slug, text, dir: L.dir };
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: L.dir === "audience" ? "Deep dive: what this audience needs" : "Deep dive: who needs this" });
+    await openNew({ machine: S.self, ...ownFolder(r, `leads ${text}`), project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: L.dir === "audience" ? "Deep dive: what this audience needs" : "Deep dive: who needs this" });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -4979,7 +4979,7 @@ async function leadsPlan(item, text, dir, places) {
   try {
     const r = await api("/api/leads/prompt", { kind: "plan", text, dir, item, places }, 10_000);
     S.disc.pending = { slug: r.slug, text: r.ideaText }; // the plan is written to Ideas; Discover lists it there once it starts
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: "Plan the app for them" });
+    await openNew({ machine: S.self, ...ownFolder(r, item?.idea || item?.label || text), project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: "Plan the app for them" });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -5274,7 +5274,7 @@ async function rsPlan(c, n) {
   try {
     const r = await api("/api/research/plan-prompt", { id: c.id, niche: n.id });
     S.disc.pending = { slug: r.slug, text: r.idea };
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Research", prompt: r.prompt, kind: "claude", label: r.label, title: `Plan the app: ${n.name.slice(0, 40)}` });
+    await openNew({ machine: S.self, ...ownFolder(r, n.name), project: "Research", prompt: r.prompt, kind: "claude", label: r.label, title: `Plan the app: ${n.name.slice(0, 40)}` });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -7311,6 +7311,13 @@ function projectHome(p) {
   return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
 }
 /** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */
+/** Discover actions start in a folder of their own under Projects, named after the idea; it's made only when you confirm the dialog. */
+function ownFolder(r, name) {
+  if (r.folder) return { cwd: r.folder, mkdir: true };
+  if (!/(^|\/)Projects\/?$/.test(String(r.cwd ?? ""))) return { cwd: r.cwd };
+  const slug = String(name ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").slice(0, 48).replace(/^-+|-+$/g, "") || `idea-${Date.now().toString(36)}`;
+  return { cwd: `${String(r.cwd).replace(/\/+$/, "")}/${slug}`, mkdir: true };
+}
 async function openNew(pre) {
   pre = pre && pre.cwd ? pre : undefined;
   newMkdir = pre?.mkdir ? pre.cwd : null; // quests: a new run's folder is made only when you confirm
