@@ -19,12 +19,14 @@ ability on top of that and let anyone else install it:
 |---|---|
 | Who installs plugins | **Strangers from day one.** Plugins are untrusted; the deck never runs plugin code. |
 | How plugins get UI | **Templates first.** The plugin declares data and a layout; the deck renders it in its own style. An iframe escape hatch is out of scope. |
-| How views and actions reach services | **Through an agent.** A locked-down headless `claude -p` with only the tools the plugin declares fetches and acts. |
+| How views and actions reach services | **Through an agent.** A locked-down agent in a **herdr pane**, with only the tools the plugin declares, fetches and acts. (First designed as headless `claude -p`; the user switched it to herdr panes after approving the spec.) |
 | What a business pack contains | **Blueprint + repo links.** Projects (optionally a public git repo pinned to a commit), roles, recipes, schedules, connections, playbook. Nothing runs until the user presses Start. |
 | How plugins are made and found | All four: **catalog**, **install from URL/file**, **agent generates one**, **export from my setup** — export ships in v1. |
 | Structure | **One format** (`plugin.json`) with extension points; any git repo with `plugin.json` at its root is a plugin. |
 
 ## Spike: agent sources are viable (2026-09-26)
+
+The spike used `claude -p`. The runner now uses herdr panes (section 2), but the tool-restriction findings carry over, because they are the same CLI flags.
 
 `claude -p --model haiku --tools "<one Gmail tool>" --allowedTools "<same>" --setting-sources "" --no-session-persistence`
 reached the claude.ai Gmail connector and returned `id`, `messages`, `viewUrl`.
@@ -36,7 +38,7 @@ reached the claude.ai Gmail connector and returned `id`, `messages`, `viewUrl`.
 | `--strict-mcp-config` | **no** (drops claude.ai connectors) | $0.016 | — |
 
 Consequences: views are **cached snapshots**, refreshed in the background, never live; the runner restricts
-tools with `--tools`, not `--strict-mcp-config`; every run has a spend cap.
+tools with `--tools`, not `--strict-mcp-config`; every plugin has a daily usage cap. Keeping a worker pane alive keeps the cache warm, so runs cost about the warm figure.
 
 ## 1. The format
 
@@ -101,7 +103,7 @@ Field rules:
 |---|---|---|
 | `sources` | Agent-fetched data, schema-checked, cached on the hub | Views; `deck_plugin_data` MCP tool; `{source:…}` in prompts |
 | `views` | `inbox`, `list` or `board` template bound to a source, plus the shared item detail pane | Pinned: a button beside Inbox / History / Discover; else inside the plugin's card |
-| `actions` | `session`: opens New session prefilled. `draft`: headless draft → you review → headless send | Item detail pane |
+| `actions` | `session`: opens New session prefilled. `draft`: worker-pane draft → you review → one-off write pane sends | Item detail pane |
 | `recipes` | Recipes with a plugin badge | Connections → Recipes |
 | `projects`, `roles` | Repo clone and folder, standing agent sessions | Projects page with **Set up** |
 | `playbook` | Milestones | The project's Journey |
@@ -116,8 +118,8 @@ it is `https:`, and the action buttons.
 
 - `plugins/<id>/`: the installed files, exactly as approved.
 - `plugins.json`: `{ id, version, from: { url?, ref?, file?, catalog? }, enabled, approved: { grants, repos, schedules, hash }, installedAt }[]`.
-- `plugins/<id>/cache/<source>.json`: `{ at, items, error?, cost }`.
-- `plugins/<id>/spend.json`: spend per day.
+- `plugins/<id>/cache/<source>.json`: `{ at, items, error?, tokens, run: <pane key> }`.
+- `plugins/<id>/usage.json`: tokens per day. `plugins/<id>/work/`: the worker pane's empty folder.
 
 ## 2. Trust and execution
 
@@ -141,29 +143,47 @@ because grants box those runs in. Changes to role or schedule prompts need appro
 full agent sessions with the user's own permissions. The approved
 manifest's hash is stored, so a file edited on disk after approval disables the plugin until it is re-approved.
 
-**Headless runner (`src/plugin-runner.ts`).** Every source refresh and draft action goes through one function
-that builds the arguments from the approved grants only:
+**Runner: herdr worker panes (`src/plugin-runner.ts`).** Changed at the user's request after spec approval:
+no `claude -p`. Every source refresh and draft action runs in a **herdr pane**: a real, visible agent session
+the deck starts and messages the same way as any other.
 
-```
-claude -p --model <haiku|sonnet> --effort low
-  --tools "<union of the run's grant tools>" --allowedTools "<same>"
-  --setting-sources "" --no-session-persistence --disable-slash-commands
-  --output-format json --system-prompt <runner system prompt + schema>
-  cwd: fresh temp dir; stdin: the plugin prompt
-```
+- **Worker panes.** Each enabled plugin that has sources gets one long-lived **read worker** pane. The deck
+  starts it through the existing launch path (`/api/new`, flags from `src/args.ts:agentArgs`, extended with
+  `--tools`/`--allowedTools`/`--setting-sources`/`--append-system-prompt`). The flags come only from the approved grants:
 
-- Timeout 90 s. The output must parse as JSON and match the schema, or the run fails; items that don't match are dropped.
-- Spend cap per plugin per day: $1 by default, adjustable on the card. `total_cost_usd` from each run is added
-  to `spend.json`. At the cap, runs stop until local midnight and the card says so.
-- At most two plugin runs at once on a machine; further runs queue. Spawned, never blocking the event loop.
+  ```
+  claude --model <haiku|sonnet> --effort low
+    --tools "<union of the plugin's read-grant tools>" --allowedTools "<same>"
+    --setting-sources "" --disable-slash-commands
+    --append-system-prompt <runner prompt: answer each [plugin-run <id>] request with one JSON block, nothing else>
+    cwd: ~/.config/herdr-deck/plugins/<id>/work/ (empty)
+  ```
+
+  Workers live in their own herdr tab, labelled `plugins`. Deck rows mark them `plugin: <name>` and group them
+  apart: they never land in Inbox "Needs you" unless blocked on a permission prompt, which grants are set up to prevent.
+- **A run** is a message sent to the idle worker: `[plugin-run r<id>] <source or draft prompt, with the schema>`.
+  The deck reads the pane's Claude Code transcript (the existing incremental parser), takes the first assistant
+  message after that request that contains the run id's JSON block, parses it and checks it against the schema.
+  Items that don't match are dropped.
+- **Why panes:** every plugin run is auditable in the deck like any session, and the user can open it, watch it or
+  press Stop. The cache stays warm between refreshes, and there's no process start per run.
+- **Upkeep:** runs to one worker are serialized, and a request waits while the worker is busy. A worker is
+  restarted after 20 runs or when its context passes about 60% (from the transcript's token counts), and whenever
+  its grants change. Workers stop when their plugin is disabled, and after 30 min with no view open (the `presence`
+  map), then restart on demand. The first start pays the shell and agent start-up (~10 s or more).
+- Timeout: 90 s per run, measured from the send. On timeout, Esc is sent to the pane.
+- **Usage cap** per plugin per day, by tokens (the transcript's usage fields), not dollars. The default is
+  2M tokens/day, adjustable on the card and shown with a rough cost estimate. At the cap, runs stop until local midnight.
+- At most two plugin worker panes are busy at once per machine; further runs queue. Nothing blocks the event loop.
 
 **Reading and writing are separate runs.** Source runs and the first half of a draft action get only
 non-`writes` grants. A `draft` action:
 
-1. Runs with read grants and returns a payload matching `draftSchema`.
+1. Runs in the plugin's read worker and returns a payload matching `draftSchema`.
 2. The deck shows that exact payload (editable text fields).
-3. On **Send**, a second run gets only the action's `writes` grants and a fixed system prompt: "Perform exactly
-   this operation with these arguments. Do nothing else." The payload goes in as JSON data.
+3. On **Send**, the deck starts a **fresh, short-lived write pane** with only the action's `writes` grants and a
+   fixed appended system prompt: "Perform exactly this operation with these arguments. Do nothing else." The
+   payload goes in as JSON data. The pane closes when its result lands, and moves to the Closed list like any closed session.
 
 Content the agent reads can distort a draft, but it can't send anything the user didn't see.
 
@@ -179,18 +199,18 @@ templates. No plugin HTML, CSS or script. Links are only made from `https:` URLs
 - Schedules may only target role sessions of the same plugin. If the role's session isn't running, the
   schedule records "skipped: Writer isn't running" instead of starting one.
 
-**Across machines.** Plugins live on the hub. A source or role with `"machine": "other"` runs through the
-existing federation tunnel on that machine's node, which uses the same runner code and flags. A node refuses
-plugin runs that don't come from its hub.
+**Across machines.** Plugins live on the hub. A source or role with `"machine": "other"` gets its worker pane
+on that machine, started and messaged through the existing federation tunnel the same way the hub starts and
+messages remote sessions today.
 
 ## 3. UI and data flow
 
 **Plugins view** (a fourth view button with a puzzle icon), with four tabs:
 
-- **Installed**: cards with state, today's spend, last refresh and error, and Enable / Update / Remove.
+- **Installed**: cards with state, today's usage, last refresh and error, a link to the worker pane, and Enable / Update / Remove.
 - **Catalog**: built-in entries shipped in `plugins-catalog/` in this repo (Gmail inbox, GitHub PRs, Content Studio sample pack).
 - **Add**: paste a git or HTTPS URL, drop `plugin.json` or a `.zip`, or **Describe it**. Describe it has an agent
-  (no tools, like `mix.ts`) write a manifest from the description and the user's connection inventory (names
+  in a no-tools herdr pane write a manifest from the description and the user's connection inventory (names
   only); the validator's errors are fed back for up to 2 fix-up rounds. Every path ends on the trust screen with a
   live preview (one source run, counted against the cap) before anything is installed.
 - **Package**: export (section 4).
@@ -224,7 +244,7 @@ triggers a paid refresh). `deck_connections` lists installed plugins and their s
 | Module | Job |
 |---|---|
 | `src/plugins.ts` | Schema and validator, trust summary and update diff, install/remove/enable, `plugins.json`, the catalog |
-| `src/plugin-runner.ts` | Runner argument building, spawning, schema filtering, spend and concurrency |
+| `src/plugin-runner.ts` | Worker pane flags from grants, start/restart/stop, run ids, reading results from the transcript, schema filtering, usage cap and queueing |
 | `src/plugin-sched.ts` | Schedule parsing and due-time calculation (pure, fake clock), hooked into the hub's existing timer |
 | `src/plugin-playbook.ts` | `playbook.md` → Journey ladder items |
 | `src/plugin-export.ts` | Export drafting and the scrubber |
@@ -241,7 +261,7 @@ actually install); `POST /api/plugins/remove`, `/enable`, `/cap`; `POST /api/plu
 1. **Collect** (deterministic): each chosen session's first user prompt, agent, model and folder; recipes and
    automations referencing the project; connections the sessions used (from transcripts, as Connections
    already does); the repo remote and HEAD; Journey milestones.
-2. **Draft**: a no-tools agent turns that into `plugin.json`, `prompts/*.md` and `playbook.md`. Generic role
+2. **Draft**: an agent in a no-tools herdr pane turns that into `plugin.json`, `prompts/*.md` and `playbook.md`. Generic role
    prompts replace one-off chatter.
 3. **Scrub** (`plugin-export.ts`, deterministic code, not an agent). It builds on `jev.ts:scrub()` and replaces:
    - the home path → `~`,
@@ -263,17 +283,19 @@ actually install); `POST /api/plugins/remove`, `/enable`, `/cap`; `POST /api/plu
 | Invalid manifest | Rejected at install with the exact JSON path and reason |
 | Run timeout, bad JSON or schema mismatch | Stale cache kept; error chip with Retry |
 | Missing connection | "Needs Gmail", linking to Connections; sources that need it don't run |
-| Spend cap reached | Refreshes pause until midnight; the card shows spend and the cap |
+| Usage cap reached | Refreshes pause until midnight; the card shows usage and the cap |
+| Worker pane blocked, died or closed by the user | Run fails with "worker stopped"; the next run starts a fresh worker |
 | Clone fails | That setup step shows the error and can be retried; other steps work |
 | Approved files changed on disk | Plugin disabled until re-approved |
-| Uninstall | Removes files, cache, spend and schedules; asks whether to keep cloned repos and sessions (default keep) |
+| Uninstall | Removes files, cache, usage, schedules and worker panes; asks whether to keep cloned repos and sessions (default keep) |
 
 **Testing** (`bun test`, no live agents):
 
 - `test/plugins.test.ts`: validator (good manifests; unknown keys; bad ids; bad grants; files escaping the
   folder; bad `every` and `refresh`), trust summary text, update diff, approved-hash tamper check.
-- `test/plugin-runner.test.ts`: exact `--tools` per run; a `writes` grant never in a source or draft run; the
-  send run has only the action's write grants; schema filtering; spend cap arithmetic.
+- `test/plugin-runner.test.ts`: exact worker flags per grant set; a `writes` grant never in a read worker; the
+  write pane has only the action's write grants; run-id matching against a transcript fixture (late, duplicate or
+  foreign messages ignored); restart rules; schema filtering; usage cap arithmetic.
 - `test/plugin-sched.test.ts`: due times on a fake clock, including DST and weekday rules.
 - `test/plugin-playbook.test.ts`: checklist → ladder items.
 - `test/plugin-export.test.ts`: scrubber against a fixture of paths, emails, tokens, hostnames and private repo URLs; placeholders round-trip.
@@ -284,13 +306,15 @@ actually install); `POST /api/plugins/remove`, `/enable`, `/cap`; `POST /api/plu
 ## Out of scope for v1
 
 A public registry and search, signing and author identity, a sandboxed iframe UI, plugin code of any kind,
-non-Claude runners for sources (Codex/OpenCode roles are fine; headless runs are Claude only), payments for
+non-Claude worker panes (Codex/OpenCode roles are fine; workers are Claude Code only), payments for
 plugins, and automatic updates from git (updates are user-initiated and re-show the trust diff).
 
 ## Build order
 
 1. Format, validator, storage and trust screen, with install from file and catalog (no runs yet).
-2. Runner, sources, `inbox`/`list` views, `deck_plugin_data`. Ships the Gmail inbox and GitHub PRs plugins.
+2. Worker-pane runner, sources, `inbox`/`list` views, `deck_plugin_data`. **First task:** confirm an interactive
+   `claude --tools <gmail tool> --allowedTools <same> --setting-sources ""` in a herdr pane reaches the Gmail connector
+   and cannot use any other tool. The spike only proved this for `-p`. Ships the Gmail inbox and GitHub PRs plugins.
 3. Actions (`session` and `draft` → send), plus the `board` template.
 4. Projects, roles, playbook, schedules, Set up flow, with the Content Studio sample pack.
 5. Install from URL, and Describe it (generation).
