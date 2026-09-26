@@ -3258,7 +3258,28 @@ function plugCatalog(d) {
 }
 
 function plugAdd() {
-  return `<div class="padd"><p class="hint">Adding a plugin from a file arrives in the next part of this update.</p></div>`;
+  return `<div class="padd">
+    <label class="pdrop${S.plug.busy ? " busy" : ""}" data-pdrop>
+      <input type="file" accept=".json,.zip,application/json,application/zip" data-pfile hidden>
+      <b>${S.plug.busy ? "Checking it…" : "Drop a plugin.json or a .zip here"}</b>
+      <span>or tap to choose a file. Nothing is installed until you’ve reviewed it.</span>
+    </label>
+    <p class="hint">A .zip can be a plugin’s folder or a GitHub “Download ZIP” of a repo with plugin.json at its top.</p>
+  </div>`;
+}
+async function plugUpload(file) {
+  if (!file || S.plug.busy) return;
+  if (file.size > 5 * 1024 * 1024) return toast("That file is over 5 MB. A plugin is a plugin.json and a few prompt files.", true);
+  S.plug.busy = true; renderPlugins();
+  try {
+    const res = await fetch(`/api/plugins/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", headers: { "x-deck-token": S.token }, body: file });
+    if (res.status === 403) { reconnectSoon(200); throw new Error("Reconnecting to the deck…"); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Upload failed (${res.status})`);
+    S.plug.busy = false;
+    return plugShow(data);
+  } catch (e) { toast(e.message, true); }
+  S.plug.busy = false; renderPlugins();
 }
 
 /** The trust screen: what the plugin may do, from its grants, repos, roles and schedules. */
@@ -3338,6 +3359,14 @@ $("dbody").addEventListener("click", async (e) => {
 $("dbody").addEventListener("change", (e) => {
   if (S.mode !== "plugins") return;
   if (e.target.matches("[data-ptick]")) { S.plug.tick = e.target.checked; renderPlugins(); }
+  if (e.target.matches("[data-pfile]")) plugUpload(e.target.files?.[0]);
+});
+$("dbody").addEventListener("dragover", (e) => { if (S.mode === "plugins" && e.target.closest("[data-pdrop]")) { e.preventDefault(); e.target.closest("[data-pdrop]").classList.add("over"); } });
+$("dbody").addEventListener("dragleave", (e) => { e.target.closest?.("[data-pdrop]")?.classList.remove("over"); });
+$("dbody").addEventListener("drop", (e) => {
+  if (S.mode !== "plugins" || !e.target.closest("[data-pdrop]")) return;
+  e.preventDefault(); e.stopPropagation();
+  plugUpload(e.dataTransfer?.files?.[0]);
 });
 
 // ══ Discover ═════════════════════════════════════════════════════════════════
