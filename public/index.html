@@ -198,6 +198,10 @@ body.moving { cursor: grabbing; user-select: none; }
 .sec.proj .sec-h { color: var(--ink); font-size: 14.5px; }
 .sec.proj .sec-h .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--pc); flex: none; }
 .sec.proj .sec-h .dots { margin-left: auto; display: flex; gap: 3px; }
+.sec-h .padd { display: grid; place-items: center; width: 22px; height: 22px; margin: -3px -2px -3px 4px; border-radius: 6px; color: var(--ink-3); opacity: 0; transition: opacity .12s, background .12s; flex: none; }
+.sec-h:hover .padd, .sec-h:focus-visible .padd, .sec-h .padd:focus-visible { opacity: 1; }
+.sec-h .padd:hover { background: var(--hover); color: var(--ink); }
+@media (hover: none) { .sec-h .padd { opacity: .8; } }
 .row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 8px; padding: 7px 8px 8px; border-radius: 9px; cursor: pointer; align-items: baseline; transition: background .1s, transform .08s; }
 .row:hover { background: var(--hover); }
 .row.sel { background: var(--sel); }

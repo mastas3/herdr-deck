@@ -82,6 +82,7 @@ const plain = (t) => String(t ?? "").replace(/^\s*\[\d{4}-\d\d-\d\d[^\]]*\]\s*/,
 const home = (p) => String(p ?? "").replace(/^\/(Users|home)\/[^/]+/, "~");
 const isAgent = (r) => ["claude", "codex", "opencode"].includes(r?.agent);
 const ICON = {
+  plus: `<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg>`,
   chev: '<svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>',
   back: '<svg class="chev" style="transform:rotate(90deg)" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 6 4 4 4-4"/></svg>',
   more: '<svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="12.5" cy="8" r="1.3"/></svg>',
@@ -467,7 +468,8 @@ function renderList() {
       if (g.proj) sec.style.setProperty("--pc", pc(g.proj));
       const nb = g.rows.filter((r) => r.status === "blocked" || r.status === "done").length, nw = g.rows.filter((r) => r.status === "working").length;
       const dots = g.proj ? `<span class="dots">${nb ? `<span class="dot" style="--c:var(--blocked)" title="${nb} need you"></span>` : ""}${nw ? `<span class="dot" style="--c:var(--working)" title="${nw} working"></span>` : ""}</span>` : "";
-      const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>` : "";
+      const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>`
+        : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
       sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
@@ -2019,6 +2021,7 @@ function moreMenu(anchor) {
     isPhone() && { html: "Switch herdr to this pane", run: () => focusPane(r.key) },
     { html: "Copy link", run: () => copy(linkUrl(r), "link") },
     r.resume && { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
+    projectHome(r.project) && { html: `New session in ${esc(r.project)}<small>${esc(home(projectHome(r.project).cwd))}</small>`, run: () => openNew(projectHome(r.project)) },
     { html: "Copy folder path", run: () => copy(r.cwd, "path") },
     { html: "Rename tab…", run: () => { const label = prompt("New tab name", r.tab || r.title); if (label != null) api("/api/rename", { key: r.key, label }).then(() => toast("Renamed")).catch((x) => toast(x.message, true)); } },
     { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
@@ -2122,7 +2125,8 @@ function paletteItems(q) {
     if (tools.length) out.push({ head: n > 1 ? `Tools for ${n} selected` : `Tools for “${cur?.title ?? "session"}”` }, ...tools.map(({ t }) => ({ html: `<span>${esc(t.label)}</span><small>${esc(t.hint ?? "")}</small>`, run: () => runTool(t) })));
   }
   const cmds = [
-    { t: "New session", k: "n", run: openNew },
+    { t: "New session", k: "n", run: () => openNew() },
+    cur && projectHome(cur.project) && { t: `New session in ${cur.project}`, run: () => openNew(projectHome(cur.project)) },
     { t: "Live board: everything working right now", k: "l", run: () => setBoard(true) },
     cur && { t: "Message this session", k: "r", run: focusReply },
     cur && !cur.app && { t: "Jump to this pane in herdr", k: "f", run: () => focusPane(cur.key) },
@@ -2193,18 +2197,28 @@ async function loadNewOptions() {
   $("nCwdSugg").innerHTML = recent.length ? `<span class="hint">Recent:</span>` + recent.map((p) => `<button type="button" data-cwd="${esc(home(p))}" title="${esc(p)}">${esc(p.split("/").pop())}</button>`).join("") : "";
   renderKinds();
 }
-async function openNew() {
+/** Where a project lives: the folder and machine of its most recent session. */
+function projectHome(p) {
+  const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && !r.app && inScope(r)).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0];
+  return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
+}
+/** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */
+async function openNew(pre) {
+  pre = pre && pre.cwd ? pre : undefined;
   const cur = rowOf(S.sel);
-  newMachine = (S.machine !== "all" ? S.machine : cur?.machine) ?? S.self;
+  newMachine = pre?.machine ?? (S.machine !== "all" ? S.machine : cur?.machine) ?? S.self;
   const ms = realMachines();
   if (!ms.some((m) => m.id === newMachine)) newMachine = S.self;
   $("nMachineWrap").hidden = ms.length <= 1;
   $("nMachine").innerHTML = ms.map((m) => `<button type="button" data-m="${esc(m.id)}" aria-pressed="${m.id === newMachine}" ${m.online ? "" : "disabled"}>${esc(m.label)}</button>`).join("");
   $("nPrompt").value = ""; $("nLabel").value = "";
   $("nFocus").checked = load("newFocus", false);
+  $("newDlg").querySelector("h3").textContent = pre ? `New session in ${pre.project}` : "New session";
+  if (pre) $("nCwd").value = home(pre.cwd);
   $("newDlg").showModal();
   renderKinds();
   await loadNewOptions();
+  if (pre) { $("nCwd").value = home(pre.cwd); renderCmd(); }
   if (!isPhone()) (newKind === "shell" ? $("nCwd") : $("nPrompt")).focus();
 }
 function renderKinds() {
@@ -2275,6 +2289,8 @@ $("machines").addEventListener("click", (e) => { const b = e.target.closest("[da
 $("groupSeg").addEventListener("click", (e) => { const g = e.target.closest("[data-group]")?.dataset.group; if (g) setGroup(g); });
 $("live").onclick = () => setBoard(!S.board);
 $("rows").addEventListener("click", async (e) => {
+  const newin = e.target.closest('[data-secact="newin"]');
+  if (newin) { e.stopPropagation(); return openNew(projectHome(newin.dataset.proj)); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
