@@ -67,7 +67,6 @@ function frozenOrder(shown, next) {
   return { keys: shown.filter((k) => want.has(k)), held: next.filter((k) => !have.has(k)) };
 }
 /* @pure:list-end */
-const SECTIONS = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"], ["stale", "Stale"], ["empty", "Empty"]];
 function sectionOf(r) {
   const k = rank(r);
   return k <= 1 ? "needs" : k === 2 ? "running" : k === 6 ? "empty" : k === 5 ? "stale" : "quiet";
