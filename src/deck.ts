@@ -44,6 +44,7 @@ export type Row = {
   dirty?: number;
   startedAt?: number;
   createdAt?: number;
+  bornAt?: number; // first seen by this deck (only for panes opened while it runs)
   lastActiveAt?: number;
   model?: string;
   ctxTokens?: number;
@@ -90,6 +91,9 @@ export class Deck {
   kids = new Map<number, number[]>();
   metas = new Map<string, AgentMeta>();
   git = new Map<string, { at: number; root?: string; branch?: string; dirty?: number }>();
+  /** When each pane first appeared; panes that were already there when the deck started count as old. */
+  born = new Map<string, number>();
+  private bornReady = false;
   rows = new Map<string, Row>();
   private sent = new Map<string, string>();
   private listeners = new Set<(patch: Patch) => void>();
@@ -446,15 +450,18 @@ export class Deck {
         let termTitle = cleanTitle(p.terminal_title_stripped, basename(p.cwd));
         // A title that is just the launch command ("claude --dangerously-…") says nothing about the work.
         if (p.agent && (termTitle === p.agent || termTitle.startsWith(`${p.agent} `))) termTitle = "";
-        const title =
-          meta?.title && p.agent === "opencode" ? meta.title
+        // A name you gave the pane (rename) beats every guess.
+        const title = p.label?.trim() ? p.label.trim()
+          : meta?.title && p.agent === "opencode" ? meta.title
           : termTitle || meta?.title || shortPrompt(meta?.firstPrompt) || p.label || (shellOnly ? "shell" : lead?.cmdline ?? "");
         const status = empty && p.agent_status !== "working" ? "empty" : p.agent_status ?? "unknown";
         const ins = this.insights.get(key);
         const cwdRoot = projectRoot(p.cwd) ?? g?.root ?? p.cwd;
         const projRoot = ins?.project?.root ?? cwdRoot;
+        if (!this.born.has(key)) this.born.set(key, this.bornReady ? Date.now() : 0);
         rows.set(key, {
           key,
+          bornAt: this.born.get(key) || undefined,
           herdr: s.name,
           workspaceId: p.workspace_id,
           workspace: wss.get(p.workspace_id)?.label ?? p.workspace_id,
@@ -536,6 +543,7 @@ export class Deck {
     this.attachPorts(rows);
 
     this.rows = rows;
+    this.bornReady = true;
     this.emit();
   }
 

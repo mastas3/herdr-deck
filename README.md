@@ -18,7 +18,9 @@ Every machine with herdr can run its own deck (a node), and one deck (the hub) s
 bin/deploy-node.sh my-linux-box      # copies the deck over SSH, runs it as a systemd --user (or launchd) service
 ```
 
-Then list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
+Or do it from the deck: **Settings → Machines…** lists every machine, adds one by SSH host (it runs the same
+install and connects without a restart), renames or removes one (removing only stops watching it).
+By hand, list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
 
 ```json
 { "self": { "id": "mac", "label": "MacBook" },
@@ -52,10 +54,21 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 - **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.
 - **Reply** (`r`): the message box under the chat. Enter sends it to the agent. Attach files with the paperclip,
   by dropping them on the chat, or by pasting; they're saved on the session's machine and the agent gets the paths.
+- **Queue or steer:** while an agent is working, Enter **queues** the message (the hub holds it and sends it
+  when the turn ends; queued messages show above the box, where you can edit, send now or remove them), and
+  **Steer** (⌘Enter) sends it right away. Queues live in `~/.config/herdr-deck/queue.json`.
+- **Long pastes** (over 4,000 characters or 40 lines) become a chip instead of a wall of text. On send each
+  one is saved as a file next to the session and the agent gets the path; preview it, put it back inline, or
+  remove it first. Anything over 12,000 characters travels the same way.
+- **`/` commands:** type `/` for the session's own commands: Claude Code's built-ins (read from the installed
+  binary, so they match your version), your commands, project commands, plugin commands and skills; Codex and
+  OpenCode built-ins and custom prompts. Arrows to move, Tab to insert, Enter to run. Deck tools are listed too.
+- **Rename** (`e`, or ⋯ → Rename): renames the herdr pane (and the tab when the pane has it to itself), the
+  herdr agent name, and runs `/rename` in Claude Code or Codex so their own history shows it (queued if busy).
 - **Status line** above the message box: project, context used, and the plan limits for that agent
   (Claude 5-hour and weekly from `~/.claude/rate-cache.json`, written by the Claude status line script;
   Codex limits from its session files).
-- **Tools** (`.`, the Tools button, or the ☆): one click that makes the agent, or the deck, do something:
+- **Tools** (`.`, or the ⚡ Tools button next to the message box): one click that makes the agent, or the deck, do something:
   check my email for context, related past work (from History), attach files, handoff → compact (writes a
   handoff note to `~/.config/herdr-deck/handoffs/`, waits, then compacts around it), status line, step back,
   update the wiki, write a handoff note, verify it's done, run the tests, review your diff, Tailscale link,
@@ -77,10 +90,19 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
   Open one to read the whole chat, jump to the match, and **Resume** it in a new herdr tab. Each machine
   indexes its own transcripts into `~/.config/herdr-deck/history.db` (SQLite FTS5), in a short-lived child
   process that re-scans every minute.
-- **Tools**: what every tool does and exactly what it sends; add, edit and delete your own.
-- **Connections**: what each machine can reach. Coding agents, AI subscriptions, MCP servers and connectors,
-  signed-in CLIs, API key names (never values), browser profiles and skills. **Suggest mega projects**
-  starts a Claude session that proposes ambitious work using them.
+- Every view has a ✕ (and Esc) to get back to the session.
+- **Tools** (Tools menu → Manage tools): what every tool does and exactly what it sends; add, edit and delete your own.
+- **Connections** (Tools menu → Connections, or ⌘K): what each machine can reach, as cards: services
+  (GitHub, Vercel, Netlify, Cloudflare, Supabase… however they're reached: a CLI, `npx`, an app, an MCP
+  server or an API key name), AI agents and plans, MCP servers from every agent app, SSH hosts, API key names
+  (never values), dev tools, browsers, skills, and your own additions. Each card says what it's for and how
+  agents should use it (editable). Pick some and **Add to** the session: the agent gets them as context.
+  Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`. Hide what you don't need;
+  your notes and additions live in `~/.config/herdr-deck/connections.json`.
+- **Simple mode** (Settings, or ⌘K): big type, only the essentials (no terminal, tool calls, meters or
+  tabs), friendly status words, and cheerful colors tuned for every theme.
+- **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin
+  Mocha and Latte, Tokyo Night, Gruvbox, Rosé Pine, Everforest, One Dark, GitHub Light, Monokai.
 
 ## MCP server
 

@@ -6,7 +6,8 @@ import { RemoteHost, splitKey, type Machine, type RemoteConf } from "./federatio
 import { BUILTIN, GROUPS, fillTool, loadTools, saveCustomTools, type Tool } from "./tools";
 import { historyProjects, historySession, historyStats, rescanHistory, searchHistory, startHistory, stopHistory, type HistSession } from "./history";
 import { claimsDone, onCheck, resultFor, setApproval, verify, detectCheck, approvalFor, type CheckResult } from "./verify";
-import { inventory, inventoryText, usage } from "./connections";
+import { inventory, inventoryText, loadConnConf, saveConnConf, usage, type Item as ConnItem } from "./connections";
+import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, judge, recordOutcome, needsYou, type Decision } from "./decisions";
 import { jevAvailable, jevUsage } from "./jev";
@@ -72,8 +73,8 @@ const deck = new Deck();
 await deck.start();
 
 const remotes = new Map<string, RemoteHost>();
-(hostsConf.remotes ?? []).forEach((conf, i) => {
-  if (!conf?.id || !conf.ssh || conf.id === SELF.id) return;
+function addRemote(conf: RemoteConf) {
+  if (!conf?.id || !conf.ssh || conf.id === SELF.id || remotes.has(conf.id)) return;
   const host = new RemoteHost(conf, {
     patch: (upsert, remove) => { broadcast("patch", { upsert, remove, summary: summary() }); scheduleDecisions(); },
     full: () => broadcast("full", fullState()),
@@ -81,7 +82,10 @@ const remotes = new Map<string, RemoteHost>();
     notice: (n) => broadcast("notice", n),
   });
   remotes.set(conf.id, host);
-});
+  return host;
+}
+(hostsConf.remotes ?? []).forEach((conf) => addRemote(conf));
+const saveHosts = () => writeFileSync(`${DATA_DIR}/hosts.json`, JSON.stringify({ ...hostsConf, remotes: [...remotes.values()].map((h) => h.conf) }, null, 2));
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => { for (const h of remotes.values()) h.stop(); stopHistory(); process.exit(0); });
 
 const tagLocal = (r: Row): Row => ({ ...r, machine: r.app ? "codex-app" : SELF.id });
@@ -123,7 +127,7 @@ const PUBLIC_URL = (process.env.DECK_PUBLIC_URL ?? "").replace(/\/$/, "");
 function fullState() {
   return {
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
-    tools: loadTools(), toolGroups: GROUPS, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
+    tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
   };
 }
 
@@ -567,7 +571,15 @@ async function startSession(body: any) {
             if (!told) { notice({ key, ok: true, message: `“${label}” is asking something first. Answer it (Inbox or terminal) and your message follows.` }); told = true; }
             await Bun.sleep(1500);
           }
-          await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000);
+          // herdr registers a just-started agent a moment after agent.start returns ("not an active named
+          // agent"); keep trying for a while instead of losing the first message.
+          for (let i = 0; ; i++) {
+            try { await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000); break; }
+            catch (e: any) {
+              if (i >= 40 || !/not an active|not found|not ready|no agent/i.test(String(e?.message ?? e))) throw e;
+              await Bun.sleep(750);
+            }
+          }
         }
         notice({ key, ok: true, message: prompt ? `${kind} is running and has your first message` : `${kind} is ready` });
       }
@@ -586,6 +598,49 @@ async function sendText(key: string, text: string) {
   if (["claude", "codex", "opencode"].includes(f.row.agent)) await call(f.sess.socket, "agent.prompt", { target: f.row.paneId, text });
   else await call(f.sess.socket, "pane.send_input", { pane_id: f.row.paneId, text, keys: ["enter"] });
 }
+
+/** Send to a session on any machine. */
+async function sendAny(key: string, text: string) {
+  const route = splitKey(key, remotes);
+  if (route.remote) {
+    const r = await route.remote.post("/api/send", { key: route.key, text });
+    if (r.status >= 300) throw new Error(r.data?.error ?? "send failed");
+  } else await sendText(key, text);
+}
+
+// ── queued messages: held by the hub, sent when the agent finishes its turn ─
+type Queued = { id: string; text: string; at: number };
+const QUEUE_FILE = `${DATA_DIR}/queue.json`;
+let queues: Record<string, Queued[]> = {};
+try { queues = JSON.parse(readFileSync(QUEUE_FILE, "utf8")); } catch {}
+const saveQueues = () => { for (const k of Object.keys(queues)) if (!queues[k]?.length) delete queues[k]; try { writeFileSync(QUEUE_FILE, JSON.stringify(queues)); } catch {} broadcast("queue", queues); };
+const quietSince = new Map<string, number>();
+let draining = false;
+setInterval(async () => {
+  if (draining || !Object.keys(queues).length) return;
+  draining = true;
+  try {
+    const rows = new Map(allRows().map((r) => [r.key, r]));
+    for (const key of Object.keys(queues)) {
+      const row = rows.get(key);
+      if (!row || !queues[key]?.length) continue;
+      if (row.status === "working" || row.status === "blocked") { quietSince.delete(key); continue; }
+      if (!quietSince.has(key)) quietSince.set(key, Date.now());
+      if (Date.now() - quietSince.get(key)! < 2500) continue; // quiet for a moment: the turn really ended
+      const item = queues[key].shift()!;
+      saveQueues();
+      try {
+        await sendAny(key, item.text);
+        quietSince.set(key, Date.now() + 12_000); // give it time to start before the next one
+        broadcast("notice", { key, ok: true, message: `Sent your queued message to “${row.title}”` });
+      } catch (e: any) {
+        queues[key] = [item, ...(queues[key] ?? [])];
+        saveQueues();
+        broadcast("notice", { key, ok: false, message: `Couldn’t send the queued message: ${e?.message ?? e}` });
+      }
+    }
+  } finally { draining = false; }
+}, 1000);
 
 // ── tools ────────────────────────────────────────────────────────────────
 function resolveTool(body: any): Tool | undefined {
@@ -669,7 +724,7 @@ async function saveUpload(req: Request, name: string) {
  * the hub writes them with its own local model from the node's conversation detail.
  */
 async function forwardToMachine(path: string, body: any): Promise<Response | undefined> {
-  if (path === "/api/decide" || path === "/api/tool" || path === "/api/history" || path === "/api/connections" || path === "/api/suggest-projects" || path === "/api/mcp-info") return;
+  if (path === "/api/queue" || path === "/api/machines" || path === "/api/decide" || path === "/api/tool" || path === "/api/history" || path === "/api/connections" || path === "/api/suggest-projects" || path === "/api/mcp-info") return;
   const proxy = async (remote: RemoteHost, payload: unknown) => {
     const r = await remote.post(path, payload);
     return json(r.data, r.status);
@@ -1025,6 +1080,94 @@ async function handle(req: Request): Promise<Response> {
           }
           return json(await inventory(!!body.refresh));
         }
+        case "/api/connections-conf": {
+          if (body.machine && body.machine !== SELF.id) {
+            const remote = remotes.get(body.machine);
+            if (!remote) return json({ error: "unknown machine" }, 404);
+            const r = await remote.post("/api/connections-conf", { ...body, machine: undefined });
+            return json(r.data, r.status);
+          }
+          const c = loadConnConf();
+          const id = String(body.id ?? "");
+          if (body.op === "hide") c.hidden = [...new Set([...c.hidden, id])];
+          else if (body.op === "unhide") c.hidden = c.hidden.filter((x) => x !== id);
+          else if (body.op === "note") { const t = String(body.text ?? "").trim().slice(0, 1000); if (t) c.notes[id] = t; else delete c.notes[id]; }
+          else if (body.op === "add") {
+            const it = body.item ?? {};
+            const name = String(it.name ?? "").trim().slice(0, 80);
+            if (!name) return json({ error: "A name is required" }, 400);
+            const item: ConnItem = { id: `custom:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name, kind: "custom", status: "ready", detail: String(it.detail ?? "").slice(0, 200), use: String(it.use ?? "").slice(0, 1000), via: String(it.via ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6) };
+            c.custom = [...c.custom.filter((x) => x.id !== item.id), item];
+          } else if (body.op === "remove") c.custom = c.custom.filter((x) => x.id !== id);
+          else return json({ error: "unknown op" }, 400);
+          saveConnConf(c);
+          return json(await inventory(true));
+        }
+        case "/api/connections-text": {
+          const inv = body.machine && body.machine !== SELF.id
+            ? (await (remotes.get(body.machine) ?? { post: async () => ({ data: null }) } as any).post("/api/connections", {})).data
+            : await inventory();
+          if (!inv?.sections) return json({ error: "That machine isn’t reachable" }, 502);
+          const ids = Array.isArray(body.ids) && body.ids.length ? new Set<string>(body.ids.map(String)) : undefined;
+          const text = inventoryText(inv, ids);
+          return json({ text, file: inv.file });
+        }
+        case "/api/queue": {
+          const key = String(body.key ?? "");
+          const q = (queues[key] ??= []);
+          if (body.op === "add") {
+            const text = String(body.text ?? "").trim();
+            if (!text) return json({ error: "empty" }, 400);
+            q.push({ id: crypto.randomUUID().slice(0, 8), text: text.slice(0, 200_000), at: Date.now() });
+          } else if (body.op === "remove") queues[key] = q.filter((x) => x.id !== body.id);
+          else if (body.op === "update") { const it = q.find((x) => x.id === body.id); if (it) it.text = String(body.text ?? it.text).trim() || it.text; }
+          else if (body.op === "now") {
+            const it = q.find((x) => x.id === body.id);
+            if (it) { queues[key] = q.filter((x) => x !== it); saveQueues(); await sendAny(key, it.text); return json({ ok: true, queue: queues[key] ?? [] }); }
+          } else if (body.op === "clear") delete queues[key];
+          saveQueues();
+          return json({ ok: true, queue: queues[key] ?? [] });
+        }
+        case "/api/machines": {
+          if (body.op === "add") {
+            const ssh = String(body.ssh ?? "").trim();
+            if (!/^[\w.@-]+$/.test(ssh)) return json({ error: "Use an SSH host from your ~/.ssh/config, like conductor-linux or me@host" }, 400);
+            const label = String(body.label ?? "").trim().slice(0, 40) || ssh;
+            const id = (String(body.id ?? "") || label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "machine";
+            if (id === SELF.id || remotes.has(id)) return json({ error: `There's already a machine called “${id}”` }, 400);
+            const p = Bun.spawn([`${import.meta.dir}/../bin/deploy-node.sh`, ssh], { stdout: "pipe", stderr: "pipe" });
+            const timer = setTimeout(() => p.kill(9), 240_000);
+            const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+            await p.exited;
+            clearTimeout(timer);
+            if (p.exitCode !== 0) return json({ error: (err || out).trim().split("\n").slice(-4).join("\n") || `install failed (exit ${p.exitCode})` }, 500);
+            const host = addRemote({ id, label, ssh });
+            saveHosts();
+            host?.start();
+            broadcast("full", fullState());
+            return json({ ok: true, id, log: out.trim().split("\n").slice(-3).join("\n") });
+          }
+          if (body.op === "remove") {
+            const h = remotes.get(String(body.id));
+            if (!h) return json({ error: "unknown machine" }, 404);
+            h.stop();
+            remotes.delete(h.conf.id);
+            saveHosts();
+            broadcast("full", fullState());
+            return json({ ok: true });
+          }
+          if (body.op === "rename") {
+            const h = remotes.get(String(body.id));
+            const label = String(body.label ?? "").trim().slice(0, 40);
+            if (!h || !label) return json({ error: "unknown machine" }, 404);
+            (h.conf as any).label = label;
+            saveHosts();
+            broadcast("full", fullState());
+            return json({ ok: true });
+          }
+          const sshHosts = [...(existsSync(`${homedir()}/.ssh/config`) ? readFileSync(`${homedir()}/.ssh/config`, "utf8") : "").matchAll(/^\s*Host\s+(.+)$/gim)].flatMap((m) => m[1].trim().split(/\s+/)).filter((h) => !/[*?!]/.test(h));
+          return json({ machines: machines(), remotes: [...remotes.values()].map((h) => ({ ...h.conf, online: h.online, error: h.error })), sshHosts });
+        }
         case "/api/suggest-projects": {
           // A fresh Claude session gets the map of everything reachable and proposes ambitious projects.
           const maps = [inventoryText(await inventory())];
@@ -1175,11 +1318,23 @@ async function handle(req: Request): Promise<Response> {
           return json({ ok: true });
         }
         case "/api/rename": {
+          // herdr: the pane label, the agent name, and the tab when the pane has it to itself.
+          // The agent's own "/rename" is returned to the caller, which sends it now or queues it.
           const f = deck.find(body.key);
           if (!f) return json({ error: "gone" }, 404);
-          await call(f.sess.socket, "tab.rename", { tab_id: f.row.tabId, label: String(body.label ?? "") });
+          const label = String(body.label ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+          const done: string[] = [];
+          if (f.row.tabPanes <= 1 || body.tab) { await call(f.sess.socket, "tab.rename", { tab_id: f.row.tabId, label }); done.push("tab"); }
+          try { await call(f.sess.socket, "pane.rename", { pane_id: f.row.paneId, label: label || null }); done.push("pane"); } catch {}
+          if (["claude", "codex", "opencode"].includes(f.row.agent)) { try { await call(f.sess.socket, "agent.rename", { target: f.row.paneId, name: label ? label.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z]+/, "").replace(/-+$/, "").slice(0, 32) || null : null }); done.push("agent"); } catch {} }
           await deck.kick(f.row.herdr);
-          return json({ ok: true });
+          const slash = label && (f.row.agent === "claude" || f.row.agent === "codex") ? `/rename ${label}` : undefined;
+          return json({ ok: true, done, slash, busy: f.row.status === "working" || f.row.status === "blocked" });
+        }
+        case "/api/slash": {
+          const row = localRow(body.key);
+          if (!row) return json({ error: "gone" }, 404);
+          return json({ agent: row.agent, commands: await slashCommands(row.agent, row.projectRoot ?? row.cwd ?? "") });
         }
         case "/api/reopen":
           return json(await reopen(body.id));
@@ -1211,5 +1366,7 @@ for (let attempt = 0; ; attempt++) {
   }
 }
 for (const h of remotes.values()) h.start();
+// Warm the slow scans so the first "/" and the first Connections view are instant.
+setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 
 console.log(`herdr-deck "${SELF.label}" on http://${HOST}:${PORT}  (${deck.rows.size} panes across ${deck.sessions.size} herdr server(s); ${remotes.size} other machine(s))`);

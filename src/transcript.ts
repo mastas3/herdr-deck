@@ -122,7 +122,7 @@ export function toolSummary(name: string, input: any): string {
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; mtime?: number; used?: number; open: Map<string, Msg> };
+type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; tailSig?: string; mtime?: number; used?: number; open: Map<string, Msg> };
 const claudeStates = new Map<string, State>();
 
 function claudeAsk(o: any): string | undefined {
@@ -263,8 +263,10 @@ async function readIncremental(states: Map<string, State>, path: string, feed: (
   if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head) { st.used = Date.now(); return st.detail; } // untouched
   let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head;
   if (!fresh && st!.pos > 0) {
-    const prev = new Uint8Array(await file.slice(st!.pos - 1, st!.pos).arrayBuffer());
-    if (prev[0] !== 10) fresh = true;
+    // The bytes we already read must be unchanged: some writers (the Codex app) rewrite earlier parts of the
+    // file in place, which a size/inode/head check can't see and which would leave every offset pointing into garbage.
+    const prev = new Uint8Array(await file.slice(Math.max(0, st!.pos - 4096), st!.pos).arrayBuffer());
+    if (prev[prev.length - 1] !== 10 || Bun.hash(prev).toString(36) !== st!.tailSig) fresh = true;
   }
   if (fresh) {
     st = { path, pos: 0, detail: emptyDetail(), ino: stat.ino, head, open: new Map() };
@@ -300,6 +302,7 @@ async function readIncremental(states: Map<string, State>, path: string, feed: (
     }
     s.pos += lastNl + 1;
   }
+  if (s.pos > 0) s.tailSig = Bun.hash(new Uint8Array(await file.slice(Math.max(0, s.pos - 4096), s.pos).arrayBuffer())).toString(36);
   return s.detail;
 }
 
@@ -329,6 +332,11 @@ export async function claudeImage(path: string, id: string): Promise<{ type: str
 
 async function lineAt(path: string, offset: number) {
   const file = Bun.file(path);
+  // An offset from a parse of an older version of the file: drop that parse so the next read starts clean.
+  if (offset > 0) {
+    const before = new Uint8Array(await file.slice(offset - 1, offset).arrayBuffer());
+    if (before[0] !== 10) { forgetTranscript(path); throw new Error("stale image offset"); }
+  }
   // Lines holding screenshots can be several MB; read until the newline.
   let chunk = 4 * 1024 * 1024, text = "";
   for (;;) {

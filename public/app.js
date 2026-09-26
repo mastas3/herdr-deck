@@ -28,6 +28,16 @@ const THEMES = [
   ["solarized", "Solarized", "The classic low-contrast dark", ["#002b36", "#b58900"]],
   ["paper", "Paper", "Warm light, like a notebook", ["#f7f3ea", "#9a4f22"]],
   ["contrast", "High contrast", "Maximum legibility", ["#000000", "#ffd000"]],
+  ["dracula", "Dracula", "Purple night with neon accents", ["#282a36", "#bd93f9"]],
+  ["mocha", "Catppuccin Mocha", "Soft pastels on warm dark", ["#1e1e2e", "#cba6f7"]],
+  ["latte", "Catppuccin Latte", "Soft pastels, light", ["#eff1f5", "#8839ef"]],
+  ["tokyo", "Tokyo Night", "Deep blue city lights", ["#1a1b26", "#7aa2f7"]],
+  ["gruvbox", "Gruvbox", "Retro warm and earthy", ["#282828", "#fabd2f"]],
+  ["rosepine", "Rosé Pine", "Muted, dreamy and calm", ["#191724", "#ebbcba"]],
+  ["everforest", "Everforest", "Green and restful", ["#2d353b", "#a7c080"]],
+  ["onedark", "One Dark", "The Atom classic", ["#282c34", "#61afef"]],
+  ["github", "GitHub Light", "Crisp and familiar", ["#ffffff", "#0969da"]],
+  ["monokai", "Monokai", "Bold and punchy", ["#272822", "#a6e22e"]],
 ];
 function applyTheme(name) {
   const root = document.documentElement;
@@ -39,6 +49,8 @@ function applyTheme(name) {
   });
 }
 applyTheme(load("theme", ""));
+S.simple = load("simple", false);
+if (S.simple) { document.documentElement.dataset.simple = ""; S.tab = "chat"; }
 const app = $("app");
 app.dataset.tpos = S.tpos;
 app.dataset.main = S.main;
@@ -46,7 +58,7 @@ app.style.setProperty("--lw-open", load("lw", 380) + "px");
 app.style.setProperty("--th-open", load("th", Math.round(innerHeight * 0.34)) + "px");
 app.style.setProperty("--tw-open", load("tw", Math.round(innerWidth * 0.4)) + "px");
 app.classList.toggle("list-off", load("listOff", false));
-app.classList.toggle("term-off", load("termOff", false));
+app.classList.toggle("term-off", load("termOff", false) || load("simple", false));
 const phone = matchMedia("(max-width: 760px)");
 const isPhone = () => phone.matches;
 
@@ -303,10 +315,14 @@ const mdLite = (t) => esc(t).replace(/`([^`\n]+)`/g, '<code class="mono" style="
 const unseenDone = (r) => r.status === "done" && !r.seen;
 const needsYou = (r) => r.status === "blocked" || unseenDone(r);
 /** herdr's "priority" order: an attention queue. Lower rank comes first. */
+/** Opened in the last 15 minutes: a new session stays in plain sight even before anything happens in it. */
+const fresh = (r) => !!r.bornAt && Date.now() - r.bornAt < 15 * 60_000;
+const act = (r) => r.lastActiveAt ?? r.bornAt ?? 0;
 function rank(r) {
   if (r.status === "blocked") return 0;
   if (unseenDone(r)) return 1;
   if (r.status === "working") return 2;
+  if (r.empty && fresh(r)) return 3;
   if (r.empty) return 6;
   if (r.stale) return 5;
   return 3;
@@ -355,7 +371,13 @@ function visibleRows() {
 
 // ── list rendering (keyed; only changed rows touch the DOM) ──────────────
 const rowCache = new Map();
+const SIMPLE_STATUS = { working: ["Working on it", "✨"], blocked: ["Needs you", "👋"], done: ["Finished", "✅"], idle: ["Resting", "💤"], empty: ["Empty", "·"], unknown: ["", ""] };
+function simpleRow(r) {
+  const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>`;
+}
 function rowHTML(r, byProject) {
+  if (S.simple) return simpleRow(r);
   const live = r.status === "working";
   const mach = multiMachine() && S.machine === "all" ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : "";
   const agoEl = `<span class="ago${live ? " going" : ""}" ${live ? "" : `data-t="${r.lastActiveAt ?? ""}"`} title="Last active ${esc(abs(r.lastActiveAt))}">${live ? "working" : ago(r.lastActiveAt)}</span>`;
@@ -414,13 +436,13 @@ function renderLive() {
 }
 function listGroups(rows) {
   if (S.group === "project") {
-    const empty = rows.filter((r) => r.empty);
+    const empty = rows.filter((r) => r.empty && !fresh(r));
     const by = new Map();
-    for (const r of rows) if (!r.empty) by.set(r.project, [...(by.get(r.project) ?? []), r]);
+    for (const r of rows) if (!r.empty || fresh(r)) by.set(r.project, [...(by.get(r.project) ?? []), r]);
     const rank = (rs) => (rs.some((r) => r.status === "blocked" || r.status === "done") ? 0 : rs.some((r) => r.status === "working") ? 1 : 2);
-    const latest = (rs) => Math.max(...rs.map((r) => r.lastActiveAt ?? 0));
+    const latest = (rs) => Math.max(...rs.map(act));
     const groups = [...by.entries()].sort((a, b) => rank(a[1]) - rank(b[1]) || latest(b[1]) - latest(a[1]))
-      .map(([p, rs]) => ({ key: "p:" + p, label: p, proj: p, rows: rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)), closed: !!S.closedProj[p] }));
+      .map(([p, rs]) => ({ key: "p:" + p, label: p, proj: p, rows: rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || act(b) - act(a)), closed: !!S.closedProj[p] }));
     if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty, closed: S.closedSecs.empty !== false });
     return groups;
   }
@@ -498,7 +520,7 @@ function renderRail(rows) {
   const groups = { needs: [], running: [], quiet: [] };
   let hidden = 0;
   for (const r of rows) { const s = sectionOf(r); if (groups[s]) groups[s].push(r); else hidden++; }
-  for (const g of Object.values(groups)) g.sort((a, b) => rank(a) - rank(b) || (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
+  for (const g of Object.values(groups)) g.sort((a, b) => rank(a) - rank(b) || act(b) - act(a));
   const tile = (r) => {
     const subs = (r.subagents ?? []).filter((x) => x.running).length;
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
@@ -760,14 +782,20 @@ const chatDom = { key: null, blocks: [], el: null };
 function renderChat() {
   const body = $("dbody");
   const key = S.sel;
-  if (!key || S.board || S.tab !== "chat") return;
+  if (!key || S.board || S.mode || (S.tab !== "chat" && !S.simple)) return;
   const id = chatId(key, S.sub);
   const c = chatOf(id);
   const r = rowOf(key);
   if (c.gen == null && !c.msgs.size && !c.pending.length) {
-    if (chatDom.key !== id + ":loading") {
-      chatDom.key = id + ":loading";
-      body.innerHTML = `<div class="chat"><p class="hint">${r && !r.sessionId ? (r.empty ? "Nothing has happened in this pane yet." : "No conversation found for this pane. The terminal shows what it’s doing.") : "Loading the conversation…"}</p></div>`;
+    // No conversation (a shell, or an agent that hasn't been asked anything yet): show the live terminal here.
+    const noConv = r && !r.sessionId;
+    const tail = noConv ? (r.tail ?? []).slice(-24).join("\n") : "";
+    const k = id + ":loading:" + (noConv ? tail.length + ":" + tail.slice(-80) + termHidden() : "");
+    if (chatDom.key !== k) {
+      chatDom.key = k;
+      body.innerHTML = noConv
+        ? `<div class="chat noconv"><p class="hint">${r.agent === "shell" ? "A shell. Type a command below and press Enter." : r.empty ? `${esc(r.agent === "opencode" ? "OpenCode" : r.agent === "codex" ? "Codex" : r.agent === "claude" ? "Claude" : r.agent)} is ready. Send it a message below.` : "No conversation found for this pane. Here’s its terminal."}</p><pre class="dterm live">${ansi(tail) || "…"}</pre>${termHidden() || app.classList.contains("term-off") ? `<button class="btn" data-dact="showterm">${ICON.term}Open the terminal</button>` : ""}</div>`
+        : `<div class="chat"><p class="hint">Loading the conversation…</p></div>`;
     }
     return;
   }
@@ -965,7 +993,7 @@ function renderDetail() {
   $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
-  const tab = S.tab === "images" && !d?.imagesTotal ? "chat" : S.tab === "agents" && !d?.subagents?.length ? "chat" : S.tab;
+  const tab = S.simple ? "chat" : S.tab === "images" && !d?.imagesTotal ? "chat" : S.tab === "agents" && !d?.subagents?.length ? "chat" : S.tab;
   const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.ctxTokens, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
@@ -978,6 +1006,12 @@ function renderDetail() {
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
   else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
   $("cStop").hidden = !(r.status === "working" && isAgent(r));
+  const busy = r.status === "working" && isAgent(r);
+  $("cSend").textContent = busy ? "Queue" : "Send";
+  $("cSend").title = busy ? "Send when it finishes this turn (Enter)" : "Send (Enter)";
+  $("cSteer").hidden = !busy;
+  renderQueue(r);
+  renderPastes();
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
   $("tTitle").textContent = r.title || r.agent;
@@ -1030,7 +1064,7 @@ function renderHead(r, d, tab) {
   const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
   setHTML($("dh"), `<div class="dh-where">${where}</div>
     <div class="dh-top"><h1 class="dh-title">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts">${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.star}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
+      <div class="dh-acts">${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${termHidden() ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.bolt}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
     <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
 }
@@ -1138,7 +1172,7 @@ function renderBoard() {
   chatDom.key = null;
   const rows = [...S.rows.values()].filter(inScope);
   const live = rows.filter((r) => r.status === "working" || r.status === "blocked").sort((a, b) => (a.status === "blocked" ? 0 : 1) - (b.status === "blocked" ? 0 : 1) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
-  const done = rows.filter(unseenDone).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
+  const done = rows.filter(unseenDone).sort((a, b) => act(b) - act(a));
   const card = (r) => {
     const subs = (r.subagents ?? []).filter((x) => x.running);
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
@@ -1174,10 +1208,24 @@ async function writeBrief(key = S.sel, auto = false) {
 
 // ── sending ──────────────────────────────────────────────────────────────
 function autosize(el) { el.style.height = ""; el.style.height = Math.min(el.scrollHeight, innerHeight * 0.34) + "px"; }
-async function sendMessage(text, fromEl) {
+async function sendMessage(text, fromEl, how) {
   const key = S.sel;
   const r = rowOf(key);
-  if (!text || !r) return;
+  if (!r) return;
+  const pastes = fromEl === $("cText") ? takePastes(key) : [];
+  if (!text && !pastes.length) return;
+  // Long text travels as a file: pasted blocks, and anything too big to type into a terminal.
+  if (pastes.length || text.length > LONG_SEND) {
+    try { text = await fileLongText(r, text, pastes); }
+    catch (x) { restorePastes(key, pastes); toast("Couldn’t save the long text: " + x.message, true); return; }
+  }
+  if (how !== "steer" && r.status === "working" && isAgent(r)) {
+    fromEl.value = ""; autosize(fromEl); S.drafts.delete(key); closeSlash();
+    try { await api("/api/queue", { op: "add", key, text }); toast("Queued. It goes when the agent finishes this turn."); }
+    catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true); }
+    return;
+  }
+  closeSlash();
   const c = chatOf(chatId(key));
   const p = { role: "user", text, at: Date.now() };
   if (isAgent(r)) { c.pending.push(p); c.v++; S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight; }
@@ -1194,16 +1242,18 @@ async function sendMessage(text, fromEl) {
     toast("Send failed: " + x.message, true);
   }
 }
-$("composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("cText").value.trim(), $("cText")); });
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("cText").value.trim(), $("cText"), e.submitter?.id === "cSteer" ? "steer" : undefined); });
 $("reply").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("replyText").value.trim(), $("replyText")); });
 for (const [id, form] of [["cText", "composer"], ["replyText", "reply"]]) {
   $(id).addEventListener("input", (e) => { autosize(e.target); if (S.sel) S.drafts.set(S.sel, e.target.value); });
   $(id).addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); return sendMessage(e.target.value.trim(), e.target, "steer"); }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); $(form).requestSubmit(); }
     if (e.key === "Escape") e.target.blur();
   });
 }
-$("cRecipe").onclick = (e) => openToolMenu(e.currentTarget);
+$("cRecipe").onclick = (e) => openToolMenu(e.currentTarget, true);
+$("cSteer").onclick = () => sendMessage($("cText").value.trim(), $("cText"), "steer");
 $("cStop").onclick = () => S.sel && api("/api/keys", { key: S.sel, keys: ["esc"] }).then(() => toast("Sent Esc to interrupt")).catch((x) => toast(x.message, true));
 function focusReply() {
   if (isPhone()) { if (app.dataset.mview !== "detail") { history.replaceState({ mview: "detail" }, ""); setMView("detail", false); } }
@@ -1213,10 +1263,253 @@ function focusReply() {
   $("cText").focus();
 }
 
+// A chat image that won't load usually means its transcript was rewritten under us: the server has
+// dropped the stale parse, so reload the conversation once to get fresh image ids.
+let imgRetry = 0;
+document.addEventListener("error", (e) => {
+  const el = e.target;
+  if (el?.tagName !== "IMG" || !String(el.src).includes("/api/image") || Date.now() - imgRetry < 15_000) return;
+  imgRetry = Date.now();
+  const id = chatId(S.sel, S.sub);
+  chats.delete?.(id);
+  chatDom.key = null;
+  setTimeout(() => chatTick(true), 300);
+}, true);
+
+// ── queued messages ──────────────────────────────────────────────────────
+// While an agent works, Enter queues (the hub sends it when the turn ends); Steer (⌘Enter) sends now.
+function renderQueue(r) {
+  const q = (S.queue ?? {})[r?.key] ?? [];
+  const el = $("qbar");
+  if (!q.length || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
+  el.hidden = false;
+  setHTML(el, q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.text.slice(0, 600))}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
+}
+$("qbar").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-qact]");
+  if (!b) return;
+  const id = b.closest("[data-qid]").dataset.qid, key = S.sel, act = b.dataset.qact;
+  const it = (S.queue[key] ?? []).find((x) => x.id === id);
+  try {
+    if (act === "edit") {
+      const text = await askDialog({ title: "Edit queued message", input: it?.text ?? "", ok: "Save", multiline: true });
+      if (text != null) await api("/api/queue", { op: "update", key, id, text });
+    } else await api("/api/queue", { op: act, key, id });
+    if (act === "now") toast("Sent");
+  } catch (x) { toast(x.message, true); }
+});
+
+// ── long pastes: a chip, not a wall of text ──────────────────────────────
+// Big pastes become chips; on send each one is saved as a file on the session's machine and the
+// agent gets the path (the way Claude Code itself handles long pastes). Anything else over the limit too.
+const LONG_PASTE_CHARS = 4000, LONG_PASTE_LINES = 40, LONG_SEND = 12000, MAX_PASTE = 20 * 1024 * 1024;
+S.pastes = new Map(); // session key → [{ id, text, name }]
+const pasteList = (key = S.sel) => S.pastes.get(key) ?? [];
+function takePastes(key) { const l = pasteList(key); S.pastes.delete(key); renderPastes(); return l; }
+function restorePastes(key, l) { if (l.length) { S.pastes.set(key, [...l, ...pasteList(key)]); renderPastes(); } }
+function pasteKind(t) {
+  const s = t.trimStart();
+  if (/^[\[{]/.test(s)) { try { JSON.parse(t); return "json"; } catch {} }
+  if (/^(diff --git|--- a\/|@@ )/m.test(s.slice(0, 400))) return "diff";
+  if (/^(\s*at |Traceback|\w+Error:|\[\d{2}:\d{2}|\d{4}-\d{2}-\d{2}[ T]\d{2}:)/m.test(s.slice(0, 2000))) return "log";
+  if (/^#{1,3} |\n#{1,3} |\*\*|^- /m.test(s.slice(0, 3000))) return "md";
+  return "txt";
+}
+function addPaste(text) {
+  if (text.length > MAX_PASTE) return toast("That’s over 20 MB; attach it as a file instead", true);
+  const l = pasteList();
+  const kind = pasteKind(text);
+  l.push({ id: Math.random().toString(36).slice(2, 8), text, name: `pasted-${l.length + 1}.${kind}`, kind });
+  S.pastes.set(S.sel, l);
+  renderPastes();
+}
+function renderPastes() {
+  const el = $("cAtt");
+  const l = S.sel ? pasteList() : [];
+  el.hidden = !l.length;
+  setHTML(el, l.map((p) => { const lines = p.text.split("\n").length; return `<span class="pchip" data-pid="${p.id}"><span class="pk">${esc(p.kind.toUpperCase())}</span><button class="pl" data-pact="view" title="Preview">Pasted text · ${lines.toLocaleString()} lines · ${p.text.length < 1024 * 1024 ? Math.max(1, Math.round(p.text.length / 1024)) + " KB" : (p.text.length / 1048576).toFixed(1) + " MB"}</button><button class="ib" data-pact="inline" title="Put the text in the message instead">${ICON.note}</button><button class="ib" data-pact="remove" title="Remove">${ICON.x}</button></span>`; }).join("") + (l.length ? `<span class="hint">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : ""));
+}
+$("cAtt").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pact]");
+  if (!b) return;
+  const id = b.closest("[data-pid]").dataset.pid, l = pasteList(), p = l.find((x) => x.id === id);
+  if (!p) return;
+  if (b.dataset.pact === "remove") S.pastes.set(S.sel, l.filter((x) => x !== p));
+  if (b.dataset.pact === "inline") { S.pastes.set(S.sel, l.filter((x) => x !== p)); const ta = $("cText"); ta.value = ta.value ? `${ta.value}\n${p.text}` : p.text; autosize(ta); }
+  if (b.dataset.pact === "view") {
+    const d = document.createElement("dialog"); d.className = "ask wide";
+    d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${esc(p.name)} <span class="hint">${p.text.split("\n").length.toLocaleString()} lines</span></h3><pre class="pview">${esc(p.text.slice(0, 200_000))}${p.text.length > 200_000 ? "\n…" : ""}</pre></div><div class="dlg-f"><button class="btn primary" value="ok">Done</button></div></form>`;
+    document.body.append(d); d.addEventListener("close", () => d.remove()); d.showModal();
+  }
+  renderPastes();
+});
+/** Saves pasted blocks (and a too-long message) next to the session and returns the message the agent gets. */
+async function fileLongText(r, text, pastes) {
+  const blocks = [...pastes];
+  if (text.length > LONG_SEND) { blocks.unshift({ text, name: "message.md", kind: "md" }); text = ""; }
+  const refs = [];
+  for (const [i, p] of blocks.entries()) {
+    const res = await fetch(`/api/upload?key=${encodeURIComponent(r.key)}&name=${encodeURIComponent(p.name)}`, { method: "POST", headers: { "x-deck-token": S.token, "content-type": "text/plain;charset=utf-8" }, body: new Blob([p.text], { type: "text/plain" }) });
+    const j = await res.json();
+    if (!res.ok || j.error) throw new Error(j.error ?? res.statusText);
+    const lines = p.text.split("\n").length;
+    refs.push(p.name === "message.md" ? `[My full message is in ${j.path} (${lines} lines). Read it first.]` : `[Pasted text #${i + 1}: ${lines} lines, saved at ${j.path}. Read it.]`);
+  }
+  return [text, ...refs].filter(Boolean).join("\n\n");
+}
+
+// ── "/" menu: the agent's own commands, plus deck tools ──────────────────
+const slash = { cache: new Map(), open: false, idx: 0, items: [] };
+function closeSlash() { slash.open = false; $("slashPop").hidden = true; }
+async function slashFor(r) {
+  const k = `${r.machine}|${r.agent}|${r.projectRoot ?? r.cwd}`;
+  if (!slash.cache.has(k)) slash.cache.set(k, api("/api/slash", { key: r.key }).then((x) => x.commands ?? []).catch(() => []));
+  return slash.cache.get(k);
+}
+async function updateSlash() {
+  const ta = $("cText"), r = rowOf(S.sel);
+  const m = ta.value.match(/^\/([\w:.\-]*)$/);
+  if (!m || !r || !isAgent(r) || r.app) return closeSlash();
+  const q = m[1].toLowerCase();
+  const cmds = await slashFor(r);
+  if (ta.value.match(/^\/([\w:.\-]*)$/)?.[1].toLowerCase() !== q) return;
+  const score = (c) => { const n = c.cmd.slice(1).toLowerCase(); if (!q) return 1; if (n === q) return 100; if (n.startsWith(q)) return 60 - n.length / 10; const seg = n.split(/[:\-]/); if (seg.some((x) => x.startsWith(q))) return 40; if (n.includes(q)) return 20; return (c.desc ?? "").toLowerCase().includes(q) ? 5 : 0; };
+  const srcRank = { project: 0, yours: 1, "built-in": 2, prompt: 2, skill: 3, plugin: 4 };
+  const agentItems = cmds.map((c) => ({ c, s: score(c) })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s || srcRank[a.c.src] - srcRank[b.c.src] || a.c.cmd.localeCompare(b.c.cmd)).slice(0, 40).map((x) => ({ ...x.c, type: "cmd" }));
+  const tools = S.tools.filter((t) => t.action !== "upload" && (!q || fuzzy(`${t.label} ${t.hint ?? ""}`, q))).slice(0, q ? 4 : 3).map((t) => ({ type: "tool", tool: t, cmd: t.label, desc: t.hint }));
+  slash.items = [...agentItems, ...tools];
+  slash.idx = 0;
+  slash.open = slash.items.length > 0;
+  renderSlash(r);
+}
+function renderSlash(r) {
+  const el = $("slashPop");
+  if (!slash.open) { el.hidden = true; return; }
+  el.hidden = false;
+  const who = r.agent === "claude" ? "Claude Code" : r.agent === "codex" ? "Codex" : "OpenCode";
+  let lastType = "";
+  el.innerHTML = slash.items.map((it, i) => {
+    const head = it.type !== lastType ? `<div class="sh">${it.type === "cmd" ? `${who} commands` : "Deck tools"}</div>` : "";
+    lastType = it.type;
+    return `${head}<button type="button" role="option" class="si${i === slash.idx ? " on" : ""}" data-si="${i}" aria-selected="${i === slash.idx}">${it.type === "tool" ? `<span class="sg">${toolGlyph(it.tool)}</span>` : ""}<b>${esc(it.cmd)}</b>${it.hint ? `<span class="shint">${esc(it.hint)}</span>` : ""}<span class="sd">${esc(it.desc ?? "")}</span>${it.src && it.src !== "built-in" ? `<span class="ssrc">${esc(it.src)}</span>` : ""}</button>`;
+  }).join("");
+  el.querySelector(".si.on")?.scrollIntoView({ block: "nearest" });
+}
+function chooseSlash(i, send) {
+  const it = slash.items[i];
+  if (!it) return;
+  const ta = $("cText");
+  closeSlash();
+  if (it.type === "tool") { ta.value = ""; autosize(ta); return runTool(it.tool); }
+  ta.value = it.cmd + " ";
+  autosize(ta);
+  ta.focus();
+  if (send && !it.hint) sendMessage(it.cmd, ta);
+}
+$("cText").addEventListener("input", () => { renderPastes(); updateSlash(); });
+$("cText").addEventListener("keydown", (e) => {
+  if (!slash.open) return;
+  const n = slash.items.length;
+  if (e.key === "ArrowDown" || (e.key === "n" && e.ctrlKey)) { slash.idx = (slash.idx + 1) % n; renderSlash(rowOf(S.sel)); }
+  else if (e.key === "ArrowUp" || (e.key === "p" && e.ctrlKey)) { slash.idx = (slash.idx - 1 + n) % n; renderSlash(rowOf(S.sel)); }
+  else if (e.key === "Tab") chooseSlash(slash.idx, false);
+  else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) chooseSlash(slash.idx, true);
+  else if (e.key === "Escape") closeSlash();
+  else return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}, true);
+$("slashPop").addEventListener("pointerdown", (e) => e.preventDefault()); // keep focus in the box
+$("slashPop").addEventListener("click", (e) => { const b = e.target.closest("[data-si]"); if (b) chooseSlash(Number(b.dataset.si), true); });
+$("cText").addEventListener("blur", () => setTimeout(closeSlash, 120));
+
+// ── rename: the herdr pane, and the agent's own /rename ──────────────────
+async function renameSession(r) {
+  if (!r || r.app || r.hist) return;
+  const agentName = r.agent === "claude" ? "Claude Code" : r.agent === "codex" ? "Codex" : null;
+  const label = await askDialog({ title: "Rename session", text: `Renames the herdr pane${r.tabPanes <= 1 ? " and tab" : ""}${agentName ? `, and runs /rename in ${agentName} so its own history shows the name too` : ""}.`, input: r.title || r.tab || "", ok: "Rename" });
+  if (label == null || !label.trim()) return;
+  try {
+    const res = await api("/api/rename", { key: r.key, label: label.trim() });
+    if (res.slash) {
+      if (res.busy) { await api("/api/queue", { op: "add", key: r.key, text: res.slash }); toast(`Renamed. ${agentName} gets /rename when it finishes this turn.`); }
+      else { await api("/api/send", { key: r.key, text: res.slash }); toast(`Renamed to “${label.trim()}”`); }
+    } else toast(`Renamed to “${label.trim()}”`);
+    headSig = "";
+  } catch (x) { toast(x.message, true); }
+}
+
+// ── machines: add or remove the computers this deck watches ─────────────
+async function openMachines() {
+  let info;
+  try { info = await api("/api/machines", {}); } catch (e) { return toast(e.message, true); }
+  const d = document.createElement("dialog");
+  d.className = "ask wide";
+  const draw = () => {
+    const rows = info.remotes.map((m) => `<div class="mrow"><span class="dot" style="--c:var(--${m.online ? "idle" : "blocked"})"></span><b>${esc(m.label)}</b><span class="hint">${esc(m.ssh)}${m.online ? "" : ` · ${esc(m.error ?? "offline")}`}</span><span class="spacer"></span><button type="button" class="btn ghost" data-mren="${esc(m.id)}">Rename</button><button type="button" class="btn ghost danger" data-mdel="${esc(m.id)}">Remove</button></div>`).join("");
+    const self = info.machines.find((m) => m.local && m.kind !== "app");
+    d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Machines</h3><p class="hint">Each machine runs its own copy of the deck; this one (${esc(self?.label ?? "")}) shows them all together.</p>
+      <div class="mrow"><span class="dot" style="--c:var(--idle)"></span><b>${esc(self?.label ?? "This machine")}</b><span class="hint">this machine</span></div>${rows}
+      <h4 style="margin:18px 0 6px">Add a machine</h4>
+      <p class="hint">It needs SSH access with a key (no password prompt) and <a href="https://bun.sh" target="_blank" rel="noopener">Bun</a> installed. The deck installs itself there as a user service that only listens locally, then connects through SSH.</p>
+      <div class="madd"><input class="inp" name="ssh" list="mSsh" placeholder="SSH host, e.g. work-laptop" autocomplete="off"><datalist id="mSsh">${info.sshHosts.filter((h) => !info.remotes.some((m) => m.ssh === h)).map((h) => `<option value="${esc(h)}">`).join("")}</datalist><input class="inp" name="label" placeholder="Name (optional)"><button type="button" class="btn primary" data-madd>Add</button></div>
+      <div class="mlog hint" aria-live="polite"></div></div><div class="dlg-f"><button class="btn" value="ok">Done</button></div></form>`;
+  };
+  draw();
+  document.body.append(d);
+  d.addEventListener("close", () => d.remove());
+  d.addEventListener("click", async (e) => {
+    const add = e.target.closest("[data-madd]"), del = e.target.closest("[data-mdel]"), ren = e.target.closest("[data-mren]");
+    const log = d.querySelector(".mlog");
+    try {
+      if (add) {
+        const f = new FormData(d.querySelector("form"));
+        if (!String(f.get("ssh")).trim()) return;
+        add.disabled = true; add.innerHTML = '<span class="spin"></span> Installing…';
+        log.textContent = `Installing the deck on ${f.get("ssh")} and connecting. This takes about a minute.`;
+        await api("/api/machines", { op: "add", ssh: f.get("ssh"), label: f.get("label") });
+        toast(`Added ${f.get("label") || f.get("ssh")}`);
+      } else if (del) {
+        const m = info.remotes.find((x) => x.id === del.dataset.mdel);
+        if (!(await askDialog({ title: `Remove ${m.label}?`, text: "The deck stops showing its sessions. Nothing on that machine is closed or uninstalled; you can add it back any time.", ok: "Remove", danger: true }))) return;
+        await api("/api/machines", { op: "remove", id: m.id });
+      } else if (ren) {
+        const m = info.remotes.find((x) => x.id === ren.dataset.mren);
+        const label = await askDialog({ title: "Rename machine", input: m.label, ok: "Rename" });
+        if (!label) return;
+        await api("/api/machines", { op: "rename", id: m.id, label });
+      } else return;
+      info = await api("/api/machines", {});
+      draw();
+    } catch (x) { log.textContent = x.message; if (add) { add.disabled = false; add.textContent = "Add"; } toast(x.message, true); }
+  });
+  d.showModal();
+}
+
+// ── simple mode ──────────────────────────────────────────────────────────
+function setSimple(on) {
+  S.simple = on;
+  store("simple", on);
+  if (on) document.documentElement.dataset.simple = ""; else delete document.documentElement.dataset.simple;
+  if (on && S.group !== "priority") setGroup("priority");
+  app.classList.toggle("term-off", on || load("termOff", false));
+  if (on) { S.tab = "chat"; S.mode = null; }
+  headSig = ""; bodySig = ""; chatDom.key = null; lastOrder = "";
+  for (const c of rowCache.values()) c.sig = "";
+  render(); renderDetail();
+  toast(on ? "Simple mode on. Settings → Simple mode turns it off." : "Simple mode off");
+}
+
 // ── terminal ─────────────────────────────────────────────────────────────
 let termTimer = null, termText = "", termHash = "", typing = false;
+/** Out of sight with no handle on screen: hidden, or collapsed while docked on the right. */
+const termHidden = () => !S.simple && (S.tpos === "none" || (S.tpos === "right" && app.classList.contains("term-off")));
 const termVisible = () => (isPhone() ? app.dataset.mview === "term" : S.tpos === "none" ? false : S.tpos === "tab" ? S.main === "term" : !app.classList.contains("term-off"));
-const showTerminal = () => setTpos(load("lastTpos", "bottom"));
+const showTerminal = () => {
+  if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
+  setTpos(S.tpos === "none" ? load("lastTpos", "bottom") : S.tpos);
+  headSig = ""; renderDetail(); pollTerm(true);
+};
 async function pollTerm(first) {
   clearTimeout(termTimer);
   const key = S.sel;
@@ -1516,18 +1809,15 @@ async function runTool(tool, keys = targets()) {
     setTimeout(() => { pollTerm(); chatTick(true); }, 300);
   } catch (e) { toast(e.message, true); }
 }
-function openToolMenu(anchor) {
+function openToolMenu(anchor, compact) {
   const n = targets().length;
-  const groups = S.toolGroups ?? {};
-  const items = [];
-  for (const g of Object.keys(groups)) {
-    const ts = S.tools.filter((t) => t.group === g);
-    if (!ts.length) continue;
-    if (items.length) items.push("-");
-    items.push(...ts.map((t) => ({ html: `<span class="tmi">${toolGlyph(t)}<span>${esc(t.label)}<small>${esc(t.hint ?? "")}</small></span></span>`, run: () => runTool(t) })));
-  }
-  items.push("-", { html: `<span class="tmi">${ICON.tools}<span>All tools…<small>What each one does; add your own</small></span></span>`, run: () => setMode("tools") });
-  openMenu(anchor, items, n > 1 ? `Tools for ${n} selected sessions` : n ? "Tools for this session" : "Tools");
+  const cell = (icon, label, hint, run) => ({ html: `<span class="tg">${icon}</span><span class="tl2">${esc(label)}</span>`, title: hint, run });
+  const items = S.tools.filter((t) => t.action !== "upload").map((t) => cell(toolGlyph(t), t.label, t.hint ?? "", () => runTool(t)));
+  items.push("-",
+    cell(ICON.plug, "Connections", "Tell this agent what it can use: deploy targets, APIs, MCP servers…", () => openConnections(S.sel)),
+    cell(ICON.clip, "Attach files", "Or drop / paste them into the chat", pickFiles),
+    cell(ICON.tools, "Manage tools", "What each tool sends; add your own", () => setMode("tools")));
+  openMenu(anchor, items, n > 1 ? `Tools for ${n} selected sessions` : "Tools", compact ? "grid up" : "grid");
 }
 
 // ── a small promise-based dialog (no browser pop-ups) ────────────────────
@@ -1559,7 +1849,7 @@ function renderViews() {
   const el = $("views");
   if (!el) return;
   const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
-  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["tools", "Tools", ICON.tools], ["connections", "Connections", ICON.plug]];
+  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history]];
   setHTML(el, v.map(([id, label, icon, count]) => `<button data-view="${id}" aria-pressed="${S.mode === id}" title="${label}${id === "inbox" ? " (i)" : id === "history" ? " (h)" : ""}">${icon}<span>${label}</span>${count ? `<b>${count}</b>` : ""}</button>`).join(""));
 }
 function renderMode() {
@@ -1573,9 +1863,10 @@ function renderMode() {
 }
 function modeHTML(html) {
   const box = $("dbody");
-  if (box._mode !== S.mode) { box.innerHTML = `<div class="view" data-view="${S.mode}"></div>`; box._mode = S.mode; box._board = ""; box.scrollTop = 0; }
-  setHTML(box.firstElementChild, html);
+  if (box._mode !== S.mode || !box.querySelector(":scope > .view")) { box.innerHTML = `<button class="vclose" data-vclose title="Close (Esc)" aria-label="Close">${ICON.x}</button><div class="view" data-view="${S.mode}"></div>`; box._mode = S.mode; box._board = ""; box.scrollTop = 0; }
+  setHTML(box.querySelector(".view"), html);
 }
+$("dbody").addEventListener("click", (e) => { if (e.target.closest("[data-vclose]")) { e.stopPropagation(); setMode(null); } }, true);
 
 // Inbox ────────────────────────────────────────────────────────────────────
 S.inboxFilter = load("inboxFilter", "all");
@@ -1820,38 +2111,164 @@ async function saveTools(custom) {
 
 // Connections ───────────────────────────────────────────────────────────────
 S.conn = { machine: null, data: new Map(), mcp: null };
+// Connections ─────────────────────────────────────────────────────────────
+// A tool, not a page you get lost in: open it from a session, pick what the agent should know about,
+// and add it to that session's context. Each machine has its own list.
+ICON.bolt = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg>';
+ICON.x = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+S.conn.pick = new Set();
+S.conn.cat = load("connCat", "services");
+S.conn.q = "";
+function openConnections(key) {
+  const r = key ? rowOf(key) : rowOf(S.sel);
+  S.conn.target = r && !r.app && !r.hist && isAgent(r) ? r.key : null;
+  if (r && r.machine && r.machine !== "codex-app") S.conn.machine = r.machine;
+  S.conn.pick.clear();
+  setMode("connections");
+}
 async function loadConnections(refresh) {
   const m = S.conn.machine ?? S.self;
+  S.conn.loading = true;
+  if (S.mode === "connections") renderConnections();
   try {
     const [inv, mcp] = await Promise.all([api("/api/connections", { machine: m, refresh }), S.conn.mcp ? null : api("/api/mcp-info", {}).catch(() => null)]);
     S.conn.data.set(m, inv);
     if (mcp) { S.conn.mcp = mcp; S.audit = mcp.audit; }
-    if (S.mode === "connections") renderConnections();
   } catch (e) { toast(e.message, true); }
+  S.conn.loading = false;
+  if (S.mode === "connections") renderConnections();
+}
+const CAT = [["services", "Services"], ["ai", "AI"], ["mcp", "MCP"], ["machines", "Machines"], ["keys", "Keys"], ["dev", "Dev tools"], ["browser", "Browsers"], ["skills", "Skills"], ["custom", "Yours"], ["missing", "Not set up"]];
+const ST = { ready: ["ok", "Ready"], partial: ["warn", "Needs sign-in"], off: ["off", "Not set up"] };
+function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function connCard(i, secId) {
+  const [cls, label] = ST[i.status ?? "ready"] ?? ST.ready;
+  const picked = S.conn.pick.has(i.id);
+  const open = S.conn.open === i.id;
+  const via = i.via ?? [];
+  return `<article class="ccard${picked ? " picked" : ""}${open ? " open" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--h:${hue(i.name)}">
+    <button class="cpick" data-cpick aria-pressed="${picked}" aria-label="Select ${esc(i.name)}" ${i.status === "off" ? "disabled" : ""}>${ICON.check}</button>
+    <div class="ctop" data-copen><span class="cbadge">${esc(initials(i.name.replace(/^[a-z]+:/, "")))}</span><span class="cname">${esc(i.name)}</span><span class="cst ${cls}">${label}</span></div>
+    ${i.detail ? `<div class="cwhat" data-copen>${esc(i.detail)}</div>` : ""}
+    ${via.length && !open ? `<div class="cvia" data-copen>${via.slice(0, 3).map((v) => `<span>${esc(v)}</span>`).join("")}${via.length > 3 ? `<span>+${via.length - 3}</span>` : ""}</div>` : ""}
+    ${open ? `<div class="cmore">
+      ${via.length ? `<div class="cvia all">${via.map((v) => `<span>${esc(v)}</span>`).join("")}</div>` : ""}
+      ${i.note ? `<div class="hint">${esc(i.note)}</div>` : ""}
+      <label class="clab">How agents should use it</label>
+      <textarea class="cuse" data-cnote rows="3" placeholder="e.g. Deploy with npx netlify-cli deploy --prod">${esc(i.use ?? "")}</textarea>
+      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button>${i.custom ? `<button class="btn ghost danger" data-cremove>Remove</button>` : ""}<span class="spacer"></span><button class="btn" data-cone>Add just this</button></div>
+    </div>` : ""}
+  </article>`;
 }
 function renderConnections() {
   const m = S.conn.machine ?? S.self;
   const inv = S.conn.data.get(m);
+  if (!inv && !S.conn.loading) { loadConnections(); }
   const mach = realMachines();
-  const sect = (s) => `<section class="csec" data-sec="${s.id}"><h3>${esc(s.title)} <span class="n">${s.items.length}</span></h3><p class="hint">${esc(s.hint)}</p>
-    <div class="cgrid">${s.items.map((i) => `<div class="citem${i.ok === false ? " off" : ""}" title="${esc([i.detail, i.note].filter(Boolean).join(" · "))}"><span class="cn">${s.id === "keys" ? "🔑 " : ""}${esc(i.name)}</span>${i.group && !["cli"].includes(s.id) ? `<span class="cg">${esc(i.group)}</span>` : ""}${i.detail ? `<span class="cd">${esc(i.detail)}</span>` : ""}${i.note ? `<span class="cnote">${esc(i.note)}</span>` : ""}</div>`).join("") || '<span class="hint">None found</span>'}</div></section>`;
-  const mcp = S.conn.mcp;
-  const audit = (S.audit ?? []).slice(0, 8);
-  modeHTML(`<header class="vh"><h2>${ICON.plug}Connections</h2><p>Everything ${esc(inv?.machine ?? "this machine")} can reach: agents, subscriptions, MCP servers, signed-in tools, keys (names only), browser accounts, skills. Agents can read this too, through the deck’s MCP server.</p>
-      <div class="chips">${mach.length > 1 ? mach.map((x) => `<button class="chip" data-cmach="${esc(x.id)}" aria-pressed="${x.id === m}">${esc(x.label)}</button>`).join("") : ""}<span class="spacer"></span><button class="btn" data-crefresh>Refresh</button><button class="btn primary" data-csuggest>${ICON.star}Suggest mega projects</button></div></header>
-    ${!inv ? `<p class="hint">Looking around ${esc(machineLabel(m))}… (takes a few seconds the first time)</p>` : inv.error ? `<p class="hint">${esc(inv.error)}</p>` : inv.sections.map(sect).join("")}
-    ${mcp ? `<section class="csec"><h3>Let agents use the deck (MCP)</h3><p class="hint">Agents can list and read every session, search all history, see your decisions and connections, message other agents and start new sessions. Closing sessions stays yours. Every message or start is logged here.</p>
-      <div class="mcpcmd"><code>${esc(mcp.claude)}</code><button class="btn" data-ccopy>Copy</button></div>
-      ${audit.length ? `<h4 class="hint" style="margin-top:14px">Recent agent actions</h4><ul class="audit">${audit.map((a) => `<li><b>${esc(a.tool.replace("deck_", ""))}</b> ${esc(a.target ?? "")} <span class="hint">${esc(agoText(a.at))}</span>${a.text ? `<div class="hint">${esc(a.text)}</div>` : ""}</li>`).join("")}</ul>` : ""}</section>` : ""}`);
+  const target = rowOf(S.conn.target);
+  const q = S.conn.q.trim().toLowerCase();
+  const secs = inv?.sections ?? [];
+  const count = (id) => secs.find((s) => s.id === id)?.items.filter((i) => !i.hidden).length ?? 0;
+  const cats = CAT.filter(([id]) => count(id) || id === "custom");
+  const inCat = (s) => (q ? s.id !== "missing" || true : s.id === S.conn.cat);
+  const match = (i) => !q || `${i.name} ${i.detail ?? ""} ${(i.via ?? []).join(" ")} ${i.group ?? ""}`.toLowerCase().includes(q);
+  const shown = secs.filter(inCat).map((s) => ({ ...s, items: s.items.filter(match).filter((i) => q || S.conn.showHidden || !i.hidden) })).filter((s) => s.items.length);
+  const hiddenN = secs.find((s) => s.id === S.conn.cat)?.items.filter((i) => i.hidden).length ?? 0;
+  const n = S.conn.pick.size;
+  modeHTML(`<header class="vh"><h2>${ICON.plug}Connections</h2>
+      <p>${target ? `Pick what <b>${esc(target.title)}</b> should know about, then add it to its context.` : "What each machine can reach, and how agents should use it."}</p>
+      <div class="chips">${mach.length > 1 ? `<span class="seg">${mach.map((x) => `<button data-cmach="${esc(x.id)}" aria-pressed="${x.id === m}">${esc(x.label)}</button>`).join("")}</span>` : ""}
+        <input class="inp csearch" data-csearch placeholder="Search ${esc(inv?.machine ?? "")}" value="${esc(S.conn.q)}" autocomplete="off">
+        <span class="spacer"></span><button class="btn ghost" data-cadd>${ICON.plus}Add your own</button><button class="btn ghost" data-crefresh title="Scan again">${S.conn.loading ? '<span class="spin"></span>' : "Rescan"}</button></div>
+      ${q ? "" : `<nav class="ccats">${cats.map(([id, label]) => `<button data-ccat="${id}" aria-pressed="${id === S.conn.cat}">${label} <span class="n">${count(id)}</span></button>`).join("")}</nav>`}
+    </header>
+    ${!inv ? `<div class="cgrid2">${Array.from({ length: 6 }, () => '<div class="ccard skel"></div>').join("")}</div><p class="hint">Looking around ${esc(machineLabel(m))}…</p>`
+      : shown.length ? shown.map((s) => `${q || s.id !== S.conn.cat ? `<h3 class="csub">${esc(s.title)}</h3>` : `<p class="hint csh">${esc(s.hint)}</p>`}<div class="cgrid2">${s.items.map((i) => connCard(i, s.id)).join("")}</div>`).join("")
+      : `<p class="hint">${q ? "Nothing matches." : S.conn.cat === "custom" ? "Nothing here yet. “Add your own” for anything the scan can’t see: a staging server, a team API, a login in your password manager…" : "Nothing found."}</p>`}
+    ${hiddenN && !q ? `<button class="link" data-cshowhid>${S.conn.showHidden ? "Hide" : "Show"} ${hiddenN} hidden</button>` : ""}
+    ${inv?.file ? `<p class="hint" style="margin-top:22px">Agents on ${esc(inv.machine)} can also read the whole list at <code>${esc(inv.file.replace(/^\/(Users|home)\/[^/]+/, "~"))}</code>, or ask the deck’s MCP server.</p>` : ""}
+    <div class="cbar${n ? " on" : ""}"><b>${n}</b> selected<span class="spacer"></span><button class="btn ghost" data-cclear>Clear</button><button class="btn" data-ccopy2>Copy</button>${target ? `<button class="btn primary" data-csend>Add to “${esc(target.title.slice(0, 28))}${target.title.length > 28 ? "…" : ""}”</button>` : `<button class="btn primary" data-csendpick>Add to a session…</button>`}</div>`);
 }
-$("dbody").addEventListener("click", (e) => {
+async function connText(ids) {
+  const m = S.conn.machine ?? S.self;
+  const { text } = await api("/api/connections-text", { machine: m, ids });
+  return `Context from herdr deck: connections you can use for this work on ${machineLabel(m)}. Use them when they help.\n\n${text}`;
+}
+async function sendConnections(ids, key) {
+  const r = rowOf(key);
+  if (!r) return toast("Pick a session first", true);
+  try {
+    const text = await connText(ids);
+    const busy = r.status === "working";
+    if (text.length > LONG_SEND) { const withFile = await fileLongText(r, "Here are the connections you can use.", [{ text, name: "connections.md" }]); await api(busy ? "/api/queue" : "/api/send", busy ? { op: "add", key, text: withFile } : { key, text: withFile }); }
+    else await api(busy ? "/api/queue" : "/api/send", busy ? { op: "add", key, text } : { key, text });
+    toast(`${busy ? "Queued" : "Added"} ${ids.length} connection${ids.length === 1 ? "" : "s"} for “${r.title}”`);
+    S.conn.pick.clear();
+    setMode(null);
+    select(key, { open: true });
+  } catch (e) { toast(e.message, true); }
+}
+function pickSessionFor(anchor, run) {
+  const rows = [...S.rows.values()].filter((r) => isAgent(r) && !r.app && inScope(r)).sort((a, b) => act(b) - act(a)).slice(0, 14);
+  openMenu(anchor, rows.map((r) => ({ html: `<span class="dot" style="--c:${statusVar(r.status)}"></span> ${esc(r.title)}<small>${esc(r.project)}</small>`, run: () => run(r.key) })), "Add to which session?");
+}
+function connItem(id) { for (const s of S.conn.data.get(S.conn.machine ?? S.self)?.sections ?? []) { const i = s.items.find((x) => x.id === id); if (i) return i; } }
+async function connConf(body) {
+  try { const inv = await api("/api/connections-conf", { machine: S.conn.machine ?? S.self, ...body }); S.conn.data.set(S.conn.machine ?? S.self, inv); renderConnections(); }
+  catch (e) { toast(e.message, true); }
+}
+$("dbody").addEventListener("click", async (e) => {
   if (S.mode !== "connections") return;
-  const cm = e.target.closest("[data-cmach]")?.dataset.cmach;
-  if (cm) { S.conn.machine = cm; renderConnections(); return loadConnections(); }
-  if (e.target.closest("[data-crefresh]")) { toast("Looking again…"); return loadConnections(true); }
-  if (e.target.closest("[data-csuggest]")) return suggestProjects();
-  if (e.target.closest("[data-ccopy]")) return copy(S.conn.mcp?.claude ?? "", "command");
+  const t = e.target;
+  const cm = t.closest("[data-cmach]")?.dataset.cmach;
+  if (cm) { S.conn.machine = cm; S.conn.pick.clear(); renderConnections(); return loadConnections(); }
+  const cat = t.closest("[data-ccat]")?.dataset.ccat;
+  if (cat) { S.conn.cat = cat; store("connCat", cat); S.conn.open = null; return renderConnections(); }
+  if (t.closest("[data-crefresh]")) return loadConnections(true);
+  if (t.closest("[data-cshowhid]")) { S.conn.showHidden = !S.conn.showHidden; return renderConnections(); }
+  if (t.closest("[data-cclear]")) { S.conn.pick.clear(); return renderConnections(); }
+  if (t.closest("[data-ccopy2]")) return copy(await connText([...S.conn.pick]), "connections");
+  if (t.closest("[data-csend]")) return sendConnections([...S.conn.pick], S.conn.target);
+  if (t.closest("[data-csendpick]")) return pickSessionFor(t.closest("[data-csendpick]"), (k) => sendConnections([...S.conn.pick], k));
+  if (t.closest("[data-cadd]")) return addConnection();
+  if (t.closest("[data-csuggest]")) return suggestProjects();
+  const card = t.closest("[data-cid]");
+  if (!card) return;
+  const id = card.dataset.cid;
+  if (t.closest("[data-cpick]")) { S.conn.pick.has(id) ? S.conn.pick.delete(id) : S.conn.pick.add(id); return renderConnections(); }
+  if (t.closest("[data-chide]")) return connConf({ op: connItem(id)?.hidden ? "unhide" : "hide", id });
+  if (t.closest("[data-cremove]")) { if (await askDialog({ title: `Remove “${connItem(id)?.name}”?`, ok: "Remove", danger: true })) connConf({ op: "remove", id }); return; }
+  if (t.closest("[data-cone]")) return S.conn.target ? sendConnections([id], S.conn.target) : pickSessionFor(t.closest("[data-cone]"), (k) => sendConnections([id], k));
+  if (t.closest("[data-copen]")) { S.conn.open = S.conn.open === id ? null : id; renderConnections(); card.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
 });
+$("dbody").addEventListener("input", (e) => {
+  if (S.mode !== "connections" || !e.target.matches("[data-csearch]")) return;
+  S.conn.q = e.target.value;
+  clearTimeout(renderConnections.t);
+  renderConnections.t = setTimeout(() => { const pos = e.target.selectionStart; renderConnections(); const el = $("dbody").querySelector("[data-csearch]"); el?.focus(); el?.setSelectionRange(pos, pos); }, 80);
+});
+$("dbody").addEventListener("focusout", (e) => {
+  if (S.mode !== "connections" || !e.target.matches("[data-cnote]")) return;
+  const id = e.target.closest("[data-cid]")?.dataset.cid;
+  const it = connItem(id);
+  if (it && e.target.value.trim() !== (it.use ?? "").trim()) connConf({ op: "note", id, text: e.target.value });
+});
+async function addConnection() {
+  const d = document.createElement("dialog");
+  d.className = "ask";
+  d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Add a connection</h3><p class="hint">Something agents on ${esc(machineLabel(S.conn.machine ?? S.self))} can use that the scan can’t see.</p>
+    <label class="lab">Name</label><input class="inp" name="name" placeholder="Staging server" required>
+    <label class="lab">What it’s for</label><input class="inp" name="detail" placeholder="Pre-production copy of the funnel">
+    <label class="lab">How agents should use it</label><textarea class="inp" name="use" rows="3" placeholder="ssh staging, app in /srv/app, restart with pm2 restart app"></textarea>
+    <label class="lab">Reached via <span class="hint">(comma separated, optional)</span></label><input class="inp" name="via" placeholder="ssh staging, key STAGING_TOKEN"></div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Add</button></div></form>`;
+  document.body.append(d);
+  d.addEventListener("close", () => {
+    if (d.returnValue === "ok") { const f = new FormData(d.querySelector("form")); S.conn.cat = "custom"; connConf({ op: "add", item: Object.fromEntries(f) }); }
+    d.remove();
+  });
+  d.showModal();
+}
 async function suggestProjects() {
   if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session in ~/wiki with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
   try { const r = await api("/api/suggest-projects", {}); toast("Starting a Claude session with your connections…"); if (r.key) pendingSelect = r.key; } catch (e) { toast(e.message, true); }
@@ -1922,7 +2339,14 @@ async function uploadFiles(files) {
   toast(`Attached ${paths.length}. Add a note and send.`);
 }
 $("fileIn").addEventListener("change", (e) => uploadFiles(e.target.files));
-$("cAttach").onclick = pickFiles;
+// The paperclip is a <label for="fileIn">: the browser opens the picker itself, which works everywhere
+// (a script-triggered click on a hidden input is ignored by some phones and installed apps).
+$("cAttach").addEventListener("click", (e) => {
+  const r = rowOf(S.sel);
+  if (!r || r.hist || r.app) { e.preventDefault(); return toast("Open a live session to attach files", true); }
+  $("fileIn").value = "";
+});
+$("cAttach").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("cAttach").click(); } });
 {
   let depth = 0;
   const det = $("detail");
@@ -1931,7 +2355,12 @@ $("cAttach").onclick = pickFiles;
   det.addEventListener("dragover", (e) => { if (canDrop(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
   det.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) det.classList.remove("dropping"); });
   det.addEventListener("drop", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth = 0; det.classList.remove("dropping"); uploadFiles(e.dataTransfer.files); });
-  $("cText").addEventListener("paste", (e) => { const fs = [...(e.clipboardData?.files ?? [])]; if (fs.length) { e.preventDefault(); uploadFiles(fs); } });
+  $("cText").addEventListener("paste", (e) => {
+    const fs = [...(e.clipboardData?.files ?? [])];
+    if (fs.length) { e.preventDefault(); return uploadFiles(fs); }
+    const t = e.clipboardData?.getData("text/plain") ?? "";
+    if (t.length > LONG_PASTE_CHARS || t.split("\n").length > LONG_PASTE_LINES) { e.preventDefault(); addPaste(t); }
+  });
 }
 
 // ── sharing a dev server, verifying ──────────────────────────────────────────
@@ -1982,17 +2411,19 @@ $("views")?.addEventListener("click", (e) => { const v = e.target.closest("[data
 
 
 let menuEl = null;
-function openMenu(anchor, items, heading) {
+function openMenu(anchor, items, heading, cls = "") {
   closeMenu();
   menuEl = document.createElement("div");
-  menuEl.className = "menu";
+  menuEl.className = "menu " + cls;
   menuEl.setAttribute("role", "menu");
-  menuEl.innerHTML = (heading ? `<div class="mh">${esc(heading)}</div>` : "") + items.map((it, i) => it === "-" ? "<hr>" : `<button role="menuitem" data-i="${i}" class="${it.danger ? "danger" : ""}${it.on ? " on" : ""}">${it.html}</button>`).join("");
+  menuEl.innerHTML = (heading ? `<div class="mh">${esc(heading)}</div>` : "") + items.map((it, i) => it === "-" ? "<hr>" : `<button role="menuitem" data-i="${i}" class="${it.danger ? "danger" : ""}${it.on ? " on" : ""}"${it.title ? ` title="${esc(it.title)}"` : ""}>${it.html}</button>`).join("");
   document.body.append(menuEl);
   const r = anchor.getBoundingClientRect();
   const h = menuEl.offsetHeight, w = menuEl.offsetWidth;
   menuEl.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + "px";
-  menuEl.style.top = (r.bottom + h + 8 > innerHeight ? Math.max(8, r.top - h - 6) : r.bottom + 6) + "px";
+  const up = cls.includes("up") || r.bottom + h + 8 > innerHeight;
+  menuEl.style.top = (up ? Math.max(8, r.top - h - 8) : r.bottom + 6) + "px";
+  menuEl.style.transformOrigin = `${Math.round(r.left + r.width / 2 - parseFloat(menuEl.style.left))}px ${up ? "100%" : "0"}`;
   menuEl.onclick = (e) => { const b = e.target.closest("[data-i]"); if (!b) return; const it = items[Number(b.dataset.i)]; closeMenu(); it.run(); };
   menuEl.querySelector("button")?.focus();
   menuEl.addEventListener("keydown", (e) => {
@@ -2023,7 +2454,7 @@ function moreMenu(anchor) {
     r.resume && { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
     projectHome(r.project) && { html: `New session in ${esc(r.project)}<small>${esc(home(projectHome(r.project).cwd))}</small>`, run: () => openNew(projectHome(r.project)) },
     { html: "Copy folder path", run: () => copy(r.cwd, "path") },
-    { html: "Rename tab…", run: () => { const label = prompt("New tab name", r.tab || r.title); if (label != null) api("/api/rename", { key: r.key, label }).then(() => toast("Renamed")).catch((x) => toast(x.message, true)); } },
+    { html: "Rename…<small>The herdr pane and the agent’s own name</small>", run: () => renameSession(r) },
     { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
     !isPhone() && { html: "Type into the terminal", run: () => focusTerminal() },
     !isPhone() && { html: `Move the terminal…<small>Now: ${TPOS_NAME[S.tpos].toLowerCase()}</small>`, run: () => layoutMenu(anchor) },
@@ -2033,13 +2464,15 @@ function moreMenu(anchor) {
 }
 function settingsMenu(anchor) {
   openMenu(anchor, [
-    { html: `Theme: ${esc(THEMES.find((t) => t[0] === load("theme", ""))?.[1] ?? "System")}<small>Harbor, Light, Midnight, Nord, Solarized, Paper…</small>`, run: () => setTimeout(() => themeMenu(anchor), 0) },
+    { html: `Theme: ${esc(THEMES.find((t) => t[0] === load("theme", ""))?.[1] ?? "System")}<small>${THEMES.length - 1} themes: Dracula, Catppuccin, Tokyo Night, Nord…</small>`, run: () => setTimeout(() => themeMenu(anchor), 0) },
     { html: `Alerts: ${S.notify ? "on" : "off"}<small>When an agent finishes or needs input</small>`, run: toggleAlerts },
     { html: `Auto briefs: ${S.autoBrief ? "on" : "off"}<small>Write a brief when you open a session</small>`, run: () => { S.autoBrief = !S.autoBrief; store("autoBrief", S.autoBrief); toast(`Auto briefs ${S.autoBrief ? "on" : "off"}`); } },
     !isPhone() && { html: `Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}<small>Move it (\\)</small>`, run: () => layoutMenu(anchor) },
     { html: "Close candidates<small>Select empty, duplicate and week-old sessions</small>", run: suggestClose },
+    { html: `Simple mode: ${S.simple ? "on" : "off"}<small>Big, friendly, only the essentials</small>`, run: () => setSimple(!S.simple) },
+    { html: "Machines…<small>Add or remove computers the deck watches</small>", run: openMachines },
     { html: "Tools<small>What each tool does; add your own</small>", run: () => setMode("tools") },
-    { html: "Connections<small>Everything this setup can reach</small>", run: () => setMode("connections") },
+    { html: "Connections<small>Everything this setup can reach</small>", run: () => openConnections() },
     !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
   ].filter(Boolean));
 }
@@ -2065,7 +2498,7 @@ function suggestClose() {
   const old = (r) => r.lastActiveAt && Date.now() - r.lastActiveAt > WEEK;
   const c = [...S.rows.values()].filter(inScope).filter((r) => !r.app && (r.empty || r.duplicate || old(r)) && r.status !== "working" && r.status !== "blocked");
   const seen = new Set(), pick = [];
-  for (const r of c.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))) {
+  for (const r of c.sort((a, b) => act(b) - act(a))) {
     const id = r.duplicate && `${r.machine}:${r.agent}:${r.sessionId}`;
     if (id && !seen.has(id) && !old(r) && !r.empty) { seen.add(id); continue; }
     pick.push(r.key);
@@ -2133,6 +2566,10 @@ function paletteItems(q) {
     cur?.app && { t: "Open this thread in the Codex app", run: () => codexAct("codex-open", cur) },
     cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
     cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
+    cur && !cur.app && !cur.hist && { t: "Rename this session…", k: "e", run: () => renameSession(cur) },
+    { t: "Connections: what agents can use", run: () => openConnections(cur?.key) },
+    { t: "Machines: add or remove computers", run: openMachines },
+    { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
     cur && { t: "Write or rewrite the brief", k: "b", run: () => writeBrief(cur.key) },
     cur && { t: "Close this session…", k: "x", run: () => askClose([cur.key]) },
     n > 1 && { t: `Close ${n} selected sessions…`, run: () => askClose(targets()) },
@@ -2192,14 +2629,14 @@ async function loadNewOptions() {
   const saved = load("newCwd:" + newMachine, "");
   $("nCwd").value = saved || (cur && cur.machine === newMachine ? home(cur.projectRoot ?? cur.cwd) : "") || home(newOpts.recent[0] ?? "");
   $("nCwdList").innerHTML = [...new Set([...newOpts.recent, ...newOpts.projects])].map((p) => `<option value="${esc(home(p))}">`).join("");
-  const projRoots = [...new Set([...S.rows.values()].filter((r) => r.machine === newMachine && r.projectRoot).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)).map((r) => r.projectRoot))];
+  const projRoots = [...new Set([...S.rows.values()].filter((r) => r.machine === newMachine && r.projectRoot).sort((a, b) => act(b) - act(a)).map((r) => r.projectRoot))];
   const recent = [...new Set([...projRoots, ...newOpts.recent])].slice(0, 7);
   $("nCwdSugg").innerHTML = recent.length ? `<span class="hint">Recent:</span>` + recent.map((p) => `<button type="button" data-cwd="${esc(home(p))}" title="${esc(p)}">${esc(p.split("/").pop())}</button>`).join("") : "";
   renderKinds();
 }
 /** Where a project lives: the folder and machine of its most recent session. */
 function projectHome(p) {
-  const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && !r.app && inScope(r)).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))[0];
+  const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && !r.app && inScope(r)).sort((a, b) => act(b) - act(a))[0];
   return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
 }
 /** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */
@@ -2437,7 +2874,11 @@ $("paletteMini").onclick = () => openPalette();
 $("newBtn").onclick = openNew;
 $("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed font size"); };
 $("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); lastOrder = ""; $("mini")._h = ""; render(); setTimeout(fitTerm, 0); };
-$("termToggle").onclick = () => { app.classList.toggle("term-off"); store("termOff", app.classList.contains("term-off")); pollTerm(); };
+$("termToggle").onclick = () => {
+  app.classList.toggle("term-off"); store("termOff", app.classList.contains("term-off")); pollTerm();
+  headSig = ""; renderDetail();
+  if (app.classList.contains("term-off") && S.tpos === "right") toast("Terminal collapsed. Bring it back with the Terminal button at the top, or ]");
+};
 
 let fileCtx = null;
 async function openFile(path, key = S.sel) {
@@ -2539,12 +2980,14 @@ document.addEventListener("keydown", (e) => {
   else if (k === "x" && (S.picked.size || cur)) askClose(targets());
   else if (k === "s" && cur) togglePick(cur);
   else if (k === "b" && cur) writeBrief(cur);
+  else if (k === "e" && cur && !rowOf(cur)?.app && !rowOf(cur)?.hist) { e.preventDefault(); renameSession(rowOf(cur)); }
   else if (k === "[") $("listToggle").click();
   else if (k === "]") $("termToggle").click();
   else if (k === "c") { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); }
   else if (k === "?") $("help").showModal();
   else if (/^[1-9]$/.test(k)) { const ids = ["all", ...(S.summary.machines ?? []).map((m) => m.id)]; if (ids[k - 1] && ids.length > 2) setMachine(ids[k - 1]); }
   else if (k === "Escape" && chatSel.size) clearPicks();
+  else if (k === "Escape" && S.mode) setMode(null);
   else if (k === "Escape") { if (S.sub) { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); } else if (S.board) setBoard(false); else if (S.q) { S.q = ""; $("q").value = ""; } else if (S.picked.size) S.picked.clear(); render(); }
 });
 
@@ -2612,6 +3055,7 @@ function applyFull(data) {
   S.summary = data.summary;
   S.graveyard = data.graveyard ?? [];
   S.tools = data.tools ?? [];
+  S.queue = data.queue ?? {};
   S.toolGroups = data.toolGroups ?? {};
   S.usage = data.usage ?? {};
   S.hist = data.history ?? {};
@@ -2656,6 +3100,7 @@ function connect() {
     if (S.sel && p.upsert.some((r) => r.key === S.sel)) chatTick();
     render();
   });
+  es.addEventListener("queue", (e) => { S.queue = JSON.parse(e.data); const r = rowOf(S.sel); if (r) renderQueue(r); render(); });
   es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
