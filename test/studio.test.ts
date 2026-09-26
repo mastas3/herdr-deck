@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { Ingredient, RunOpts } from "../src/mix";
-import { buildCatalog, buildPromptFor, createStudio, historyText, isExecutable, normalizeBuild, parseReply, planScore, redact, slugOf, templateReply, turnPrompt, type Msg } from "../src/studio";
+import { buildCatalog, buildPromptFor, createStudio, historyText, isExecutable, isSlop, normalizeBuild, parseReply, planScore, redact, slugOf, templateReply, turnPrompt, type Msg } from "../src/studio";
 import { composeDice, fillStarters, fillTemplate, INTENTS, partsText, rng, STARTERS, SYSTEM } from "../src/studio-prompts";
 
 const root = mkdtempSync(`${tmpdir()}/deck-studio-`);
@@ -421,4 +421,13 @@ describe("the studio: conversations, jobs, fallbacks", () => {
     expect(m.blocks.some((b) => b.t === "build")).toBe(true);
     expect(Object.keys(m.refs).length).toBeGreaterThanOrEqual(2);
   });
+});
+
+describe("slop gate", () => {
+  const good = { title: "HD Daily Digest", pitch: "A $9/month Telegram digest of today's transits for your own chart", customer: "Human Design readers in r/humandesign", offer: "a daily chart-specific note", problem: "generic transit posts", launch: ["Post a free week in r/humandesign"] };
+  test("a specific idea passes", () => expect(isSlop(good)).toBe(false));
+  test("hype words fail", () => expect(isSlop({ ...good, pitch: "Revolutionize your mornings with a seamless AI digest" })).toBe(true));
+  test("a buyer nobody can message fails", () => expect(isSlop({ ...good, customer: "creators" })).toBe(true));
+  test("a launch without a named place fails", () => expect(isSlop({ ...good, launch: ["Share it on social media"] })).toBe(true));
+  test("emoji in the name fails", () => expect(isSlop({ ...good, title: "HD Digest 🚀" })).toBe(true));
 });

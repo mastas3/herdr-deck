@@ -187,7 +187,17 @@ export function normalizeBuild(raw: any, ings: Ingredient[], source: Mix["source
     first_dollar: opt(raw.first_dollar ?? raw.firstDollar ?? raw.time_to_first_dollar, 80), risks: list(raw.risks ?? raw.risk, 180, 4), row: raw.row ? plain(raw.row, 20) : undefined,
   };
 }
-const GENERIC = /\b(ai[- ]powered platform|leverag\w*|synerg\w*|revolutioni[sz]\w*|seamless\w*|cutting[- ]edge|one[- ]stop|all[- ]in[- ]one solution|next[- ]gen\w*)\b/i;
+const GENERIC = /\b(ai[- ]powered (platform|solution|tool)|leverag\w*|synerg\w*|revolutioni[sz]\w*|seamless\w*|cutting[- ]edge|one[- ]stop|all[- ]in[- ]one solution|next[- ]gen\w*|game[- ]chang\w*|supercharg\w*|unleash\w*|empower\w*|harness(ing)? the power|elevate your|streamline your|transform your|effortless\w*|in today'?s (fast|digital)|unlock(ing)? (the|your) (full )?potential)\b/i;
+/** "Everyone", "businesses", "creators": not a buyer you can message today. */
+const VAGUE_BUYER = /^\s*(everyone|anyone|people|users|businesses|small businesses|companies|creators|content creators|developers|entrepreneurs|professionals|individuals)\s*\.?\s*$/i;
+/** The first-customer plan has to name a real place, not "social media". */
+const NAMED_CHANNEL = /r\/\w|@\w|https?:\/\/|\b(groups?|discord|telegram|slack|whatsapp|facebook|instagram|tiktok|twitter|x\.com|reddit|youtube|linkedin|forums?|subreddit|newsletter|mailing list|product hunt|hacker news|indie hackers|meetup|shopify community|app store|github)\b|\b(dm|message|email|call)\w* \d+/i;
+const EMOJI = /\p{Extended_Pictographic}/u;
+/** Buzzwords, a buyer nobody can message, no named channel, or emoji in the name: AI slop, never shown. */
+export function isSlop(b: Partial<Build>): boolean {
+  const text = [b.title, b.pitch, b.customer, b.offer, b.problem, ...(b.launch ?? [])].filter(Boolean).join(" ");
+  return GENERIC.test(text) || VAGUE_BUYER.test(String(b.customer ?? "")) || !NAMED_CHANNEL.test((b.launch ?? []).join(" ")) || EMOJI.test(String(b.title ?? ""));
+}
 /** How complete the plan is, 0..1 (the feed shows the best first). */
 export function planScore(b: Build): number {
   const checks = [b.customer, b.problem, b.offer, b.price && /\d/.test(b.price), b.model, (b.mvp?.length ?? 0) >= 3, b.ids.length >= 2, (b.launch?.length ?? 0) >= 1, (b.week?.length ?? 0) >= 3, b.cost, b.first_dollar, b.risks?.length];
@@ -196,7 +206,7 @@ export function planScore(b: Build): number {
 /** The feed's quality gate: a specific customer, a real price, a buildable MVP on his real inventory, a launch and a week of tasks; nothing generic. */
 export function isExecutable(b: Build): boolean {
   return !!b.customer && b.customer.length >= 12 && !!b.price && /\d/.test(b.price) && (b.mvp?.length ?? 0) >= 3 && b.ids.length >= 2
-    && (b.launch?.length ?? 0) >= 1 && (b.week?.length ?? 0) >= 3 && !!b.pitch && b.pitch.length >= 20 && !GENERIC.test(`${b.title} ${b.pitch}`) && planScore(b) >= 0.75;
+    && (b.launch?.length ?? 0) >= 1 && (b.week?.length ?? 0) >= 3 && !!b.pitch && b.pitch.length >= 20 && !isSlop(b) && planScore(b) >= 0.75;
 }
 function blockOf(kind: string, inner: string, ings: Ingredient[], source: Mix["source"]): Block | undefined {
   const j = tryJson(inner);
