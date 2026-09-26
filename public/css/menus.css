@@ -1,0 +1,65 @@
+/* ── menus, palette, dialogs ──────────────────────────────────── */
+.menu { position: fixed; z-index: 30; min-width: 230px; max-width: min(360px, 92vw); max-height: 60vh; overflow-y: auto; background: var(--raise); border: 1px solid var(--line-2); border-radius: 11px; padding: 5px; box-shadow: 0 14px 40px rgba(0,0,0,.35); animation: pop .12s var(--ease); }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.menu button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 7px; font-size: 14.5px; }
+.menu button:hover, .menu button:focus-visible { background: var(--hover); outline: none; }
+.menu button small { color: var(--ink-3); font-size: 12.5px; }
+.menu button.danger { color: var(--danger); }
+.menu button.on::after { content: "✓"; position: absolute; right: 14px; color: var(--accent); }
+.menu button { position: relative; }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
+.menu .mh { font-size: 12px; color: var(--ink-3); padding: 6px 10px 2px; }
+dialog { background: var(--raise); color: var(--ink); border: 1px solid var(--line-2); border-radius: 14px; padding: 0; width: min(640px, calc(100vw - 32px)); box-shadow: 0 24px 70px rgba(0,0,0,.45); }
+dialog[open] { animation: pop .14s var(--ease); }
+dialog::backdrop { background: rgba(8, 12, 18, .55); }
+.dlg-b { padding: 18px 20px; }
+.dlg-b h3 { margin: 0 0 8px; font: 600 22px var(--serif); }
+.dlg-b p { margin: 6px 0; color: var(--ink-2); }
+.dlg-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px 16px; }
+.warn { color: var(--working); font-weight: 600; }
+.dlg-list { max-height: 40vh; overflow: auto; margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; }
+.dlg-list div { padding: 7px 11px; border-top: 1px solid var(--line); font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.dlg-list div:first-child { border-top: 0; }
+.dlg-list .m { margin-left: auto; color: var(--ink-3); white-space: nowrap; font-size: 13px; }
+.field { display: flex; flex-direction: column; gap: 5px; margin: 14px 0 0; font-size: 14px; color: var(--ink-2); }
+.field input, .field textarea, .field select { background: var(--bg); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; font-size: 15px; color: var(--ink); }
+.field textarea { min-height: 88px; resize: vertical; font: 15.5px/1.5 var(--read); }
+.fields2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.hint { font-size: 13px; color: var(--ink-3); }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { border: 1px solid var(--line-2); background: var(--bg); border-radius: 7px; padding: 5px 12px; font-size: 14.5px; }
+.seg button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.seg button:disabled { opacity: .45; cursor: default; }
+.seg.small button { padding: 3px 9px; font-size: 13.5px; }
+.sugg { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.sugg button { font-size: 12.5px; border: 1px dashed var(--line-2); background: transparent; border-radius: 5px; padding: 1px 7px; color: var(--ink-2); }
+.sugg button:hover { color: var(--ink); border-color: var(--ink-3); }
+#nArgsSugg button, #nCmd { font-family: var(--mono); font-size: 12px; }
+#nCmd { background: var(--term-bg); color: var(--term-ink); border-radius: 7px; padding: 6px 9px; overflow-x: auto; white-space: pre; margin-top: 12px; }
+.palette { width: min(640px, calc(100vw - 24px)); margin-top: 12vh; }
+.palette input { width: 100%; border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 15px 18px; font-size: 17px; outline: none; }
+.pal-list { max-height: 56vh; overflow-y: auto; padding: 6px; }
+.pal-list .mh { font-size: 12px; color: var(--ink-3); padding: 8px 10px 3px; }
+.pal-list button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 8px; font-size: 15px; }
+.pal-list button.on { background: var(--sel); }
+.pal-list button small { color: var(--ink-3); font-size: 13px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
+.pal-foot { display: flex; gap: 14px; padding: 8px 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3); }
+.proute { display: flex; flex-direction: column; gap: 2px; padding: 6px 4px; }
+.proute textarea { width: 100%; min-height: 64px; max-height: 30vh; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); padding: 10px 12px; font: inherit; font-size: 15px; outline: none; }
+.proute textarea:focus { border-color: var(--accent); }
+.proute .mh { padding: 10px 10px 3px; }
+.proute-f { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 4px 2px; }
+.pal-list .proute-f .btn { width: auto; flex: 0 0 auto; padding: 7px 16px; border: 1px solid var(--line-2); background: var(--raise); font-size: 14.5px; }
+.pal-list .proute-f .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.pal-list .proute-f .btn:disabled { opacity: .45; cursor: default; }
+.recipes-ed .r { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
+.recipes-ed .r:first-child { border-top: 0; }
+.recipes-ed input, .recipes-ed textarea { background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 9px; font-size: 14.5px; color: var(--ink); width: 100%; }
+.recipes-ed textarea { grid-column: 1 / -1; min-height: 60px; resize: vertical; font: 14.5px/1.45 var(--sans); }
+.lightbox { width: min(1400px, 96vw); background: var(--term-bg); }
+.lightbox img { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; }
+.lightbox .dlg-f { justify-content: space-between; align-items: center; color: var(--ink-2); font-size: 14px; }
+.toast { position: fixed; right: 16px; bottom: 16px; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 14px; z-index: 60; max-width: 440px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); animation: pop .14s var(--ease); }
+.toast.err { border-color: var(--danger); }
+.help td { padding: 3px 14px 3px 0; font-size: 14px; }
+.mbar { display: none; }

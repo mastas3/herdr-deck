@@ -1,0 +1,133 @@
+/* Discover → Opportunities: the notebook. */
+/* The notebook uses the full desktop detail area without changing saved terminal layout. */
+@media (min-width: 761px) {
+  .app:has(.view[data-view="opportunities"]) { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
+  .app:has(.view[data-view="opportunities"]) :is(#term, #splitH) { display: none; }
+  .app:has(.view[data-view="opportunities"]) .detail { display: flex; }
+}
+.view[data-view="opportunities"] { max-width: 1100px; }
+/* Opportunity notebook: evidence and working notes, using the deck's editorial type. */
+#opportunities { --op-space: clamp(16px, 3vw, 28px); font: 14px/1.55 var(--read); padding: 10px 0 36px; }
+#opportunities button, #opportunities input, #opportunities select, #opportunities textarea { font-family: inherit; }
+#opportunities :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#opportunities .btn { min-height: 40px; }
+.opintro { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; padding: 18px 0 28px; border-bottom: 1px solid var(--line-2); }
+.opeyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .11em; font: 650 11px/1.5 var(--sans); margin: 0 0 12px; }
+.opintro h3 { font: 560 clamp(30px, 4.5vw, 46px)/1.06 var(--serif); letter-spacing: -.025em; margin: 0 0 16px; }
+.opintro p:not(.opeyebrow) { color: var(--ink-2); margin: 0; max-width: 55ch; font-size: 14px; }
+.opintro > .btn { flex-shrink: 0; }
+.opfilters { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 14px; margin: 22px 0; }
+.opfilters label > span, .opfield > span { font: 600 12px/1.4 var(--sans); color: var(--ink-2); display: block; margin-bottom: 6px; }
+#opportunities .inp { display: block; width: 100%; box-sizing: border-box; min-height: 40px; font-size: 14px; background: var(--bg); }
+.oplisthead, .opsectionhead { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px 20px; }
+.oplisthead { padding: 24px 0 12px; }
+#opportunities h4 { font: 600 20px/1.3 var(--serif); margin: 0; }
+#opportunities h5 { font: 600 17px/1.4 var(--serif); margin: 0 0 10px; }
+.oplisthead h4 > span, .opsubhead > span { font: 400 12px var(--read); color: var(--ink-3); margin-left: 8px; }
+.oplist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
+.opcard { padding: 23px 0 20px; border-top: 1px solid var(--line); min-width: 0; }
+.opcardmeta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; font-size: 11px; color: var(--ink-2); }
+.opstage { border: 1px solid var(--line-2); padding: 2px 7px; border-radius: 4px; font: 600 11px/1.4 var(--sans); color: var(--ink-2); white-space: nowrap; }
+.opstage[data-stage="research-ready"] { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.opstage[data-stage="paid-pilot"], .opstage[data-stage="repeat-use"] { color: var(--idle); border-color: color-mix(in srgb, var(--idle) 50%, var(--line)); }
+.opstage[data-stage="buying-signal"] { color: var(--working); }
+.opopen { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; border: none; color: var(--ink); background: none; text-align: left; padding: 14px 0 4px; cursor: pointer; }
+#opportunities .opopen h4 { font-size: 23px; overflow-wrap: anywhere; }
+.opopen > span { color: var(--accent); font-size: 21px; }
+.opopen:hover h4 { color: var(--accent); }
+.opcard > p { color: var(--ink-2); margin: 10px 0; }
+.opcard .opbuyer { font-size: 12px; color: var(--ink); margin: 2px 0 10px; }
+.opcardfacts { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 20px 0; }
+.opcardfacts dt, .opnumbers dt { color: var(--ink-3); font: 600 11px var(--sans); text-transform: uppercase; letter-spacing: .04em; }
+.opcardfacts dd { margin: 4px 0 0; font-size: 13px; color: var(--ink-2); }
+.opcardfoot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: var(--ink-3); font-size: 11px; }
+.opmore { margin: 20px 0; }
+.opfootnote { font-size: 12px; color: var(--ink-3); max-width: 65ch; margin-top: 24px; }
+.opempty { padding: 32px 0; max-width: 60ch; color: var(--ink-2); }
+.opempty h4 { color: var(--ink); }
+.opdiscover, .opedit { border-top: 1px solid var(--line); padding: 13px 0; }
+.opdiscover { border-bottom: 1px solid var(--line); }
+.opdiscover summary, .opedit summary { cursor: pointer; color: var(--ink); font-weight: 550; padding: 4px 0; }
+.opdiscover summary > span { font-weight: 400; color: var(--ink-3); font-size: 12px; margin-left: 10px; }
+.opdiscover[open] > summary, .opedit[open] > summary { margin-bottom: 16px; }
+.opeditor { background: var(--side); padding: 20px; margin: 20px 0; }
+.opform { margin: 16px 0 8px; }
+.opfields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.opfield { min-width: 0; }
+.opfields > .wide { grid-column: 1 / -1; }
+.opfield > small { color: var(--ink-3); font-size: 11px; display: block; margin-top: 5px; }
+.opfield textarea { resize: vertical; line-height: 1.5; }
+.opactions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.opcheck, .opchecks label { display: flex; align-items: flex-start; gap: 9px; color: var(--ink-2); font-size: 13px; }
+.opcheck input, .opchecks input { flex: none; margin-top: 4px; accent-color: var(--accent); }
+.opchecks { padding: 12px 0; margin: 0; border: 0; }
+.opchecks legend { font-weight: 600; font-size: 12px; color: var(--ink-2); }
+.opchecks label { margin-top: 8px; overflow-wrap: anywhere; }
+.opchecks small { color: var(--ink-3); }
+.operror { color: var(--blocked); font-size: 13px; overflow-wrap: anywhere; }
+.opjob { display: flex; align-items: center; gap: 10px; background: var(--side); padding: 12px; margin: 15px 0; }
+.opjob > span:not(.spin) { flex: 1; }
+.opback { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; color: var(--ink-3); font-size: 11px; padding: 10px 0 24px; }
+.opdossierhead h3 { font: 550 clamp(28px, 4vw, 40px)/1.14 var(--serif); letter-spacing: -.015em; margin: 14px 0; overflow-wrap: anywhere; }
+.opdossierhead > p { color: var(--ink-2); max-width: 75ch; }
+.opsections { display: flex; overflow-x: auto; gap: 22px; border-bottom: 1px solid var(--line-2); padding-top: 12px; scrollbar-width: thin; }
+.opsections > button { flex: none; border: 0; border-bottom: 2px solid transparent; color: var(--ink-2); background: none; padding: 12px 0; min-height: 44px; cursor: pointer; font-size: 13px; }
+.opsections > button[aria-pressed="true"] { border-bottom-color: var(--accent); color: var(--ink); font-weight: 650; }
+.opsection { padding: 25px 0; }
+.opoverview { display: grid; grid-template-columns: 1.3fr 1fr; gap: 32px; margin-bottom: 28px; }
+.opdefinition { margin: 10px 0; }
+.opdefinition dt { color: var(--ink-3); font: 600 11px var(--sans); letter-spacing: .04em; text-transform: uppercase; margin-top: 18px; }
+.opdefinition dd { margin: 5px 0 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.opdefinition dd ul { padding-left: 18px; margin-top: 5px; }
+.opreadiness { border-left: 1px solid var(--line); padding-left: 24px; }
+.opreadiness p, .opreadiness li { font-size: 12px; color: var(--ink-2); }
+.opreadiness ul { padding-left: 16px; }
+.opreadiness li { margin-bottom: 7px; }
+.opnotice { background: var(--side); padding: 16px 18px; margin: 20px 0; color: var(--ink-2); }
+.opnotice p { margin: 10px 0 0; }
+.opnotice ul, .opnotice ol { padding-left: 18px; margin: 12px 0 0; }
+.opnotice li { margin: 6px 0; }
+#opportunities .opsubhead { margin: 28px 0 16px; }
+.opclaim { padding: 15px 0; border-bottom: 1px solid var(--line); }
+.opclaim p { margin: 8px 0; }
+.opclaim small { color: var(--ink-3); }
+.opstatus { color: var(--ink-3); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.opsourcelinks { font-size: 12px; overflow-wrap: anywhere; }
+.opsources { padding-left: 22px; }
+.opsources > li { padding: 8px 0 18px 4px; border-bottom: 1px solid var(--line); margin: 12px 0; overflow-wrap: anywhere; }
+.opsources p { margin: 9px 0; color: var(--ink-2); white-space: pre-wrap; }
+.opsources small { color: var(--ink-3); font-size: 11px; }
+.opsources a { color: var(--accent); }
+.opblank { color: var(--ink-3); padding: 16px 0; max-width: 70ch; }
+.opexperiment, .opstream { padding: 20px 0; border-bottom: 1px solid var(--line); }
+.opexperiment > h5 { margin-top: 12px !important; }
+.opinputgroup { padding: 18px 0 22px; border: 0; border-top: 1px solid var(--line); margin: 28px 0 0; }
+.opinputgroup > legend { color: var(--ink); font: 600 17px var(--serif); padding-right: 12px; }
+.opcalculation { border-top: 1px solid var(--line); margin: 20px 0 28px; padding-top: 16px; }
+.opnumbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 20px; margin: 20px 0 26px; }
+.opnumbers dd { margin: 7px 0 0; font: 550 24px var(--serif); font-variant-numeric: tabular-nums; }
+.optablewrap { max-width: 100%; overflow-x: auto; scrollbar-width: thin; }
+.optable { width: 100%; border-collapse: collapse; font-size: 12px; margin: 10px 0; }
+.optable caption { text-align: left; font-weight: 600; padding-bottom: 12px; color: var(--ink-2); }
+.optable td, .optable th { text-align: right; padding: 10px 8px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; white-space: nowrap; font-weight: 400; }
+.optable th:first-child { text-align: left; padding-left: 0; white-space: normal; }
+.optable thead th { font-weight: 600; color: var(--ink-3); }
+.optable tbody th { color: var(--ink-2); }
+.opwarnings { font-size: 12px; color: var(--working); padding-left: 20px; }
+.opwarnings li { margin: 6px 0; }
+@media (max-width: 760px) {
+  .opintro { align-items: flex-start; flex-direction: column; gap: 20px; }
+  .opfilters { grid-template-columns: 1fr; gap: 10px; }
+  .opfilters label { display: grid; grid-template-columns: 95px minmax(0, 1fr); align-items: center; gap: 10px; }
+  .opfilters label > span { margin: 0; }
+  .oplist { grid-template-columns: 1fr; }
+  .opoverview { grid-template-columns: 1fr; gap: 24px; }
+  .opreadiness { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; }
+  .opfields { grid-template-columns: 1fr; }
+  .opnumbers { gap: 20px 12px; }
+  .opnumbers dd { font-size: 21px; }
+  .opdiscover summary > span { display: block; margin: 6px 0 0; }
+  .opeditor { padding: 16px; }
+  .opsections { gap: 20px; }
+  #opportunities .inp { font-size: 16px; }
+}

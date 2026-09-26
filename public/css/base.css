@@ -1,0 +1,67 @@
+/* Base elements and controls, and the frame: list | chat, the terminal wherever you put it. */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.4 var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+[hidden] { display: none !important; }
+.mono { font-family: var(--mono); }
+.spacer { flex: 1; }
+kbd { font: 11px var(--mono); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink-3); }
+
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--raise); border-radius: 8px; padding: 5px 11px; font-size: 14.5px; color: var(--ink); white-space: nowrap; transition: transform .08s, background .12s; }
+.btn:hover { border-color: var(--ink-3); }
+.btn:active, .ib:active, .row:active, .sec-h:active, .card:active { transform: scale(.975); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+.btn.ghost:hover { background: var(--hover); color: var(--ink); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
+.btn:disabled { opacity: .5; cursor: default; }
+.btn svg, .ib svg { width: 16px; height: 16px; flex: none; }
+.ib { width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border: 0; background: transparent; border-radius: 8px; color: var(--ink-2); flex: none; transition: transform .08s; }
+.ib:hover { background: var(--hover); color: var(--ink); }
+.link { background: none; border: 0; padding: 2px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); font-size: 13.5px; }
+.link:hover { color: var(--ink); text-decoration-color: currentColor; }
+.seg2 { display: inline-flex; background: var(--bg); border: 1px solid var(--line); border-radius: 9px; padding: 2px; flex: none; }
+.seg2 button { border: 0; background: transparent; padding: 3px 11px; border-radius: 7px; font-size: 14px; color: var(--ink-3); }
+.seg2 button[aria-selected="true"] { background: var(--raise); color: var(--ink); font-weight: 600; box-shadow: inset 0 0 0 1px var(--line-2); }
+.spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--working) 30%, transparent); border-top-color: var(--working); animation: spin .8s linear infinite; flex: none; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── frame: list | chat, terminal wherever you put it ─────────── */
+.app { --lw: var(--lw-open, 380px); --th: var(--th-open, 36vh); --tw: var(--tw-open, 44vw); display: grid; height: 100vh; }
+.app[data-tpos="bottom"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 1px var(--th); grid-template-areas: "list vs detail" "hs hs hs" "term term term"; }
+.app[data-tpos="top"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: var(--th) 1px minmax(0, 1fr); grid-template-areas: "term term term" "hs hs hs" "list vs detail"; }
+.app[data-tpos="right"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr) 1px var(--tw); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail hs term"; }
+.app:is([data-tpos="tab"], [data-tpos="none"]) { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
+@media (min-width: 761px) {
+  .app[data-tpos="tab"] .term { grid-area: detail; }
+  .app:is([data-tpos="tab"], [data-tpos="none"]) .split.h { display: none; }
+  .app[data-tpos="tab"][data-main="chat"] .term, .app[data-tpos="tab"][data-main="term"] .detail, .app[data-tpos="none"] .term { display: none; }
+}
+.app.list-off { --lw: 88px; }
+.app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) { --th: 38px; }
+.app.term-off[data-tpos="right"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr) 0 0; }
+@media (min-width: 761px) { .app.term-off[data-tpos="right"] :is(.term, .split.h) { display: none; } }
+.split { background: var(--line); position: relative; z-index: 5; touch-action: none; }
+.split::before { content: ""; position: absolute; }
+.split.v { grid-area: vs; cursor: col-resize; }
+.split.v::before { inset: 0 -5px; }
+.split.h { grid-area: hs; cursor: row-resize; }
+.split.h::before { inset: -5px 0; }
+.app[data-tpos="right"] .split.h { cursor: col-resize; }
+.app[data-tpos="right"] .split.h::before { inset: 0 -5px; }
+.split:hover, .split.drag, .split:focus-visible { background: var(--accent); outline: none; }
+.app.list-off .split.v { pointer-events: none; }
+body.dragging { user-select: none; }
+body.dragging.col { cursor: col-resize; }
+body.dragging.row { cursor: row-resize; }
+body.dragging :is(.screen, .chat) { pointer-events: none; }
+
+/* drop zones while moving the terminal */
+.dz { position: fixed; z-index: 50; display: none; pointer-events: none; }
+body.moving .dz { display: block; }
+body.moving { cursor: grabbing; user-select: none; }
+.dz div { position: fixed; display: grid; place-items: center; border: 2px dashed var(--line-2); border-radius: 12px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--ink-2); font-weight: 600; font-size: 15px; transition: background .1s, border-color .1s; }
+.dz div.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); }

@@ -49,5 +49,30 @@
     "js/gallery-play.js",
     "js/library.js"
   ],
-  "styles": ["css/gallery.css", "css/gallery-sheet.css", "css/library.css"]
+  "styles": [
+    "css/tokens.css",
+    "css/base.css",
+    "css/list.css",
+    "css/session.css",
+    "css/views.css",
+    "css/chat.css",
+    "css/menus.css",
+    "css/phone.css",
+    "css/composer.css",
+    "css/connections.css",
+    "css/notifications.css",
+    "css/leads.css",
+    "css/research.css",
+    "css/opportunities.css",
+    "css/discover.css",
+    "css/studio.css",
+    "css/feed.css",
+    "css/motion.css",
+    "css/simple.css",
+    "css/journey.css",
+    "css/quests.css",
+    "css/gallery.css",
+    "css/gallery-sheet.css",
+    "css/library.css"
+  ]
 }
