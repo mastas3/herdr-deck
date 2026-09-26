@@ -24,7 +24,8 @@ import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
 import { PushStore, endpointOk, type Message } from "./push";
-import { Automations } from "./automations";
+import { Automations, linkPath } from "./automations";
+import { Radar } from "./radar";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -167,7 +168,7 @@ const PUBLIC_URL = (process.env.DECK_PUBLIC_URL ?? "").replace(/\/$/, "");
 function fullState() {
   return {
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
-    tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
+    tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], radar: radar.list(), jev: jevUsage(), canShare: canShare(),
     auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() },
   };
 }
@@ -236,7 +237,8 @@ const screenOf = async (row: Row): Promise<string[] | undefined> => {
   return text ? String(text).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split("\n").slice(-60) : undefined;
 };
 let decTimer: Timer | undefined;
-const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(rebuildDecisions, 350); };
+// The radar runs on the same beat but on its own: the decisions rebuild never waits for it.
+const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(() => { rebuildDecisions(); radar.pass(allRows()).catch(() => {}); }, 350); };
 async function rebuildDecisions() {
   const rows = allRows().filter(needsYou);
   const next = new Map<string, Decision>();
@@ -254,6 +256,17 @@ async function rebuildDecisions() {
   if (u.calls !== lastJevCalls) { lastJevCalls = u.calls; broadcast("jev", u); }
 }
 let lastJevCalls = jevUsage().calls;
+// Stuck and drift radar: running sessions that look stuck get a Jev read, shown as a chip; two confident
+// "stuck" reads in a row push once (as a "needs you" alert, so device choices and quiet hours apply).
+const radar = new Radar({
+  chat: chatTail,
+  changed: (list) => broadcast("radar", list),
+  push: (m, r) => {
+    const rules = auto?.rules.alerts;
+    if (isNode() || (rules && !(rules.on && rules.needs)) || viewing(r.key)) return;
+    push.deliver({ ...m, url: linkPath(r) }, { urgency: "high", ttl: 6 * 3600, topic: `r${Bun.hash(r.key).toString(36)}` }).catch(() => {});
+  },
+});
 deck.onPatch(scheduleDecisions);
 setInterval(scheduleDecisions, 10_000);
 

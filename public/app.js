@@ -511,12 +511,23 @@ function srcLine(r) {
 }
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
   const tip = why.k === "work" && why.t ? `Working since ${abs(why.t)}` : `Last active ${abs(r.lastActiveAt)}`;
   return `<span class="ago why" data-k="${why.k}"${why.t ? ` data-t="${why.t}" data-why="${why.k}"` : ""} title="${esc(tip)}">${esc(why.text)}</span>`;
+}
+const RADAR_PHASE = { exploring: "reading and searching", editing: "changing files", testing: "running tests or builds", debugging: "chasing a failure", wrapping_up: "wrapping up" };
+const RADAR_WHY = { repeat: "it made the same tool call 3 or more times in its last 8", errors: "3 or more of its last 6 tool calls failed", stall: "this turn has run over 10 minutes without editing a file" };
+/** Jev's stuck/drift read on a running session, as a small chip; nothing unless it's fairly sure (70%+). */
+function radarChip(r) {
+  const e = r.status === "working" && (S.radar ?? []).find((x) => x.key === r.key);
+  if (!e) return "";
+  const bits = [e.stuck >= 0.7 ? `looping ${Math.round(e.stuck * 100)}%` : "", e.offTask >= 0.7 ? `off task ${Math.round(e.offTask * 100)}%` : ""].filter(Boolean);
+  if (!bits.length) return "";
+  const tip = `Jev thinks this session may be ${e.stuck >= 0.7 ? "stuck" : "off task"}${e.phase ? `; it looks like it's mostly ${RADAR_PHASE[e.phase] ?? e.phase}` : ""}.\nThe deck asked because ${RADAR_WHY[e.trigger] ?? "it looked unusual"}.\nJust a heads-up: nothing happens on its own.`;
+  return `<span class="rchip" title="${esc(tip)}">${esc(bits.join(" · "))}</span>`;
 }
 function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now())) {
   if (S.simple) return simpleRow(r);
@@ -540,8 +551,9 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  const rc = radarChip(r);
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
 }
 let lastOrder = "", queued = false;
 function render() {
@@ -663,7 +675,7 @@ function renderList() {
     }
     const ask = pendingAsk(r);
     const why = reasonOf(r, ask?.kind, now);
-    const ctx = JSON.stringify(ask ?? "") + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const ctx = JSON.stringify(ask ?? "") + radarChip(r) + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
     const sig = JSON.stringify(r) + ctx;
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
@@ -1236,7 +1248,7 @@ function renderDetail() {
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length, radarChip(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -1282,6 +1294,7 @@ function renderHead(r, d, tab) {
   const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
+    radarChip(r),
     `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
@@ -4849,6 +4862,7 @@ function applyFull(data) {
   S.usage = data.usage ?? {};
   S.hist = data.history ?? {};
   S.decisions = data.decisions ?? [];
+  S.radar = data.radar ?? [];
   S.jev = data.jev ?? {};
   S.canShare = !!data.canShare;
   S.publicUrl = data.publicUrl ?? "";
@@ -4893,6 +4907,7 @@ function connect() {
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
   es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
+  es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
   es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
   es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
   es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });

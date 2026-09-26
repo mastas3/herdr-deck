@@ -78,7 +78,8 @@ function touchText(d: Detail, text: string, weight: number) {
   for (const m of text.matchAll(PATH_RE)) if (!seen.has(m[0])) { seen.add(m[0]); touch(d, m[0], weight); }
 }
 
-const EDIT_TOOLS = /^(edit|write|multiedit|notebookedit|apply_patch|patch)$/i;
+/** Tools that change files, by the names this module emits (Claude, Codex, OpenCode). */
+export const EDIT_TOOLS = /^(edit|write|multiedit|notebookedit|apply_patch|patch)$/i;
 const READ_TOOLS = /^(read|grep|glob|ls|view|list)$/i;
 
 /** "mcp__plugin_playwright_playwright__browser_click" → "playwright · browser_click". */
