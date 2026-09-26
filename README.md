@@ -547,7 +547,8 @@ Found a security problem? Please report it privately; see [SECURITY.md](SECURITY
 ## Contributing
 
 Issues and pull requests are welcome. The code is plain TypeScript run by Bun with no dependencies and no
-build step: `src/` is the server, `public/` is the page. `bun run dev` runs it with reload and `bun test` runs
+build step: `src/` is the server (`src/server.ts` wires the parts in `src/http/`), `public/` is the page (`index.html`
+plus the scripts and styles `public/assets.json` lists). `bun run dev` runs it with reload and `bun test` runs
 the tests. [AGENTS.md](AGENTS.md) has the conventions (it's also what coding agents read).
 
 ## License
