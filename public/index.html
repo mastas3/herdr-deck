@@ -1242,7 +1242,10 @@ dialog.ask.wide { width: min(820px, calc(100vw - 24px)); }
 .cuse { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; color: var(--ink); font: 14px/1.45 var(--read); resize: vertical; }
 .cuse:focus { outline: none; border-color: var(--accent); }
 .cacts { display: flex; gap: 6px; align-items: center; }
-.btn.danger { color: var(--danger); }
+/* Was ".btn.danger", which also matched the solid dialog danger button and, coming after its own rule, overrode its
+   white text to red-on-red (invisible). Scoped to the ghost variant, and reset to a transparent, ghost-style
+   background so its own red text (and the .btn.danger rule's solid red background) don't collide the same way. */
+.btn.ghost.danger { color: var(--danger); background: transparent; border-color: var(--line-2); }
 .cbar { position: sticky; bottom: 12px; z-index: 5; margin-top: 20px; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--raise); border: 1px solid var(--accent); box-shadow: 0 12px 34px rgba(0,0,0,.35); transform: translateY(140%); opacity: 0; pointer-events: none; transition: transform .25s var(--ease), opacity .2s; }
 .cbar.on { transform: none; opacity: 1; pointer-events: auto; }
 .cbar .btn svg { width: 15px; height: 15px; }
@@ -1498,6 +1501,39 @@ dialog.ask .inp.num { width: 72px; display: inline-block; padding: 3px 6px; }
 /* ══ Discover ══ (public/app.js "Discover" block, src/discover.ts) */
 .view[data-view="discover"] { max-width: 1100px; }
 .dtabs { margin-top: 12px; }
+.view[data-view="plugins"] { max-width: 860px; }
+.plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 12px; margin-top: 14px; }
+.pcard { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pcard p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.ptop { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pid { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pid b, .pid h3 { margin: 0; overflow-wrap: anywhere; }
+.pid small, .pid h3 small { color: var(--ink-3); font-weight: 400; font-size: 12.5px; }
+.pbadge { color: #fff; font-weight: 700; }
+.pstate { font-size: 12px; border-radius: 999px; padding: 2px 8px; border: 1px solid var(--line-2); color: var(--ink-2); white-space: nowrap; }
+.pstate.pon { color: var(--accent); border-color: var(--accent); }
+.pstate.pwarn { color: var(--danger); border-color: var(--danger); }
+.pacts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.pempty { margin-top: 24px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; color: var(--ink-2); }
+.phead { font-weight: 600; color: var(--ink) !important; }
+.ptrust { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; max-width: 720px; }
+.ptrust h4 { margin: 10px 0 2px; font-size: 14px; }
+.ptrust ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.ptrust code { font-size: 12.5px; overflow-wrap: anywhere; }
+.pauthor { color: var(--ink-2); font-style: italic; }
+.pauthor span { font-style: normal; color: var(--ink-3); }
+.pgrants { list-style: none; padding-left: 0 !important; gap: 8px !important; }
+.pgrants li { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.pgrants li.pw { border-color: var(--danger); }
+.pgrants details { flex-basis: 100%; font-size: 12.5px; color: var(--ink-3); }
+.ptag { font-size: 11.5px; border: 1px solid var(--line-2); border-radius: 999px; padding: 1px 7px; color: var(--ink-2); }
+.ptag.pw, .pdiff li.pw { color: var(--danger); border-color: var(--danger); }
+.pdiff { border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 12px; }
+.pprompts pre { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; max-height: 320px; overflow: auto; }
+.pprompts h5 { margin: 10px 0 4px; }
+.pprob { color: var(--danger); }
+.ptick { display: flex; gap: 8px; align-items: center; font-weight: 600; }
+.padd { margin-top: 14px; }
 .dsub { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; font: 650 15px/1.3 var(--sans); color: var(--ink); margin: 22px 0 10px; }
 .dsub .hint { font: 400 13px var(--read); }
 .dlead { margin: 14px 0 12px; }

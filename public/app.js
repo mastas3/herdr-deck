@@ -2158,6 +2158,7 @@ function setMode(m) {
   if (m === "history" && !S.histRes) loadHistory();
   if (m === "connections") loadConnections();
   if (m === "discover") loadDiscover();
+  if (m === "plugins") loadPlugins();
   if (m === "project") loadJourney(S.jp.name, { force: true }); // journey: cached on the server, so this is instant
   if (m === "projects") loadProjects();
   if (m === "inbox" && S.jevOpen) loadJevStats(true);
@@ -2171,7 +2172,7 @@ function renderViews() {
   const el = $("views");
   if (!el) return;
   const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
-  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["discover", "Discover", ICON.compass]];
+  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["discover", "Discover", ICON.compass], ["plugins", "Plugins", ICON.puzzle]];
   setHTML(el, v.map(([id, label, icon, count]) => `<button data-view="${id}" aria-pressed="${S.mode === id}" title="${label}${id === "inbox" ? " (i)" : id === "history" ? " (h)" : id === "discover" ? " (d)" : ""}">${icon}<span>${label}</span>${count ? `<b>${count}</b>` : ""}</button>`).join(""));
 }
 function renderMode() {
@@ -2183,6 +2184,7 @@ function renderMode() {
   else if (S.mode === "tools") renderTools();
   else if (S.mode === "connections") renderConnections();
   else if (S.mode === "discover") renderDiscover();
+  else if (S.mode === "plugins") renderPlugins();
   else if (S.mode === "project") renderJourney();
   else if (S.mode === "projects") renderProjects();
 }
@@ -3193,6 +3195,150 @@ async function suggestProjects() {
   if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session (in ~/wiki if you have one, otherwise your home folder) with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
   try { const r = await api("/api/suggest-projects", {}); toast("Starting a Claude session with your connections…"); if (r.key) pendingSelect = r.key; } catch (e) { toast(e.message, true); }
 }
+
+// ══ Plugins ══════════════════════════════════════════════════════════════════
+// Integrations and business packs anyone can share. They're data only: the server validates them, and the trust
+// screen shows exactly what one may do, built from its grants rather than its description, before it's installed.
+// Server side: src/plugins.ts.
+ICON.puzzle = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.8 5.6h2.4a1.7 1.7 0 1 1 3.2 0h2.4V8a1.7 1.7 0 1 1 0 3.2v2.4H8.4a1.7 1.7 0 1 0-3.2 0H2.8v-2.4a1.7 1.7 0 1 0 0-3.2z"/></svg>';
+S.plug = { data: null, loading: false, tab: load("plugTab", "installed"), review: null, busy: false, tick: false };
+const PTABS = [["installed", "Installed"], ["catalog", "Catalog"], ["add", "Add"]];
+const PSTATE = { on: ["On", "pon"], off: ["Off", "poff"], changed: ["Files changed", "pwarn"] };
+
+async function loadPlugins() {
+  if (S.plug.loading) return;
+  S.plug.loading = true;
+  try { S.plug.data = await api("/api/plugins", {}); } catch (e) { toast(e.message, true); }
+  S.plug.loading = false;
+  if (S.mode === "plugins") renderPlugins();
+}
+function plugTab(t) { S.plug.tab = t; S.plug.review = null; store("plugTab", t); renderPlugins(); $("dbody").scrollTop = 0; }
+/** The plugin's badge. The colour comes from a stranger, so it's checked again here before it goes into a style. */
+function plugIcon(name, icon) {
+  const color = /^#[0-9a-f]{6}$/i.test(icon?.color ?? "") ? icon.color : "var(--accent)";
+  return `<span class="cbadge pbadge" style="background:${color}">${esc(icon?.glyph || initials(name))}</span>`;
+}
+const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+function renderPlugins() {
+  const d = S.plug.data;
+  const tabs = PTABS.map(([id, label]) => `<button data-ptab="${id}" aria-pressed="${S.plug.tab === id && !S.plug.review}">${label}${id === "installed" && d?.plugins?.length ? ` <span class="n">${d.plugins.length}</span>` : ""}</button>`).join("");
+  const head = `<header class="vh"><h2>${ICON.puzzle}Plugins</h2><p>Add integrations and whole working setups to the deck. A plugin is data only, and you see exactly what it may do before it’s installed.</p><nav class="seg dtabs">${tabs}</nav></header>`;
+  let body;
+  if (S.plug.review) body = plugReview(S.plug.review);
+  else if (!d) body = `<p class="hint">Loading plugins…</p>`;
+  else if (S.plug.tab === "catalog") body = plugCatalog(d);
+  else if (S.plug.tab === "add") body = plugAdd();
+  else body = plugInstalled(d);
+  modeHTML(head + body);
+}
+
+function plugInstalled(d) {
+  if (!d.plugins.length) return `<div class="pempty"><p>No plugins yet.</p><button class="btn primary" data-ptab="catalog">Browse the catalog</button></div>`;
+  return `<div class="plist">${d.plugins.map((p) => {
+    const [label, cls] = PSTATE[p.state] ?? PSTATE.off;
+    const t = p.trust;
+    const from = p.from?.catalog ? "from the catalog" : p.from?.file ? `from ${p.from.file}` : "";
+    return `<article class="pcard" data-pid="${esc(p.id)}">
+      <div class="ptop">${plugIcon(p.name, t?.icon)}<div class="pid"><b>${esc(p.name)}</b><small>${esc(p.version)}${from ? ` · ${esc(from)}` : ""}</small></div><span class="pstate ${cls}">${label}</span></div>
+      ${p.state === "changed" ? `<p class="derr">${ICON.warn}Its files changed on disk since you approved them, so it’s off until you review it again.</p>` : t ? `<p class="phead">${esc(t.headline)}</p>` : ""}
+      ${t?.adds.sources.length ? `<p class="hint">Its views fill in once plugin runs are available in the deck.</p>` : ""}
+      <div class="pacts">${p.state === "changed" ? `<button class="btn primary" data-preview>Review again</button>` : `<button class="btn ghost" data-penable="${p.enabled ? "off" : "on"}">${p.enabled ? "Turn off" : "Turn on"}</button><button class="btn ghost" data-preview>Details</button>`}<span class="spacer"></span><button class="btn ghost danger" data-premove>Remove</button></div>
+    </article>`;
+  }).join("")}</div>`;
+}
+
+function plugCatalog(d) {
+  if (!d.catalog.length) return `<p class="hint">The catalog is empty.</p>`;
+  return `<div class="plist">${d.catalog.map((c) => `<article class="pcard">
+      <div class="ptop">${plugIcon(c.name, c.icon)}<div class="pid"><b>${esc(c.name)}</b><small>${c.kind === "business" ? "Business pack" : "Integration"} · ${esc(c.version)}</small></div>${c.installed ? `<span class="pstate pon">Installed</span>` : ""}</div>
+      ${c.description ? `<p>${esc(c.description)}</p>` : ""}
+      <div class="pacts"><button class="btn ${c.installed ? "ghost" : "primary"}" data-pcat="${esc(c.id)}">${c.installed ? (c.installed === c.version ? "Review" : `Update to ${esc(c.version)}`) : "Review & install"}</button></div>
+    </article>`).join("")}</div>`;
+}
+
+function plugAdd() {
+  return `<div class="padd"><p class="hint">Adding a plugin from a file arrives in the next part of this update.</p></div>`;
+}
+
+/** The trust screen: what the plugin may do, from its grants, repos, roles and schedules. */
+function plugReview(r) {
+  if (!r.ok) return `<section class="ptrust"><button class="link" data-pback>← Back</button><h3>This plugin can’t be installed</h3>
+    <p>The deck checked it and found ${plural(r.problems.length, "problem")}:</p>
+    <ul class="pprob">${r.problems.map((x) => `<li>${x.path ? `<code>${esc(x.path)}</code> ` : ""}${esc(x.message)}</li>`).join("")}</ul></section>`;
+  const t = r.trust;
+  const installed = S.plug.data?.plugins?.find((p) => p.id === t.id);
+  const sameAsInstalled = installed && installed.state !== "changed" && installed.hash === r.hash; // identical bytes: nothing to approve
+  const sec = (title, items) => (items.length ? `<h4>${title}</h4><ul>${items.join("")}</ul>` : "");
+  const grants = t.grants.length
+    ? `<ul class="pgrants">${t.grants.map((g) => `<li class="${g.writes ? "pw" : ""}"><b>${esc(g.sentence)}</b>${g.bash ? '<span class="ptag">runs commands on this machine</span>' : g.machine ? '<span class="ptag">uses files on this machine</span>' : ""}${g.web ? '<span class="ptag">reaches the web</span>' : ""}${g.writes ? '<span class="ptag pw">can change things</span>' : ""}<details><summary>Exact tools</summary><code>${g.tools.map(esc).join("<br>")}</code></details></li>`).join("")}</ul>`
+    : `<p class="hint">It asks for no tools.</p>`;
+  const diff = r.update ? `<div class="pdiff"><b>Update from ${esc(r.update.fromVersion)} to ${esc(t.version)}</b>${r.update.diff.changes.length ? `<ul>${r.update.diff.changes.map((c) => `<li class="${c.approve ? "pw" : ""}">${esc(c.text)}${c.approve ? "" : ' <span class="hint">(no approval needed)</span>'}</li>`).join("")}</ul>` : `<p class="hint">Nothing that needs your approval changed.</p>`}</div>` : "";
+  const blocked = r.missing?.length ? `<p class="derr">${ICON.warn}Install ${r.missing.map(esc).join(", ")} first.</p>` : "";
+  const can = !r.missing?.length && (!t.needsTick || S.plug.tick) && !S.plug.busy && !sameAsInstalled;
+  return `<section class="ptrust">
+    <button class="link" data-pback>← Back</button>
+    <div class="ptop">${plugIcon(t.name, t.icon)}<div class="pid"><h3>${esc(t.name)} <small>${esc(t.version)}</small></h3><small>${t.kind === "business" ? "Business pack" : "Integration"}${t.author ? ` · by ${esc(t.author)}` : ""}${r.from?.catalog ? " · from the catalog" : r.from?.file ? ` · from ${esc(r.from.file)}` : ""}</small></div></div>
+    ${t.description ? `<p class="pauthor"><span>The author says:</span> ${esc(t.description)}</p>` : ""}
+    <p class="phead">${esc(t.headline)}</p>
+    ${diff}
+    <h4>What its agents may do</h4>${grants}
+    ${sec("Repos it will clone", t.repos.map((x) => `<li>${esc(x.project)}: <code>${esc(x.url)}</code> at <code>${esc(x.ref.slice(0, 12))}</code></li>`))}
+    ${sec("Agents it can start (only when you press Start)", t.roles.map((x) => `<li><b>${esc(x.title)}</b> · ${esc(x.agent)}${x.model ? ` ${esc(x.model)}` : ""} · in ${esc(x.project)}${x.machine === "other" ? " · on your other machine" : ""}</li>`))}
+    ${sec("Schedules", t.schedules.map((x) => `<li>${esc(x.role)} gets a prompt ${esc(x.when)}</li>`))}
+    ${sec("Connections it needs", t.requires.connections.map((x) => `<li>${esc(x)}</li>`))}
+    ${sec("What it adds", [...t.adds.views.map((x) => `<li>View: ${esc(x)}</li>`), ...t.adds.actions.map((x) => `<li>Action: ${esc(x)}</li>`), ...t.adds.recipes.map((x) => `<li>Recipe: ${esc(x)}</li>`), ...t.adds.projects.map((x) => `<li>Project: ${esc(x)}</li>`)])}
+    ${t.prompts.length ? `<details class="pprompts"><summary>Read every prompt (${t.prompts.length})</summary>${t.prompts.map((x) => `<h5>${esc(x.where)}</h5><pre>${esc(x.text)}</pre>`).join("")}</details>` : ""}
+    ${blocked}
+    ${t.needsTick ? `<label class="ptick"><input type="checkbox" data-ptick ${S.plug.tick ? "checked" : ""}> Let it run the commands listed above on this machine</label>` : ""}
+    <div class="pacts">${sameAsInstalled ? `<span class="hint">This is what you have installed.</span>` : `<button class="btn primary" data-pinstall ${can ? "" : "disabled"}>${r.update || installed ? "Update" : "Install"}</button>`}<button class="btn ghost" data-pback>${sameAsInstalled ? "Back" : "Cancel"}</button></div>
+  </section>`;
+}
+
+function plugShow(preview) { S.plug.review = preview; S.plug.tick = false; renderPlugins(); $("dbody").scrollTop = 0; }
+async function plugInspect(body) {
+  if (S.plug.busy) return;
+  S.plug.busy = true;
+  try { const pv = await api("/api/plugins/inspect", body); S.plug.busy = false; plugShow(pv); }
+  catch (e) { S.plug.busy = false; toast(e.message, true); }
+}
+async function plugInstall() {
+  const r = S.plug.review;
+  if (!r?.ok || S.plug.busy) return;
+  S.plug.busy = true; renderPlugins();
+  try {
+    S.plug.data = await api("/api/plugins/install", { staged: r.staged, approve: r.hash, bash: S.plug.tick });
+    S.plug.review = null; S.plug.tab = "installed"; store("plugTab", "installed");
+    toast(`${r.trust.name} installed`);
+  } catch (e) { toast(e.message, true); }
+  S.plug.busy = false; renderPlugins();
+}
+async function plugDo(path, body) {
+  try { S.plug.data = await api(path, body); } catch (e) { toast(e.message, true); }
+  renderPlugins();
+}
+
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "plugins") return;
+  const t = e.target;
+  const tab = t.closest("[data-ptab]")?.dataset.ptab;
+  if (tab) return plugTab(tab);
+  if (t.closest("[data-pback]")) { S.plug.review = null; return renderPlugins(); }
+  const cat = t.closest("[data-pcat]")?.dataset.pcat;
+  if (cat) return plugInspect({ catalog: cat });
+  if (t.closest("[data-pinstall]")) return plugInstall();
+  const id = t.closest("[data-pid]")?.dataset.pid;
+  if (!id) return;
+  const p = S.plug.data?.plugins?.find((x) => x.id === id);
+  if (t.closest("[data-preview]")) return plugInspect({ review: id });
+  const en = t.closest("[data-penable]")?.dataset.penable;
+  if (en) return plugDo("/api/plugins/enable", { id, on: en === "on" });
+  if (t.closest("[data-premove]") && (await askDialog({ title: `Remove ${p?.name ?? id}?`, text: "Its files are deleted from this machine. You can install it again later.", ok: "Remove", danger: true }))) return plugDo("/api/plugins/remove", { id });
+});
+$("dbody").addEventListener("change", (e) => {
+  if (S.mode !== "plugins") return;
+  if (e.target.matches("[data-ptick]")) { S.plug.tick = e.target.checked; renderPlugins(); }
+});
 
 // ══ Discover ═════════════════════════════════════════════════════════════════
 // Repos worth forking, matched to what you build; an idea lab that searches GitHub for building blocks; the
@@ -5967,6 +6113,7 @@ function paletteItems(q) {
     { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
     { t: "History: search every past session", k: "h", run: () => setMode("history") },
     { t: "Tools: what each one does", run: () => setMode("tools") },
+    { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
     { t: "Connections: everything this setup can reach", run: () => setMode("connections") },
     { t: "Suggest mega projects from my connections", run: suggestProjects },
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },
