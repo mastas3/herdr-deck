@@ -31,6 +31,7 @@ import { PushStore, endpointOk, type Message } from "./push";
 import { Automations, linkPath } from "./automations";
 import { Radar } from "./radar";
 import { routeMessage } from "./route";
+import { researchForServer } from "./autoresearch-server";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -127,6 +128,8 @@ let auto: Automations | undefined = new Automations({
 });
 /** Test-only rows (DECK_DEV): exercise alerts, the digest and the empty-session card without touching real sessions. */
 const fakeRows = new Map<string, Row>();
+// Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
+const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession, closeLocal, sendText, screen: (r) => screenOf(r), push, auto: () => auto, isNode, discover, machines });
 
 const remotes = new Map<string, RemoteHost>();
 function addRemote(conf: RemoteConf) {
@@ -1104,6 +1107,7 @@ async function handle(req: Request): Promise<Response> {
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
@@ -1574,6 +1578,7 @@ for (let attempt = 0; ; attempt++) {
 }
 for (const h of remotes.values()) h.start();
 auto.start();
+research.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 

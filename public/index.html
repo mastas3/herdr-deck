@@ -1495,6 +1495,75 @@ dialog.ask .inp.num { width: 72px; display: inline-block; padding: 3px 6px; }
   .lheat i, .lbar i { transition: none; }
 }
 
+/* ══ Autoresearch ══ (public/app.js "Autoresearch" block, src/autoresearch*.ts) */
+#rsbody { min-width: 0; margin-top: 14px; }
+.rshead { display: flex; flex-direction: column; gap: 8px; }
+.rshead > .hint { margin: 0; max-width: 78ch; font-size: 13.5px; line-height: 1.45; }
+.rsacts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rsacts svg { width: 15px; height: 15px; }
+.rsmeta { margin-left: auto; font-size: 12.5px; }
+.rsempty { margin-top: 18px; }
+.rslist { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 14px -2px 0; scrollbar-width: thin; }
+.rscamp { flex: 0 0 min(260px, 80%); display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--raise); border-radius: 12px; padding: 9px 11px; color: var(--ink); cursor: pointer; }
+.rscamp[aria-pressed="true"] { border-color: var(--accent); }
+.rsct { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rscamp .hint { grid-column: 2; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rsc { margin-top: 16px; }
+.rsch h3 { margin: 0; font: 600 21px/1.3 var(--serif); color: var(--ink); overflow-wrap: anywhere; }
+.rsline { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 0; font-size: 13px; color: var(--ink-3); }
+.rspill { display: inline-flex; align-items: center; font: 600 11.5px/1 var(--sans); letter-spacing: .03em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); padding: 4px 8px; border-radius: 999px; }
+.rsnote { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
+.rsprog { height: 4px; border-radius: 99px; background: color-mix(in srgb, var(--ink-3) 18%, transparent); overflow: hidden; margin: 4px 0 10px; }
+.rsprog i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform .4s var(--ease); }
+.rscols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; margin-top: 8px; align-items: start; }
+.rsboard, .rsruns { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.rsnone { margin: 0; }
+.rsn { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 13px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.rsntop { display: flex; align-items: center; gap: 10px; }
+.rsrank { font: 600 13px var(--mono); color: var(--ink-3); }
+.rsn h4 { flex: 1; min-width: 0; margin: 0; font: 600 17px/1.3 var(--serif); overflow-wrap: anywhere; }
+.rsscore { flex: none; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; font: 600 14px var(--mono); color: var(--ink);
+  background: radial-gradient(closest-side, var(--raise) 78%, transparent 80% 100%), conic-gradient(var(--accent) calc(var(--p) * 1%), color-mix(in srgb, var(--ink-3) 22%, transparent) 0); }
+.rssum { margin: 0; font-size: 14.5px; line-height: 1.45; color: var(--ink); }
+.rsfacts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 10px; margin: 0; font-size: 13.5px; line-height: 1.4; }
+.rsfacts dt { color: var(--ink-3); }
+.rsfacts dd { margin: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.rsbars { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 5px 14px; }
+.rsb { display: grid; grid-template-columns: 78px minmax(0, 1fr) 26px; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-3); }
+.rsb i { height: 5px; border-radius: 99px; background: color-mix(in srgb, var(--ink-3) 18%, transparent); overflow: hidden; }
+.rsb b { display: block; height: 100%; background: var(--idle); transform-origin: left; }
+.rsb.inv b { background: var(--working); }
+.rsb em { font: normal 12px var(--mono); color: var(--ink-2); text-align: right; }
+.rsn .lq { border-left-color: var(--line-2); }
+.rslinks { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-size: 12.5px; }
+.rslinks a { color: var(--ink-2); text-decoration: none; }
+.rslinks a:hover { color: var(--accent); }
+.rstl { list-style: none; margin: 0 0 0 5px; padding: 0 0 0 16px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 16px; }
+.rsr { position: relative; min-width: 0; }
+.rsr::before { content: ""; position: absolute; left: -23px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px var(--bg); }
+.rsr p { margin: 0 0 4px; }
+.rsrh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.rsq { font-size: 14px; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; }
+.rsq .spin { vertical-align: -1px; }
+.rsbest { font-size: 13px; color: var(--ink-2); }
+.rswhy { font-size: 13px; color: var(--ink-3); border-left: 2px solid var(--line-2); padding-left: 8px; }
+.rsrej p { font-size: 12.5px; color: var(--ink-3); margin: 4px 0 0; }
+.rsrep { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); max-height: 60vh; overflow: auto; font-size: 14px; }
+.rsdlg .rspre { margin: 4px 0 2px; }
+.rsdlg .lstart { font-size: 13px; padding: 5px 9px; }
+.rsquiet { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rsgoal { font: 600 17px/1.35 var(--serif); color: var(--ink); margin: 4px 0 10px; }
+.rslist2 { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+@media (max-width: 760px) {
+  .rscols { grid-template-columns: minmax(0, 1fr); }
+  .rsmeta { margin-left: 0; }
+  .rsn .gacts .btn { flex: 1 1 auto; justify-content: center; }
+  .rsch h3 { font-size: 19px; }
+}
+.view.calm .rsn { animation: none; }
+@media (prefers-reduced-motion: reduce) { .rsn { animation: none; } .rsprog i { transition: none; } }
+/* ══ end Autoresearch ══ */
+
 /* ══ Discover ══ (public/app.js "Discover" block, src/discover.ts) */
 .view[data-view="discover"] { max-width: 1100px; }
 .dtabs { margin-top: 12px; }
