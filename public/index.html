@@ -948,6 +948,20 @@ label.ib { display: inline-grid; place-items: center; cursor: pointer; }
 [data-simple] .row .src svg { width: 15px; height: 15px; }
 [data-simple] #cAttach { width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--raise); }
 [data-simple] #cAttach svg { width: 20px; height: 20px; }
+.rask { grid-column: 2 / -1; margin: 6px 0 2px; padding: 9px 10px 10px; border-radius: 12px; background: color-mix(in srgb, var(--blocked) 8%, var(--raise)); border: 1px solid color-mix(in srgb, var(--blocked) 35%, var(--line)); animation: enter .2s var(--ease); cursor: default; }
+.rask .rq { font: 14px/1.4 var(--read); color: var(--ink); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; white-space: normal; }
+.rask .ropts { display: flex; flex-wrap: wrap; gap: 5px; }
+.ropt { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 4px 11px 4px 5px; font-size: 13.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: background .12s, border-color .12s, transform .1s; }
+.ropt .ol { display: grid; place-items: center; min-width: 20px; height: 20px; border-radius: 999px; background: var(--hover); font: 600 11px var(--mono); color: var(--ink-2); flex: none; }
+.ropt:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg)); }
+.ropt:active { transform: scale(.95); }
+.ropt.rec { border-color: color-mix(in srgb, var(--accent) 60%, var(--line-2)); }
+.ropt.rec .ol { background: var(--accent); color: var(--accent-ink); }
+.ropt.ghost, .ropt.more { padding: 4px 11px; color: var(--ink-2); background: none; }
+.rask.sending { opacity: .5; pointer-events: none; }
+[data-simple] .rask .rq { font-size: 16px; }
+[data-simple] .ropt { font-size: 15.5px; padding: 7px 14px 7px 7px; }
+[data-simple] .ropt .ol { min-width: 24px; height: 24px; }
 /* ── views: a way out ── */
 .vclose { position: sticky; top: 12px; float: right; margin: 12px 14px -46px 0; z-index: 4; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--raise) 88%, transparent); color: var(--ink-2); backdrop-filter: blur(6px); transition: background .12s, color .12s, transform .12s var(--ease); }
 .vclose:hover { background: var(--hover); color: var(--ink); transform: rotate(90deg); }

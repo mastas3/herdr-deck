@@ -371,7 +371,23 @@ function visibleRows() {
 
 // ── list rendering (keyed; only changed rows touch the DOM) ──────────────
 const rowCache = new Map();
-const SIMPLE_STATUS = { working: ["Working on it", "✨"], blocked: ["Needs you", "👋"], done: ["Finished", "✅"], idle: ["Resting", "💤"], empty: ["Empty", "·"], unknown: ["", ""] };
+const SIMPLE_STATUS = { working: ["Working on it", "✨"], blocked: ["Needs you", "👋"], done: ["Finished", "✅"], idle: ["Resting", "💤"], empty: ["Ready, nothing asked yet", "·"], unknown: ["Status unknown", "?"], history: ["Past session", "🕘"] };
+/** The question an agent is waiting on, answerable right in the list (like Claude on the web and phone). */
+const pendingAsk = (r) => (S.decisions ?? []).find((d) => d.key === r.key && (d.kind === "prompt" || d.kind === "question") && !S.done.has(d.key));
+function rowAsk(r) {
+  const d = pendingAsk(r);
+  if (!d) return "";
+  const opts = d.options.slice(0, 4).map((o) => `<button class="ropt${o.rec ? " rec" : ""}" data-ropt="${esc(o.id)}" title="${esc(o.title)}"><span class="ol">${esc(String(o.id).toUpperCase())}</span>${esc(plain(o.title).slice(0, 44))}${plain(o.title).length > 44 ? "…" : ""}</button>`).join("");
+  return `<div class="rask" data-rask="${esc(r.key)}"><div class="rq">${esc(plain(d.question))}</div><div class="ropts">${opts}${d.options.length > 4 ? `<button class="ropt more" data-ropen>+${d.options.length - 4} more</button>` : ""}<button class="ropt ghost" data-rreply>${d.options.length ? "Other…" : "Reply…"}</button></div></div>`;
+}
+async function answerOption(d, o) {
+  if (d.kind === "prompt") await api("/api/keys", { key: d.key, keys: o.keys ?? [String(o.id)] });
+  else await api("/api/send", { key: d.key, text: o.send ?? o.title });
+  S.done.set(d.key, Date.now());
+  api("/api/decide", { key: d.key, action: "answer", choice: String(o.id) }).catch(() => {});
+  api("/api/seen", { key: d.key }).catch(() => {});
+}
+
 /** Where a session lives: which machine (and herdr workspace), shown under every row in both modes. */
 const SRC_ICON = {
   mac: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3" width="11" height="7.5" rx="1"/><path d="M1 13h14"/></svg>',
@@ -386,7 +402,7 @@ function srcLine(r) {
 }
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}${rowAsk(r)}`;
 }
 function rowHTML(r, byProject) {
   if (S.simple) return simpleRow(r);
@@ -396,7 +412,7 @@ function rowHTML(r, byProject) {
   const title = `<span class="tl"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span></span>`;
   let line = "";
   const tail = r.tail?.length ? plain(r.tail[r.tail.length - 1]) : "";
-  if (r.status === "blocked") line = `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
+  if (r.status === "blocked") line = pendingAsk(r) ? "" : `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
   else if (live) line = `<span class="ln now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span>` : ""}${r.now ? esc(nowWords(r.now)) : r.step ? esc(r.step) : "thinking…"}</span>`;
   else if (unseenDone(r)) line = `<span class="ln">Finished · ${esc(plain(r.lastMessage) || tail)}</span>`;
   else if (r.empty) line = `<span class="ln">${r.agent === "shell" ? "empty shell" : "no conversation yet"}</span>`;
@@ -409,8 +425,8 @@ function rowHTML(r, byProject) {
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs">${running.slice(0, 3).map((x) => `<div><span class="spin"></span>${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` <span class="mono">${esc(x.now)}</span>` : ""}</div>`).join("")}${running.length > 3 ? `<div>+${running.length - 3} more</div>` : ""}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}`;
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
 }
 let lastOrder = "", queued = false;
 function render() {
@@ -479,7 +495,7 @@ function renderList() {
       c = { el, sig: "" };
       rowCache.set(r.key, c);
     }
-    const sig = JSON.stringify(r) + S.machine + multiMachine() + byProject + (S.q && S.deep?.q === S.q ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const sig = JSON.stringify(r) + JSON.stringify(pendingAsk(r) ?? "") + S.machine + multiMachine() + byProject + (S.q && S.deep?.q === S.q ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
       const was = c.el.dataset.status;
@@ -3023,6 +3039,24 @@ function rowMenu(r, x, y) {
   ].filter(Boolean);
   openMenu(anchor, items, r.title || r.agent);
 }
+$("rows").addEventListener("click", async (e) => {
+  const card = e.target.closest("[data-rask]");
+  if (!card) return;
+  e.stopPropagation();
+  const key = card.dataset.rask, d = (S.decisions ?? []).find((x) => x.key === key);
+  if (!d) return;
+  const b = e.target.closest("[data-ropt]");
+  if (b) {
+    const o = d.options.find((x) => String(x.id) === b.dataset.ropt);
+    if (!o) return;
+    card.classList.add("sending");
+    try { await answerOption(d, o); toast(`Answered: ${plain(o.title).slice(0, 60)}`); render(); if (S.mode === "inbox") renderInbox(); renderViews(); }
+    catch (x) { card.classList.remove("sending"); toast(x.message, true); }
+    return;
+  }
+  if (e.target.closest("[data-rreply], [data-ropen]")) { select(key, { scroll: true, open: true }); if (e.target.closest("[data-rreply]")) focusReply(); return; }
+  select(key, { scroll: true, open: true });
+}, true);
 $("rows").addEventListener("contextmenu", (e) => {
   const el = e.target.closest(".row[data-key]");
   const r = el && rowOf(el.dataset.key);
@@ -3157,7 +3191,7 @@ function connect() {
   es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
-  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") renderInbox(); });
+  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") renderInbox(); render(); });
   es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });
   es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");

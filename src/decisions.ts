@@ -98,38 +98,73 @@ function closingQuestion(text: string) {
  * ("❯ No, exit" / "Yes, I trust this folder") answer by moving the cursor and pressing Enter.
  */
 export function promptFromTail(tail: string[]): { question: string; options: Option[] } {
-  const lines = tail.map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/[│╭╮╰╯─┃━]+/g, " ").replace(/\s+$/, "").trim()).filter(Boolean);
+  // Keep indentation and blank lines: menu options are the contiguous lines aligned with the cursor line,
+  // and a blank line separates them from links like "Security guide" above.
+  const raw = tail.map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").replace(/[│╭╮╰╯─┃━]/g, " ").replace(/\s+$/, ""));
   const HELP = /(enter to (confirm|select)|esc to (cancel|go back)|↑\/↓|tab to|ctrl\+|to navigate)/i;
   const options: Option[] = [];
-  let firstOpt = -1;
-  lines.forEach((l, i) => {
-    const m = l.match(/^(?:[❯›>▸●]\s*)?(\d)[.)]\s+(.{2,120})$/);
-    if (m && !options.some((o) => o.id === m[1])) { options.push({ id: m[1], title: m[2].trim(), keys: [m[1]] }); if (firstOpt < 0) firstOpt = i; }
-  });
+  let first = -1;
+  // The last copy of the menu on screen is the live one.
+  const numbered = (l: string) => l.match(/^\s*(?:[❯›>▸●]\s*)?(\d)[.)]\s+(.{2,120})$/);
+  let lastNum = -1;
+  for (let i = raw.length - 1; i >= 0; i--) if (numbered(raw[i])) { lastNum = i; break; }
+  if (lastNum >= 0) {
+    let a = lastNum;
+    while (a > 0 && (numbered(raw[a - 1]) || (!raw[a - 1].trim() && numbered(raw[a - 2] ?? "")))) a--;
+    for (let i = a; i <= lastNum; i++) {
+      const m = numbered(raw[i]);
+      if (m && !options.some((o) => o.id === m[1])) options.push({ id: m[1], title: m[2].trim(), keys: [m[1]] });
+    }
+    first = a;
+  }
   if (!options.length) {
-    const cur = lines.findIndex((l) => /^[❯›▸]\s+\S/.test(l));
+    let cur = -1;
+    for (let i = raw.length - 1; i >= 0; i--) if (/^\s*[❯›▸]\s+\S/.test(raw[i])) { cur = i; break; }
     if (cur >= 0) {
+      const mark = raw[cur].search(/[❯›▸]/);
+      const col = mark + 1 + raw[cur].slice(mark + 1).search(/\S/);
+      const isOpt = (l?: string) => !!l && !!l.trim() && !HELP.test(l) && Math.abs(l.search(/\S/) - col) <= 1 && l.trim().length <= 90 && !/[?:]$/.test(l.trim());
       let a = cur, b = cur;
-      const isOpt = (l?: string) => !!l && l.length <= 90 && !HELP.test(l) && !/[?:]$/.test(l);
-      while (a > 0 && isOpt(lines[a - 1]) && cur - a < 8) a--;
-      while (b < lines.length - 1 && isOpt(lines[b + 1]) && b - cur < 8) b++;
-      // a leading line that reads like the question isn't an option
-      if (a < cur && /\?$/.test(lines[a])) a++;
+      while (a > 0 && isOpt(raw[a - 1]) && cur - a < 8) a--;
+      while (b < raw.length - 1 && isOpt(raw[b + 1]) && b - cur < 8) b++;
       for (let i = a; i <= b; i++) {
         const d = i - cur;
-        const keys = [...Array(Math.abs(d)).fill(d < 0 ? "up" : "down"), "enter"];
-        options.push({ id: String(options.length + 1), title: lines[i].replace(/^[❯›▸]\s+/, ""), keys });
+        options.push({ id: String(options.length + 1), title: raw[i].trim().replace(/^[❯›▸]\s+/, ""), keys: [...Array(Math.abs(d)).fill(d < 0 ? "up" : "down"), "enter"] });
       }
-      if (options.length >= 2) firstOpt = a;
+      if (options.length >= 2) first = a;
       else options.length = 0;
     }
   }
-  const question = (firstOpt > 0 ? lines.slice(Math.max(0, firstOpt - 3), firstOpt) : lines.slice(-3)).filter((l) => !HELP.test(l)).join(" ").slice(0, 400);
+  const question = questionAbove(raw, first >= 0 ? first : raw.length, HELP);
   if (!options.length) {
+    const lines = raw.map((l) => l.trim()).filter(Boolean);
     const yn = lines.some((l) => /\(y\/n\)|\[y\/N\]|\[Y\/n\]|yes\/no/i.test(l));
     options.push(...(yn ? [{ id: "y", title: "Yes", keys: ["y", "enter"] }, { id: "n", title: "No", keys: ["n", "enter"] }] : [{ id: "enter", title: "Confirm (Enter)", keys: ["enter"] }, { id: "esc", title: "Cancel (Esc)", keys: ["esc"] }]));
   }
   return { question: question || "The agent is waiting for you", options };
+}
+
+/** The question a menu answers: the nearest sentence ending in "?" above it, else the paragraph just above. */
+function questionAbove(raw: string[], before: number, HELP: RegExp): string {
+  const paras: string[] = [];
+  let cur: string[] = [];
+  for (let i = before - 1; i >= 0 && before - i <= 16; i--) {
+    const t = raw[i].trim();
+    if (!t || HELP.test(t)) { if (cur.length) { paras.push(cur.reverse().join(" ")); cur = []; } continue; }
+    cur.push(t);
+  }
+  if (cur.length) paras.push(cur.reverse().join(" "));
+  const withQ = paras.find((p) => p.includes("?"));
+  if (withQ) {
+    const sentences = withQ.match(/[^.?!]*\?/g) ?? [];
+    const q = sentences[sentences.length - 1]?.trim();
+    if (q) {
+      // Keep a short lead-in like "Quick safety check:" that belongs to the same sentence.
+      return q.length < 12 && sentences.length > 1 ? sentences.slice(-2).join(" ").trim() : q;
+    }
+  }
+  const p = paras.find((x) => x.length > 3 && !/^[❯›▸]/.test(x));
+  return (p ?? "").slice(0, 300);
 }
 
 // ── building the inbox ──────────────────────────────────────────────────────
@@ -140,14 +175,16 @@ const jevState = new Map<string, NonNullable<Decision["jev"]> & { sig: string }>
 const sigOf = (r: Row) => `${r.status}|${r.lastActiveAt ?? 0}|${(r.tail ?? []).slice(-3).join("¦")}|${r.check?.state ?? ""}|${r.check?.sig ?? ""}`;
 export const needsYou = (r: Row) => (r.status === "blocked" && !r.app) || (r.status === "done" && !r.seen);
 
-export async function buildDecision(r: Row, chat: (r: Row) => Promise<ChatTail | undefined>): Promise<Decision | undefined> {
+export async function buildDecision(r: Row, chat: (r: Row) => Promise<ChatTail | undefined>, screen?: (r: Row) => Promise<string[] | undefined>): Promise<Decision | undefined> {
   const sig = sigOf(r);
   const hit = cache.get(r.key);
   if (hit && hit.sig === sig) return { ...hit.d, jev: jevState.get(r.key)?.sig === sig ? jevState.get(r.key) : hit.d.jev };
   let d: Decision | undefined;
   const at = r.lastActiveAt ?? Date.now();
   if (r.status === "blocked" && !r.app) {
-    const p = promptFromTail(r.tail ?? []);
+    // The live screen, with its blank lines and indentation, reads far better than the trimmed tail.
+    const lines = (screen ? await screen(r).catch(() => undefined) : undefined) ?? r.tail ?? [];
+    const p = promptFromTail(lines);
     d = { key: r.key, kind: "prompt", at, question: p.question, options: p.options };
   } else if (r.status === "done" && !r.seen) {
     const c = await chat(r).catch(() => undefined);

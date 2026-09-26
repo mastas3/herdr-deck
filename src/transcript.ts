@@ -35,6 +35,7 @@ export type Detail = {
   asks: number;
   workMs?: number;
   turnStartedAt?: number; // when the current (or last) turn began
+  turnOpen?: boolean; // Codex only: a turn started and hasn't completed or been aborted
   todo?: string; // the task the agent marked in progress, if it keeps a todo list
   todos?: { done: number; total: number }; // progress through that list (Claude/OpenCode todos, Codex plans)
   touch: Map<string, number>; // folder → how much work happened there (edits weigh most)
@@ -440,7 +441,8 @@ function feedCodex(st: State, line: string, offset: number) {
   const p = o.payload;
   if (o.type === "session_meta") d.startedAt = Date.parse(p?.timestamp ?? o.timestamp);
   if (o.type === "compacted") { d.compactions++; push(d, { role: "note", at, text: "Conversation compacted" }); }
-  if (o.type === "event_msg" && p?.type === "task_started") d.turnStartedAt = at;
+  if (o.type === "event_msg" && p?.type === "task_started") { d.turnStartedAt = at; d.turnOpen = true; }
+  if (o.type === "event_msg" && (p?.type === "task_complete" || p?.type === "turn_aborted")) d.turnOpen = false;
   if (o.type === "event_msg" && p?.type === "turn_aborted") push(d, { role: "note", at, text: "Interrupted" });
   if (o.type !== "response_item") return;
   if (p?.type === "function_call" || p?.type === "custom_tool_call" || p?.type === "local_shell_call") {

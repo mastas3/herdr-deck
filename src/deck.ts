@@ -454,8 +454,11 @@ export class Deck {
         const title = p.label?.trim() ? p.label.trim()
           : meta?.title && p.agent === "opencode" ? meta.title
           : termTitle || meta?.title || shortPrompt(meta?.firstPrompt) || p.label || (shellOnly ? "shell" : lead?.cmdline ?? "");
-        const status = empty && p.agent_status !== "working" ? "empty" : p.agent_status ?? "unknown";
         const ins = this.insights.get(key);
+        let status = empty && p.agent_status !== "working" ? "empty" : p.agent_status ?? "unknown";
+        // herdr reads the screen; Codex also writes explicit turn markers. An open turn that started in the
+        // last few hours is work in progress even when the screen looks quiet.
+        if (p.agent === "codex" && (status === "idle" || status === "unknown" || status === "empty") && ins?.turnOpen && ins.turnStartedAt && Date.now() - ins.turnStartedAt < 3 * 3600_000) status = "working";
         const cwdRoot = projectRoot(p.cwd) ?? g?.root ?? p.cwd;
         const projRoot = ins?.project?.root ?? cwdRoot;
         if (!this.born.has(key)) this.born.set(key, this.bornReady ? Date.now() : 0);

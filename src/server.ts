@@ -177,13 +177,25 @@ const chatTail = async (row: Row) => {
   const d = await detailFor(row);
   return d ? { messages: d.messages.slice(-40) } : undefined;
 };
+/** What a waiting pane shows right now (full screen, blank lines kept), on whichever machine it's on. */
+const screenOf = async (row: Row): Promise<string[] | undefined> => {
+  const route = splitKey(row.key, remotes);
+  let text: string | undefined;
+  if (route.remote) text = (await route.remote.post("/api/read", { key: route.key, lines: 60 })).data?.text;
+  else {
+    const f = deck.find(row.key);
+    if (!f) return;
+    text = (await call(f.sess.socket, "pane.read", { pane_id: f.row.paneId, source: "visible" }))?.read?.text;
+  }
+  return text ? String(text).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split("\n").slice(-60) : undefined;
+};
 let decTimer: Timer | undefined;
 const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(rebuildDecisions, 350); };
 async function rebuildDecisions() {
   const rows = allRows().filter(needsYou);
   const next = new Map<string, Decision>();
   await Promise.all(rows.map(async (r) => {
-    const d = await buildDecision(r, chatTail).catch(() => undefined);
+    const d = await buildDecision(r, chatTail, screenOf).catch(() => undefined);
     if (!d) return;
     next.set(r.key, d);
     judge(d, r, chatTail, scheduleDecisions).catch(() => {});
@@ -197,7 +209,7 @@ deck.onPatch(scheduleDecisions);
 setInterval(scheduleDecisions, 10_000);
 
 /** One-off messages for the page (progress and failures of background work like starting a session). */
-const notice = (data: { key?: string; ok: boolean; message: string }) => broadcast("notice", data);
+const notice = (data: { key?: string; ok: boolean; message: string }) => { if (!data.ok) console.warn(`notice: ${data.key ?? ""} ${data.message}`); broadcast("notice", data); };
 const broadcastGraves = () => broadcast("graveyard", allGraves());
 setInterval(() => {
   const ping = enc.encode(`: ping\n\n`);
@@ -558,26 +570,34 @@ async function startSession(body: any) {
         const name = `${base}-${Math.random().toString(36).slice(2, 6)}`;
         const args = agentArgs(kind, body);
         notice({ key, ok: true, message: `Starting ${kind}…` });
-        await call(sess.socket, "agent.start", { name, kind, pane_id: paneId, args, timeout_ms: 90_000 }, 95_000);
+        let asked = false;
+        try { await call(sess.socket, "agent.start", { name, kind, pane_id: paneId, args, timeout_ms: 90_000 }, 95_000); }
+        catch (e: any) {
+          // The agent is up but opened on a question (Claude's "trust this folder?"): that's not a failure.
+          if (!/blocked|interactive input/i.test(String(e?.message ?? e))) throw e;
+          await deck.kick(sess.name);
+          asked = true;
+          notice({ key, ok: true, message: `“${label}” is asking something first. Answer it (in the list, Inbox or terminal)${String(body.prompt ?? "").trim() ? " and your message follows" : ""}.` });
+        }
         const prompt = String(body.prompt ?? "").trim();
         if (prompt) {
-          // A new folder can open on a prompt (Claude's "trust this folder?"). Typing into it would lose
-          // the message, so hold it until you've answered and the agent is ready.
+          // A new folder can open on a prompt (Claude's "trust this folder?"), and herdr only registers the
+          // agent a moment after it starts. Hold the message until the agent can take it: while it's asking
+          // you something, wait (up to 10 minutes); otherwise keep retrying until herdr is ready.
           await deck.kick(sess.name);
-          await Bun.sleep(1200);
           const until = Date.now() + 10 * 60_000;
-          let told = false;
-          while (deck.rows.get(key)?.status === "blocked" && Date.now() < until) {
-            if (!told) { notice({ key, ok: true, message: `“${label}” is asking something first. Answer it (Inbox or terminal) and your message follows.` }); told = true; }
-            await Bun.sleep(1500);
-          }
-          // herdr registers a just-started agent a moment after agent.start returns ("not an active named
-          // agent"); keep trying for a while instead of losing the first message.
-          for (let i = 0; ; i++) {
+          let told = asked;
+          for (;;) {
+            if (deck.rows.get(key)?.status === "blocked") {
+              if (!told) { notice({ key, ok: true, message: `“${label}” is asking something first. Answer it (in the list, Inbox or terminal) and your message follows.` }); told = true; }
+              if (Date.now() > until) throw new Error("it was still waiting for an answer after 10 minutes");
+              await Bun.sleep(1500);
+              continue;
+            }
             try { await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000); break; }
             catch (e: any) {
-              if (i >= 40 || !/not an active|not found|not ready|no agent/i.test(String(e?.message ?? e))) throw e;
-              await Bun.sleep(750);
+              if (Date.now() > until || !/not an active|not found|not ready|no agent/i.test(String(e?.message ?? e))) throw e;
+              await Bun.sleep(1000);
             }
           }
         }

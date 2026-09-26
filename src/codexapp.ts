@@ -43,24 +43,57 @@ export function codexAppRunning(): boolean {
   return running.value;
 }
 
-const turnCache = new Map<string, { size: number; mtime: number; open: boolean; startedAt?: number; endedAt?: number }>();
-/** Reads only the tail of the rollout to see whether the latest turn is still open. */
+type TurnState = { size: number; mtime: number; ino: number; open: boolean; startedAt?: number; endedAt?: number };
+const turnCache = new Map<string, TurnState>();
+const MARKER = /"type":"event_msg","payload":\{"type":"(task_started|task_complete|turn_aborted)"/;
+
+/** Applies every turn marker in `text` (whole lines only) to the state, in order. */
+function applyMarkers(v: TurnState, text: string) {
+  for (const line of text.split("\n")) {
+    const m = line.match(MARKER);
+    if (!m) continue;
+    const at = Date.parse(line.match(/"timestamp":"([^"]+)"/)?.[1] ?? "") || undefined;
+    if (m[1] === "task_started") { v.open = true; v.startedAt = at; }
+    else { v.open = false; v.endedAt = at; }
+  }
+}
+
+/**
+ * Whether the thread's latest turn is still open. A busy turn can write tens of MB (screenshots, tool
+ * output) after it starts, so a fixed tail window misses its start: search backwards chunk by chunk for
+ * the last marker the first time, then only read what was appended since.
+ */
 export async function turnState(file: string) {
   const st = statSync(file);
   const hit = turnCache.get(file);
-  if (hit && hit.size === st.size && hit.mtime === st.mtimeMs) return { ...hit, mtime: st.mtimeMs };
-  const tail = await Bun.file(file).slice(Math.max(0, st.size - 256 * 1024), st.size).text();
-  let open = false, startedAt: number | undefined, endedAt: number | undefined;
-  for (const line of tail.split("\n")) {
-    if (!line.includes('"event_msg"')) continue;
-    let o: any;
-    try { o = JSON.parse(line); } catch { continue; }
-    const t = o.payload?.type;
-    const at = o.timestamp ? Date.parse(o.timestamp) : undefined;
-    if (t === "task_started") { open = true; startedAt = at; }
-    else if (t === "task_complete" || t === "turn_aborted") { open = false; endedAt = at; }
+  if (hit && hit.size === st.size && hit.mtime === st.mtimeMs && hit.ino === st.ino) return hit;
+  const f = Bun.file(file);
+  let v: TurnState;
+  if (hit && hit.ino === st.ino && st.size > hit.size) {
+    v = { ...hit, size: st.size, mtime: st.mtimeMs };
+    // Back up to the start of the line the previous read may have cut through.
+    const from = Math.max(0, hit.size - 4096);
+    const text = await f.slice(from, st.size).text();
+    const lastNl = text.lastIndexOf("\n");
+    applyMarkers(v, text.slice(text.indexOf("\n") + 1, lastNl + 1));
+    v.size = from + Buffer.byteLength(text.slice(0, lastNl + 1)); // re-read an unfinished last line next time
+  } else {
+    v = { size: st.size, mtime: st.mtimeMs, ino: st.ino, open: false };
+    const CHUNK = 4 << 20;
+    for (let end = st.size; end > 0; end -= CHUNK) {
+      const text = await f.slice(Math.max(0, end - CHUNK - 8192), end).text();
+      const lines = text.split("\n");
+      let found = false;
+      for (let i = lines.length - 1; i > (end - CHUNK - 8192 > 0 ? 0 : -1); i--) {
+        if (!MARKER.test(lines[i])) continue;
+        applyMarkers(v, lines[i]);
+        // For a closed turn, also find when it started (for the elapsed clock we don't need; keep it cheap).
+        found = true;
+        break;
+      }
+      if (found) break;
+    }
   }
-  const v = { size: st.size, mtime: st.mtimeMs, open, startedAt, endedAt };
   turnCache.set(file, v);
   return v;
 }
