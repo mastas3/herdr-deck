@@ -2287,7 +2287,7 @@ function jevBar(j) {
 const JEV_FEATS = [
   ["risk", "Risk level on permission prompts", "adds one question to the prompt check it already sends"],
   ["radar", "Stuck radar", "sends the last tool calls of a running session when it looks stuck"],
-  ["route", "Send by description", "sends your message and your sessions' titles when you ask it to route"],
+  ["route", "Send by description", "sends your message and your sessions' titles and what each is doing when you ask it to route"],
 ];
 function jevPanel(st, j) {
   if (!st) return `<section class="jevp"><p class="hint">${S.jevErr ? esc(S.jevErr) : "Reading the receipts…"}</p></section>`;
@@ -2302,7 +2302,7 @@ function jevPanel(st, j) {
     return `<li><span class="jt" data-t="${x.at}">${esc(agoText(x.at))}</span><span class="jk">${KS[x.kind]}${rep}</span><span class="jq">${x.label ? esc(x.label) : `<span class="hint">–</span>`}</span><span class="js">Jev <b>${esc(x.suggestion)}</b>${x.pickTitle ? ` <span class="hint">${esc(x.pickTitle)}</span>` : ""}</span><span class="ja">${x.actual ? `You <b>${esc(x.actual)}</b>${x.actualTitle ? ` <span class="hint">${esc(x.actualTitle)}</span>` : ""}` : `<span class="hint">no answer recorded</span>`}</span>${mark}</li>`;
   }).join("") : `<li class="hint">No deck decisions in the receipts yet.</li>`;
   const cap = st.cap;
-  const feats = JEV_FEATS.map(([k, title, sends]) => `<label class="nchk"><input type="checkbox" data-jevfeat="${k}" ${j.features?.[k] !== false ? "checked" : ""}><span><b>${title}</b><small>${sends}</small></span></label>`).join("");
+  const feats = JEV_FEATS.map(([k, title, sends]) => `<label class="nchk"><input type="checkbox" data-jevfeat="${k}" ${j.features?.[k] !== false ? "checked" : ""}><span><b>${title}</b>${st.features ? ` <span class="hint">${st.features[k] ?? 0} today</span>` : ""}<small>${sends}</small></span></label>`).join("");
   return `<section class="jevp" aria-label="Jev">
     <div class="jgrid">${span("Today", st.today)}${span("7 days", st.week)}${span("All time", st.total)}</div>
     <div class="jcols">
@@ -4265,7 +4265,7 @@ function fuzzy(text, q) {
 function paletteItems(q) {
   const out = [];
   // A sentence rather than a search: offer to have Jev find the session it's meant for.
-  if (routeOn() && q.split(/\s+/).filter(Boolean).length >= 3) out.push({ html: `<span>Send to the right session…</span><small>Jev suggests, you confirm</small>`, keep: true, run: () => routeAsk(q) });
+  if (routeOn() && q.split(/\s+/).filter(Boolean).length >= 3) out.push({ html: `<span>Send to the right session…</span><small>Jev suggests, you confirm</small>`, keep: true, route: true, run: () => routeAsk(q) });
   const cur = rowOf(S.sel);
   const n = targets().length;
   const sessions = [...S.rows.values()].map((r) => ({ r, s: fuzzy(`${r.title} ${r.project} ${r.launch ?? ""} ${paneName(r)} ${machineLabel(r.machine)} ${r.agent} ${r.branch ?? ""}`, q) }))
@@ -4308,7 +4308,7 @@ function paletteItems(q) {
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },
     { t: "Idea lab: research and plan any idea", run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },
     { t: "Ideas: plans your agents wrote", run: () => { S.disc.tab = "ideas"; setMode("discover"); } },
-    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, run: () => { setMode("discover"); ideaSearch(q); } },
+    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, echo: true, run: () => { setMode("discover"); ideaSearch(q); } },
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Notifications on this device…", run: openNotifications },
     { t: "Automations: alerts, morning digest, empty sessions, proof of done", run: openAutomations },
@@ -4318,7 +4318,7 @@ function paletteItems(q) {
     !isPhone() && { t: "Keyboard shortcuts", k: "?", run: () => $("help").showModal() },
     ...(multiMachine() ? [["all", "all machines"], ...S.summary.machines.map((m) => [m.id, m.label])].map(([id, label]) => ({ t: `Show ${label}`, run: () => setMachine(id) })) : []),
   ].filter(Boolean).map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, q ? 8 : 6);
-  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, run: c.run })));
+  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, echo: c.echo, run: c.run })));
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
     if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
@@ -4327,7 +4327,10 @@ function paletteItems(q) {
 }
 function renderPalette() {
   palItems = paletteItems($("palQ").value.trim());
-  palIndex = palItems.findIndex((x) => !x.head);
+  // Enter runs the top match. Routing (a Jev call) is the default only when nothing else matches; the Idea lab
+  // item echoes any long query, so it doesn't count as a match, and comes last.
+  const at = (f) => palItems.findIndex((x) => !x.head && f(x));
+  palIndex = [at((x) => !x.route && !x.echo), at((x) => x.route), at(() => true)].find((i) => i >= 0) ?? -1;
   $("palList").innerHTML = palItems.map((it, idx) => it.head ? `<div class="mh">${esc(it.head)}</div>` : `<button role="option" data-p="${idx}" class="${idx === palIndex ? "on" : ""}">${it.html}</button>`).join("") || `<div class="empty-state">Nothing found</div>`;
 }
 function palMove(d) {
@@ -4342,7 +4345,7 @@ $("palQ").addEventListener("input", renderPalette);
 $("palQ").addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") { e.preventDefault(); palMove(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); palMove(-1); }
-  else if (e.key === "Enter") { e.preventDefault(); palRun(); }
+  else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); palRun(); } // the route view it may open mustn't see this Enter
 });
 $("palList").addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) palRun(Number(b.dataset.p)); });
 $("palette").addEventListener("click", (e) => { if (e.target === $("palette")) $("palette").close(); });
@@ -4350,9 +4353,11 @@ $("palette").addEventListener("click", (e) => { if (e.target === $("palette")) $
 // ── send by description ──────────────────────────────────────────────────
 // Jev suggests which session a message is for; nothing is sent until you press Enter or Send here.
 let palRoute = null;
+let routeDraft = null; // the message as you last edited it, kept when you go back to the list
 const PAL_FOOT = $("palette").querySelector(".pal-foot").innerHTML;
 const routeOn = () => !!S.jev?.available && S.jev?.features?.route !== false;
 const ROUTE_SURE = 0.6;
+const ROUTE_SETTLE_MS = 400; // Enter does nothing this long after the picks appear, so a held or double Enter can't send
 const ROUTE_WHY = { no_sessions: "No coding-agent session is running to send it to.", one_session: "Only one session can take it.", timeout: "Jev took too long.", deck_daily_cap: "Jev’s daily cap for the deck is used up.", unavailable: "Jev isn’t available." };
 // Without Jev's picks you still choose, from the most recent sessions that can take a message.
 const routeRecent = () => [...S.rows.values()].filter((r) => isAgent(r) && !r.empty && r.status !== "empty" && !r.app && !r.hist)
@@ -4363,7 +4368,7 @@ async function routeAsk(q) {
   $("palette").querySelector(".pal-foot").innerHTML = `<span><kbd>↑</kbd> <kbd>↓</kbd> pick</span><span><kbd>↵</kbd> send</span><span><kbd>esc</kbd> back</span>`;
   $("palList").innerHTML = `<div class="proute"><textarea id="palMsg" rows="3" aria-label="Message to send" spellcheck="true"></textarea><div class="mh" id="palWhy"></div><div id="palPicks" role="listbox" aria-label="Sessions"></div>
     <div class="proute-f"><button type="button" class="btn" data-rback>Back</button><button type="button" class="btn primary" data-rsend>Send</button></div></div>`;
-  $("palMsg").value = q;
+  $("palMsg").value = routeDraft?.q === q ? routeDraft.text : q;
   $("palMsg").focus();
   renderRoute();
   try {
@@ -4372,11 +4377,13 @@ async function routeAsk(q) {
     const picks = (r.picks ?? []).filter((x) => S.rows.has(x.key));
     if (picks.length) {
       m.list = picks;
-      m.sel = picks[0].p >= ROUTE_SURE ? picks[0].key : null;
-      m.why = m.sel ? `Jev’s pick${r.ms != null ? ` · ${r.ms} ms` : ""}` : "Jev isn’t sure, pick one";
+      m.sel = picks[0].p >= ROUTE_SURE && !routeBlocked(picks[0].key) ? picks[0].key : null;
+      m.why = m.sel ? `Jev’s pick${r.ms != null ? ` · ${r.ms} ms` : ""}` : picks[0].p >= ROUTE_SURE ? "Jev’s pick is waiting on a prompt, so it isn’t preselected" : "Jev isn’t sure, pick one";
     } else {
       m.list = routeRecent();
-      m.why = `${ROUTE_WHY[r.fallback] ?? "Jev couldn’t pick one."}${m.list.length ? " Pick one." : ""}`;
+      // Only one session can take it: pick it for you, Enter still sends.
+      if (r.fallback === "one_session" && m.list.length === 1 && !routeBlocked(m.list[0].key)) m.sel = m.list[0].key;
+      m.why = `${ROUTE_WHY[r.fallback] ?? "Jev couldn’t pick one."}${m.list.length && !m.sel ? " Pick one." : ""}`;
     }
   } catch (x) {
     if (palRoute !== m) return;
@@ -4384,8 +4391,11 @@ async function routeAsk(q) {
     m.why = `${x.message}${m.list.length ? " Pick one." : ""}`;
   }
   m.busy = false;
+  m.readyAt = Date.now() + ROUTE_SETTLE_MS;
   renderRoute();
 }
+// A session waiting on a prompt could take the message as its answer ("yes, and…"): flag it, never preselect it.
+const routeBlocked = (key) => rowOf(key)?.status === "blocked";
 function renderRoute() {
   const m = palRoute;
   if (!m) return;
@@ -4393,7 +4403,7 @@ function renderRoute() {
   $("palPicks").innerHTML = m.list.map((x) => {
     const r = rowOf(x.key);
     if (!r) return "";
-    return `<button type="button" role="option" data-rk="${esc(x.key)}" class="${x.key === m.sel ? "on" : ""}" aria-selected="${x.key === m.sel}"><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.project)} · ${esc(r.title || r.agent)}${x.p != null ? ` — ${Math.round(x.p * 100)}%` : ""}</span><small>${multiMachine() ? esc(machineLabel(r.machine)) + " · " : ""}${esc(STATUS_NAME[r.status] ?? r.status)}</small></button>`;
+    return `<button type="button" role="option" data-rk="${esc(x.key)}" class="${x.key === m.sel ? "on" : ""}" aria-selected="${x.key === m.sel}"><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.project)} · ${esc(r.title || r.agent)}${x.p != null ? ` — ${Math.round(x.p * 100)}%` : ""}</span><small>${multiMachine() ? esc(machineLabel(r.machine)) + " · " : ""}${r.status === "blocked" ? `<b>${pendingAsk(r)?.kind === "question" ? "waiting on your answer to a question" : "waiting on a permission prompt"}</b>` : esc(STATUS_NAME[r.status] ?? r.status)}</small></button>`;
   }).join("");
   $("palette").querySelector("[data-rsend]").disabled = m.busy || !m.sel;
 }
@@ -4407,6 +4417,7 @@ function routeMove(d) {
 }
 function routeBack() {
   const q = palRoute?.q ?? "";
+  if (palRoute) routeDraft = { q, text: $("palMsg").value };
   routeReset();
   $("palQ").value = q;
   renderPalette();
@@ -4427,6 +4438,7 @@ async function routeSend() {
   try {
     // The same path as the message box: long text travels as a file.
     await api("/api/send", { key: r.key, text: text.length > LONG_SEND ? await fileLongText(r, text, []) : text });
+    routeDraft = null;
     $("palette").close();
     toast(`Sent to ${r.project}: “${plain(text).slice(0, 50)}${text.length > 50 ? "…" : ""}”`);
     if (S.sel === r.key) setTimeout(() => chatTick(true), 250);
@@ -4440,6 +4452,8 @@ $("palette").addEventListener("keydown", (e) => {
     if (t.closest?.("[data-rback], [data-rsend]")) return; // the button's own click
     if (t.id === "palMsg" && isPhone()) return; // a new line, like the message box on a phone
     e.preventDefault();
+    // Only a fresh press after Jev's picks have settled sends: not the Enter that opened this view, nor one held down.
+    if (palRoute.busy || e.repeat || Date.now() < (palRoute.readyAt ?? Infinity)) return;
     if (t.dataset?.rk) { palRoute.sel = t.dataset.rk; renderRoute(); }
     routeSend();
   } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(t.id === "palMsg" && t.value.includes("\n"))) { e.preventDefault(); routeMove(e.key === "ArrowDown" ? 1 : -1); }
@@ -4804,7 +4818,7 @@ new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return !$("palette").open ? openPalette() : palRoute ? routeBack() : $("palette").close(); } // in the route view: back, like Esc
   if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.mode === "inbox" && inboxKeydown(e)) return;
