@@ -2918,7 +2918,7 @@ function recipeCard(r, inv, n) {
   const st = rd.state === "ready" ? `Ready on ${mname}` : rd.state === "almost" ? "Needs a sign-in" : `Missing ${rd.missing}`;
   const chip = (x, opt) => `<span class="rneed ${x.state}${opt ? " opt" : ""}" title="${esc(x.state === "missing" ? `${x.label}: not found on ${mname}` : `${x.label}: ${x.name ?? ""}${x.state === "partial" ? " (signed out / not running)" : ""}`)}">${x.state === "ready" ? ICON.check : x.state === "partial" ? "!" : "–"} ${esc(x.label)}</span>`;
   return `<article class="rcard r-${rd.state}${open ? " open" : ""}" data-rid="${esc(r.id)}" style="--i:${Math.min(n, 14)}">
-    <div class="rtop" data-ropen><span class="cti">${CICON[r.cat] ?? CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
+    <div class="rtop" data-ropen><span class="cti">${CICON[r.cat] ?? CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.plugin ? ` · from ${esc(r.plugin)}` : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
     <p class="rpitch" data-ropen>${esc(r.pitch)}</p>
     <div class="rneeds">${rd.needs.map((x) => chip(x)).join("")}${rd.optional.map((x) => chip(x, true)).join("")}</div>
     ${open ? `<div class="rmore"><ol class="rsteps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
