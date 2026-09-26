@@ -327,6 +327,56 @@ function rank(r) {
   if (r.stale) return 5;
   return 3;
 }
+/* @pure:list-begin: no globals in here; test/list.test.ts evaluates this block on its own. */
+/** A compact span for reason chips: "" under 45 s, then "3m", "2h", "5d", "2mo". */
+function span(ms) {
+  const s = ms / 1000;
+  if (!(s >= 45)) return "";
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + "m";
+  if (s < 86400) return Math.round(s / 3600) + "h";
+  if (s < 86400 * 60) return Math.round(s / 86400) + "d";
+  return Math.round(s / 86400 / 30) + "mo";
+}
+/** The chip text for a reason kind at time `now` (re-run by the ticker for chips that carry a time). */
+function reasonLabel(k, t, now) {
+  const s = t ? span(now - t) : "";
+  switch (k) {
+    case "perm": return "needs permission";
+    case "ask": return "asks you";
+    case "wait": return "needs you";
+    case "done": return s ? `finished ${s} ago` : "just finished";
+    case "work": return s ? `working ${s}` : "working";
+    case "new": return "new";
+    case "empty": return "empty";
+    case "stale": return s ? `stale ${s}` : "stale";
+    default: return s ? `idle ${s}` : "idle";
+  }
+}
+/** Why a row sits where it does in the priority list, mirroring rank(). `ask` is the pending decision's kind, if any. */
+function reasonOf(r, ask, now) {
+  let k, t = 0;
+  if (ask === "prompt") k = "perm";
+  else if (ask === "question") k = "ask";
+  else if (r.status === "blocked") k = "wait";
+  else if (r.status === "done" && !r.seen) { k = "done"; t = r.lastActiveAt ?? 0; }
+  else if (r.status === "working") { k = "work"; t = r.turnStartedAt && now - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : 0; }
+  else if (r.empty) k = r.bornAt && now - r.bornAt < 15 * 60_000 ? "new" : "empty";
+  else if (r.stale) { k = "stale"; t = r.lastActiveAt ?? 0; }
+  else { k = "idle"; t = r.lastActiveAt ?? 0; }
+  return { k, t, text: reasonLabel(k, t, now) };
+}
+/** Fields that change every few seconds while an agent works; a row that only changed these re-renders at most once a second. */
+const VOLATILE = new Set(["now", "step", "todos", "tail", "subagents", "lastActiveAt", "rssKB", "cpu", "procs", "ctxTokens", "cost", "focused", "dirty", "cols", "rows", "_hay"]);
+function stableSig(r) {
+  const running = (r.subagents ?? []).filter((x) => x.running).length;
+  return JSON.stringify(r, (k, v) => (VOLATILE.has(k) ? undefined : v)) + "|" + running + "|" + !!(r.tail?.length || r.now || r.step);
+}
+/** While the order is frozen: what is shown keeps its place, gone rows drop out, new rows wait. */
+function frozenOrder(shown, next) {
+  const want = new Set(next), have = new Set(shown);
+  return { keys: shown.filter((k) => want.has(k)), held: next.filter((k) => !have.has(k)) };
+}
+/* @pure:list-end */
 const SECTIONS = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"], ["stale", "Stale"], ["empty", "Empty"]];
 function sectionOf(r) {
   const k = rank(r);
@@ -404,17 +454,21 @@ function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
   return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}${rowAsk(r)}`;
 }
-function rowHTML(r, byProject) {
+/** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
+function reasonChip(r, why) {
+  const tip = why.k === "work" && why.t ? `Working since ${abs(why.t)}` : `Last active ${abs(r.lastActiveAt)}`;
+  return `<span class="ago why" data-k="${why.k}"${why.t ? ` data-t="${why.t}" data-why="${why.k}"` : ""} title="${esc(tip)}">${esc(why.text)}</span>`;
+}
+function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now())) {
   if (S.simple) return simpleRow(r);
   const live = r.status === "working";
-  const mach = "";
-  const agoEl = `<span class="ago${live ? " going" : ""}" ${live ? "" : `data-t="${r.lastActiveAt ?? ""}"`} title="Last active ${esc(abs(r.lastActiveAt))}">${live ? "working" : ago(r.lastActiveAt)}</span>`;
+  const agoEl = reasonChip(r, why);
   const title = `<span class="tl"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span></span>`;
   let line = "";
   const tail = r.tail?.length ? plain(r.tail[r.tail.length - 1]) : "";
   if (r.status === "blocked") line = pendingAsk(r) ? "" : `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
   else if (live) line = `<span class="ln now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span>` : ""}${r.now ? esc(nowWords(r.now)) : r.step ? esc(r.step) : "thinking…"}</span>`;
-  else if (unseenDone(r)) line = `<span class="ln">Finished · ${esc(plain(r.lastMessage) || tail)}</span>`;
+  else if (unseenDone(r)) line = `<span class="ln">${esc(plain(r.lastMessage) || tail || "finished")}</span>`;
   else if (r.empty) line = `<span class="ln">${r.agent === "shell" ? "empty shell" : "no conversation yet"}</span>`;
   const hit = S.q && S.deep?.q === S.q ? S.deep.byKey.get(r.key) : null;
   if (hit) {
@@ -422,8 +476,10 @@ function rowHTML(r, byProject) {
     for (const w of parseQuery(S.q).inc) snip = snip.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (x) => `<mark>${x}</mark>`);
     line = `<span class="ln hit">${hit.role === "user" ? "You: " : hit.role === "tool" ? "" : "Agent: "}“${snip}”${hit.count > 1 ? ` <span class="hint">· ${hit.count} messages</span>` : ""}</span>`;
   }
+  // The status line is always there (quiet rows show the last reply, or stay blank), so rows keep their height.
+  if (!line && !pendingAsk(r)) { const last = plain(r.lastMessage); line = last ? `<span class="ln last">${esc(last)}</span>` : `<span class="ln ph" aria-hidden="true">&nbsp;</span>`; }
   const running = (r.subagents ?? []).filter((x) => x.running);
-  const subs = running.length ? `<span class="subs">${running.slice(0, 3).map((x) => `<div><span class="spin"></span>${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` <span class="mono">${esc(x.now)}</span>` : ""}</div>`).join("")}${running.length > 3 ? `<div>+${running.length - 3} more</div>` : ""}</span>` : "";
+  const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
   return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
@@ -480,35 +536,93 @@ function listGroups(rows) {
   if (tail.length) out.push({ key: "old", label: `Stale & empty`, rows: tail, closed: S.closedSecs.old !== false, tail: true });
   return out.filter((x) => x.rows.length);
 }
+// The order never changes under the pointer: it is frozen while the pointer is over the list, while a touch is
+// in progress, and for FREEZE_MS after it leaves. Row contents keep updating; moves are applied (FLIP) on release.
+const FREEZE_MS = 1200;
+const listHold = { over: false, touch: false, until: 0, timer: 0 };
+const orderFrozen = () => listHold.over || listHold.touch || Date.now() < listHold.until;
+function releaseSoon() {
+  listHold.until = Date.now() + FREEZE_MS;
+  clearTimeout(listHold.timer);
+  listHold.timer = setTimeout(() => { listHold.timer = 0; if (!orderFrozen()) render(); }, FREEZE_MS + 20);
+}
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+const EASE = getComputedStyle(document.documentElement).getPropertyValue("--ease").trim() || "cubic-bezier(.2, .8, .2, 1)";
+/** A row whose volatile fields changed within the last second waits; this brings the list back to it. */
+let volTimer = 0, volDue = 0;
+function renderLater(ms) {
+  const due = Date.now() + ms;
+  if (volTimer && volDue <= due) return;
+  clearTimeout(volTimer); volDue = due;
+  volTimer = setTimeout(() => { volTimer = 0; render(); }, ms);
+}
+/** Where each row is, before a reorder (read before any DOM write, so it costs no extra layout). */
+function rowTops(box) {
+  const out = new Map();
+  for (const el of box.querySelectorAll(".row[data-key]")) { const r = el.getBoundingClientRect(); if (r.height) out.set(el.dataset.key, r.top); }
+  return out;
+}
+/** FLIP: every on-screen row that moved starts where it was and glides to its new place (new rows slide in via CSS). */
+function flipRows(box, before) {
+  const b = box.getBoundingClientRect();
+  const moves = [];
+  for (const el of box.querySelectorAll(".row[data-key]")) {
+    const r = el.getBoundingClientRect();
+    if (!r.height || r.bottom < b.top || r.top > b.bottom) continue;
+    const was = before.get(el.dataset.key);
+    // A row coming from far away enters from the nearest edge instead of flying across the whole list.
+    if (was != null && Math.abs(was - r.top) >= 1) moves.push([el, Math.max(-b.height, Math.min(b.height, was - r.top))]);
+  }
+  for (const [el, dy] of moves) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], { duration: 200, easing: EASE });
+}
+let lastView = "";
 function renderList() {
   const box = $("rows");
   const rows = visibleRows();
   const byProject = S.group === "project";
   const groups = listGroups(rows);
-  S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
+  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + g.rows.map((r) => r.key).join(",")).join("|");
+  // Anything you changed yourself (filter, grouping, machine, a folded section) applies at once, even under the pointer.
+  const view = [S.group, S.machine, S.q, S.deep?.q ?? "", JSON.stringify(S.closedSecs), JSON.stringify(S.closedProj)].join("\u0001");
+  const selHidden = !!S.sel && rows.some((r) => r.key === S.sel) && !rowCache.get(S.sel)?.el.isConnected;
+  const force = !lastOrder || box.dataset.view !== "list" || view !== lastView || selHidden || !rows.length || !box.querySelector(".row[data-key]");
+  const apply = order !== lastOrder && (force || !orderFrozen());
+  const before = apply && !force && !reduceMotion.matches ? rowTops(box) : null;
   for (const k of rowCache.keys()) if (!S.rows.has(k)) rowCache.delete(k);
+  const now = Date.now();
+  const deepOn = S.q && S.deep?.q === S.q;
   for (const r of rows) {
     let c = rowCache.get(r.key);
     if (!c) {
       const el = document.createElement("div");
-      el.className = "row"; el.dataset.key = r.key; el.setAttribute("role", "button");
-      c = { el, sig: "" };
+      el.className = "row born"; el.dataset.key = r.key; el.setAttribute("role", "button");
+      // Drop the flash once it has played, or re-inserting the row on a reorder would replay it.
+      el.addEventListener("animationend", (e) => { if (e.animationName === "flash") el.classList.remove("flash"); });
+      c = { el, sig: "", stable: "", at: 0 };
       rowCache.set(r.key, c);
     }
-    const sig = JSON.stringify(r) + JSON.stringify(pendingAsk(r) ?? "") + S.machine + multiMachine() + byProject + (S.q && S.deep?.q === S.q ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const ask = pendingAsk(r);
+    const why = reasonOf(r, ask?.kind, now);
+    const ctx = JSON.stringify(ask ?? "") + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const sig = JSON.stringify(r) + ctx;
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
-      const was = c.el.dataset.status;
-      c.el.innerHTML = rowHTML(r, byProject); c.el.dataset.status = r.status; c.sig = sig;
-      if (was && was !== r.status && (r.status === "blocked" || r.status === "done")) { c.el.classList.remove("flash"); void c.el.offsetWidth; c.el.classList.add("flash"); }
+      const stable = stableSig(r) + ctx;
+      // Only the live bits moved (tool line, todos, tail, subagents, memory): at most one repaint a second per row.
+      if (c.sig && c.stable === stable && now - c.at < 1000) renderLater(1000 - (now - c.at) + 16);
+      else {
+        const was = c.el.dataset.status;
+        c.el.innerHTML = rowHTML(r, byProject, why); c.el.dataset.status = r.status; c.sig = sig; c.stable = stable; c.at = now;
+        if (was && was !== r.status && (r.status === "blocked" || r.status === "done")) { c.el.classList.remove("flash"); void c.el.offsetWidth; c.el.classList.add("flash"); }
+      }
     }
-    c.el.classList.toggle("sel", S.sel === r.key && !S.board);
+    // Selected means "this is the session on the right": not while the board or a view (Inbox, History…) is showing.
+    c.el.classList.toggle("sel", S.sel === r.key && !S.board && !S.mode);
     c.el.classList.toggle("picked", S.picked.has(r.key));
     c.el.classList.toggle("stale", !!r.stale && r.status !== "working" && r.status !== "blocked");
   }
-  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + g.rows.map((r) => r.key).join(",")).join("|");
-  if (order !== lastOrder || box.dataset.view !== "list") {
-    lastOrder = order;
+  if (apply) {
+    lastOrder = order; lastView = view;
     box.dataset.view = "list";
     box._h = "";
     const frag = document.createDocumentFragment();
@@ -526,9 +640,23 @@ function renderList() {
       for (const r of g.rows) body.append(rowCache.get(r.key).el);
       frag.append(sec);
     }
+    // A live reorder glides (FLIP below); only a change you made replays the sections' entrance.
+    box.classList.toggle("settled", !force);
     box.replaceChildren(frag);
     if (!rows.length) box.innerHTML = `<div class="empty-state">${S.rows.size ? "Nothing matches. Press Esc to clear the filter." : "No sessions yet. Press n to start one."}</div>`;
-  }
+    if (before) flipRows(box, before);
+    const born = box.querySelectorAll(".row.born");
+    if (born.length) requestAnimationFrame(() => requestAnimationFrame(() => { for (const el of born) el.classList.remove("born"); }));
+    S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
+  } else if (order !== lastOrder) {
+    // Frozen: rows that went away leave, everything else holds its place, newcomers wait for the release.
+    const shown = [...box.querySelectorAll(".row[data-key]")].map((el) => el.dataset.key);
+    const { keys } = frozenOrder(shown, rows.map((r) => r.key));
+    const keep = new Set(keys);
+    for (const k of shown) if (!keep.has(k)) { box.querySelector(`.row[data-key="${CSS.escape(k)}"]`)?.remove(); lastOrder = "~" + lastOrder; }
+    const open = new Set([...box.querySelectorAll(".sec:not(.closed) .row[data-key]")].map((el) => el.dataset.key));
+    S.visible = keys.filter((k) => open.has(k)).map((k) => S.rows.get(k)).filter(Boolean);
+  } else S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
   if (app.classList.contains("list-off")) renderRail(rows);
   for (const k of S.picked) if (!S.rows.has(k)) S.picked.delete(k);
   $("selbar").hidden = !S.picked.size;
@@ -554,7 +682,7 @@ function renderRail(rows) {
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
     const tm = since ? `<span class="tm" data-since="${since}">${clock(Date.now() - since)}</span>` : r.status === "blocked" ? `<span class="tm">waiting</span>` : `<span class="tm" data-t="${r.lastActiveAt ?? ""}">${ago(r.lastActiveAt)}</span>`;
     const tip = `${r.title || r.agent}\n${r.project}${r.launch ? " (via " + r.launch + ")" : ""} · ${paneName(r)}${multiMachine() ? " · " + machineLabel(r.machine) : ""}\n${STATUS_NAME[r.status] ?? r.status}${r.now ? " · " + r.now : ""}${subs ? `\n${subs} subagent${subs === 1 ? "" : "s"} running` : ""}`;
-    return `<button class="tile${S.sel === r.key && !S.board ? " sel" : ""}" data-key="${esc(r.key)}" data-status="${r.status}" style="--pc:${pc(r.project)};--c:${statusVar(r.status)}" title="${esc(tip)}"><span class="ab">${esc(initials(r.project))}</span>${r.status !== "idle" ? '<span class="sd"></span>' : ""}${subs ? `<span class="sb">+${subs}</span>` : ""}<span class="tt">${esc(shortTitle(r.title))}</span>${tm}</button>`;
+    return `<button class="tile${S.sel === r.key && !S.board && !S.mode ? " sel" : ""}" data-key="${esc(r.key)}" data-status="${r.status}" style="--pc:${pc(r.project)};--c:${statusVar(r.status)}" title="${esc(tip)}"><span class="ab">${esc(initials(r.project))}</span>${r.status !== "idle" ? '<span class="sd"></span>' : ""}${subs ? `<span class="sb">+${subs}</span>` : ""}<span class="tt">${esc(shortTitle(r.title))}</span>${tm}</button>`;
   };
   const html = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"]].filter(([k]) => groups[k].length)
     .map(([k, label]) => `<div class="mh">${label.split(" ")[0]} <span class="n">${groups[k].length}</span></div>${groups[k].map(tile).join("")}`).join("")
@@ -562,9 +690,17 @@ function renderRail(rows) {
   setHTML($("mini"), html);
 }
 function renderFooter() {
+  // Counted by the same rules as the list (machine tab and search), so the two never disagree.
   const all = [...S.rows.values()].filter(inScope);
+  const shown = S.q ? visibleRows() : all;
+  const kb = (rs) => rs.reduce((s, r) => s + (r.rssKB || 0), 0);
+  const per = new Map();
+  for (const r of shown) { const m = per.get(r.machine) ?? { n: 0, kb: 0 }; m.n++; m.kb += r.rssKB || 0; per.set(r.machine, m); }
+  const tip = [...per].sort((a, b) => b[1].kb - a[1].kb).map(([id, m]) => `${machineLabel(id)}: ${m.n} session${m.n === 1 ? "" : "s"}${m.kb ? ` · ${mem(m.kb)}` : ""}`).join("\n")
+    + "\n\nMemory is what the agents’ process trees use right now: each agent plus the builds, tests and servers it started. It rises and falls as they start and stop. The deck itself isn’t counted.";
+  const count = S.q ? `<b>${shown.length}</b> of ${all.length} sessions` : `<b>${all.length}</b> session${all.length === 1 ? "" : "s"}`;
   const off = (S.summary.machines ?? []).filter((m) => !m.online);
-  setHTML($("lf"), `<span><b>${all.length}</b> sessions · ${mem(all.reduce((s, r) => s + r.rssKB, 0))}</span>${off.length ? `<span class="warn" title="${esc(off.map((m) => m.label + ": " + (m.error ?? "")).join("\n"))}">${off.length} offline</span>` : ""}<span class="spacer"></span><button class="link" data-lf="closed">${S.view === "closed" ? "Sessions" : `Closed ${S.graveyard.length}`}</button><button class="link" data-lf="menu">Settings</button>`);
+  setHTML($("lf"), `<span class="lfn" title="${esc(tip)}">${count} · agents use ${mem(kb(shown))}</span>${off.length ? `<span class="warn" title="${esc(off.map((m) => m.label + ": " + (m.error ?? "")).join("\n"))}">${off.length} offline</span>` : ""}<span class="spacer"></span><button class="link" data-lf="closed">${S.view === "closed" ? "Sessions" : `Closed ${S.graveyard.length}`}</button><button class="link" data-lf="menu">Settings</button>`);
 }
 function renderClosed() {
   const box = $("rows");
@@ -582,7 +718,8 @@ function renderClosed() {
 }
 function setHTML(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
 setInterval(() => {
-  for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (t) el.textContent = el.dataset.fmt === "long" ? agoText(t) : ago(t); }
+  const now = Date.now();
+  for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (t) el.textContent = el.dataset.why ? reasonLabel(el.dataset.why, t, now) : el.dataset.fmt === "long" ? agoText(t) : ago(t); }
 }, 20000);
 setInterval(() => { for (const el of document.querySelectorAll("[data-since]")) el.textContent = clock(Date.now() - Number(el.dataset.since)); }, 1000);
 
@@ -2784,6 +2921,14 @@ $("rows").addEventListener("click", async (e) => {
   if (hit) return jumpTo(row.dataset.key, hit.i);
   select(row.dataset.key, { open: true });
 });
+// Order freeze: the pointer (or a finger) on the list holds the order still; see renderList.
+$("rows").addEventListener("pointerenter", () => { listHold.over = true; });
+$("rows").addEventListener("pointermove", () => { listHold.over = true; }, { passive: true });
+$("rows").addEventListener("pointerleave", () => { listHold.over = false; releaseSoon(); });
+$("rows").addEventListener("touchstart", () => { listHold.touch = true; }, { passive: true });
+for (const ev of ["touchend", "touchcancel"]) $("rows").addEventListener(ev, () => { listHold.touch = false; releaseSoon(); }, { passive: true });
+// Switching away with the pointer resting on the list shouldn't pin a stale order forever.
+addEventListener("blur", () => { if (listHold.over || listHold.touch) { listHold.over = listHold.touch = false; releaseSoon(); } });
 let hoverTimer = null;
 $("rows").addEventListener("pointerover", (e) => {
   const row = e.target.closest(".row[data-key]");
