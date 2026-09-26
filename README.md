@@ -111,6 +111,23 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
   agents should use it (editable). Pick some and **Add to** the session: the agent gets them as context.
   Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`. Hide what you don't need;
   your notes and additions live in `~/.config/herdr-deck/connections.json`.
+- **Discover** (`d`, or ⌘K): repos worth forking and ideas worth building.
+  - **For you:** your interests, read from the wiki (project tags, status and recency, concepts, the last month
+    of `log.md`), your local repos (languages, keywords, dependencies) and your connections, as chips you can
+    add to or remove. For each one the deck searches GitHub with `gh` for hidden gems: 30–5,000 stars, pushed in
+    the last six months, licensed, not archived or a fork, not yours or already cloned. They're ranked by fit ×
+    momentum (stars a month), and each card says which interest and projects it fits. **Fork & explore** opens the
+    New session dialog with a prompt to clone it and judge how to build on it; Save and Dismiss are remembered.
+    A **Trending in your areas** row shows new repos climbing fast. Results are cached for hours
+    (`~/.config/herdr-deck/discover-cache.json`), refreshed in the background, and marked when stale.
+  - **Idea lab:** describe any idea. Enter searches GitHub for its building blocks (grouped by the role each
+    could play) and topics, and shows which of your projects and connections fit. **Research & plan it** opens a
+    new Claude Code session, prefilled, that researches what exists and writes a plan (architecture, the exact
+    repos and services, build order, costs and risks, first three tasks) to `~/.config/herdr-deck/ideas/<slug>.md`.
+    **Sparks** are "what if" ideas combined from your interests, projects, connections and gems.
+  - **Ideas:** the plans, rendered, with the session that wrote them and **Start building**.
+  - Only interest keywords and the words of your idea go to GitHub. Nothing starts until you confirm the
+    dialog. Your chips, saves and dismissals live in `~/.config/herdr-deck/discover.json`.
 - **Simple mode** (Settings, or ⌘K): big type, only the essentials (no terminal, tool calls, meters or
   tabs), friendly status words, and cheerful colors tuned for every theme.
 - **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin
