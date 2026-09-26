@@ -34,6 +34,8 @@ import { Automations, linkPath } from "./automations";
 import { Radar } from "./radar";
 import { routeMessage } from "./route";
 import { researchForServer } from "./autoresearch-server";
+import { createOpportunityService } from "./opportunity-service";
+import { runOpportunityWeb } from "./opportunity-web";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -107,6 +109,14 @@ const covers = createCovers({ dir: COVERS_DIR, confFile: process.env.DECK_COVERS
 const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
+});
+const opportunities = createOpportunityService({
+  dir: process.env.DECK_DISCOVER_DIR || DATA_DIR,
+  ingredients: async () => (await discover.ingredients(2500)).list,
+  archive: async () => (await discover.handle("/api/discover/archive", { limit: 500, all: true })).ideas,
+  research: (query, kind, force) => leads.search(query, kind, force),
+  researchStatus: (id) => leads.handle("/api/leads/status", { id }),
+  deepResearch: runOpportunityWeb,
 });
 // Project pages (journeys): their own module; the server only routes to it.
 const journeyHist = localHistory(HISTORY_DB, SELF.id);
@@ -1115,6 +1125,7 @@ async function handle(req: Request): Promise<Response> {
         const choice = d && choiceFromInput(d, { text: body.text, keys: body.keys });
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
+      if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }

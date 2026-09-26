@@ -50,6 +50,50 @@ bun run dev             # or run it in the foreground with reload (DECK_PORT=474
 bun test
 ```
 
+## Opportunities
+
+**Opportunities** is a separate workspace alongside Discover. The original Discover feed, saved ideas,
+and generation remain available. Importing from Discover makes an explicit copy and never overwrites
+an existing opportunity.
+
+- Explore your existing advantages, unrelated markets, or novel product mechanisms across 13 industries.
+- Keep a dossier with buyer/problem hypotheses, sources, counterevidence, alternatives, unknowns, and
+  human review of buyer, problem, alternatives, distribution, feasibility and economics.
+- Calculate contribution, acquisition payback, founder capacity, break-even, a 12-month cash projection,
+  and sensitivity from explicit inputs. Missing inputs remain unknown; assumptions and measurements
+  retain their notes and source references. Annual billing separates receipts from recognized revenue.
+- Get a revenue model to test, its prerequisites, complementary streams and a concrete paid experiment.
+- Plan experiments before recording results. Payment and repeat-customer stages require owner-attested
+  outcomes with denominators and evidence references. They are not payment-provider verification.
+
+Opening this workspace runs no external research. **Explore with an agent** explicitly sends a scrubbed
+brief to the configured Claude model. Market and novel modes do not include the project inventory.
+**Research** offers public signal collectors or a bounded Claude WebSearch/WebFetch run for alternatives,
+prices, distribution, feasibility and counterevidence. Deep research requires an installed, signed-in
+Claude Code supporting the safety flags. Each run has a time/output limit, cancellation and explicit
+retry after interruption. A retrieved page is evidence of source access; generated interpretations
+remain provisional. Tool-returned text can be a summary and must be checked against the original page
+before quoting. Search coverage cannot establish global nonexistence or proven demand.
+
+Research-ready is a screening policy: two independent current customer evidence groups, current human
+review across six dimensions, and complete conditional economics. Publisher and copied-text grouping
+is conservative. Source changes, failed refreshes and concept changes invalidate relevant reviews.
+Historical payment evidence cannot transfer to a different buyer/problem/mechanism.
+
+Data stays in separate `opportunities.db` and `opportunity-jobs.json` files under the deck data directory
+(or `DECK_DISCOVER_DIR`). The implementation remains dependency-free. The longer design rationale is
+in [the opportunity engine proposal](docs/discover-opportunity-engine.md).
+
+For an isolated UI preview with separate temporary data and no live session controls:
+
+```bash
+bun bin/opportunities-preview.ts   # http://127.0.0.1:4759/?view=opportunities
+```
+
+Use `DECK_PREVIEW_PORT` and `DECK_PREVIEW_DIR` to override its port and data directory. Tailnet access
+also requires `DECK_PREVIEW_TS_USER` to match the owner's Tailscale login. This preview does not import
+production ideas or restart the installed deck.
+
 ## What you need
 
 | | Needed? | What for |
