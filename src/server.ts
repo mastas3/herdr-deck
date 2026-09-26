@@ -20,6 +20,7 @@ import type { Detail, Msg } from "./transcript";
 import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
+import { createDiscover } from "./discover";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -72,6 +73,15 @@ const saveGraves = () => writeFileSync(GRAVE_FILE, JSON.stringify(graveyard.slic
 
 const deck = new Deck();
 await deck.start();
+
+// Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
+const discover = createDiscover(
+  { dataDir: DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
+  {
+    connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name),
+    rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
+  },
+);
 
 const remotes = new Map<string, RemoteHost>();
 function addRemote(conf: RemoteConf) {
@@ -1025,6 +1035,7 @@ async function handle(req: Request): Promise<Response> {
         const choice = d && choiceFromInput(d, { text: body.text, keys: body.keys });
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
+      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
