@@ -2873,7 +2873,7 @@ function renderConnections() {
       <div class="cmain">${tab === "store" ? renderStore(inv, items, labels, q) : renderRecipes(inv, labels, q)}</div>
     </div>
     ${inv?.file && tab === "store" ? `<p class="hint cfile">Agents on ${esc(inv.machine)} can also read the whole list at <code>${esc(inv.file.replace(/^\/(Users|home)\/[^/]+/, "~"))}</code>, or ask the deck’s MCP server.</p>` : ""}
-    <div class="cbar${n ? " on" : ""}"><b>${n}</b>&nbsp;selected<button class="btn ghost" data-cclear>Clear</button><span class="spacer"></span><button class="btn ghost" data-ccopy2>Copy</button><button class="btn" data-cuse>${CICON.recipe}Use in a recipe</button>${target ? `<button class="btn primary" data-csend>Add to “${esc(target.title.slice(0, 28))}${target.title.length > 28 ? "…" : ""}”</button>` : `<button class="btn primary" data-csendpick>Add to a session…</button>`}</div>`);
+    <div class="cbar${n ? " on" : ""}"><b>${n}</b>&nbsp;selected<button class="btn ghost" data-cclear>Clear</button><span class="spacer"></span><button class="btn ghost" data-ccopy2>Copy</button><button class="btn ghost" data-cmix title="Open them in Discover’s mixer">Mix these</button><button class="btn" data-cuse>${CICON.recipe}Use in a recipe</button>${target ? `<button class="btn primary" data-csend>Add to “${esc(target.title.slice(0, 28))}${target.title.length > 28 ? "…" : ""}”</button>` : `<button class="btn primary" data-csendpick>Add to a session…</button>`}</div>`);
 }
 async function connText(ids) {
   const m = S.conn.machine ?? S.self;
@@ -3056,7 +3056,7 @@ async function suggestProjects() {
 ICON.compass = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="m10.7 5.3-1.6 3.8-3.8 1.6 1.6-3.8z"/></svg>';
 ICON.bulb = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4h4M6.6 14.4h2.8M8 1.7a4.4 4.4 0 0 0-2.6 8c.4.3.6.8.6 1.3v.4h4V11c0-.5.2-1 .6-1.3A4.4 4.4 0 0 0 8 1.7z"/></svg>';
 S.disc = { data: null, loading: false, tab: load("discTab", "you"), filter: null, idea: load("discIdea", ""), ideaRes: null, ideaBusy: false, open: null, plans: new Map(), shuffle: 0, pending: null, more: false };
-const DTABS = [["you", "For you"], ["lab", "Idea lab"], ["ideas", "Ideas"], ["saved", "Saved"]];
+const DTABS = [["you", "For you"], ["mix", "Mix"], ["lab", "Idea lab"], ["ideas", "Ideas"], ["saved", "Saved"]];
 const kfmt = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
 function dHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
@@ -3069,11 +3069,13 @@ async function loadDiscover(opts = {}) {
   catch (e) { toast(e.message, true); }
   S.disc.loading = false;
   if (S.mode !== "discover") return;
-  renderDiscover();
-  // While GitHub is being searched in the background, check back every few seconds.
-  if (S.disc.data?.refreshing) loadDiscover.t = setTimeout(() => { if (S.mode === "discover") loadDiscover(); }, 3000);
+  // The mixer keeps its own regions up to date; a background refresh doesn't rebuild it (and the phone keyboard) mid-typing.
+  if (S.disc.tab !== "mix" || !$("dbody").querySelector("#mixtray")) renderDiscover();
+  // While GitHub is being searched, or today's mixes are being made, check back every few seconds.
+  const fy = S.disc.data?.mixes?.forYou;
+  if (S.disc.data?.refreshing || fy?.running || fy?.waiting) loadDiscover.t = setTimeout(() => { if (S.mode === "discover") loadDiscover(); }, 3000);
 }
-function discTab(t) { S.disc.tab = t; store("discTab", t); renderDiscover(); $("dbody").scrollTop = 0; }
+function discTab(t) { S.disc.tab = t; store("discTab", t); renderDiscover(); $("dbody").scrollTop = 0; if (t === "mix") mixEnter(); }
 function gemBy(full) {
   const d = S.disc.data ?? {};
   const all = [...(d.gems ?? []), ...(d.trending ?? []), ...(d.saved ?? []), ...(S.disc.ideaRes?.groups ?? []).flatMap((g) => g.repos)];
@@ -3093,7 +3095,7 @@ function gemCard(g, i, opts = {}) {
     ${g.desc ? `<p class="gdesc">${esc(g.desc)}</p>` : ""}
     ${g.topics?.length && !opts.mini ? `<div class="gtopics">${g.topics.slice(0, 5).map((t) => `<span>${esc(t)}</span>`).join("")}</div>` : ""}
     ${areas.length ? `<div class="gwhy">${ICON.star}<span>Fits <b>${esc(areas.join(" + "))}</b>${projs.length ? ` · like your ${projs.map((p) => `<i>${esc(p)}</i>`).join(", ")}` : ""}</span></div>` : ""}
-    <div class="gacts"><button class="btn primary" data-gfork>Fork &amp; explore</button><a class="btn ghost" href="${esc(g.url)}" target="_blank" rel="noopener">GitHub</a><button class="btn ghost" data-gsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>${opts.saved ? "" : `<button class="btn ghost" data-gdis title="Don’t show it again">Dismiss</button>`}</div>
+    <div class="gacts"><button class="btn primary" data-gfork>Fork &amp; explore</button><a class="btn ghost" href="${esc(g.url)}" target="_blank" rel="noopener">GitHub</a><button class="btn ghost" data-gsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-gmix title="Add it to the mixer and combine it with your other things">Mix this</button>${opts.saved ? "" : `<button class="btn ghost" data-gdis title="Don’t show it again">Dismiss</button>`}</div>
   </article>`;
 }
 function discStatus(d) {
@@ -3106,26 +3108,38 @@ function discStatus(d) {
 function renderDiscover() {
   const d = S.disc.data;
   const tab = S.disc.tab;
-  const nIdeas = d?.ideas?.length ?? 0, nSaved = d?.saved?.length ?? 0;
+  const nIdeas = d?.ideas?.length ?? 0, nSaved = (d?.saved?.length ?? 0) + (d?.mixes?.saved?.length ?? 0);
+  const tabs = DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("");
+  // The mixer, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
+  if (tab === "mix" && d && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #mixtray")) {
+    const nav = $("dbody").querySelector(".dtabs");
+    if (nav) setHTML(nav, tabs);
+    return mixPatch();
+  }
   const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Repos worth forking, picked for what you build. Any idea, searched against what already exists and planned by an agent.</p>
-    <nav class="seg dtabs">${DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("")}</nav></header>`;
+    <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
   if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
+  else if (tab === "mix") body = discMix();
   else if (tab === "ideas") body = discIdeas(d);
-  else if (tab === "saved") body = nSaved ? `<p class="hint dlead">Repos you saved. They stay here until you remove them.</p><div class="dgrid">${d.saved.map((g, i) => gemCard(g, i, { saved: true })).join("")}</div>` : `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem to keep it here.</div>`;
+  else if (tab === "saved") body = discSaved(d, nSaved);
   else body = discForYou(d);
-  const ta = document.activeElement?.matches?.("[data-didea]") ? document.activeElement : null;
-  const sel = ta ? [ta.selectionStart, ta.selectionEnd] : null;
+  const ta = document.activeElement?.matches?.("[data-didea], [data-mixdir], [data-mixq]") ? document.activeElement : null;
+  const taSel = ta ? [...["didea", "mixdir", "mixq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
   // Cards animate in when a tab (or a new idea result) first appears, not on every background update.
   const animKey = `${tab}|${S.disc.ideaRes?.text ?? ""}|${!!d}`;
   const calm = S.disc.animKey === animKey && $("dbody")._mode === "discover";
   S.disc.animKey = animKey;
   // The flag lives on the persistent .view element, so flipping it never rebuilds the cards.
   $("dbody").querySelector(":scope > .view")?.classList.toggle("calm", calm);
+  // Background redraws keep where you swiped the horizontal rows to.
+  const strips = [...$("dbody").querySelectorAll(".dstrip")].map((x) => x.scrollLeft);
   modeHTML(head + body);
+  $("dbody").querySelectorAll(".dstrip").forEach((x, i) => { if (strips[i]) x.scrollLeft = strips[i]; });
   $("dbody").querySelector(":scope > .view")?.classList.toggle("calm", calm);
-  if (sel) { const t = $("dbody").querySelector("[data-didea]"); t?.focus(); t?.setSelectionRange(...sel); }
+  if (taSel) { const t = $("dbody").querySelector(taSel[0]); t?.focus(); try { t?.setSelectionRange(taSel[1], taSel[2]); } catch {} }
+  if (tab === "mix" && d && !S.disc.mix.ings && !S.disc.mix.loading) mixEnter();
 }
 function discForYou(d) {
   const p = d.profile;
@@ -3137,6 +3151,7 @@ function discForYou(d) {
   return `<section class="dprof"><h3 class="dsub">What you’re into</h3>
       <div class="dchips">${p.interests.map(chip).join("")}<button class="dchip add" data-dadd>${ICON.plus}Add</button></div>
       <p class="hint">From ${p.counts.wiki} wiki projects, ${p.counts.concepts} concepts, ${p.counts.log} recent log entries and ${p.counts.repos} local repos${p.connections.length ? `, plus ${p.connections.length} connections` : ""}.${langs.length ? ` Mostly ${esc(langs.join(", "))}.` : ""} Only these keywords are sent to GitHub search.${p.removed.length ? ` <button class="link" data-drestore>Restore ${p.removed.length} removed</button>` : ""}</p></section>
+    ${f ? "" : mixesForYou(d)}
     <div class="dstatus">${discStatus(d)}</div>
     ${d.trending.length && !f ? `<h3 class="dsub">Trending in your areas <span class="hint">new this season, climbing fast</span></h3><div class="dstrip">${d.trending.map((g, i) => gemCard(g, i, { mini: true })).join("")}</div>` : ""}
     <h3 class="dsub">Hidden gems ${f ? `<span class="hint">in ${esc(p.interests.find((i) => i.id === f)?.label)}</span> <button class="link" data-dfilter="">Show all</button>` : `<span class="hint">30–5,000 stars, active this half-year, licensed</span>`}</h3>
@@ -3261,6 +3276,7 @@ $("dbody").addEventListener("click", async (e) => {
     if (t.closest("[data-sparkplan]")) { S.disc.idea = s.idea; store("discIdea", s.idea); return ideaResearch(s.idea); }
     return;
   }
+  if (mixClick(t)) return;
   const ic = t.closest("[data-islug]");
   if (ic) {
     const slug = ic.dataset.islug;
@@ -3286,6 +3302,7 @@ $("dbody").addEventListener("click", async (e) => {
   const g = gemBy(card.dataset.gfull);
   if (!g) return;
   if (t.closest("[data-gfork]")) return discStart("fork", { repo: g }, `Fork & explore ${g.full}`);
+  if (t.closest("[data-gmix]")) return mixOpenWith([{ id: `r:${g.full}`, kind: "repo", name: g.full, desc: g.desc ?? "" }], { add: true, toastText: `Added ${g.full} to the mixer` });
   if (t.closest("[data-gsave]")) { await discRepo(isSaved(g.full) ? "unsave" : "save", g); toast(isSaved(g.full) ? `Saved ${g.full}` : `Removed ${g.full} from Saved`); return renderDiscover(); }
   if (t.closest("[data-gdis]")) {
     card.classList.add("gone");
@@ -3304,6 +3321,356 @@ $("dbody").addEventListener("keydown", (e) => {
   if (S.mode !== "discover" || !e.target.matches("[data-didea]")) return;
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ideaResearch(e.target.value); }
   else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ideaSearch(e.target.value); }
+});
+// ── Mixer: pick projects, repos, connections, tools and interests; get ideas only that mix makes possible ──
+// Server side: src/mix.ts. The model sees only the names and one-line descriptions you pick, plus your direction.
+S.disc.mix = { sel: load("mixSel", []), dir: load("mixDir", ""), engine: load("mixEngine", "claude"), q: "", all: false, ings: null, engines: null, connLoading: false, loading: false, job: null, res: null, open: new Set(), seen: new Set(), more: new Set(), peeked: "" };
+const MIX_KINDS = [["project", "Your projects"], ["repo", "Gems & trending"], ["conn", "Connections & services"], ["tool", "Tools & skills"], ["interest", "Interests"]];
+const MIX_PREFIX = { p: "project", r: "repo", c: "conn", t: "tool", i: "interest" };
+const mixKindOf = (id) => MIX_PREFIX[String(id)[0]] ?? "conn";
+const MIX_DIRS = ["make money", "for my HD audience", "weekend hack", "privacy-first", "wow on a phone", "runs itself"];
+const MIX_DIFF = { weekend: "Weekend", week: "A week", month: "A month" };
+const MIX_TOOL_CATS = new Set(["ai", "mcp", "skills"]);
+const ingLite = (x) => ({ id: String(x.id), kind: x.kind, name: String(x.name), desc: String(x.desc ?? "").slice(0, 140) });
+const mixIsSel = (id) => S.disc.mix.sel.some((x) => x.id === id);
+function mixSetSel(sel) { S.disc.mix.sel = sel.slice(0, 16); store("mixSel", S.disc.mix.sel); }
+function mixEngineParts() { const e = S.disc.mix.engine; return e.startsWith("ollama:") ? ["ollama", e.slice(7)] : [e, undefined]; }
+function mixEngineLabel(engine, model) { return engine === "ollama" ? `Ollama · ${model ?? "local"}` : engine === "template" ? "templates" : `Claude${model ? ` ${model[0].toUpperCase()}${model.slice(1)}` : ""}`; }
+/** The mixer regions update in place, so typing in the direction or search box never loses the keyboard. */
+function mixPatch(...ids) {
+  if (S.mode !== "discover" || S.disc.tab !== "mix") return;
+  const view = $("dbody").querySelector(":scope > .view");
+  const f = { mixtray: mixTrayHTML, mixopts: mixOptsHTML, mixres: mixResHTML, mixlist: mixListHTML };
+  let n = 0;
+  for (const id of ids.length ? ids : Object.keys(f)) {
+    const el = view?.querySelector(`#${id}`);
+    if (!el) continue;
+    n++;
+    const prog = id === "mixres" && S.disc.mix.job && el.querySelector(".mixprog");
+    if (prog) { const st = prog.querySelector(".mstage"); if (st.textContent !== (S.disc.mix.job.stage ?? "")) st.textContent = S.disc.mix.job.stage ?? ""; setHTML(el.querySelector("#mixgrid"), mixGridHTML(S.disc.mix.job.mixes ?? [])); }
+    else setHTML(el, f[id]());
+  }
+  if (!n) return renderDiscover();
+  if (view) view._h = null; // the whole-view cache no longer matches what's on screen
+}
+async function mixEnter() {
+  const m = S.disc.mix;
+  if (!m.ings && !m.loading) loadMixIngs();
+  mixPeek();
+}
+async function loadMixIngs(wait) {
+  const m = S.disc.mix;
+  if (m.loading) return;
+  m.loading = true;
+  try {
+    const r = await api("/api/discover/mix-ingredients", wait ? { wait } : {}, 20_000);
+    m.ings = r.ingredients; m.engines = r.engines; m.connLoading = r.connLoading;
+    // Fresher descriptions for what's already picked.
+    const by = new Map(m.ings.map((x) => [x.id, x]));
+    mixSetSel(m.sel.map((x) => (by.has(x.id) ? ingLite(by.get(x.id)) : x)));
+    if (m.engine === "claude" && !m.engines.claude) m.engine = m.engines.ollama[0] ? `ollama:${m.engines.ollama[0]}` : "template";
+  } catch (e) { toast(e.message, true); }
+  m.loading = false;
+  mixPatch();
+  // The connections scan wasn't done yet: ask once more, waiting longer.
+  if (m.connLoading && !wait) setTimeout(() => { if (S.mode === "discover") { m.ings && (m.connLoading = false); loadMixIngs(9000); } }, 800);
+}
+/** Show the cached result for this exact selection, direction and engine, if there is one. */
+async function mixPeek() {
+  const m = S.disc.mix;
+  if (m.sel.length < 2 || m.job) return;
+  const [engine, model] = mixEngineParts();
+  const sig = JSON.stringify([m.sel.map((x) => x.id).sort(), m.dir.trim().toLowerCase(), m.engine]);
+  if (m.peeked === sig) return;
+  m.peeked = sig;
+  try { const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, peek: true }, 8000); if (r.cached && !m.job) { m.res = { ...r.result, cached: true }; mixPatch("mixres"); } } catch {}
+}
+async function mixStart(force = false) {
+  const m = S.disc.mix;
+  if (m.sel.length < 2) { toast("Pick at least two ingredients", true); return; }
+  if (m.job) return;
+  const [engine, model] = mixEngineParts();
+  m.job = { status: "running", stage: "Starting…", mixes: [], engine, model, t0: Date.now() };
+  mixPatch("mixres", "mixtray");
+  const res = $("dbody").querySelector("#mixres");
+  if (res && res.getBoundingClientRect().top > innerHeight * 0.6) res.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  try {
+    const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, force }, 15_000);
+    if (r.cached) { m.job = null; m.res = { ...r.result, cached: true }; }
+    else { m.job = { ...r.job, t0: m.job.t0 }; m.peeked = ""; mixPoll(); }
+  } catch (e) { m.job = null; toast(e.message, true); }
+  mixPatch("mixres", "mixtray");
+}
+async function mixPoll() {
+  const m = S.disc.mix;
+  clearTimeout(mixPoll.t);
+  if (!m.job?.id) return;
+  const id = m.job.id;
+  try {
+    const j = await api("/api/discover/mix-status", { id }, 8000);
+    if (m.job?.id !== id) return;
+    if (j.status === "running") m.job = { ...j, t0: m.job.t0 };
+    else {
+      if (j.mixes.length) m.res = { mixes: j.mixes, note: j.status === "cancelled" ? "Stopped: these arrived before you cancelled." : j.note, engine: j.engine, model: j.model, ms: j.elapsed };
+      else if (j.status === "cancelled") toast("Mix cancelled");
+      m.job = null;
+    }
+  } catch (e) { if (m.job?.id === id) { toast(e.message, true); m.job = null; } }
+  mixPatch("mixres", "mixtray");
+  if (m.job) mixPoll.t = setTimeout(mixPoll, 650);
+}
+async function mixCancel() {
+  const m = S.disc.mix;
+  const id = m.job?.id;
+  if (!id) { m.job = null; return mixPatch("mixres", "mixtray"); }
+  try { await api("/api/discover/mix-cancel", { id }, 5000); } catch {}
+  mixPoll();
+}
+function mixSurprise() {
+  const m = S.disc.mix;
+  if (!m.ings) return;
+  const pick = (xs) => xs[Math.floor(Math.random() * xs.length)];
+  const of = (k, n) => m.ings.filter((x) => x.kind === k && x.ready).slice(0, n);
+  const pools = [of("project", 12), of("repo", 16), of("conn", 60), Math.random() < 0.5 ? of("tool", 60) : of("interest", 14)];
+  if (Math.random() < 0.4) pools.push(of("interest", 14));
+  const out = [];
+  for (const p of pools) { const x = p.length && pick(p); if (x && !out.some((y) => y.id === x.id)) out.push(ingLite(x)); }
+  mixSetSel(out);
+  m.res = null; m.peeked = "";
+  mixPatch("mixtray", "mixopts", "mixlist", "mixres");
+  mixPeek();
+}
+/** Put ingredients in the mixer (added to, or instead of, what's there) and open it. */
+function mixOpenWith(xs, { add = false, toastText } = {}) {
+  const m = S.disc.mix;
+  const cur = add ? [...m.sel] : [];
+  for (const x of xs) if (!cur.some((y) => y.id === x.id)) cur.push(ingLite(x));
+  mixSetSel(cur);
+  m.peeked = "";
+  if (!add) m.res = null;
+  S.disc.tab = "mix"; store("discTab", "mix");
+  if (S.mode !== "discover") setMode("discover"); else { renderDiscover(); $("dbody").scrollTop = 0; }
+  mixSyncDir();
+  mixEnter();
+  if (toastText) toast(toastText);
+}
+const mixFromCard = (x) => x.ids.map((id, i) => { const k = S.disc.mix.ings?.find((y) => y.id === id); return k ? ingLite(k) : { id, kind: mixKindOf(id), name: x.ingredients[i] ?? id, desc: "" }; });
+function mixText(x) {
+  return [`${x.title}: ${x.pitch}`, "", `Ingredients: ${x.ingredients.join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`), x.why_novel ? `Why it’s new: ${x.why_novel}` : "", x.first_steps?.length ? `First steps:\n${x.first_steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", `Size: ${MIX_DIFF[x.difficulty] ?? x.difficulty} · wow ${x.wow}/5`].filter(Boolean).join("\n");
+}
+/** "Research & plan it": the same research flow as the Idea lab, with the mix as the idea (the dialog opens prefilled; nothing starts before you confirm). */
+function mixResearch(x) {
+  const dir = x.direction ?? S.disc.mix.dir;
+  const text = `${x.title}: ${x.pitch} Combine ${x.how.map((h) => `${h.name} (${h.role})`).join("; ")}.${x.why_novel ? ` Why it’s new: ${x.why_novel}` : ""}${dir?.trim() ? ` Direction: ${dir.trim()}.` : ""} First steps I have in mind: ${x.first_steps.join("; ")}.`;
+  const repos = x.ids.filter((id) => id.startsWith("r:")).map((id) => gemBy(id.slice(2)) ?? { full: id.slice(2), stars: "?" });
+  const projects = x.ids.filter((id) => id.startsWith("p:")).map((id) => id.slice(2));
+  return discStart("research", { text, slug: x.title, repos, projects }, "Research & plan this mix");
+}
+const allMixes = () => [...(S.disc.mix.res?.mixes ?? []), ...(S.disc.mix.job?.mixes ?? []), ...(S.disc.data?.mixes?.forYou?.mixes ?? []), ...(S.disc.data?.mixes?.saved ?? [])];
+const mixSaved = (id) => (S.disc.data?.mixes?.saved ?? []).some((x) => x.id === id);
+async function mixSave(x) {
+  const op = mixSaved(x.id) ? "unsave" : "save";
+  try {
+    const r = await api("/api/discover/mix-save", { op, mix: x, direction: x.direction ?? S.disc.mix.dir });
+    if (S.disc.data) S.disc.data.mixes = { ...(S.disc.data.mixes ?? {}), saved: r.mixes };
+    toast(op === "save" ? `Saved “${x.title}”` : `Removed “${x.title}” from Saved`);
+  } catch (e) { toast(e.message, true); }
+}
+
+/** The direction box lives outside the patched regions: set it (and the suggestion chips) directly. */
+function mixSyncDir() {
+  const m = S.disc.mix;
+  const inp = $("dbody").querySelector("[data-mixdir]");
+  if (inp && inp.value !== m.dir) inp.value = m.dir;
+  for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
+  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+}
+function mixCard(x, i, ctx) {
+  const m = S.disc.mix;
+  const seenKey = `${ctx}:${x.id}`;
+  const fresh = !m.seen.has(seenKey);
+  m.seen.add(seenKey);
+  const saved = mixSaved(x.id);
+  const acts = ctx === "fy" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>`
+    : ctx === "sv" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-mcopy>Copy</button><button class="btn ghost" data-msave aria-pressed="true">Remove</button>`
+    : `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mremix title="Keep these ingredients selected and mix again">Remix</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-mcopy>Copy</button>`;
+  return `<article class="mixcard${fresh ? "" : " still"}" data-mix="${esc(x.id)}" style="--h:${dHue(x.title)};--i:${Math.min(i, 8)}">
+    <h4>${esc(x.title)}</h4>
+    <div class="mbadges"><span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" role="img" aria-label="Wow ${x.wow} of 5" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span>${x.source === "template" ? '<span class="msrc" title="From the quick template combiner, not a model">template</span>' : ""}</div>
+    ${x.pitch ? `<p class="mpitch">${esc(x.pitch)}</p>` : ""}
+    <div class="mings">${x.ids.map((id, j) => `<span class="ming k-${mixKindOf(id)}">${esc(x.ingredients[j] ?? id)}</span>`).join("")}</div>
+    <details class="mmore" data-mdet="${esc(seenKey)}"${m.open.has(seenKey) ? " open" : ""}><summary>How, why &amp; first steps</summary>
+      <ul class="mhow">${(x.how ?? []).map((h) => `<li><span class="ming k-${mixKindOf(x.ids[x.ingredients.indexOf(h.name)] ?? "")}">${esc(h.name)}</span> ${esc(h.role)}</li>`).join("")}</ul>
+      ${x.why_novel ? `<p class="mwhy"><b>Why it’s new</b> ${esc(x.why_novel)}</p>` : ""}
+      ${x.first_steps?.length ? `<ol class="msteps">${x.first_steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}
+    </details>
+    <div class="gacts">${acts}</div>
+  </article>`;
+}
+function mixesForYou(d) {
+  const fy = d.mixes?.forYou;
+  if (!fy?.mixes?.length) return "";
+  const status = fy.running ? '<span class="spin"></span> mixing today’s set with Claude… these are quick picks meanwhile'
+    : fy.generated ? `from your top interests, projects, gems and connections · ${esc(mixEngineLabel(fy.engine, fy.model))}, ${esc(agoText(fy.at))}`
+    : "quick picks from your top interests, projects, gems and connections";
+  return `<h3 class="dsub">Mixes for you <span class="hint mfyst">${status}</span> <button class="link" data-dtab="mix">Open the mixer</button></h3>
+    <div class="dstrip mstrip">${fy.mixes.map((x, i) => mixCard(x, i, "fy")).join("")}</div>`;
+}
+function mixChip(x) {
+  return `<button class="mchip k-${x.kind}${x.ready ? "" : " off"}" data-ing="${esc(x.id)}" aria-pressed="${mixIsSel(x.id)}" title="${esc([x.desc, x.ready ? "" : "not ready on this machine"].filter(Boolean).join(" · "))}">${esc(x.name)}</button>`;
+}
+function mixTrayHTML() {
+  const m = S.disc.mix;
+  const n = m.sel.length;
+  // Only a chip that was just added animates in; redraws of the tray don't replay the others.
+  const fresh = m.justAdded; m.justAdded = null;
+  return `<div class="mtray" aria-label="Picked">${n ? m.sel.map((x) => `<span class="mpick k-${esc(x.kind)}${x.id === fresh ? " fresh" : ""}"><span>${esc(x.name)}</span><button data-mixrm="${esc(x.id)}" aria-label="Remove ${esc(x.name)}">${ICON.x}</button></span>`).join("") : '<span class="hint">Nothing picked yet: tap things below, or <button class="link" data-mixsurprise>Surprise me</button></span>'}</div>
+    <button class="btn primary mgo" data-mixgo ${n < 2 || m.job ? "disabled" : ""} title="${n < 2 ? "Pick at least two" : "Mix them"}">${m.job ? '<span class="spin"></span>Mixing' : `Mix${n ? ` ${n}` : ""}`}</button>`;
+}
+const mixGridHTML = (got) => `${got.map((x, i) => mixCard(x, i, "res")).join("")}${Array.from({ length: Math.max(0, 6 - got.length) }, () => '<div class="mixcard skel"></div>').join("")}`;
+function mixResHTML() {
+  const m = S.disc.mix;
+  const j = m.job;
+  // While mixing, the progress bar is drawn once and then only its words and clock change (mixPatch), so Cancel is always tappable.
+  if (j) return `<div class="mixprog" role="status"><span class="spin"></span><b>Mixing with ${esc(mixEngineLabel(j.engine, j.model))}</b><span class="hint mstage">${esc(j.stage ?? "")}</span><span class="mclock" data-since="${j.t0}">${clock(Date.now() - j.t0)}</span><span class="spacer"></span><button class="btn ghost" data-mixcancel>Cancel</button></div>
+      <div class="mgrid" id="mixgrid">${mixGridHTML(j.mixes ?? [])}</div>`;
+  const r = m.res;
+  if (!r) return `<p class="hint mempty">${m.sel.length < 2 ? "Pick two or more things below, add a direction if you like, then press <b>Mix</b>." : "Ready: press <b>Mix</b>."} Only the names and one-line descriptions of what you pick, and your direction, go to the model.</p>`;
+  const secs = r.ms ? `${(r.ms / 1000).toFixed(r.ms < 10_000 ? 1 : 0)}s` : "";
+  return `<div class="mixhead"><span><b>${r.mixes.length} mixes</b> · ${esc(mixEngineLabel(r.engine, r.model))}${r.cached ? ` · from cache${r.at ? `, ${esc(agoText(r.at))}` : ""}` : secs ? ` · ${secs}` : ""}</span><span class="spacer"></span><button class="btn ghost" data-mixagain ${m.sel.length < 2 ? "disabled" : ""}>Mix again</button></div>
+    ${r.note ? `<p class="mnote">${ICON.warn}${esc(r.note)}</p>` : ""}
+    <div class="mgrid">${r.mixes.map((x, i) => mixCard(x, i, "res")).join("")}</div>`;
+}
+function mixListHTML() {
+  const m = S.disc.mix;
+  if (!m.ings) return `<div class="mchips">${Array.from({ length: 14 }, (_, i) => `<span class="mchip skel" style="width:${60 + ((i * 37) % 70)}px"></span>`).join("")}</div>`;
+  const q = m.q.trim().toLowerCase();
+  const match = (x) => !q || `${x.name} ${x.desc} ${x.group ?? ""}`.toLowerCase().includes(q);
+  const limit = (key, xs, n) => (q || m.more.has(key) || xs.length <= n + 2 ? xs : xs.slice(0, n));
+  const more = (key, xs, shown) => (xs.length > shown.length ? `<button class="mchip moremix" data-mixmore="${esc(key)}">+${xs.length - shown.length} more</button>` : "");
+  const out = [];
+  for (const [k, label] of MIX_KINDS) {
+    const all = m.ings.filter((x) => x.kind === k);
+    const xs = all.filter((x) => (m.all || x.ready || !["conn", "tool"].includes(k)) && match(x));
+    if (!xs.length && q) continue;
+    let body;
+    if (k === "conn" || k === "tool") {
+      const groups = new Map();
+      for (const x of xs) groups.set(x.group ?? "Other", [...(groups.get(x.group ?? "Other") ?? []), x]);
+      body = [...groups].map(([g, ys]) => { const shown = limit(`${k}:${g}`, ys, 10); return `<div class="mgrp"><span class="mgl">${esc(g)} <span class="n">${ys.length}</span></span><div class="mchips">${shown.map(mixChip).join("")}${more(`${k}:${g}`, ys, shown)}</div></div>`; }).join("");
+    } else { const shown = limit(k, xs, 18); body = `<div class="mchips">${shown.map(mixChip).join("")}${more(k, xs, shown)}</div>`; }
+    const nsel = m.sel.filter((x) => x.kind === k).length;
+    out.push(`<section class="mkind k-${k}"><h4><span class="kdot"></span>${esc(label)} <span class="n">${xs.length}${xs.length !== all.length && !q ? ` of ${all.length}` : ""}</span>${nsel ? `<span class="msel">${nsel} picked</span>` : ""}</h4>${xs.length ? body : `<p class="hint">${k === "repo" ? "No gems found yet: open For you and let it search GitHub." : (k === "conn" || k === "tool") && (m.connLoading || m.loading) ? '<span class="spin"></span> Scanning your connections…' : "Nothing here yet."}</p>`}</section>`);
+  }
+  return out.join("") || `<p class="hint">Nothing matches “${esc(m.q)}”.</p>`;
+}
+function mixOptsHTML() {
+  const m = S.disc.mix;
+  const e = m.engines;
+  const opts = [["claude", "Claude (fast, default)", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} (private, local)`]), ["template", "Templates (instant, offline)"]];
+  if (!opts.some(([v]) => v === m.engine)) opts.push([m.engine, m.engine]);
+  return `<label class="mixeng"><span class="hint">Engine</span><select class="inp" data-mixeng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === m.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select></label>
+    <span class="spacer"></span><button class="btn ghost" data-mixsurprise>Surprise me</button><button class="btn ghost" data-mixclear ${m.sel.length ? "" : "disabled"}>Clear</button>`;
+}
+function discMix() {
+  const m = S.disc.mix;
+  // The picked tray is a direct child of the view, so it stays stuck to the top the whole way down.
+  return `<p class="hint dlead mixlead">Pick things you have or found: projects, repos, connections, tools, interests. Get ideas only that combination makes possible.</p>
+      <div class="mixbar" id="mixtray">${mixTrayHTML()}</div>
+      <div class="mixctl">
+        <input class="inp mixdir" data-mixdir type="text" enterkeyhint="go" maxlength="200" placeholder="Optional direction, e.g. “make money” or “for my HD audience”" value="${esc(m.dir)}" aria-label="Direction (optional)">
+        <div class="mixsugg">${MIX_DIRS.map((x) => `<button class="dtag" data-mixdirpick="${esc(x)}" aria-pressed="${m.dir.trim().toLowerCase() === x}">${esc(x)}</button>`).join("")}</div>
+        <div class="mixrow" id="mixopts">${mixOptsHTML()}</div>
+      </div>
+    <div id="mixres" class="mixres">${mixResHTML()}</div>
+    <section class="mixpick"><div class="mixsearch"><input class="inp" data-mixq type="search" placeholder="Search ingredients" value="${esc(m.q)}" autocomplete="off" aria-label="Search ingredients">
+      <label class="mixall"><input type="checkbox" data-mixall ${m.all ? "checked" : ""}> Show all connections, not only ready ones</label></div>
+      <div id="mixlist">${mixListHTML()}</div></section>`;
+}
+function discSaved(d, n) {
+  if (!n) return `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem or a mix to keep it here.</div>`;
+  const mixes = d.mixes?.saved ?? [];
+  return `${mixes.length ? `<h3 class="dsub">Mixes <span class="hint">ideas you kept from the mixer</span></h3><div class="mgrid">${mixes.map((x, i) => mixCard(x, i, "sv")).join("")}</div>` : ""}
+    ${d.saved.length ? `<h3 class="dsub">Repos <span class="hint">they stay here until you remove them</span></h3><div class="dgrid">${d.saved.map((g, i) => gemCard(g, i, { saved: true })).join("")}</div>` : ""}`;
+}
+/** Clicks inside the mixer and on mix cards. Returns true when it handled the click. */
+function mixClick(t) {
+  const m = S.disc.mix;
+  const ing = t.closest("[data-ing]")?.dataset.ing;
+  if (ing) {
+    const x = m.ings?.find((y) => y.id === ing);
+    if (!x) return true;
+    if (mixIsSel(ing)) mixSetSel(m.sel.filter((y) => y.id !== ing));
+    else if (m.sel.length >= 16) { toast("That’s plenty: 16 at most", true); return true; }
+    else { mixSetSel([...m.sel, ingLite(x)]); m.justAdded = x.id; }
+    mixPatch("mixtray", "mixopts", "mixlist");
+    $("dbody").querySelector(`[data-ing="${CSS.escape(ing)}"]`)?.focus({ preventScroll: true });
+    mixPeek();
+    return true;
+  }
+  const rm = t.closest("[data-mixrm]")?.dataset.mixrm;
+  if (rm) { mixSetSel(m.sel.filter((y) => y.id !== rm)); mixPatch("mixtray", "mixopts", "mixlist"); return true; }
+  if (t.closest("[data-mixgo]")) { mixStart(false); return true; }
+  if (t.closest("[data-mixagain]")) { mixStart(true); return true; }
+  if (t.closest("[data-mixcancel]")) { mixCancel(); return true; }
+  if (t.closest("[data-mixsurprise]")) { mixSurprise(); return true; }
+  if (t.closest("[data-mixclear]")) { mixSetSel([]); m.res = null; mixPatch(); return true; }
+  const more = t.closest("[data-mixmore]")?.dataset.mixmore;
+  if (more) { m.more.add(more); mixPatch("mixlist"); return true; }
+  const dp = t.closest("[data-mixdirpick]")?.dataset.mixdirpick;
+  if (dp != null) {
+    m.dir = m.dir.trim().toLowerCase() === dp ? "" : dp; store("mixDir", m.dir);
+    mixSyncDir();
+    mixPeek();
+    return true;
+  }
+  const card = t.closest("[data-mix]");
+  if (!card || t.closest("summary")) return false;
+  const x = allMixes().find((y) => y.id === card.dataset.mix);
+  if (!x) return false;
+  if (t.closest("[data-mplan]")) { mixResearch(x); return true; }
+  if (t.closest("[data-mcopy]")) { copy(mixText(x), "the mix"); return true; }
+  if (t.closest("[data-mopen]")) { if (x.direction != null) { m.dir = x.direction; store("mixDir", m.dir); } mixOpenWith(mixFromCard(x), { toastText: "Opened in the mixer" }); return true; }
+  if (t.closest("[data-mremix]")) { mixSetSel(mixFromCard(x)); m.peeked = ""; mixPatch("mixtray", "mixopts", "mixlist"); mixStart(true); return true; }
+  if (t.closest("[data-msave]")) { mixSave(x).then(() => { if (S.disc.tab === "mix") mixPatch("mixres"); else renderDiscover(); }); return true; }
+  return false;
+}
+$("dbody").addEventListener("toggle", (e) => {
+  const k = e.target.dataset?.mdet;
+  if (!k) return;
+  if (e.target.open) S.disc.mix.open.add(k); else S.disc.mix.open.delete(k);
+  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+}, true);
+$("dbody").addEventListener("input", (e) => {
+  if (S.mode !== "discover") return;
+  const m = S.disc.mix;
+  if (e.target.matches("[data-mixq]")) { m.q = e.target.value; mixPatch("mixlist"); }
+  else if (e.target.matches("[data-mixdir]")) {
+    m.dir = e.target.value;
+    for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
+    clearTimeout(m.saveT); m.saveT = setTimeout(() => { store("mixDir", m.dir); mixPeek(); }, 400);
+    const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+  }
+});
+$("dbody").addEventListener("change", (e) => {
+  if (S.mode !== "discover") return;
+  const m = S.disc.mix;
+  if (e.target.matches("[data-mixeng]")) { m.engine = e.target.value; store("mixEngine", m.engine); m.res = null; mixPatch("mixres"); mixPeek(); }
+  else if (e.target.matches("[data-mixall]")) { m.all = e.target.checked; mixPatch("mixlist"); }
+});
+$("dbody").addEventListener("keydown", (e) => {
+  if (S.mode !== "discover" || !e.target.matches("[data-mixdir]") || e.key !== "Enter" || e.isComposing) return;
+  e.preventDefault(); store("mixDir", S.disc.mix.dir); mixStart(false);
+});
+// Connections → "Mix these": the picked store cards go to the mixer (key names stay out).
+$("dbody").addEventListener("click", (e) => {
+  if (S.mode !== "connections" || !e.target.closest("[data-cmix]")) return;
+  const byId = new Map(connItems(S.conn.data.get(S.conn.machine ?? S.self)).map((i) => [i.id, i]));
+  const xs = [...S.conn.pick].map((id) => byId.get(id)).filter((i) => i && i.cat !== "keys")
+    .map((i) => { const tool = MIX_TOOL_CATS.has(i.cat) || ["agent", "sub", "skill", "mcp"].includes(i.kind); return { id: `${tool ? "t" : "c"}:${i.id}`, kind: tool ? "tool" : "conn", name: i.name, desc: i.detail ?? "" }; });
+  if (!xs.length) return toast("Pick some connections first (API key names can’t be mixed)", true);
+  S.conn.pick.clear();
+  mixOpenWith(xs, { add: true, toastText: `Added ${xs.length} to the mixer` });
 });
 // ══ end Discover ═════════════════════════════════════════════════════════════
 

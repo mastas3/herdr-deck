@@ -7,6 +7,7 @@
 // Network work never blocks a request for long: cached data is returned at once and refreshed in the background.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { collectIngredients, createMixer, forYouIngredients, KIND_LABEL, sanitizeIngredient, type ConnLite, type Engine, type Ingredient, type Mix, type MixerDeps } from "./mix";
 
 const HOME = homedir();
 const DAY = 86_400_000;
@@ -38,6 +39,7 @@ export type DiscoverConf = {
   added: { label: string; q?: string }[]; removed: string[];
   saved: (Repo & { why?: Why[]; savedAt: number })[]; dismissed: string[];
   ideas: { slug: string; text: string; at: number }[];
+  mixes?: (Mix & { savedAt: number; direction?: string })[];
 };
 
 // ── interests: wiki tags → searchable interests ────────────────────────────────
@@ -645,7 +647,8 @@ const TTL = 6 * 3600_000;
 const TREND_TTL = 12 * 3600_000;
 const SEARCH_GAP = 350;
 
-export function createDiscover(paths: DiscoverPaths, deps: { connections?: () => Promise<string[]>; rows?: () => RowLite[]; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; gap?: number } = {}) {
+export type ItemsDep = () => Promise<{ items: ConnLite[]; categories?: { id: string; label: string }[] }>;
+export function createDiscover(paths: DiscoverPaths, deps: { connections?: () => Promise<string[]>; items?: ItemsDep; rows?: () => RowLite[]; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; gap?: number; mixer?: Partial<MixerDeps> } = {}) {
   const run = deps.gh ?? gh;
   const GAP = deps.gap ?? SEARCH_GAP;
   const CONF = `${paths.dataDir}/discover.json`;
@@ -655,7 +658,7 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   const pctx: PromptCtx = { ideasDir: IDEAS, connectionsFile: CONN_FILE, projectsDir: paths.projectsDir };
   const readJson = (p: string) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return undefined; } };
   const writeJson = (p: string, v: unknown) => { mkdirSync(paths.dataDir, { recursive: true }); const tmp = `${p}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(v)); renameSync(tmp, p); };
-  let conf: DiscoverConf = { added: [], removed: [], saved: [], dismissed: [], ideas: [], ...readJson(CONF) };
+  let conf: DiscoverConf = { added: [], removed: [], saved: [], dismissed: [], ideas: [], mixes: [], ...readJson(CONF) };
   let cache: Cache = { gems: {}, trend: {}, ideas: {}, ...readJson(CACHE) };
   const saveConf = () => writeJson(CONF, conf);
   let cacheTimer: ReturnType<typeof setTimeout> | undefined;
@@ -748,6 +751,24 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     return { gems, trending };
   }
 
+  // ── the Mixer: ingredients from the profile, gems, saved repos and the connections store ──
+  const mixer = createMixer({ file: `${paths.dataDir}/mix-cache.json`, ...deps.mixer });
+  let items: { at: number; items: ConnLite[]; labels: Record<string, string> } | undefined;
+  let itemsLoading: Promise<void> | undefined;
+  function loadItems() {
+    if (!deps.items) return Promise.resolve();
+    if (items && Date.now() - items.at < 10 * 60_000) return Promise.resolve();
+    return (itemsLoading ??= deps.items().then((r) => { items = { at: Date.now(), items: r.items, labels: Object.fromEntries((r.categories ?? []).map((c) => [c.id, c.label])) }; }).catch(() => { items = { at: Date.now() - 9 * 60_000, items: [], labels: {} }; }).finally(() => { itemsLoading = undefined; }));
+  }
+  /** Everything you could mix. Waits briefly for the connections scan; the page asks again when it wasn't ready. */
+  async function ingredients(wait = 2500) {
+    const p = await profile();
+    await Promise.race([loadItems(), Bun.sleep(wait)]);
+    const { gems, trending } = ranked(p);
+    return { list: collectIngredients({ profile: p, gems, trending, saved: conf.saved, items: items?.items, catLabels: items?.labels }), connLoading: !!deps.items && !items };
+  }
+  const byId = (xs: Ingredient[]) => new Map(xs.map((x) => [x.id, x]));
+
   async function state(body: { refresh?: boolean; shuffle?: number } = {}) {
     const p = await profile(!!body.refresh);
     const ats = p.interests.map((i) => cache.gems[i.id]?.at ?? 0);
@@ -758,7 +779,12 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     if (body.refresh || stale || missing || retry) refresh(!!body.refresh);
     const { gems, trending } = ranked(p);
     const day = Math.floor(Date.now() / DAY);
+    // "Mixes for you": templates at once, a model's mixes once a day (started here, i.e. only when Discover is open).
+    await Promise.race([loadItems(), Bun.sleep(1500)]);
+    const ings = collectIngredients({ profile: p, gems, trending, saved: conf.saved, items: items?.items, catLabels: items?.labels });
+    const forYou = mixer.daily(forYouIngredients(ings, day), Date.now(), !!deps.items && !items);
     return {
+      mixes: { forYou, saved: conf.mixes ?? [] },
       profile: { interests: p.interests, removed: p.removed.map(({ id, label }) => ({ id, label })), languages: p.languages, connections: p.connections, recent: p.recent, counts: p.counts, projects: p.projects.slice(0, 40).map(({ name, status }) => ({ name, status })) },
       gems, trending, sparks: sparks(p, gems, day + (Number(body.shuffle) || 0)),
       saved: conf.saved, dismissed: conf.dismissed.length, ideas: listIdeas(IDEAS, deps.rows?.() ?? [], conf.ideas),
@@ -863,6 +889,40 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
         saveConf();
         return { ideas: listIdeas(IDEAS, deps.rows?.() ?? [], conf.ideas) };
       }
+      case "/api/discover/mix-ingredients": {
+        const [r, engines] = await Promise.all([ingredients(Number(body.wait) || 2500), mixer.engines()]);
+        return { ingredients: r.list, connLoading: r.connLoading, engines, kinds: KIND_LABEL };
+      }
+      case "/api/discover/mix": {
+        const known = byId((await ingredients(800)).list);
+        const chosen = (Array.isArray(body.ingredients) ? body.ingredients : []).slice(0, 16).map((x: any) => known.get(String(x?.id ?? "")) ?? sanitizeIngredient(x)).filter((x: Ingredient | undefined): x is Ingredient => !!x);
+        const uniq = chosen.filter((x: Ingredient, i: number) => chosen.findIndex((y: Ingredient) => y.id === x.id) === i);
+        if (uniq.length < 2) throw new Error("Pick at least two ingredients to mix");
+        const engine = (["claude", "ollama", "template"].includes(body.engine) ? body.engine : "claude") as Engine;
+        const direction = String(body.direction ?? "").trim().slice(0, 200);
+        const model = engine === "ollama" && body.model ? String(body.model).slice(0, 80) : undefined;
+        return body.peek ? mixer.peek(uniq, direction, engine, model) : mixer.mix(uniq, direction, engine, model, !!body.force);
+      }
+      case "/api/discover/mix-status": return mixer.status(String(body.id ?? ""));
+      case "/api/discover/mix-cancel": return mixer.cancel(String(body.id ?? ""));
+      case "/api/discover/mix-save": {
+        const m = body.mix ?? {};
+        const id = String(m.id ?? body.id ?? "");
+        if (!/^[\w-]{1,40}$/.test(id)) throw new Error("Which mix?");
+        if (body.op === "save") {
+          const clean = (v: unknown, n: number) => String(v ?? "").slice(0, n);
+          const keep = {
+            id, title: clean(m.title, 90), pitch: clean(m.pitch, 260), ingredients: (m.ingredients ?? []).slice(0, 4).map((x: unknown) => clean(x, 80)), ids: (m.ids ?? []).slice(0, 4).map((x: unknown) => clean(x, 160)),
+            how: (m.how ?? []).slice(0, 4).map((h: any) => ({ name: clean(h?.name, 80), role: clean(h?.role, 200) })), why_novel: clean(m.why_novel, 260), first_steps: (m.first_steps ?? []).slice(0, 3).map((x: unknown) => clean(x, 200)),
+            difficulty: ["weekend", "week", "month"].includes(m.difficulty) ? m.difficulty : "week", wow: Math.max(1, Math.min(5, Number(m.wow) || 3)), source: ["claude", "ollama", "template"].includes(m.source) ? m.source : "template",
+            direction: body.direction ? clean(body.direction, 200) : undefined, savedAt: Date.now(),
+          } as DiscoverConf["mixes"] extends (infer T)[] | undefined ? T : never;
+          conf.mixes = [keep, ...(conf.mixes ?? []).filter((x) => x.id !== id)].slice(0, 200);
+        } else if (body.op === "unsave") conf.mixes = (conf.mixes ?? []).filter((x) => x.id !== id);
+        else throw new Error("unknown op");
+        saveConf();
+        return { mixes: conf.mixes };
+      }
       case "/api/discover/prompt": {
         if (body.kind === "fork") return { prompt: forkPrompt(body.repo, pctx), cwd: paths.projectsDir, label: `Explore ${String(body.repo?.name ?? "").slice(0, 30)}` };
         if (body.kind === "build") {
@@ -881,5 +941,5 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     }
     return undefined;
   }
-  return { handle, refresh, profile, state, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
+  return { handle, refresh, profile, state, ingredients, mixer, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
 }

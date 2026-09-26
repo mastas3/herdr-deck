@@ -83,9 +83,11 @@ await deck.start();
 
 // Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
 const discover = createDiscover(
-  { dataDir: DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
+  { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
   {
     connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name),
+    // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
+    items: async () => { const inv = enrich(await inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   },
 );
