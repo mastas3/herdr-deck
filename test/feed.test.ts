@@ -80,10 +80,11 @@ describe("the feed", () => {
     writeFileSync(`${root}/cut-short.json`, JSON.stringify({ day: "2026-09-26", ideas: [], cursor: 0, dropped: 0 }));
     const cut = make(() => "", "cut-short");
     cut.f.ensure();
-    expect(cut.calls.length).toBeGreaterThan(0);
+    await wait(() => cut.calls.length > 0);
     writeFileSync(`${root}/settled.json`, JSON.stringify({ day: "2026-09-26", settled: "2026-09-26", ideas: [], cursor: 0, dropped: 0 }));
     const done = make(() => "", "settled");
     done.f.ensure();
+    await Bun.sleep(50);
     expect(done.calls.length).toBe(0);
   });
   test("the first view: six batches in parallel, ideas land in their rows, the gate and dedupe drop the weak ones", async () => {
