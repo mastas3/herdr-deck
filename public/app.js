@@ -3601,7 +3601,7 @@ function renderDiscover() {
   // Leads (its own block below) patches its results under the input, never the input itself.
   if (tab === "leads" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #leadsres")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return leadsPatch(); }
   if (tab === "research" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #rsbody")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return rsPatch(); }
-  const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Repos worth forking, picked for what you build. Any idea, searched against what already exists and planned by an agent.</p>
+  const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Ideas worth building and repos worth forking, picked for what you have. Any idea, searched against what already exists and planned by an agent.</p>
     <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
   if (tab === "leads") body = discLeads();
@@ -3612,6 +3612,7 @@ function renderDiscover() {
   else if (tab === "ideas") body = discIdeas(d);
   else if (tab === "saved") body = discSaved(d, nSaved);
   else body = discForYou(d);
+  if (tab === "you" && typeof galleryHTML === "function") body = galleryHTML() + body; // the gallery (public/js/gallery-*.js)
   const ta = document.activeElement?.matches?.("[data-didea], [data-stq], [data-stdq]") ? document.activeElement : null;
   const taSel = ta ? [...["didea", "stq", "stdq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
   // Cards animate in when a tab (or a new idea result) first appears, not on every background update.
@@ -3638,7 +3639,7 @@ function discForYou(d) {
   return `<section class="dprof"><h3 class="dsub">What you’re into</h3>
       <div class="dchips">${p.interests.map(chip).join("")}<button class="dchip add" data-dadd>${ICON.plus}Add</button></div>
       <p class="hint">From ${p.counts.wiki} wiki projects, ${p.counts.concepts} concepts, ${p.counts.log} recent log entries and ${p.counts.repos} local repos${p.connections.length ? `, plus ${p.connections.length} connections` : ""}.${langs.length ? ` Mostly ${esc(langs.join(", "))}.` : ""} Only these keywords are sent to GitHub search.${p.removed.length ? ` <button class="link" data-drestore>Restore ${p.removed.length} removed</button>` : ""}</p></section>
-    ${f ? "" : mixesForYou(d)}
+    ${f || typeof galleryHTML === "function" ? "" : mixesForYou(d)}
     <div class="dstatus">${discStatus(d)}</div>
     ${d.trending.length && !f ? `<h3 class="dsub">Trending in your areas <span class="hint">new this season, climbing fast</span></h3><div class="dstrip">${d.trending.map((g, i) => gemCard(g, i, { mini: true })).join("")}</div>` : ""}
     <h3 class="dsub">Hidden gems ${f ? `<span class="hint">in ${esc(p.interests.find((i) => i.id === f)?.label)}</span> <button class="link" data-dfilter="">Show all</button>` : `<span class="hint">30–5,000 stars, active this half-year, licensed</span>`}</h3>

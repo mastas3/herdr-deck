@@ -165,8 +165,10 @@ export function createGame(deps: GameDeps) {
     deps.journeys.seedLadder?.(run.id, runLadder(run));
     const cwd = `${deps.projectsDir.replace(/\/+$/, "")}/${run.id}`;
     const exists = existsSync(cwd);
-    const quest = { title: `Ship the offer page for ${run.name}`, why: `Milestone one: a page ${run.buyer ?? "your buyers"} can read and buy from.` };
-    return { ok: true, run, project: run.id, cwd, exists, mkdir: !exists && runFolderOk(cwd, deps.projectsDir), isMain: s.main?.project === run.id, main: s.main?.project ?? null, quest, prompt: runPrompt(run, cwd, quest, exists), label: clip(run.name, 40) };
+    // The gallery's Play passes the starter kit's task 1 (its folder already holds the kit); otherwise the offer page.
+    const ft = idea?.firstTask && typeof idea.firstTask.prompt === "string" && idea.firstTask.prompt.trim() ? idea.firstTask : undefined;
+    const quest = ft ? { title: clip(ft.title || "Task 1 of the starter kit", 120), why: "The first task in the starter kit's TASKS.md." } : { title: `Ship the offer page for ${run.name}`, why: `Milestone one: a page ${run.buyer ?? "your buyers"} can read and buy from.` };
+    return { ok: true, run, project: run.id, cwd, exists, mkdir: !exists && runFolderOk(cwd, deps.projectsDir), isMain: s.main?.project === run.id, main: s.main?.project ?? null, quest, prompt: ft ? String(ft.prompt).slice(0, 8000) : runPrompt(run, cwd, quest, exists), label: clip(run.name, 40) };
   }
 
   // ── push: completions, boss hits and new achievements, only for devices that asked (push.ts "quests") ──

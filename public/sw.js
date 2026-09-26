@@ -1,7 +1,9 @@
 // herdr deck service worker: makes the app installable, keeps static assets instant,
 // shows a clear offline page when the Mac can't be reached, and shows push notifications from the hub.
 // Live data is never cached.
-const CACHE = "deck-v6";
+const CACHE = "deck-v7";
+// Served under a content hash (?v=…, src/assets.ts): app.js and everything public/assets.json names.
+const HASHED = /^\/(?:app\.js|js\/[\w.-]+\.js|css\/[\w.-]+\.css)$/;
 const ASSETS = [
   "/offline.html", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png", "/icon-180.png",
   "/fonts/BarlowSemiCondensed-400.woff2", "/fonts/BarlowSemiCondensed-600.woff2", "/fonts/SourceSerif4-400.woff2",
@@ -17,6 +19,17 @@ const cacheFirst = (req) => caches.match(req).then((hit) => hit || fetch(req).th
   if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
   return res;
 }));
+/** A hashed asset: the cached copy is always the right one; a new version replaces the older ones of the same file. */
+const cacheHashed = (req) => caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+  if (res.ok) {
+    const copy = res.clone(), path = new URL(req.url).pathname;
+    caches.open(CACHE).then(async (c) => {
+      await c.put(req, copy);
+      for (const k of await c.keys()) { const u = new URL(k.url); if (u.pathname === path && k.url !== req.url) await c.delete(k); }
+    });
+  }
+  return res;
+}));
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
@@ -26,8 +39,8 @@ self.addEventListener("fetch", (e) => {
     e.respondWith(fetch(e.request).catch(() => caches.match("/offline.html")));
     return;
   }
-  // app.js is requested by content hash (?v=…), so a cached copy is always the right one.
-  if ((url.pathname === "/app.js" && url.searchParams.has("v")) || url.pathname.startsWith("/fonts/") || url.pathname.startsWith("/icon")) e.respondWith(cacheFirst(e.request));
+  if (HASHED.test(url.pathname) && url.searchParams.has("v")) { e.respondWith(cacheHashed(e.request)); return; }
+  if (url.pathname.startsWith("/fonts/") || url.pathname.startsWith("/icon")) e.respondWith(cacheFirst(e.request));
 });
 
 // ── push ──────────────────────────────────────────────────────────────────

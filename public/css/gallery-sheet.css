@@ -1,0 +1,122 @@
+/* ══ Gallery: an opened idea (side panel on a desktop, bottom sheet on a phone), the kit, and Play's confirm ══ */
+dialog.galdlg { margin: 0 0 0 auto; width: min(720px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 18px 0 0 18px; border-width: 0 0 0 1px; padding: 0; background: var(--bg); overflow: hidden; }
+dialog.galdlg[open] { animation: galin .26s var(--ease); }
+@keyframes galin { from { transform: translateX(40px); opacity: 0; } }
+dialog.galdlg::backdrop { background: rgba(8, 12, 18, .5); }
+.galsh { height: 100%; overflow-y: auto; overscroll-behavior: contain; outline: 0; transition: transform .2s var(--ease); }
+.galgrab { display: none; }
+.galx { position: sticky; top: 12px; float: right; margin: 12px 12px -46px 0; z-index: 3; width: 34px; height: 34px; border-radius: 10px; background: color-mix(in srgb, var(--raise) 85%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
+.galshb > .galcov { aspect-ratio: 16 / 8; }
+.galshb > .galcov .galmark { font-size: clamp(56px, 12cqw, 110px); }
+.galshh { padding: 18px 28px 6px; }
+.galshh h2 { margin: 0 0 8px; font: 600 30px/1.1 var(--serif); letter-spacing: -0.015em; text-wrap: balance; }
+.galshh .galhook { margin-bottom: 14px; }
+.galplaying { margin: 12px 0 0; font-size: 14px; line-height: 1.7; color: var(--ink-2); }
+.galplaying .galbadge { margin-right: 4px; }
+.galplaying code { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.galsec { padding: 4px 28px 4px; margin-top: 18px; }
+.galsec > h3 { margin: 0 0 8px; font: 650 12.5px/1.2 var(--sans); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-3); }
+.galsec p { margin: 0 0 8px; font-size: 15.5px; line-height: 1.5; text-wrap: pretty; }
+.galsec h4 { margin: 16px 0 6px; font: 650 15px/1.3 var(--sans); }
+.galsec ul, .galsec ol { margin: 0 0 8px; padding-left: 20px; font-size: 15px; line-height: 1.5; }
+.galwhere b, .galfix b { display: block; font-size: 13px; color: var(--ink-3); font-weight: 600; margin-bottom: 2px; }
+.galkv { display: grid; gap: 8px; margin: 8px 0 0; }
+.galkv dt { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+.galkv dd { margin: 0; font-size: 15px; line-height: 1.5; }
+.galevs { list-style: none; padding: 0 !important; display: grid; gap: 8px; }
+.galev { display: block; padding: 10px 14px; border-left: 3px solid var(--line-2); background: var(--raise); border-radius: 0 10px 10px 0; color: inherit; text-decoration: none; }
+.galev:hover { border-left-color: var(--accent); }
+.galev q { display: block; font: italic 15.5px/1.5 var(--serif); quotes: "“" "”"; }
+.galev span { display: block; margin-top: 4px; font-size: 12.5px; color: var(--ink-3); }
+.galstack { list-style: none; padding: 0 !important; display: grid; gap: 6px; }
+.galstack li { display: flex; gap: 10px; align-items: baseline; }
+.galstack .galo { flex: none; max-width: 18ch; }
+.galpiv { color: var(--ink-2); }
+.galfail { counter-reset: f; list-style: none; padding: 0 !important; display: grid; gap: 10px; }
+.galfail li { counter-increment: f; position: relative; padding-left: 30px; }
+.galfail li::before { content: counter(f); position: absolute; left: 0; top: 1px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font: 600 12px var(--sans); background: var(--hover); color: var(--ink-2); }
+.galfail p { margin: 0 0 4px; }
+.galpat { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--ink-2); }
+.galfix { padding: 10px 14px; border-radius: 10px; background: color-mix(in srgb, var(--idle) 10%, var(--raise)); border: 1px solid color-mix(in srgb, var(--idle) 30%, var(--line)); }
+.galsig li a { color: var(--ink); }
+.galconn { list-style: none; padding: 0 !important; display: grid; gap: 8px; }
+.galconn li { padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; }
+.galconn li > b { font-weight: 600; min-width: 12ch; }
+.galconn li.have > span { display: flex; gap: 5px; flex-wrap: wrap; }
+.galsug { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; justify-content: space-between; padding-top: 6px; border-top: 1px dashed var(--line); }
+.galsug p { margin: 0; font-size: 14px; flex: 1; min-width: 220px; }
+.galsuga { display: flex; gap: 6px; flex-wrap: wrap; }
+.galscores { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 0 0 8px; }
+.galscores dt { font-size: 12px; color: var(--ink-3); }
+.galscores dd { margin: 0; font: 600 16px/1.3 var(--sans); font-variant-numeric: tabular-nums; }
+
+/* the starter kit */
+.galkit { margin-top: 26px; padding-top: 18px !important; padding-bottom: 40px !important; border-top: 1px solid var(--line); }
+.galkit > h3 { font-size: 13px; }
+.galkitrun { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--raise); }
+.galkitrun .galbar { margin-bottom: 10px; }
+.galkitrun p { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.galerr { color: var(--danger); display: flex; gap: 6px; align-items: center; }
+.galerr svg { width: 15px; height: 15px; }
+.galready p { margin: 8px 0 4px; font-size: 14.5px; }
+.galmeter { display: flex; height: 8px; border-radius: 99px; overflow: hidden; background: var(--hover); gap: 2px; }
+.galmeter i { display: block; min-width: 0; }
+.galmeter .r { background: var(--idle); } .galmeter .u { background: var(--working); } .galmeter .m { background: var(--blocked); }
+.galready summary { cursor: pointer; font-size: 14px; color: var(--ink-2); margin: 2px 0 6px; }
+.galneeds { font-size: 14px !important; }
+.galneeds li.missing b { color: var(--blocked); }
+.galtabs { margin: 14px 0 12px; position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 6px 0; }
+.galtask { border: 1px solid var(--line); border-radius: 12px; background: var(--raise); margin: 0 0 10px; overflow: hidden; }
+.galtask header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.galtask header .spacer { flex: 1; }
+.galtid { font: 600 12px var(--mono); color: var(--ink-3); }
+.galsz { font: 600 11.5px var(--mono); padding: 1px 6px; border-radius: 5px; background: var(--hover); color: var(--ink-2); }
+.galpre { margin: 0; padding: 10px 12px; font: 12.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow-y: auto; background: var(--code-bg, var(--bg)); color: var(--ink); }
+.galtask .hint, .galtask ul { margin: 8px 12px 6px; }
+.galtask .hint + ul { margin-top: 0; }
+.galcols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.galtbl { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 10px; }
+.galtbl th { text-align: left; font-weight: 600; color: var(--ink-3); font-size: 12.5px; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); }
+.galtbl td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+.galck { list-style: none; padding: 0 !important; }
+.galck li { padding-left: 20px; position: relative; margin-bottom: 5px; }
+.galck li::before { content: ""; position: absolute; left: 2px; top: 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--working); }
+.galck li.ok::before { background: var(--idle); }
+.galck code { font: 13px var(--mono); }
+.gallanding { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--raise); }
+.gallanding h4 { margin: 0 0 6px; font: 600 22px/1.2 var(--serif); }
+.galtiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.galtiers > div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
+.galtiers span { display: block; font: 600 17px var(--sans); margin: 2px 0 4px; }
+.galtiers ul { font-size: 13.5px; padding-left: 16px; }
+.galpost { border: 1px solid var(--line); border-radius: 12px; background: var(--raise); margin-bottom: 8px; }
+.galpost header { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+.galpost header .spacer { flex: 1; }
+.galpost p { padding: 10px 12px; margin: 0; white-space: pre-wrap; font-size: 14.5px; }
+.galquests { display: grid; gap: 8px; }
+.galquests li b { display: block; }
+
+/* Play's confirm */
+dialog.galplay { width: min(580px, calc(100vw - 24px)); }
+dialog.galplay h3 { margin: 0 0 12px; font: 600 24px/1.2 var(--serif); }
+dialog.galplay .dlg-b { padding: 20px 22px 8px; }
+.galsteps { margin: 0 0 12px; padding-left: 22px; display: grid; gap: 9px; font-size: 14.5px; line-height: 1.5; }
+.galsteps { min-width: 0; }
+.galsteps code { font: 12px var(--mono); padding: 0 4px; border-radius: 4px; background: var(--hover); }
+.galsteps code.galpath { overflow-wrap: anywhere; }
+.galplayrun { display: flex; gap: 8px; align-items: center; font-size: 14px; padding: 8px 0 2px; }
+
+@media (max-width: 760px) {
+  dialog.galdlg { margin: auto 0 0; width: 100vw; height: 94dvh; max-height: 94dvh; border-radius: 20px 20px 0 0; border-width: 1px 0 0; }
+  dialog.galdlg[open] { animation: galup .28s var(--ease); }
+  @keyframes galup { from { transform: translateY(60px); opacity: 0; } }
+  .galgrab { display: block; position: sticky; top: 0; z-index: 3; height: 0; }
+  .galgrab::before { content: ""; position: absolute; left: 50%; top: 8px; width: 40px; height: 4px; margin-left: -20px; border-radius: 99px; background: color-mix(in srgb, #fff 75%, transparent); box-shadow: 0 0 0 1px rgba(0,0,0,.15); }
+  .galshh { padding: 16px 16px 4px; }
+  .galshh h2 { font-size: 26px; }
+  .galsec { padding: 4px 16px; }
+  .galcols { grid-template-columns: 1fr; gap: 0; }
+  .galhacts .btn { padding: 8px 14px; }
+  .galshh .galhacts .btn.primary { flex-basis: 100%; }
+}
+.galdlg a.btn, .gal a.btn { text-decoration: none; }
