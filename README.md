@@ -72,7 +72,8 @@ brief to the configured Claude model. Market and novel modes do not include the 
 prices, distribution, feasibility and counterevidence. Deep research requires an installed, signed-in
 Claude Code supporting the safety flags. Each run has a time/output limit, cancellation and explicit
 retry after interruption. A retrieved page is evidence of source access; generated interpretations
-remain provisional. Search coverage cannot establish global nonexistence or proven demand.
+remain provisional. Tool-returned text can be a summary and must be checked against the original page
+before quoting. Search coverage cannot establish global nonexistence or proven demand.
 
 Research-ready is a screening policy: two independent current customer evidence groups, current human
 review across six dimensions, and complete conditional economics. Publisher and copied-text grouping
