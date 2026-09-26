@@ -8,7 +8,7 @@ HOST="${1:?usage: deploy-node.sh <ssh-host> [port]}"
 PORT="${2:-4747}"
 DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-rsync -a --delete --exclude .git --exclude node_modules --exclude '*.log' "$DIR/" "$HOST:.local/share/herdr-deck/"
+rsync -a --delete --exclude .git --exclude node_modules --exclude '*.log' --exclude .claude --exclude shots --exclude docs "$DIR/" "$HOST:.local/share/herdr-deck/"
 
 ssh -o BatchMode=yes "$HOST" PORT="$PORT" bash -s <<'REMOTE'
 set -euo pipefail
