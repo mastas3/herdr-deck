@@ -3,7 +3,7 @@
 // it is capped: 15 calls in all, counted in <library>/spotcheck/calls.json. Reports go next to it as JSON.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { Library } from "./library";
-import { buildCard, EXTRACT_SYSTEM, extractUser, parseCardJson, toLines, transcriptParts, type Card } from "./library-extract";
+import { amounts, buildCard, EXTRACT_SYSTEM, extractUser, parseCardJson, toLines, transcriptParts, type Card } from "./library-extract";
 import { runClaude } from "./mix";
 
 export const SPOTCHECK_CAP = 15;
@@ -20,7 +20,8 @@ export function compareCards(local: Card, ref: Card) {
     id: local.id, title: local.title,
     business: { local: local.business, claude: ref.business, match: nameMatch || (!local.business && !ref.business) },
     btype: { local: local.btype, claude: ref.btype, match: local.btype === ref.btype },
-    revenue: { local: amt(local.revenue), claude: amt(ref.revenue), match: !!local.revenue === !!ref.revenue && (!local.revenue || local.revenue.perMonth === ref.revenue?.perMonth || norm(local.revenue.text) === norm(ref.revenue?.text)) },
+    // Same claim = both have one and they state the same amount (wording differs: "11,000 MR" vs "$11,000/month").
+    revenue: { local: amt(local.revenue), claude: amt(ref.revenue), match: !!local.revenue === !!ref.revenue && (!local.revenue || amounts(local.revenue.text)[0] === amounts(ref.revenue!.text)[0]) },
     price: { local: amt(local.price), claude: amt(ref.price), match: !!local.price === !!ref.price },
     firstChannels: { local: [...a], claude: [...b], jaccard: union ? +(inter / union).toFixed(2) : 1 },
     counts: { local: [local.first.length, local.lessons.length, local.failed.length], claude: [ref.first.length, ref.lessons.length, ref.failed.length] },

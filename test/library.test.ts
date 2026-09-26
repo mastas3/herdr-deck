@@ -38,6 +38,7 @@ describe("card extraction: parsing and repair", () => {
     expect(perMonth("$1.2M a year")).toBe(100000);
     expect(perMonth("$50K/month")).toBe(50000);
     expect(perMonth("made $500K total")).toBeUndefined();
+    expect(perMonth("11,000 MR")).toBe(11000);
   });
   test("captions become ~20 s lines without HTML entities or [music]", () => {
     const lines = toLines([{ start: 0, text: "Hi &gt;&gt; there" }, { start: 5, text: "[music] welcome" }, { start: 21, text: "next" }]);

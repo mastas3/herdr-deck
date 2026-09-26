@@ -147,7 +147,7 @@ export function perMonth(text: string): number | undefined {
   const s = text.toLowerCase();
   if (/\b(a|per|\/)\s?(day|daily)\b|\/day/.test(s)) return v * 30;
   if (/year|annual|\/yr|\barr\b|a yr/.test(s)) return Math.round(v / 12);
-  if (/month|\/mo\b|mrr|monthly/.test(s)) return v;
+  if (/month|\/mo\b|\bmrr?\b|monthly/.test(s)) return v;
   return undefined; // a total ("made $500K") has no monthly rate
 }
 
@@ -284,7 +284,7 @@ export function buildCard(raws: any[], lines: Line[], v: VideoMeta, model: strin
     business: str(firstOf("business"), 80), founder: str(firstOf("founder"), 80), sells: str(firstOf("sells")),
     btype: oneOf(BTYPES, firstOf("business_type"), "other"), customer: str(firstOf("customer")),
     price: claimOf("price"), ttfr: claimOf("time_to_first_revenue"), team: claimOf("team"),
-    revenue: revenue ? { ...revenue, perMonth: perMonth(revenue.text), currency: currencyOf(`${revenue.text} ${revenue.quote ?? ""} ${lines.find((l) => l.t === revenue.t)?.text ?? ""}`) } : undefined,
+    revenue: revenue ? { ...revenue, perMonth: perMonth(revenue.text) ?? perMonth(`${revenue.text} ${revenue.quote ?? ""}`), currency: currencyOf(`${revenue.text} ${revenue.quote ?? ""} ${lines.find((l) => l.t === revenue.t)?.text ?? ""}`) } : undefined,
     first: items("first_customers", "tactic", 4, true), growth: items("growth", "tactic", 4, true),
     stack: [...new Set(raws.flatMap((r) => (Array.isArray(r?.stack) ? r.stack : [])).map((x: unknown) => str(x, 40)).filter((x): x is string => !!x))].slice(0, 15),
     failed: items("failed_before", "text", 5), lessons: items("lessons", "text", 6),
