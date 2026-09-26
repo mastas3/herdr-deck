@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { createPlugins, hashFiles, readFolder } from "../src/plugins";
+import { createPlugins, hashFiles, readFolder, runCapped } from "../src/plugins";
 
 const root = mkdtempSync(`${tmpdir()}/deck-plugins-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -28,6 +28,21 @@ const mail = (over: any = {}) => ({
   ...over,
 });
 const MAIL_FILES = { "prompts/inbox.md": "List my inbox.", "prompts/triage.md": "Triage it." };
+
+describe("runCapped", () => {
+  test("times out and kills a hung process", async () => {
+    const start = Date.now();
+    const r = await runCapped(["sleep", "5"], 10, 200);
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeLessThan(2000);
+    expect(r.code).not.toBe(0); // killed
+  });
+  test("caps output and reports over", async () => {
+    const r = await runCapped(["yes"], 1000);
+    expect(r.over).toBe(true);
+    expect(r.out.length).toBeLessThanOrEqual(1000 + 50); // one chunk over
+  });
+});
 
 describe("reading plugin folders", () => {
   test("reads plugin.json and the files it points to, nothing else", () => {
@@ -198,5 +213,22 @@ describe("uploads", () => {
     mkdirSync(join(base, "z")); writeFileSync(join(base, "z", "readme.md"), "hi");
     Bun.spawnSync(["zip", "-qr", join(base, "n.zip"), "z"], { cwd: base });
     await expect(p.stageUpload("n.zip", new Uint8Array(readFileSync(join(base, "n.zip"))))).rejects.toThrow("no plugin.json");
+  });
+  zip("a zip bomb (compressible 3 MB file) is capped and reported as a problem", async () => {
+    const { base, p } = setup();
+    writePlugin(join(base, "src", "repo-main"), mail(), { "prompts/inbox.md": "x".repeat(3 * 1024 * 1024) });
+    const out = join(base, "bomb.zip");
+    Bun.spawnSync(["zip", "-qr", out, "repo-main"], { cwd: join(base, "src") });
+    const pv = await p.stageUpload("bomb.zip", new Uint8Array(readFileSync(out)));
+    expect(pv.ok).toBe(false);
+    if (!pv.ok) expect(pv.problems.some((x) => x.message.includes("isn't in the plugin"))).toBe(true);
+  });
+});
+
+describe("catalog safety", () => {
+  test("stageCatalog rejects a manifest id that doesn't match its folder", () => {
+    const { catalogDir, p } = setup();
+    writePlugin(join(catalogDir, "other-name"), mail({ id: "demo-mail" }), MAIL_FILES);
+    expect(() => p.stageCatalog("other-name")).toThrow("doesn't match its folder");
   });
 });

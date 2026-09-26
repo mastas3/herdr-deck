@@ -47,28 +47,50 @@ export function readFolder(dir: string): Record<string, string> {
   return files;
 }
 
-async function run(cmd: string[]) {
-  const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "pipe" });
-  const [out] = await Promise.all([new Response(p.stdout).arrayBuffer(), new Response(p.stderr).text()]);
-  return { code: await p.exited, out: new Uint8Array(out) };
+/** Read command output up to maxOut bytes with a timeout. A zip bomb or hung unzip must not take the
+ *  deck down: we kill the process and report over=true if it exceeds the limit or timeout. */
+export async function runCapped(cmd: string[], maxOut: number, ms = 10_000): Promise<{ code: number; over: boolean; out: Uint8Array }> {
+  const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore" });
+  const chunks: Uint8Array[] = [];
+  let total = 0, over = false;
+  const timer = setTimeout(() => p.kill(), ms);
+  try {
+    for await (const chunk of p.stdout) {
+      total += chunk.length;
+      if (total > maxOut) {
+        over = true;
+        p.kill();
+        break;
+      }
+      chunks.push(new Uint8Array(chunk));
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+  const code = await p.exited;
+  const out = new Uint8Array(chunks.reduce((a, b) => a + b.length, 0));
+  let pos = 0;
+  for (const chunk of chunks) { out.set(chunk, pos); pos += chunk.length; }
+  return { code, over, out };
 }
 /** plugin.json and its files from a .zip, read entry by entry (nothing is extracted to disk). A GitHub
  *  "Download ZIP" puts everything under one folder, so the shallowest plugin.json marks the plugin's root. */
 export async function readZip(path: string): Promise<Record<string, string>> {
   if (!Bun.which("unzip")) throw new Error("Adding a .zip needs the unzip command on this machine. Install unzip, or drop the plugin.json instead.");
-  const listing = await run(["unzip", "-Z1", path]);
+  const listing = await runCapped(["unzip", "-Z1", path], 1024 * 1024);
+  if (listing.over) throw new Error("That .zip lists too many files.");
   if (listing.code !== 0) throw new Error("That .zip couldn't be read.");
   const entries = new TextDecoder().decode(listing.out).split("\n").map((s) => s.trim()).filter(Boolean);
   const roots = entries.filter((e) => e === "plugin.json" || e.endsWith("/plugin.json")).sort((a, b) => a.split("/").length - b.split("/").length);
   if (!roots.length) throw new Error("There's no plugin.json in that .zip.");
   const base = roots[0].slice(0, -"plugin.json".length);
-  if (!/^([\w-][\w.-]*\/)?$/.test(base)) throw new Error("The plugin.json in that .zip is too deep. Put it at the top, or one folder down.");
+  if (!/^([A-Za-z0-9_][\w.-]*\/)?$/.test(base)) throw new Error("The plugin.json in that .zip is too deep. Put it at the top, or one folder down.");
   const files: Record<string, string> = {};
   let total = 0;
   const take = async (rel: string, max: number) => {
     if (!entries.includes(base + rel)) return;
-    const r = await run(["unzip", "-p", path, base + rel]);
-    if (r.code !== 0 || r.out.length > max) return;
+    const r = await runCapped(["unzip", "-p", path, base + rel], max);
+    if (r.code !== 0 || r.over) return;
     total += r.out.length;
     files[rel] = new TextDecoder().decode(r.out);
   };
@@ -133,7 +155,9 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
   }
   function stageCatalog(id: string): Preview {
     if (!PLUGIN_ID.test(id) || !existsSync(join(o.catalogDir, id, "plugin.json"))) throw new Error("There's no catalog plugin by that name.");
-    return stage(readFolder(join(o.catalogDir, id)), { catalog: id });
+    const pv = stage(readFolder(join(o.catalogDir, id)), { catalog: id });
+    if (pv.ok && pv.trust.id !== id) throw new Error("That catalog entry's id doesn't match its folder.");
+    return pv;
   }
   async function stageUpload(name: string, bytes: Uint8Array): Promise<Preview> {
     if (bytes.length > MAX_UPLOAD) throw new Error("That file is over 5 MB. A plugin is a plugin.json and a few prompt files.");
