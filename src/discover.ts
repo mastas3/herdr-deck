@@ -40,6 +40,7 @@ export type DiscoverConf = {
   saved: (Repo & { why?: Why[]; savedAt: number })[]; dismissed: string[];
   ideas: { slug: string; text: string; at: number }[];
   mixes?: (Mix & { savedAt: number; direction?: string })[];
+  leads?: any[]; // Leads the user saved (src/leads.ts owns their shape)
 };
 
 // ── interests: wiki tags → searchable interests ────────────────────────────────
@@ -608,7 +609,7 @@ const BIN_DIRS = [`${HOME}/.local/bin`, "/opt/homebrew/bin", "/usr/local/bin", "
 const GH = BIN_DIRS.map((d) => `${d}/gh`).find((p) => existsSync(p));
 export const ghAvailable = () => !!GH;
 export type GhRes = { ok: boolean; status: number; data?: any; error?: string; remaining?: number; reset?: number };
-async function gh(args: string[], timeoutMs = 15_000): Promise<GhRes> {
+export async function gh(args: string[], timeoutMs = 15_000): Promise<GhRes> {
   if (!GH) return { ok: false, status: 0, error: "The GitHub CLI (gh) isn't installed" };
   let p: ReturnType<typeof Bun.spawn> | undefined;
   try {
@@ -941,5 +942,7 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
     }
     return undefined;
   }
-  return { handle, refresh, profile, state, ingredients, mixer, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
+  // Leads (src/leads.ts) keeps its saved pains and ideas in discover.json too; this is its only door into it.
+  const leadsSaved = { get: () => conf.leads ?? [], set: (v: any[]) => { conf.leads = v; saveConf(); } };
+  return { handle, refresh, profile, state, ingredients, mixer, leadsSaved, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
 }
