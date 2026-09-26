@@ -40,8 +40,9 @@ export const isFileRef = (s: unknown): s is string => typeof s === "string" && F
 const BUILTIN = ["Read", "Glob", "Grep", "WebFetch", "WebSearch", "Write", "Edit", "Bash"];
 const MCP_TOOL = /^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$/;
 const SCOPED_BASH = /^Bash\(([A-Za-z0-9_][\w .\/-]{0,60}):\*\)$/;
-/** Programs that reach the network or run arbitrary code: scoping Bash to them is no scope at all. */
-const OPEN_BIN = /^(curl|wget|nc|ncat|ssh|scp|rsync|sftp|ftp|telnet|http|https|python|python3|node|bun|deno|ruby|perl|php|sh|bash|zsh|fish|env|xargs|eval|exec|sudo|osascript|open|npx|pnpx|bunx|uvx|pipx)$/;
+/** The only programs a scoped Bash grant may use read-only, and then only with a read-only subcommand. Any other
+ *  program counts as changing things, wrappers included (time, timeout, sudo...): they run whatever follows them. */
+const READ_BINS = new Set(["gh", "git", "ls"]);
 
 const READ_WORDS = new Set([
   "search", "get", "list", "read", "query", "find", "lookup", "view", "show", "describe",
@@ -64,6 +65,8 @@ const WRITE_WORDS = new Set([
   "block", "unblock", "ban", "mute", "unmute", "follow", "unfollow", "like", "subscribe",
   "unsubscribe", "trigger", "output", "api",
 ]);
+/** Words that chain a second step onto a name ("search_and_destroy"): the read word no longer tells the whole story. */
+const JOIN_WORDS = new Set(["and", "or", "then"]);
 
 /** Tokenize a tool name: split camelCase, lowercase, split on non-alphanumeric, drop empties. */
 function tokenize(s: string): string[] {
@@ -73,6 +76,10 @@ function tokenize(s: string): string[] {
 /** A name is read-only when it contains at least one READ_WORD and no WRITE_WORDS. */
 function readOnly(tokens: string[]): boolean {
   return tokens.some((t) => READ_WORDS.has(t)) && !tokens.some((t) => WRITE_WORDS.has(t));
+}
+/** A scoped Bash command's words after the program: a read word, and nothing that changes things or chains. */
+function readOnlyRest(tokens: string[]): boolean {
+  return tokens.some((t) => READ_WORDS.has(t)) && !tokens.some((t) => WRITE_WORDS.has(t) || JOIN_WORDS.has(t));
 }
 
 export type ToolClass = { ok: boolean; writes: boolean; web: boolean; machine: boolean; bash: boolean };
@@ -89,10 +96,11 @@ export function toolClass(t: string): ToolClass {
   const b = SCOPED_BASH.exec(t);
   if (b) {
     const words = b[1].trim().split(/\s+/);
-    const open = OPEN_BIN.test(words[0]);
-    // One program with any subcommand ("gh") can do anything that program can, including change things.
-    const writes = open || words.length < 2 || !readOnly(tokenize(words.slice(1).join(" ")));
-    return { ok: true, writes, web: open, machine: true, bash: true };
+    // A prefix rule can't bound what the arguments do: `git ls-remote <url>`, `npm view --registry <url>` or
+    // `time curl ...` all reach any host they're given. So every scoped command counts as reaching the web, and it
+    // only reads when it's a known program with a read-only subcommand (one program alone, "gh", can do anything).
+    const writes = !(READ_BINS.has(words[0]) && words.length >= 2 && readOnlyRest(tokenize(words.slice(1).join(" "))));
+    return { ok: true, writes, web: true, machine: true, bash: true };
   }
   if (MCP_TOOL.test(t)) {
     const server = t.slice("mcp__".length, t.lastIndexOf("__"));

@@ -17,11 +17,17 @@ describe("toolClass", () => {
     expect(toolClass("Bash")).toEqual({ ok: true, writes: true, web: true, machine: true, bash: true });
   });
   test("scoped Bash: a read-only two-word command reads; anything open-ended counts as writing", () => {
-    expect(toolClass("Bash(gh search prs:*)")).toEqual({ ok: true, writes: false, web: false, machine: true, bash: true });
+    expect(toolClass("Bash(gh search prs:*)")).toEqual({ ok: true, writes: false, web: true, machine: true, bash: true });
     expect(toolClass("Bash(gh pr merge:*)").writes).toBe(true);
     expect(toolClass("Bash(gh:*)").writes).toBe(true); // one program with any subcommand is no scope
     expect(toolClass("Bash(curl:*)")).toMatchObject({ writes: true, web: true });
     expect(toolClass("Bash(python3 x.py:*)").writes).toBe(true);
+  });
+  test("scoped Bash: always reaches the web, and only gh, git or ls with a read subcommand reads", () => {
+    // A wrapper runs whatever follows it, and many CLIs take a host in their arguments.
+    for (const t of ["Bash(time curl list:*)", "Bash(timeout 5 curl get:*)", "Bash(nice curl get:*)", "Bash(xcrun curl get:*)", "Bash(npm view:*)", "Bash(kubectl get:*)", "Bash(git pull:*)"])
+      expect(toolClass(t), t).toMatchObject({ ok: true, writes: true, web: true });
+    for (const t of ["Bash(git log:*)", "Bash(gh pr list:*)"]) expect(toolClass(t), t).toEqual({ ok: true, writes: false, web: true, machine: true, bash: true });
   });
   test("anything else is refused", () => {
     for (const t of ["mcp__x__*", "Bash(rm -rf /; echo:*)", "Bash(a|b:*)", "Task", "NotebookEdit", "mcp__x", "", "bash"]) expect(toolClass(t).ok).toBe(false);
@@ -31,12 +37,13 @@ describe("toolClass", () => {
     expect(grantClass({ tools: ["mcp__claude_ai_Gmail__search_threads"] }).writes).toBe(false);
     expect(grantClass({ tools: ["mcp__claude_ai_Gmail__search_threads"], writes: true }).writes).toBe(true);
     expect(grantClass({ tools: ["mcp__claude_ai_Gmail__search_threads", "mcp__claude_ai_Gmail__reply"] }).writes).toBe(true);
-    expect(grantClass({ tools: ["Bash(gh search prs:*)"] })).toEqual({ writes: false, web: false, machine: true, bash: true });
+    expect(grantClass({ tools: ["Bash(gh search prs:*)"] })).toEqual({ writes: false, web: true, machine: true, bash: true });
   });
   test("unknown or oddly named tools count as changing things (default-deny)", () => {
     // MCP tools without clear read verbs default to writes: true
     expect(toolClass("mcp__claude_ai_Google_Drive__copy_file").writes).toBe(true);
     expect(toolClass("mcp__claude_ai_Gmail__untrash_message").writes).toBe(true);
+    expect(toolClass("mcp__claude_ai_Gmail__untrash_thread").writes).toBe(true);
     expect(toolClass("mcp__claude_ai_Gmail__unmark_message_spam").writes).toBe(true);
     expect(toolClass("mcp__claude_ai_Claude_Docs__batch").writes).toBe(true);
     expect(toolClass("mcp__x__do_thing").writes).toBe(true);
@@ -47,6 +54,8 @@ describe("toolClass", () => {
     expect(toolClass("mcp__plugin_playwright_playwright__browser_click")).toEqual({
       ok: true, writes: true, web: true, machine: false, bash: false,
     });
+    for (const t of ["browser_type", "browser_navigate", "browser_evaluate", "browser_run_code_unsafe"])
+      expect(toolClass(`mcp__plugin_playwright_playwright__${t}`), t).toMatchObject({ ok: true, writes: true, web: true });
     expect(toolClass("mcp__fetch__fetch")).toEqual({ ok: true, writes: true, web: true, machine: false, bash: false });
     // Safe read-only operations
     expect(toolClass("mcp__claude_ai_Google_Drive__search_files").writes).toBe(false);
@@ -60,10 +69,10 @@ describe("toolClass", () => {
     expect(toolClass("Bash(find . -delete:*)").writes).toBe(true);
     expect(toolClass("Bash(gh api:*)").writes).toBe(true);
     // Scoped Bash with read-only operations
-    expect(toolClass("Bash(aws s3 ls:*)").writes).toBe(false);
+    expect(toolClass("Bash(aws s3 ls:*)").writes).toBe(true); // only gh, git and ls may read; aws can reach any endpoint
     expect(toolClass("Bash(git log:*)").writes).toBe(false);
     expect(toolClass("Bash(gh pr list:*)").writes).toBe(false);
-    // Extended OPEN_BIN
+    // A program that runs other programs
     expect(toolClass("Bash(npx foo:*)")).toMatchObject({ writes: true, web: true });
   });
 });
