@@ -1,5 +1,5 @@
 // HTTP front: one HTML page, one SSE stream of row patches, a handful of action endpoints.
-import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { Deck, type Row } from "./deck";
 import { call } from "./herdr";
@@ -269,11 +269,41 @@ async function startSession(body: any) {
   return { key, paneId };
 }
 
+const DAY = "public, max-age=86400";
+const STATIC: Record<string, [string, string]> = {
+  "/manifest.webmanifest": ["application/manifest+json", DAY],
+  "/icon.svg": ["image/svg+xml", DAY],
+  "/icon-180.png": ["image/png", DAY],
+  "/icon-192.png": ["image/png", DAY],
+  "/icon-512.png": ["image/png", DAY],
+  "/icon-maskable-512.png": ["image/png", DAY],
+  "/offline.html": ["text/html; charset=utf-8", "no-cache"],
+  "/sw.js": ["text/javascript; charset=utf-8", "no-cache"],
+};
+
 const json = (data: unknown, status = 200) => Response.json(data, { status });
+
+// Remote access goes through `tailscale serve`, which proxies tailnet HTTPS to this loopback port and
+// stamps each request with the caller's Tailscale login. Only the machine owner's login (or DECK_TS_USERS) is let in.
+const tsUsers = new Set((process.env.DECK_TS_USERS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+if (!tsUsers.size) {
+  try {
+    const bin = ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((p) => existsSync(p));
+    if (bin) {
+      const st = JSON.parse(Bun.spawnSync([bin, "status", "--json"], { stderr: "ignore" }).stdout.toString());
+      const login = st.User?.[String(st.Self?.UserID)]?.LoginName;
+      if (login) tsUsers.add(login);
+    }
+  } catch {}
+}
 
 function allowedHost(req: Request) {
   const host = req.headers.get("host") ?? "";
-  return host === `127.0.0.1:${PORT}` || host === `localhost:${PORT}` || (HOST !== "127.0.0.1" && !!process.env.DECK_ALLOW_ANY_HOST);
+  if (host === `127.0.0.1:${PORT}` || host === `localhost:${PORT}`) return true;
+  // A cross-site page can't add this header without a CORS preflight, which is never answered.
+  const tsLogin = req.headers.get("tailscale-user-login");
+  if (tsLogin && tsUsers.has(tsLogin)) return true;
+  return HOST !== "127.0.0.1" && !!process.env.DECK_ALLOW_ANY_HOST;
 }
 
 Bun.serve({
@@ -303,9 +333,11 @@ Bun.serve({
         const f = Bun.file(new URL(`../public${url.pathname}`, import.meta.url).pathname);
         if (await f.exists()) return new Response(f, { headers: { "content-type": "font/woff2", "cache-control": "public, max-age=31536000, immutable" } });
       }
-      if (url.pathname === "/manifest.webmanifest" || url.pathname === "/icon.svg") {
-        const type = url.pathname.endsWith(".svg") ? "image/svg+xml" : "application/manifest+json";
-        return new Response(Bun.file(new URL(`../public${url.pathname}`, import.meta.url).pathname), { headers: { "content-type": type, "cache-control": "public, max-age=86400" } });
+      const asset = STATIC[url.pathname];
+      if (asset) {
+        return new Response(Bun.file(new URL(`../public${url.pathname}`, import.meta.url).pathname), {
+          headers: { "content-type": asset[0], "cache-control": asset[1], ...(url.pathname === "/sw.js" ? { "service-worker-allowed": "/" } : {}) },
+        });
       }
       if (url.pathname === "/api/image") {
         // <img> can't send headers, so the token rides in the query string.

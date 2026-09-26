@@ -26,7 +26,7 @@ const clean = (s: string, n: number) => {
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type ClaudeState = { path: string; pos: number; detail: Detail; cur?: Turn };
+type ClaudeState = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string };
 const claudeStates = new Map<string, ClaudeState>();
 
 function claudeAsk(o: any): string | undefined {
@@ -83,29 +83,45 @@ function addImage(st: { detail: Detail; cur?: Turn }, img: Img) {
 
 const emptyDetail = (): Detail => ({ turns: [], images: [], compactions: 0, asks: 0 });
 
-export async function claudeDetail(path: string): Promise<Detail> {
-  let st = claudeStates.get(path);
-  const size = statSync(path).size;
-  if (!st || size < st.pos) {
-    st = { path, pos: 0, detail: emptyDetail() };
-    claudeStates.set(path, st);
+/**
+ * Feeds only the bytes appended since the last call. Agents sometimes rewrite a transcript in place
+ * (Claude does on some compactions), so a changed inode, changed first bytes, or a last position that
+ * no longer sits right after a newline all mean "start over": stale offsets would point into garbage.
+ */
+async function readIncremental(states: Map<string, ClaudeState>, path: string, feed: (st: ClaudeState, line: string, offset: number) => void): Promise<Detail> {
+  const stat = statSync(path);
+  const file = Bun.file(path);
+  const head = await file.slice(0, 64).text();
+  let st = states.get(path);
+  let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head;
+  if (!fresh && st!.pos > 0) {
+    const prev = new Uint8Array(await file.slice(st!.pos - 1, st!.pos).arrayBuffer());
+    if (prev[0] !== 10) fresh = true;
   }
-  if (size > st.pos) {
-    const buf = await Bun.file(path).slice(st.pos, size).arrayBuffer();
-    const bytes = new Uint8Array(buf);
+  if (fresh) {
+    st = { path, pos: 0, detail: emptyDetail(), ino: stat.ino, head };
+    states.set(path, st);
+  }
+  const s = st!;
+  if (stat.size > s.pos) {
+    const bytes = new Uint8Array(await file.slice(s.pos, stat.size).arrayBuffer());
     const lastNl = bytes.lastIndexOf(10);
     if (lastNl >= 0) {
       const dec = new TextDecoder();
       let start = 0;
       for (let i = 0; i <= lastNl; i++) {
         if (bytes[i] !== 10) continue;
-        if (i > start) feedClaude(st, dec.decode(bytes.subarray(start, i)), st.pos + start);
+        if (i > start) feed(s, dec.decode(bytes.subarray(start, i)), s.pos + start);
         start = i + 1;
       }
-      st.pos += lastNl + 1;
+      s.pos += lastNl + 1;
     }
   }
-  return st.detail;
+  return s.detail;
+}
+
+export function claudeDetail(path: string): Promise<Detail> {
+  return readIncremental(claudeStates, path, feedClaude);
 }
 
 /** Re-reads one transcript line and returns the image block it points at. */
@@ -160,28 +176,8 @@ function feedCodex(st: ClaudeState, line: string, offset: number) {
   }
 }
 
-export async function codexDetail(path: string): Promise<Detail> {
-  let st = codexStates.get(path);
-  const size = statSync(path).size;
-  if (!st || size < st.pos) {
-    st = { path, pos: 0, detail: emptyDetail() };
-    codexStates.set(path, st);
-  }
-  if (size > st.pos) {
-    const bytes = new Uint8Array(await Bun.file(path).slice(st.pos, size).arrayBuffer());
-    const lastNl = bytes.lastIndexOf(10);
-    if (lastNl >= 0) {
-      const dec = new TextDecoder();
-      let start = 0;
-      for (let i = 0; i <= lastNl; i++) {
-        if (bytes[i] !== 10) continue;
-        if (i > start) feedCodex(st, dec.decode(bytes.subarray(start, i)), st.pos + start);
-        start = i + 1;
-      }
-      st.pos += lastNl + 1;
-    }
-  }
-  return st.detail;
+export function codexDetail(path: string): Promise<Detail> {
+  return readIncremental(codexStates, path, feedCodex);
 }
 
 export async function codexImage(path: string, id: string) {

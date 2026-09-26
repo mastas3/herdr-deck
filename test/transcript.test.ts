@@ -61,3 +61,18 @@ describe("brief", () => {
     expect(p).toContain("ABOUT:");
   });
 });
+
+describe("transcript rewritten in place", () => {
+  test("starts over instead of trusting stale offsets", async () => {
+    const dir = mkdtempSync(`${tmpdir()}/deck-`);
+    const path = `${dir}/r.jsonl`;
+    const pad = "x".repeat(400);
+    writeFileSync(path, line({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: "old ask " + pad } }) + line({ type: "user", timestamp: "2026-09-20T10:01:00Z", message: { content: "second old ask " + pad } }));
+    expect((await claudeDetail(path)).asks).toBe(2);
+    // Rewritten shorter-then-longer with different content: same size class, new bytes.
+    writeFileSync(path, line({ type: "user", timestamp: "2026-09-21T10:00:00Z", message: { content: "new ask" } }) + line({ type: "user", timestamp: "2026-09-21T10:01:00Z", message: { content: "another new ask " + pad + pad } }));
+    const d = await claudeDetail(path);
+    expect(d.asks).toBe(2);
+    expect(d.started).toBe("new ask");
+  });
+});

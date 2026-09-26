@@ -20,7 +20,7 @@ cat > "$PLIST" <<PLIST
   <key>WorkingDirectory</key><string>$DIR</string>
   <key>EnvironmentVariables</key><dict>
     <key>DECK_PORT</key><string>$PORT</string>
-    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -37,9 +37,20 @@ if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then
 else
   launchctl bootstrap "gui/$(id -u)" "$PLIST"
 fi
+up=""
 for _ in $(seq 1 40); do
-  curl -s -o /dev/null "http://127.0.0.1:$PORT/health" && { echo "herdr-deck running on http://127.0.0.1:$PORT (log: $LOG)"; exit 0; }
+  curl -s -o /dev/null "http://127.0.0.1:$PORT/health" && { up=1; break; }
   sleep 0.25
 done
-echo "service installed but not answering yet; check $LOG" >&2
-exit 1
+[ -n "$up" ] || { echo "service installed but not answering yet; check $LOG" >&2; exit 1; }
+echo "herdr-deck running on http://127.0.0.1:$PORT (log: $LOG)"
+
+# Phones and other machines: HTTPS on the tailnet only (never Funnel), proxied to the loopback port.
+# The server itself only lets in the machine owner's Tailscale login.
+TS="$(command -v tailscale || true)"
+TS_PORT="${DECK_TS_PORT:-8448}"
+if [ -n "$TS" ] && "$TS" status >/dev/null 2>&1; then
+  "$TS" serve --bg --https="$TS_PORT" "http://127.0.0.1:$PORT" >/dev/null
+  NAME="$("$TS" status --json | python3 -c 'import sys,json;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')"
+  echo "on your tailnet: https://$NAME:$TS_PORT  (open it on your phone and add it to the home screen)"
+fi

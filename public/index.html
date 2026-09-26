@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>herdr deck</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <link rel="manifest" href="/manifest.webmanifest">
-<meta name="theme-color" content="#151d26">
+<link rel="apple-touch-icon" href="/icon-180.png">
+<meta name="theme-color" content="#151d26" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#cfd7e0" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="herdr deck">
 <link rel="preload" href="/fonts/BarlowSemiCondensed-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/BarlowSemiCondensed-600.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/SourceSerif4-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -62,25 +68,33 @@ button { cursor: pointer; }
 
 /* ── frame: list | detail over terminal ───────────────────────── */
 .app {
-  --lw: 420px; --th: 38vh;
+  --lw: var(--lw-open, 420px); --th: var(--th-open, 38vh);
   display: grid; height: 100vh;
   grid-template-columns: var(--lw) 6px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) 6px var(--th);
   grid-template-areas: "list vs detail" "hs hs hs" "term term term";
 }
-.app.list-off { --lw: 46px; }
+.app.list-off { --lw: 48px; }
 .app.term-off { --th: 34px; }
 .list { grid-area: list; display: flex; flex-direction: column; min-height: 0; background: var(--rail); border-right: 1px solid var(--line); }
 .detail { grid-area: detail; overflow-y: auto; min-width: 0; background: var(--panel); }
 .term { grid-area: term; display: flex; flex-direction: column; min-height: 0; background: var(--term-bg); border-top: 1px solid var(--line); }
-.split { background: var(--board); position: relative; z-index: 2; }
-.split::after { content: ""; position: absolute; background: var(--line); border-radius: 2px; }
+.split { background: var(--board); position: relative; z-index: 5; touch-action: none; }
+.split::before { content: ""; position: absolute; inset: -6px; } /* wider grab area than it looks */
+.split::after { content: ""; position: absolute; background: var(--ink-3); opacity: .55; border-radius: 2px; }
 .split.v { grid-area: vs; cursor: col-resize; }
-.split.v::after { left: 2px; top: calc(50% - 16px); width: 2px; height: 32px; }
+.split.v::before { inset: 0 -6px; }
+.split.v::after { left: 2px; top: calc(50% - 20px); width: 2px; height: 40px; }
 .split.h { grid-area: hs; cursor: row-resize; }
-.split.h::after { top: 2px; left: calc(50% - 16px); height: 2px; width: 32px; }
-.split:hover, .split.drag { background: color-mix(in srgb, var(--focus) 35%, var(--board)); }
+.split.h::before { inset: -6px 0; }
+.split.h::after { top: 2px; left: calc(50% - 20px); height: 2px; width: 40px; }
+.split:hover, .split.drag, .split:focus-visible { background: color-mix(in srgb, var(--focus) 45%, var(--board)); outline: none; }
+body.dragging { user-select: none; }
+body.dragging.col { cursor: col-resize; }
+body.dragging.row { cursor: row-resize; }
+body.dragging iframe, body.dragging .screen { pointer-events: none; }
 .app.list-off .split.v { pointer-events: none; }
+.app.list-off .split.v::after { display: none; }
 
 /* ── list panel ───────────────────────────────────────────────── */
 .lh { padding: 10px 12px 8px; display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); }
@@ -158,11 +172,16 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .tag.stale { color: var(--ink-3); } .tag.dup { color: var(--working); } .tag.empty { color: var(--empty); } .tag.blocked, .tag.hot { color: var(--blocked); }
 .r3 { font: 11.5px/1.4 var(--mono); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 3px; }
 .empty-state { padding: 40px 16px; text-align: center; color: var(--ink-3); }
-.mini { display: none; flex-direction: column; align-items: center; gap: 5px; padding: 8px 0; overflow-y: auto; flex: 1; }
+.mini { display: none; flex-direction: column; align-items: center; justify-content: flex-start; gap: 6px; padding: 6px 0 12px; overflow-y: auto; flex: 1; min-height: 0; }
 .mini button { width: 22px; height: 16px; border-radius: 3px; border: 2px solid var(--pc); background: var(--band, var(--idle)); padding: 0; flex: none; }
 .mini button.sel { outline: 2px solid var(--focus); outline-offset: 2px; }
-.app.list-off .lh > :not(.lh-top), .app.list-off .rows, .app.list-off .lf, .app.list-off .bulk, .app.list-off .lh-top > :not(#listToggle) { display: none; }
-.app.list-off .lh { padding: 8px 0; align-items: center; border-bottom: none; }
+.app.list-off .lh > :not(.lh-top), .app.list-off .rows, .app.list-off .lf, .app.list-off .bulk, .app.list-off .lh-top > :not(#listToggle):not(#newMini) { display: none; }
+#newMini { display: none; }
+.app.list-off #newMini { display: grid; }
+.app.list-off .lh-top { flex-direction: column; gap: 6px; }
+.app.list-off .lh { padding: 8px 0 6px; align-items: center; border-bottom: 1px solid var(--line); }
+.app.list-off .lh-top { justify-content: center; }
+.app.list-off .list { overflow: hidden; }
 .app.list-off .mini { display: flex; }
 
 .grave { background: var(--strip); border: 1px solid var(--line); border-left: 5px solid var(--empty); border-radius: 3px 6px 6px 3px; padding: 7px 9px; margin-bottom: 4px; }
@@ -226,6 +245,8 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width
 .term.typing .screen { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--working) 70%, transparent); }
 .app.term-off .screen, .app.term-off .th .keys { display: none; }
 
+.mbar, .compose, #filtersBtn { display: none; }
+
 /* ── dialogs, toast ───────────────────────────────────────────── */
 dialog { background: var(--rail); color: var(--ink); border: 1px solid var(--ink-3); border-radius: 12px; padding: 0; width: min(640px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
 dialog::backdrop { background: rgba(8, 12, 18, .6); }
@@ -258,14 +279,84 @@ dialog::backdrop { background: rgba(8, 12, 18, .6); }
 .toast.err { border-color: var(--danger); }
 .help td { padding: 3px 12px 3px 0; font-size: 14px; }
 
-@media (max-width: 860px) {
-  body { overflow: auto; }
-  .app, .app.list-off, .app.term-off { display: flex; flex-direction: column; height: auto; }
-  .list { max-height: 60vh; }
-  .split { display: none; }
-  .term { height: 70vh; }
-  .d-wrap { padding: 0 16px 30px; }
+/* ── phone: list screen → session screen (story | terminal) ─────── */
+@media (max-width: 760px) {
+  body { font-size: 16px; overscroll-behavior: none; }
+  .app, .app.list-off, .app.term-off { display: block; height: 100dvh; }
+  .split, #listToggle, #newMini, .mini, .th .t-mode, .th .t-title, #fitBtn, #termToggle { display: none !important; }
+  .list, .detail, .term { position: fixed; left: 0; right: 0; bottom: 0; top: 0; }
+  .app[data-mview="list"] .detail, .app[data-mview="list"] .term, .app[data-mview="list"] .mbar,
+  .app[data-mview="detail"] .list, .app[data-mview="detail"] .term,
+  .app[data-mview="term"] .list, .app[data-mview="term"] .detail { display: none !important; }
+  .app.list-off .lh > *, .app.list-off .rows, .app.list-off .lf, .app.list-off .lh-top > * { display: revert; }
+
+  /* list screen */
+  .list { border-right: none; padding-top: env(safe-area-inset-top); }
+  .lh { padding: 10px 14px 8px; gap: 9px; }
+  .brand { font-size: 19px; }
+  #filtersBtn { display: inline-flex; }
+  .app:not(.filters-open) .ctrls, .app:not(.filters-open) #agentChips { display: none; }
+  #statusChips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -14px; padding: 0 14px; }
+  #statusChips::-webkit-scrollbar { display: none; }
+  .chip { padding: 4px 11px; font-size: 14.5px; }
+  .ctrls select, .search input { font-size: 16px; padding: 8px 10px; } /* 16px stops iOS zooming on focus */
+  .rows { padding: 8px 10px calc(12px + env(safe-area-inset-bottom)); }
+  .row { padding: 10px 10px 10px 7px; grid-template-columns: 24px minmax(0, 1fr); margin-bottom: 6px; }
+  .chk { width: 18px; height: 18px; margin-top: 2px; }
+  .r1 .title { font-size: 16.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .r2 { font-size: 14px; margin-top: 3px; }
+  .r3 { font-size: 12px; margin-top: 5px; }
+  .lf { padding: 8px 14px calc(8px + env(safe-area-inset-bottom)); font-size: 14px; }
+  .lf .linkbtn { font-size: 14px; padding: 4px 2px; }
+  .bulk { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+
+  /* session screen */
+  .mbar { display: flex; position: fixed; top: 0; left: 0; right: 0; z-index: 10; align-items: center; gap: 8px;
+    padding: calc(6px + env(safe-area-inset-top)) 10px 6px 4px; background: var(--rail); border-bottom: 1px solid var(--line); }
+  .mbar .back { display: flex; align-items: center; gap: 2px; background: none; border: 0; color: var(--focus); font-size: 17px; padding: 8px 6px; }
+  .mbar .back svg { width: 20px; height: 20px; }
+  .mbar .m-title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 7px; }
+  .mbar .m-title i { width: 9px; height: 9px; border-radius: 2px; flex: none; background: var(--c, var(--idle)); }
+  .mbar .seg2 { display: flex; background: var(--board); border-radius: 8px; padding: 2px; flex: none; }
+  .mbar .seg2 button { border: 0; background: transparent; padding: 6px 12px; border-radius: 6px; font-size: 15px; color: var(--ink-2); }
+  .mbar .seg2 button[aria-selected="true"] { background: var(--strip-hi); color: var(--ink); font-weight: 600; }
+  .detail, .term { top: calc(53px + env(safe-area-inset-top)); }
+  .d-band { height: 4px; }
+  .d-wrap { padding: 0 16px calc(40px + env(safe-area-inset-bottom)); }
+  .d-title { font-size: 25px; }
+  .d-meta { font-size: 14.5px; gap: 3px 12px; }
+  .d-acts .btn { padding: 8px 12px; font-size: 15px; }
+  .d-acts .spacer { display: none; }
+  .brief { padding: 14px; }
+  .brief .about { font-size: 18.5px; }
   .brief .cols { grid-template-columns: 1fr; }
+  .prose { font-size: 16.5px; }
+  .gallery { grid-template-columns: repeat(2, 1fr); }
+  .facts { grid-template-columns: 1fr; gap: 0; }
+  .facts dd { margin-bottom: 8px; }
+
+  /* terminal screen: wrapped output, keys, message box */
+  .term { display: flex; flex-direction: column; border-top: none; }
+  .screen { order: 1; white-space: pre-wrap; word-break: break-word; font-size: 11.5px !important; line-height: 1.4; padding: 10px 12px; }
+  .th { order: 2; border-bottom: none; border-top: 1px solid var(--line); padding: 6px 8px; min-height: 0; }
+  .th .spacer { display: none; }
+  .th .keys { overflow-x: auto; scrollbar-width: none; flex: 1; }
+  .th .keys::-webkit-scrollbar { display: none; }
+  .th .keys button { font-size: 13px; padding: 7px 11px; flex: none; }
+  .compose { order: 3; display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); background: var(--rail); }
+  .compose textarea { flex: 1; resize: none; min-height: 42px; max-height: 30dvh; background: var(--strip); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: 16px/1.35 var(--sans); color: var(--ink); }
+  .compose .btn { align-self: flex-end; padding: 10px 16px; font-size: 16px; border-radius: 10px; }
+
+  /* dialogs become sheets */
+  dialog { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 16px 16px 0 0; max-height: 92dvh; border-bottom: 0; padding-bottom: env(safe-area-inset-bottom); }
+  #newDlg { height: 100dvh; max-height: 100dvh; margin: 0; border-radius: 0; padding-top: env(safe-area-inset-top); }
+  #newDlg[open] { display: flex; }
+  #newForm { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  #newForm .dlg-b { flex: 1; overflow-y: auto; }
+  #newForm .dlg-f .btn, #confirm .dlg-f .btn { padding: 11px 18px; font-size: 16px; flex: 1; }
+  .field input, .field textarea { font-size: 16px; }
+  .seg button { padding: 8px 14px; }
+  .toast { left: 12px; right: 12px; bottom: calc(80px + env(safe-area-inset-bottom)); max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .conn.off { animation: none; } }
 </style>
@@ -279,7 +370,9 @@ dialog::backdrop { background: rgba(8, 12, 18, .6); }
         <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="6" rx="1" fill="var(--working)"/><rect x="3" y="13" width="26" height="6" rx="1" fill="var(--idle)"/><rect x="3" y="21" width="26" height="6" rx="1" fill="var(--done)"/></svg>herdr deck<span class="conn" id="conn" title="Live"></span></div>
         <span class="spacer"></span>
         <div class="tabs" role="tablist"><button role="tab" id="tabLive" aria-selected="true">Live</button><button role="tab" id="tabClosed" aria-selected="false">Closed</button></div>
+        <button class="btn quiet" id="filtersBtn" aria-expanded="false">Filters</button>
         <button class="btn primary" id="newBtn" title="Start a new session (n)">New</button>
+        <button class="ibtn" id="newMini" title="Start a new session (n)" aria-label="Start a new session"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg></button>
       </div>
       <div class="search"><input id="q" type="search" placeholder="Search sessions, output, prompts…" autocomplete="off" spellcheck="false" aria-label="Search"><kbd>/</kbd></div>
       <div class="chips" id="statusChips" role="group" aria-label="Filter by status"></div>
@@ -309,6 +402,11 @@ dialog::backdrop { background: rgba(8, 12, 18, .6); }
     <div class="lf" id="lf"></div>
   </section>
   <div class="split v" id="splitV" role="separator" aria-orientation="vertical" aria-label="Resize the list" title="Drag to resize, double-click to reset"></div>
+  <header class="mbar" id="mbar">
+    <button class="back" id="mBack" aria-label="Back to sessions"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 4 6.5 10l6 6"/></svg>Sessions</button>
+    <span class="m-title" id="mTitle"></span>
+    <div class="seg2" role="tablist"><button role="tab" data-mv="detail" aria-selected="true">Story</button><button role="tab" data-mv="term" aria-selected="false">Terminal</button></div>
+  </header>
   <main class="detail" id="detail" aria-label="Session details"></main>
   <div class="split h" id="splitH" role="separator" aria-orientation="horizontal" aria-label="Resize the terminal" title="Drag to resize, double-click to reset"></div>
   <section class="term" id="term" aria-label="Terminal">
@@ -321,6 +419,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .6); }
       <button class="ibtn" id="fitBtn" title="Fit the pane's width" aria-label="Fit width"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3"/></svg></button>
     </div>
     <pre class="screen" id="screen" tabindex="0" aria-label="Live terminal output. Focus it to type into the pane."></pre>
+    <form class="compose" id="compose"><textarea id="cText" rows="1" placeholder="Message this session" enterkeyhint="send" autocomplete="off"></textarea><button class="btn primary">Send</button></form>
   </section>
 </div>
 
@@ -401,8 +500,12 @@ S.statuses = new Set(load("statuses", [])); S.agents = new Set(load("agents", []
 S.notify = load("notify", false) && "Notification" in window && Notification.permission === "granted";
 const theme = load("theme", ""); if (theme) document.documentElement.dataset.theme = theme;
 const app = $("app");
-app.style.setProperty("--lw", load("lw", 420) + "px");
-app.style.setProperty("--th", load("th", Math.round(innerHeight * 0.38)) + "px");
+// Open sizes go in --lw-open/--th-open; the collapsed classes then override --lw/--th cleanly.
+app.style.setProperty("--lw-open", load("lw", 420) + "px");
+app.style.setProperty("--th-open", load("th", Math.round(innerHeight * 0.38)) + "px");
+const phone = matchMedia("(max-width: 760px)");
+const isPhone = () => phone.matches;
+app.dataset.mview = "list";
 app.classList.toggle("list-off", load("listOff", false));
 app.classList.toggle("term-off", load("termOff", false));
 
@@ -659,6 +762,7 @@ function renderDetailIfChanged() {
   if (cached && cached.stamp !== r.lastActiveAt) { clearTimeout(detailTimer); detailTimer = setTimeout(() => loadDetail(r.key), 600); }
   box.style.setProperty("--pc", pc(r.project));
   $("tTitle").textContent = `${r.title || r.agent} · ${r.paneId}`;
+  $("mTitle").innerHTML = `<i style="--c:${statusVar(r.status)}"></i><span style="overflow:hidden;text-overflow:ellipsis">${esc(r.title || r.agent)}</span>`;
   const scroll = box.scrollTop;
   box.innerHTML = detailHTML(r, d);
   box.scrollTop = scroll;
@@ -715,7 +819,7 @@ function detailHTML(r, d) {
     const imgs = [...d.images].reverse();
     S.gallery = imgs;
     parts.push(`<section class="d-sec"><h3>Images <span style="font-weight:400">${d.imagesTotal}${d.imagesTotal > d.images.length ? `, newest ${d.images.length} shown` : ""}</span></h3>
-      <div class="gallery">${imgs.map((im, i) => `<button data-img="${i}" title="${im.source === "pasted" ? "You pasted this" : "The agent looked at this"}${im.at ? " · " + esc(abs(im.at)) : ""}"><img loading="lazy" decoding="async" alt="" src="${imgUrl(r.key, im.id)}"><span>${im.source === "pasted" ? "you" : "agent"}${im.at ? " · " + esc(DF.format(new Date(im.at))) : ""}</span></button>`).join("")}</div></section>`);
+      <div class="gallery">${imgs.map((im, i) => `<button data-img="${i}" title="${im.source === "pasted" ? "You pasted this" : "The agent looked at this"}${im.at ? " · " + esc(abs(im.at)) : ""}"><img loading="lazy" decoding="async" alt="" src="${imgUrl(r.key, im.id)}" onerror="this.parentElement.hidden=true"><span>${im.source === "pasted" ? "you" : "agent"}${im.at ? " · " + esc(DF.format(new Date(im.at))) : ""}</span></button>`).join("")}</div></section>`);
   }
   if (d.turns?.length) {
     const turns = S.oldestFirst ? d.turns : [...d.turns].reverse();
@@ -759,7 +863,8 @@ async function pollTerm(first) {
   const key = S.sel;
   if (!key || !S.rows.has(key)) return;
   const r = S.rows.get(key);
-  if (!document.hidden && !app.classList.contains("term-off")) {
+  const visible = isPhone() ? app.dataset.mview === "term" : !app.classList.contains("term-off");
+  if (!document.hidden && visible) {
     try {
       const res = await api("/api/read", { key, lines: 400 });
       if (S.sel !== key) return;
@@ -767,7 +872,10 @@ async function pollTerm(first) {
         termText = res.text;
         const el = $("screen");
         const atBottom = first === true || el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        el.innerHTML = ansi(res.text.replace(/\s+$/, ""));
+        let text = res.text.replace(/\s+$/, "");
+        // Full-width rules wrap into several lines on a phone; trim them to the screen.
+        if (isPhone()) { const cols = Math.max(20, Math.floor((el.clientWidth - 24) / 6.9)); text = text.replace(/[─━═▀▄_]{24,}/g, (m) => m.slice(0, cols)); }
+        el.innerHTML = ansi(text);
         if (atBottom) el.scrollTop = el.scrollHeight;
       }
     } catch {}
@@ -778,6 +886,7 @@ async function pollTerm(first) {
 function fitTerm() {
   const r = S.rows.get(S.sel);
   const el = $("screen");
+  if (isPhone()) { el.style.fontSize = ""; return; } // phones wrap lines instead
   let size = 12.5;
   if (S.fit && r?.cols) size = Math.max(8, Math.min(13.5, (el.clientWidth - 26) / (r.cols * 0.6)));
   const v = size.toFixed(2) + "px";
@@ -956,7 +1065,7 @@ async function openNew() {
   $("nFocus").checked = load("newFocus", false);
   renderKinds();
   $("newDlg").showModal();
-  (newKind === "shell" ? $("nCwd") : $("nPrompt")).focus();
+  if (!isPhone()) (newKind === "shell" ? $("nCwd") : $("nPrompt")).focus(); // on a phone, don't throw the keyboard up unasked
 }
 function renderKinds() {
   $("nKind").innerHTML = KINDS.map(([k, label]) => `<button type="button" data-kind="${k}" aria-pressed="${newKind === k}">${label}</button>`).join("");
@@ -979,7 +1088,7 @@ $("newDlg").addEventListener("close", async () => {
   try {
     const { key } = await api("/api/new", body);
     pendingSelect = key;
-    if (S.rows.has(key)) { pendingSelect = null; select(key, { scroll: true }); }
+    if (S.rows.has(key)) { pendingSelect = null; select(key, { scroll: true }); if (isPhone()) setMView("term", true); }
     toast(newKind === "shell" ? "Opened a new shell tab" : `Opening a tab for ${newKind}…`);
   } catch (e) { toast("Couldn’t start: " + e.message, true); }
 });
@@ -1003,6 +1112,7 @@ $("rows").addEventListener("click", async (e) => {
   if (!row) return;
   if (e.target.classList.contains("chk") || e.shiftKey || e.metaKey) { e.preventDefault(); return toggleSelect(row.dataset.key); }
   select(row.dataset.key);
+  if (isPhone()) setMView("detail", true);
 });
 $("mini").addEventListener("click", (e) => { const b = e.target.closest("[data-key]"); if (b) select(b.dataset.key); });
 $("detail").addEventListener("click", (e) => {
@@ -1015,7 +1125,10 @@ $("detail").addEventListener("click", (e) => {
   if (!b || !r) return;
   const act = b.dataset.dact;
   if (act === "focus") focusPane(r.key);
-  if (act === "type") { app.classList.remove("term-off"); store("termOff", false); $("screen").focus(); }
+  if (act === "type") {
+    if (isPhone()) { history.replaceState({ mview: "term" }, ""); setMView("term", false); $("cText").focus(); }
+    else { app.classList.remove("term-off"); store("termOff", false); $("screen").focus(); }
+  }
   if (act === "close") askClose([r.key]);
   if (act === "copyResume") copy(r.resume, "resume command");
   if (act === "copyCwd") copy(r.cwd, "path");
@@ -1087,23 +1200,46 @@ $("lbPrev").onclick = () => openLightbox(Math.max(0, S.lb - 1));
 $("lbNext").onclick = () => openLightbox(Math.min((S.gallery?.length ?? 1) - 1, S.lb + 1));
 $("lightbox").addEventListener("keydown", (e) => { if (e.key === "ArrowLeft") $("lbPrev").click(); if (e.key === "ArrowRight") $("lbNext").click(); });
 
-// Splitters.
-function drag(el, onMove, onEnd) {
+// Splitters: listeners live on window during a drag, so fast moves over other panels never drop it.
+function drag(el, axis, onMove, onEnd) {
   el.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
     e.preventDefault();
-    el.setPointerCapture(e.pointerId);
     el.classList.add("drag");
-    const move = (ev) => onMove(ev);
-    const up = () => { el.classList.remove("drag"); el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); onEnd(); };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
+    document.body.classList.add("dragging", axis === "x" ? "col" : "row");
+    const move = (ev) => { ev.preventDefault(); onMove(ev); };
+    const up = () => {
+      el.classList.remove("drag");
+      document.body.classList.remove("dragging", "col", "row");
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
+      onEnd();
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
   });
 }
 let lw = load("lw", 420), th = load("th", Math.round(innerHeight * 0.38));
-drag($("splitV"), (e) => { lw = Math.max(260, Math.min(innerWidth * 0.7, e.clientX)); app.style.setProperty("--lw", lw + "px"); }, () => { store("lw", lw); fitTerm(); });
-drag($("splitH"), (e) => { th = Math.max(90, Math.min(innerHeight - 160, innerHeight - e.clientY)); app.style.setProperty("--th", th + "px"); if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); } }, () => { store("th", th); fitTerm(); });
-$("splitV").ondblclick = () => { lw = 420; app.style.setProperty("--lw", "420px"); store("lw", lw); };
-$("splitH").ondblclick = () => { th = Math.round(innerHeight * 0.38); app.style.setProperty("--th", th + "px"); store("th", th); };
+const setLw = (v) => { lw = Math.round(Math.max(260, Math.min(innerWidth * 0.7, v))); app.style.setProperty("--lw-open", lw + "px"); };
+const setTh = (v) => { th = Math.round(Math.max(90, Math.min(innerHeight - 160, v))); app.style.setProperty("--th-open", th + "px"); };
+drag($("splitV"), "x", (e) => setLw(e.clientX), () => { store("lw", lw); fitTerm(); });
+drag($("splitH"), "y", (e) => {
+  setTh(innerHeight - e.clientY);
+  if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
+}, () => { store("th", th); fitTerm(); });
+$("splitV").ondblclick = () => { setLw(420); store("lw", lw); fitTerm(); };
+$("splitH").ondblclick = () => { setTh(Math.round(innerHeight * 0.38)); store("th", th); fitTerm(); };
+// Keyboard resizing for the separators.
+for (const [el, axis] of [[$("splitV"), "x"], [$("splitH"), "y"]]) {
+  el.tabIndex = 0;
+  el.addEventListener("keydown", (e) => {
+    const step = e.shiftKey ? 60 : 20;
+    if (axis === "x" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); setLw(lw + (e.key === "ArrowRight" ? step : -step)); store("lw", lw); fitTerm(); }
+    if (axis === "y" && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); setTh(th + (e.key === "ArrowUp" ? step : -step)); store("th", th); fitTerm(); }
+  });
+}
 new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
@@ -1133,6 +1269,48 @@ document.addEventListener("keydown", (e) => {
     else if (S.selected.size) S.selected.clear();
     render();
   }
+});
+
+// ── phone navigation: list screen ⇄ session screen (story | terminal) ─────
+function setMView(v, push) {
+  if (app.dataset.mview === v) return;
+  const from = app.dataset.mview;
+  app.dataset.mview = v;
+  for (const b of document.querySelectorAll(".mbar [data-mv]")) b.setAttribute("aria-selected", b.dataset.mv === v);
+  // Going deeper adds a history entry so the system back gesture returns to the list.
+  if (push && isPhone()) history.pushState({ mview: v }, "");
+  if (v === "term") pollTerm(true);
+  if (v === "list" && from !== "list") requestAnimationFrame(() => rowCache.get(S.sel)?.el.scrollIntoView({ block: "nearest" }));
+}
+addEventListener("popstate", (e) => setMView(e.state?.mview ?? "list", false));
+$("mBack").onclick = () => (history.state?.mview ? history.back() : setMView("list", false));
+document.querySelector(".mbar .seg2").addEventListener("click", (e) => {
+  const v = e.target.closest("[data-mv]")?.dataset.mv;
+  if (!v || v === app.dataset.mview) return;
+  // Story and terminal are siblings: swap without growing the history.
+  if (isPhone()) history.replaceState({ mview: v }, "");
+  setMView(v, false);
+});
+$("filtersBtn").onclick = () => {
+  const open = app.classList.toggle("filters-open");
+  $("filtersBtn").setAttribute("aria-expanded", open);
+};
+$("newMini").onclick = openNew;
+$("compose").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("cText").value.trim();
+  if (!text || !S.sel) return;
+  try {
+    await api("/api/send", { key: S.sel, text });
+    $("cText").value = "";
+    $("cText").style.height = "";
+    setTimeout(pollTerm, 150);
+  } catch (x) { toast("Send failed: " + x.message, true); }
+});
+$("cText").addEventListener("input", (e) => { e.target.style.height = ""; e.target.style.height = Math.min(e.target.scrollHeight, innerHeight * 0.3) + "px"; });
+$("cText").addEventListener("keydown", (e) => {
+  // On a hardware keyboard Enter sends; Shift+Enter adds a line. The phone keyboard's send key submits too.
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); $("compose").requestSubmit(); }
 });
 
 // ── live data ────────────────────────────────────────────────────────────
@@ -1168,7 +1346,12 @@ function connect() {
     for (const r of p.upsert) { notifyTransitions(S.rows.get(r.key), r); S.rows.set(r.key, r); }
     for (const k of p.remove) { S.rows.delete(k); S.details.delete(k); }
     S.summary = p.summary;
-    if (pendingSelect && S.rows.has(pendingSelect)) { const k = pendingSelect; pendingSelect = null; return select(k, { scroll: true }); }
+    if (pendingSelect && S.rows.has(pendingSelect)) {
+      const k = pendingSelect; pendingSelect = null;
+      select(k, { scroll: true });
+      if (isPhone()) setMView("term", true); // watch it start
+      return;
+    }
     if (S.sel && !S.rows.has(S.sel)) { S.sel = null; const next = visibleRows()[0]?.key; if (next) return select(next); }
     render();
   });
@@ -1179,6 +1362,16 @@ function connect() {
 }
 if (window.__BOOT__) applyFull(window.__BOOT__);
 connect();
+if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").catch(() => {});
+{
+  const params = new URLSearchParams(location.search);
+  const st = params.get("status");
+  if (st) { S.statuses = new Set([st]); store("statuses", [st]); render(); }
+  if (params.get("new")) setTimeout(openNew, 50);
+  if (params.size) history.replaceState(history.state, "", "/");
+}
+// Coming back to the app (phone unlocked, tab refocused): refresh the open terminal right away.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) pollTerm(); });
 </script>
 </body>
 </html>
