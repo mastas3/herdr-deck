@@ -363,6 +363,8 @@ export type StudioDeps = {
   runClaude?: typeof runClaude; runOllama?: typeof runOllama;
   timeouts?: { haiku: number; sonnet: number; ollama: number };
   archive?: { put: (idea: any) => void };
+  /** Founder Library evidence for a message (3–5 real founder cards with links), or "" (src/library.ts). */
+  evidence?: (text: string) => Promise<string>;
 };
 export type Engine = "claude" | "ollama" | "template";
 type Job = { id: string; convo: string; engine: Engine; model?: string; started: number; firstAt?: number; finished?: number; status: "running" | "done" | "error" | "cancelled"; stage: string; text: string; msg?: BotMsg; err?: string; abort: AbortController; ings: Ingredient[] };
@@ -437,9 +439,11 @@ export function createStudio(deps: StudioDeps) {
       const timer = setTimeout(() => { reason = "timeout"; job.abort.abort(); }, limit);
       const source = job.engine === "ollama" ? "ollama" : "claude";
       try {
+        // What real founders did for something like this: grounds prices, channels and first-customer plans.
+        const ev = text && deps.evidence ? await deps.evidence(text).catch(() => "") : "";
         const opts = {
           // A small local model reads a shorter catalog (faster to load, easier to follow).
-          system: `${SYSTEM}\n\n${buildCatalog(all, job.engine === "ollama" ? 9000 : 18_000)}`, user: turnPrompt(history, text, use), timeoutMs: limit, signal: job.abort.signal, model: job.model, json: false,
+          system: `${SYSTEM}\n\n${buildCatalog(all, job.engine === "ollama" ? 9000 : 18_000)}${ev ? `\n\n${ev}\nUse this evidence where it fits (prices, first-customer channels, what failed) and cite its links; don't copy a founder's business.` : ""}`, user: turnPrompt(history, text, use), timeoutMs: limit, signal: job.abort.signal, model: job.model, json: false,
           onText: (t: string) => { if (!job.firstAt) { job.firstAt = Date.now(); job.stage = "Writing…"; } job.text = t; },
           onStage: (s: string) => { if (!job.firstAt) job.stage = s; },
         };

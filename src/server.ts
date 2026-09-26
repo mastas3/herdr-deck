@@ -30,6 +30,7 @@ import { createCovers } from "./covers";
 import { galleryForServer } from "./gallery-server";
 import { createAssets } from "./assets";
 import { createLeads } from "./leads";
+import { createLibrary, feedQuery } from "./library";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
 import { PushStore, endpointOk, type Message } from "./push";
@@ -95,6 +96,11 @@ const saveGraves = () => writeFileSync(GRAVE_FILE, JSON.stringify(graveyard.slic
 const deck = new Deck();
 await deck.start();
 
+// Founder Library (Discover → Library): its own module; the server routes /api/library/* to it, and the Studio, the
+// ideas feed and the MCP tool read it as evidence. Its worker resumes only if you left it running.
+const library = createLibrary();
+if (!process.env.DECK_NO_LIBRARY) library.autostart();
+
 // Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
 const discover = createDiscover(
   { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
@@ -103,6 +109,8 @@ const discover = createDiscover(
     // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
     items: async () => { const inv = enrich(await inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
+    studio: { evidence: async (text) => (await library.evidence(text, 4, "studio")).text },
+    feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
   },
 );
 // Cover images for Discover ideas, a few a day from Codex on the hub (src/covers.ts). DECK_COVERS_DIR moves them and their covers.json (tests).
@@ -954,6 +962,7 @@ const mcpCtx: McpCtx = {
     return r;
   },
   audit: (e) => { appendAudit(e); broadcast("audit", readAudit(30)); },
+  library: async (q, k) => (await library.evidence(q, k, "research")).text,
 };
 
 const DAY = "public, max-age=86400";
@@ -1118,6 +1127,7 @@ async function handle(req: Request): Promise<Response> {
       if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
       if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
+      if (url.pathname.startsWith("/api/library/")) { const d = await library.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }

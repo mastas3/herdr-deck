@@ -641,7 +641,7 @@ export function deepPrompt(text: string, dir: Dir, slug: string, ctx: { leadsDir
     "2. Also search the web for older and deeper evidence: 1–3★ App Store and Google Play reviews of the leading apps, Product Hunt comments, Stack Exchange, niche forums, public Discord or Facebook group posts that are indexed, and YouTube comments.",
     "3. Collect pain points as short quotes (one or two sentences), each with source, date and link. Group them into themes and count how often each one comes up.",
     "4. Who needs it: the segments, the communities where they gather (with size or activity), and notable public voices (public handles only).",
-    "5. Demand and willingness to pay: evidence of people paying for workarounds, asking for paid options, or the prices of what they use now. Give demand as low / medium / high, with the reasons.",
+    "5. Demand and willingness to pay: evidence of people paying for workarounds, asking for paid options, or the prices of what they use now. Give demand as low / medium / high, with the reasons. If the herdr-deck MCP tool `deck_library` is available, ask it how real founders priced and found the first customers for something similar, and cite its timestamp links.",
     "6. Competitors and gaps: a table of what exists (name, link, price, what its users complain about) and the gap nobody fills.",
     dir === "audience"
       ? "7. Propose 5 app or feature ideas ranked by the strength of the evidence. For each: a one-line pitch, the pains it solves (link the quotes), who pays and how much, why now, and a 1-week MVP plan (day by day)."

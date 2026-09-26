@@ -3538,7 +3538,7 @@ $('dbody').addEventListener('click', async (e) => {
 ICON.compass = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="m10.7 5.3-1.6 3.8-3.8 1.6 1.6-3.8z"/></svg>';
 ICON.bulb = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4h4M6.6 14.4h2.8M8 1.7a4.4 4.4 0 0 0-2.6 8c.4.3.6.8.6 1.3v.4h4V11c0-.5.2-1 .6-1.3A4.4 4.4 0 0 0 8 1.7z"/></svg>';
 S.disc = { data: null, loading: false, tab: load("discTab", "you"), filter: null, idea: load("discIdea", ""), ideaRes: null, ideaBusy: false, open: null, plans: new Map(), shuffle: 0, pending: null, more: false };
-const DTABS = [["you", "For you"], ["mix", "Studio"], ["lab", "Idea lab"], ["leads", "Leads"], ["research", "Research"], ["ideas", "Ideas"], ["saved", "Saved"]];
+const DTABS = [["you", "For you"], ["mix", "Studio"], ["lab", "Idea lab"], ["leads", "Leads"], ["research", "Research"], ["lib", "Library"], ["ideas", "Ideas"], ["saved", "Saved"]];
 const kfmt = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
 function dHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
@@ -3601,11 +3601,14 @@ function renderDiscover() {
   // Leads (its own block below) patches its results under the input, never the input itself.
   if (tab === "leads" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #leadsres")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return leadsPatch(); }
   if (tab === "research" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #rsbody")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return rsPatch(); }
+  // The Library (public/library.js) patches under its inputs, like Leads.
+  if (tab === "lib" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #libroot")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return libPatch(); }
   const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Ideas worth building and repos worth forking, picked for what you have. Any idea, searched against what already exists and planned by an agent.</p>
     <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
   if (tab === "leads") body = discLeads();
   else if (tab === "research") body = discResearch();
+  else if (tab === "lib") body = discLibrary();
   else if (tab === "mix") body = discMix(); // the Studio paints at once from its own cache; it doesn't wait for Discover's data
   else if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
