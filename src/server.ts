@@ -1,8 +1,11 @@
 // HTTP front: one HTML page, one SSE stream of row patches, a handful of action endpoints.
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { Deck, type Row } from "./deck";
 import { call } from "./herdr";
+import { findClaudeFile, findCodexFile } from "./agents";
+import { claudeDetail, claudeImage, codexDetail, codexImage, opencodeDetail, opencodeImage, type Detail } from "./transcript";
+import { cachedBrief, writeBrief } from "./brief";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -51,6 +54,11 @@ deck.onPatch((patch) => {
     try { c.enqueue(chunk); } catch { clients.delete(c); }
   }
 });
+/** One-off messages for the page (progress and failures of background work like starting a session). */
+const notice = (data: { key?: string; ok: boolean; message: string }) => {
+  const chunk = sse("notice", data);
+  for (const c of clients) try { c.enqueue(chunk); } catch { clients.delete(c); }
+};
 const broadcastGraves = () => {
   const chunk = sse("graveyard", graveyard.slice(0, 100));
   for (const c of clients) try { c.enqueue(chunk); } catch { clients.delete(c); }
@@ -140,6 +148,127 @@ async function reopen(id: string) {
   return { ok: true, paneId };
 }
 
+async function detailFor(row: Row): Promise<Detail | undefined> {
+  if (!row.sessionId) return;
+  if (row.agent === "claude") {
+    const f = findClaudeFile(row.sessionId);
+    return f ? claudeDetail(f) : undefined;
+  }
+  if (row.agent === "codex") {
+    const f = findCodexFile(row.sessionId);
+    return f ? codexDetail(f) : undefined;
+  }
+  if (row.agent === "opencode") return opencodeDetail(row.sessionId);
+}
+
+async function imageFor(row: Row, id: string) {
+  if (!row.sessionId) return;
+  if (id.startsWith("c:")) { const f = findClaudeFile(row.sessionId); return f ? claudeImage(f, id) : undefined; }
+  if (id.startsWith("x:")) { const f = findCodexFile(row.sessionId); return f ? codexImage(f, id) : undefined; }
+  if (id.startsWith("o:")) return opencodeImage(id);
+}
+
+const briefKey = (row: Row) => `${row.agent}-${row.sessionId}`;
+
+/** Detail payload: newest turns first are what the page shows, so cap from the end. */
+function detailPayload(row: Row, d: Detail | undefined) {
+  const brief = row.sessionId ? cachedBrief(briefKey(row)) : undefined;
+  if (!d) return { brief };
+  return {
+    brief,
+    briefStale: !!brief && brief.asks !== d.asks,
+    startedAt: d.startedAt,
+    started: d.started,
+    recap: d.recap,
+    aiTitle: d.aiTitle,
+    asks: d.asks,
+    compactions: d.compactions,
+    workMs: d.workMs,
+    turns: d.turns.slice(-150),
+    turnsOmitted: Math.max(0, d.turns.length - 150),
+    images: d.images.slice(-60),
+    imagesTotal: d.images.length,
+  };
+}
+
+const AGENT_KINDS = new Set(["claude", "codex", "opencode", "gemini", "cursor", "copilot", "amp", "grok", "hermes", "qwen", "kimi", "droid", "pi"]);
+
+/** Folder suggestions and the flags the user tends to start each agent with. */
+function newSessionOptions() {
+  const recent = new Map<string, number>();
+  for (const r of deck.rows.values()) recent.set(r.cwd, Math.max(recent.get(r.cwd) ?? 0, r.lastActiveAt ?? r.startedAt ?? 0));
+  for (const g of graveyard) recent.set(g.cwd, Math.max(recent.get(g.cwd) ?? 0, g.closedAt));
+  const projectsDir = `${homedir()}/Documents/Projects`;
+  let projects: { path: string; mtime: number }[] = [];
+  try {
+    projects = readdirSync(projectsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith("."))
+      .map((d) => ({ path: `${projectsDir}/${d.name}`, mtime: statSync(`${projectsDir}/${d.name}`).mtimeMs }))
+      .sort((a, b) => b.mtime - a.mtime);
+  } catch {}
+  const argHints: Record<string, Record<string, number>> = {};
+  for (const r of deck.rows.values()) {
+    if (!AGENT_KINDS.has(r.agent) || !r.command) continue;
+    // "node /…/bin/codex --yolo" or "claude --resume <id>": keep the flags, drop paths and resume ids.
+    const words = r.command.split(/\s+/);
+    const i = words.findIndex((w) => w === r.agent || w.endsWith(`/${r.agent}`));
+    const flags = words.slice(i + 1).filter((w, j, a) => w.startsWith("-") && !/^--?(resume|r|session|s)$/.test(w) && !/^--?(resume|session)$/.test(a[j - 1] ?? ""));
+    const k = flags.join(" ");
+    (argHints[r.agent] ??= {})[k] = (argHints[r.agent][k] ?? 0) + 1;
+  }
+  const workspaces = [...deck.sessions.values()].filter((s) => s.online).flatMap((s) =>
+    (s.snap?.workspaces ?? []).map((w: any) => ({ herdr: s.name, id: w.workspace_id, label: w.label, focused: s.snap.focused_workspace_id === w.workspace_id })),
+  );
+  return {
+    recent: [...recent.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p).slice(0, 30),
+    projects: projects.map((p) => p.path).slice(0, 80),
+    argHints: Object.fromEntries(Object.entries(argHints).map(([k, v]) => [k, Object.entries(v).sort((a, b) => b[1] - a[1]).map(([a]) => a).filter(Boolean).slice(0, 3)])),
+    workspaces,
+  };
+}
+
+async function startSession(body: any) {
+  const kind = String(body.kind ?? "claude");
+  if (kind !== "shell" && !AGENT_KINDS.has(kind)) throw new Error(`unknown agent "${kind}"`);
+  const cwd = String(body.cwd ?? "").replace(/^~(?=\/|$)/, homedir());
+  try {
+    if (!statSync(cwd).isDirectory()) throw 0;
+  } catch {
+    throw new Error(`folder not found: ${cwd}`);
+  }
+  const sess = deck.sessions.get(body.herdr) ?? [...deck.sessions.values()].find((s) => s.online);
+  if (!sess?.online) throw new Error("no herdr server running");
+  const ws = body.workspaceId ?? sess.snap?.focused_workspace_id ?? null;
+  const label = String(body.label ?? "").trim() || cwd.split("/").pop() || kind;
+  const r = await call(sess.socket, "tab.create", { cwd, label, workspace_id: ws, focus: false });
+  const paneId: string = r.root_pane?.pane_id;
+  const key = `${sess.name}/${paneId}`;
+  await deck.kick(sess.name);
+
+  // The rest waits on a slow shell and the agent's own startup; report progress over SSE.
+  (async () => {
+    try {
+      if (kind !== "shell") {
+        notice({ key, ok: true, message: `Waiting for the shell in “${label}”…` });
+        await waitForPrompt(sess.socket, paneId, 30_000);
+        const base = label.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z]+/, "").slice(0, 24) || kind;
+        const name = `${base}-${Math.random().toString(36).slice(2, 6)}`;
+        const args: string[] = Array.isArray(body.args) ? body.args.map(String) : String(body.args ?? "").split(/\s+/).filter(Boolean);
+        notice({ key, ok: true, message: `Starting ${kind}…` });
+        await call(sess.socket, "agent.start", { name, kind, pane_id: paneId, args, timeout_ms: 90_000 }, 95_000);
+        const prompt = String(body.prompt ?? "").trim();
+        if (prompt) await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000);
+        notice({ key, ok: true, message: prompt ? `${kind} is running and has your first message` : `${kind} is ready` });
+      }
+      if (body.focus) await call(sess.socket, "pane.focus", { pane_id: paneId });
+    } catch (e: any) {
+      notice({ key, ok: false, message: `Couldn’t start ${kind}: ${e?.message ?? e}` });
+    }
+    await deck.kick(sess.name);
+  })();
+  return { key, paneId };
+}
+
 const json = (data: unknown, status = 200) => Response.json(data, { status });
 
 function allowedHost(req: Request) {
@@ -178,6 +307,14 @@ Bun.serve({
         const type = url.pathname.endsWith(".svg") ? "image/svg+xml" : "application/manifest+json";
         return new Response(Bun.file(new URL(`../public${url.pathname}`, import.meta.url).pathname), { headers: { "content-type": type, "cache-control": "public, max-age=86400" } });
       }
+      if (url.pathname === "/api/image") {
+        // <img> can't send headers, so the token rides in the query string.
+        if (url.searchParams.get("t") !== TOKEN) return new Response("forbidden", { status: 403 });
+        const f = deck.find(url.searchParams.get("key") ?? "");
+        const img = f && (await imageFor(f.row, url.searchParams.get("id") ?? "").catch(() => undefined));
+        if (!img) return new Response("image not found", { status: 404 });
+        return new Response(img.data, { headers: { "content-type": img.type, "cache-control": "private, max-age=86400" } });
+      }
       if (url.pathname === "/health") return json({ ok: true, clients: clients.size, ...deck.health() });
       return new Response("not found", { status: 404 });
     }
@@ -197,6 +334,32 @@ Bun.serve({
             strip_ansi: false,
           });
           return json({ text: r.read?.text ?? "" });
+        }
+        case "/api/new-options":
+          return json(newSessionOptions());
+        case "/api/new":
+          return json(await startSession(body));
+        case "/api/detail": {
+          const f = deck.find(body.key);
+          if (!f) return json({ error: "gone" }, 404);
+          return json(detailPayload(f.row, await detailFor(f.row)));
+        }
+        case "/api/brief": {
+          const f = deck.find(body.key);
+          if (!f) return json({ error: "gone" }, 404);
+          const d = await detailFor(f.row);
+          if (!d || !f.row.sessionId || !d.turns.length) return json({ error: "This pane has no conversation to summarise" }, 400);
+          return json({ brief: await writeBrief(briefKey(f.row), f.row.title, f.row.project, d) });
+        }
+        case "/api/type": {
+          // Keystrokes from the page's terminal, batched: [{ text }, { keys: [...] }, ...] in order.
+          const f = deck.find(body.key);
+          if (!f) return json({ error: "gone" }, 404);
+          for (const op of (body.ops ?? []).slice(0, 200)) {
+            if (typeof op.text === "string" && op.text) await call(f.sess.socket, "pane.send_text", { pane_id: f.row.paneId, text: op.text });
+            else if (Array.isArray(op.keys) && op.keys.length) await call(f.sess.socket, "pane.send_keys", { pane_id: f.row.paneId, keys: op.keys });
+          }
+          return json({ ok: true });
         }
         case "/api/close": {
           const keys: string[] = body.keys ?? [];

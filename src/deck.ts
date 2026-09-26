@@ -40,6 +40,8 @@ export type Row = {
   sessionId?: string;
   resume?: string;
   tail: string[];
+  cols?: number;
+  rows?: number;
   empty: boolean;
   stale: boolean;
   duplicate: boolean;
@@ -284,6 +286,8 @@ export class Deck {
       if (!s.online || !s.snap) continue;
       const tabs = new Map<string, any>(s.snap.tabs.map((t: any) => [t.tab_id, t]));
       const wss = new Map<string, any>(s.snap.workspaces.map((w: any) => [w.workspace_id, w]));
+      const rects = new Map<string, { width: number; height: number }>();
+      for (const l of s.snap.layouts ?? []) for (const lp of l.panes ?? []) rects.set(lp.pane_id, lp.rect);
       for (const p of s.snap.panes) {
         const key = `${s.name}/${p.pane_id}`;
         const tab = tabs.get(p.tab_id) ?? {};
@@ -339,6 +343,8 @@ export class Deck {
           sessionId: meta?.sessionId ?? p.agent_session?.value,
           resume: resumeCommand(p.agent, meta?.sessionId ?? p.agent_session?.value),
           tail: s.tails.get(p.pane_id) ?? [],
+          cols: rects.get(p.pane_id)?.width,
+          rows: rects.get(p.pane_id)?.height ?? p.scroll?.viewport_rows,
           empty,
           stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && status !== "working" && status !== "blocked",
           duplicate: false,

@@ -10,33 +10,64 @@ bun run dev             # or run it in the foreground (DECK_PORT=4748 to use ano
 bun test
 ```
 
-## What each row shows
+## Layout
 
-- **Status band**: working (amber), needs input (red), finished and unseen (blue), idle (green), empty (dashed grey).
-- **Title**: the agent's own session title (terminal title, OpenCode session title, or the first request).
-- **Project, git branch, uncommitted file count, model, herdr tab**.
-- **Dates**: last activity and conversation start, read from the agent's own session store
-  (Claude `~/.claude/projects/*.jsonl`, Codex `~/.codex/sessions`, OpenCode `opencode.db`);
-  process start time from `ps`. Hover for exact timestamps.
-- **Memory** for the pane's whole process tree (agents drag in MCP servers and dev servers), and **context size**.
-- **Last output**: the pane's recent terminal lines with agent chrome stripped.
-- Flags: `empty` (bare shell, or an agent with no conversation), `duplicate` (two panes on the same conversation),
-  `stale` (no activity for 2+ days), `heavy` (over 1.5 GB).
+```
+┌ sessions ───────────┬ details ───────────────────────────────┐
+│ search, filters,    │ project · title · status · dates        │
+│ sort, group         │ In short (local-model brief)            │
+│ rows (project-      │ How it started · latest recap           │
+│ coloured)           │ images · history of asks and replies    │
+├─────────────────────┴─────────────────────────────────────────┤
+│ terminal: live view of the pane; click it to type into it     │
+└───────────────────────────────────────────────────────────────┘
+```
 
-## Doing things
+The list collapses (`[`) to a column of coloured squares and resizes by dragging its edge; the terminal
+collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 
-- Click a row for the detail panel: live terminal output (ANSI colour), every date, first request and last reply,
-  resume command, key buttons (Esc, Enter, Ctrl+C, 1/2/3, y/n) for answering prompts, and a box to message the agent.
-- **Close** any pane or a whole selection. A confirmation lists what will stop, flags anything still working,
-  and shows the memory it frees. If the pane is the only one in its tab, the tab closes.
-- **Closed** keeps every closed agent session with a **Reopen** button: it opens a new herdr tab in the same folder,
-  waits for the shell prompt, then runs `claude --resume …` / `codex resume …` / `opencode -s …`.
-- **Select close candidates** picks empty panes, the older copy of duplicates, and anything untouched for a week.
-- **Jump to pane** focuses it in herdr and brings WezTerm forward (`DECK_TERMINAL` to change the app).
-- **Alerts** sends a desktop notification when an agent finishes or needs input; the tab title shows the count.
-- Keyboard: `/` search, `j`/`k` move, `Enter` detail, `f` jump, `x` close, `s` select, `a` select all shown,
-  `p` message, `1`–`4` status filters, `c` closed list, `Esc` clear. Search takes `-word`, `is:stale`,
-  `is:dup`, `is:empty`, `agent:codex`.
+## The list
+
+- A colored band shows status: working (amber), needs input (red), finished and unseen (blue), idle (green), empty (dashed grey).
+- Each project gets its own color, shown in the list, in group headers and across the top of the details panel.
+- Each row shows the title, project, agent, branch with changed-file count, last activity and the last output line.
+- Flags: `empty`, `dup` (two panes on one conversation), `stale` (no activity for 2+ days) and `heavy` (over 1.5 GB).
+- Search takes `-word`, `is:stale`, `is:dup`, `is:empty` and `agent:codex`.
+- Filter by status, agent or project. Sort by what needs you, last active, newest, project, memory or context size.
+  Group by project, status, agent or workspace.
+
+## Details
+
+- **In short**: three lines covering what the session is for, how it started and where it stands.
+  A local Ollama model (`gemma4:e4b` by default; set `DECK_BRIEF_MODEL` to change it) writes them on request,
+  so conversation text never leaves the Mac. Briefs are cached in `~/.config/herdr-deck/briefs/`.
+- **How it started**: your first message, quoted in full.
+- **Recap**: Claude's own recap (`away_summary`) when there is one, otherwise the agent's latest reply.
+- **Images**: screenshots you pasted and images the agent looked at, with a full-size viewer.
+- **History**: every request with the reply it got, oldest or newest first.
+  It also shows compactions, total agent work time, context size, memory, spend and the resume command.
+
+Sources: Claude `~/.claude/projects/*.jsonl`, Codex `~/.codex/sessions`, OpenCode `opencode.db`.
+Transcripts are read incrementally: after the first read, only newly appended bytes are parsed.
+
+## Terminal
+
+The bottom panel mirrors the selected pane live, in color, fitted to the pane's width. Click it (or press `t`)
+and your keystrokes go to the pane: letters, Enter, Esc, arrows, Tab, Ctrl/Alt combinations and pasted text.
+Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter, 1/2/3, y/n) in one click.
+
+## Starting and closing sessions
+
+- **New** (`n`): choose Claude Code, Codex, OpenCode or a plain shell, a folder (recent folders and
+  `~/Documents/Projects/*` are suggested), optional flags and an optional first message. It opens a herdr tab,
+  waits for the shell prompt, starts the agent through herdr's API and sends the message. Progress appears
+  as notifications, and the new session is selected as soon as its tab exists.
+- **Close** works on one session or a selection. A confirmation lists what will stop, warns about anything
+  still working, and shows the memory it frees.
+- **Closed** keeps closed agent sessions with a **Reopen** button, which resumes them in a new tab.
+- **Close candidates** selects empty sessions, the older copy of each duplicate, and anything untouched for a week.
+- **Jump to pane** (`f`) switches herdr to the pane and brings WezTerm forward (set `DECK_TERMINAL` to change the app).
+- **Alerts** sends a desktop notification when an agent finishes or needs input.
 
 ## How it stays fast
 
@@ -44,7 +75,8 @@ bun test
 - It subscribes to herdr's event stream and re-snapshots on change (coalesced), with a 2 s safety poll.
 - The browser gets the full state inlined in the first HTML response, then row-level patches over SSE:
   only rows that changed are sent, and only those DOM nodes are touched.
-- Session files are parsed from their head and tail only, and cached by size and mtime; OpenCode rows are
+- Row data comes from the head and tail of session files and is cached by size and mtime. The detail view parses
+  transcripts incrementally, so an active 35 MB file costs about 1 ms after the first read (about 150 ms). OpenCode data is
   cached by `time_updated`. Fonts are bundled locally.
 
 ## Safety

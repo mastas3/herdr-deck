@@ -114,7 +114,7 @@ export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt"
 let claudeDirs: { at: number; dirs: string[] } = { at: 0, dirs: [] };
 const claudePathCache = new Map<string, string>();
 
-function findClaudeFile(id: string): string | undefined {
+export function findClaudeFile(id: string): string | undefined {
   const cached = claudePathCache.get(id);
   if (cached && existsSync(cached)) return cached;
   const root = `${HOME}/.claude/projects`;
@@ -146,7 +146,7 @@ export async function claudeMeta(id: string): Promise<AgentMeta> {
 const codexPathCache = new Map<string, string>();
 
 /** Codex ids are UUIDv7, so the id itself says which day folder the rollout lives in. */
-function findCodexFile(id: string): string | undefined {
+export function findCodexFile(id: string): string | undefined {
   const cached = codexPathCache.get(id);
   if (cached) return cached;
   const ms = parseInt(id.replace(/-/g, "").slice(0, 12), 16);
