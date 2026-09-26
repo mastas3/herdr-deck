@@ -76,7 +76,7 @@ export function buildComps(b: Partial<Build>, find: (t: Target) => Comparables |
   if (!r) return undefined;
   return {
     line: comparablesLine(r), checks: r.checks,
-    items: r.comparables.slice(0, 3).map((c) => { const f = c.first.find((x) => x.channel !== "other") ?? c.first[0]; return { name: c.name, link: f?.link ?? c.url, revenue: c.revenue?.text, published: c.published || undefined, old: c.old || undefined, channel: f ? CH_LABEL[f.channel] : undefined, tactic: f?.text }; }),
+    items: r.comparables.slice(0, 3).map((c) => { const f = c.first.find((x) => x.channel !== "other") ?? c.first[0]; return { name: c.name, link: f?.link ?? c.url, revenue: c.revenue?.text, published: c.published || undefined, old: c.old || undefined, channel: f && f.channel !== "other" ? CH_LABEL[f.channel] : undefined, tactic: f?.text }; }),
   };
 }
 export type Block =

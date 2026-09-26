@@ -80,9 +80,9 @@ function galKitTab(k, tab) {
     return `<p class="hint">Copy for you to use and send yourself. Nothing is posted or sent from here.</p>
       <div class="gallanding" dir="auto"><p class="galkick">Landing page</p><h4 dir="auto">${esc(l.headline)}</h4><p dir="auto">${esc(l.subhead)}</p>${galList(l.benefits)}<span class="btn primary sm" aria-hidden="true">${esc(l.cta)}</span></div>
       ${g.pricing.length ? `<h4>Pricing</h4><div class="galtiers">${g.pricing.map((p) => `<div><b>${esc(p.tier)}</b><span>${esc(p.price)}</span>${galList(p.includes)}</div>`).join("")}</div>` : ""}
-      ${g.pricingWhy ? `<p class="galwhy">${galCiteHTML(g.pricingWhy)}</p>` : ""}
-      ${g.first10?.length ? `<h4>The first 10 customers</h4><ol class="galsteps">${g.first10.map((x) => `<li>${esc(x.step)}${cite(x.cites)}</li>`).join("")}</ol>` : ""}
-      ${g.launchPlan?.length ? `<h4>Launch plan</h4><ul class="galsteps">${g.launchPlan.map((x) => `<li><b>${esc(x.when)}</b> ${esc(x.what)}${cite(x.cites)}</li>`).join("")}</ul>` : ""}
+      ${g.pricingWhy ? `<p class="galwhy" dir="auto">${galCiteHTML(g.pricingWhy)}</p>` : ""}
+      ${g.first10?.length ? `<h4>The first 10 customers</h4><ol class="galsteps">${g.first10.map((x) => `<li dir="auto">${esc(x.step)}${cite(x.cites)}</li>`).join("")}</ol>` : ""}
+      ${g.launchPlan?.length ? `<h4>Launch plan</h4><ul class="galsteps">${g.launchPlan.map((x) => `<li dir="auto"><b>${esc(x.when)}</b> ${esc(x.what)}${cite(x.cites)}</li>`).join("")}</ul>` : ""}
       ${g.launchPosts.length ? `<h4>Launch posts</h4>${g.launchPosts.map((p, i) => `<article class="galpost"><header><b>${esc(p.channel)}</b><span class="spacer"></span><button class="btn ghost sm" data-galcopypost="${i}">${ICON.copy}Copy</button></header><p dir="auto">${esc(p.text)}</p></article>`).join("")}` : ""}
       ${g.outreach ? `<h4>First 10 people</h4><article class="galpost"><header><span class="hint">One message you send personally</span><span class="spacer"></span><button class="btn ghost sm" data-galcopyout>${ICON.copy}Copy</button></header><p dir="auto">${esc(g.outreach)}</p></article>` : ""}`;
   }
