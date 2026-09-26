@@ -54,9 +54,10 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 - **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.
 - **Reply** (`r`): the message box under the chat. Enter sends it to the agent. Attach files with the paperclip,
   by dropping them on the chat, or by pasting; they're saved on the session's machine and the agent gets the paths.
-- **Queue or steer:** while an agent is working, Enter **queues** the message (the hub holds it and sends it
-  when the turn ends; queued messages show above the box, where you can edit, send now or remove them), and
-  **Steer** (⌘Enter) sends it right away. Queues live in `~/.config/herdr-deck/queue.json`.
+- **Send** always delivers right away, even while the agent works (Claude Code takes it at its next step,
+  Codex steers with it). To hold a message until the turn is over instead, press ⌥Enter: the hub keeps it
+  (shown above the box, where you can edit, send now or drop it) and sends it when the agent finishes.
+  Held messages live in `~/.config/herdr-deck/queue.json`.
 - **Long pastes** (over 4,000 characters or 40 lines) become a chip instead of a wall of text. On send each
   one is saved as a file next to the session and the agent gets the path; preview it, put it back inline, or
   remove it first. Anything over 12,000 characters travels the same way.

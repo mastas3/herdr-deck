@@ -1231,9 +1231,9 @@ function renderDetail() {
   else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
   $("cStop").hidden = !(r.status === "working" && isAgent(r));
   const busy = r.status === "working" && isAgent(r);
-  $("cSend").textContent = busy ? "Queue" : "Send";
-  $("cSend").title = busy ? "Send when it finishes this turn (Enter)" : "Send (Enter)";
-  $("cSteer").hidden = !busy;
+  $("cSend").textContent = "Send";
+  $("cSend").title = busy ? "Send now; the agent picks it up while it works (⌥Enter: hold it until it finishes)" : "Send (Enter)";
+  $("cSteer").hidden = true;
   renderQueue(r);
   renderPastes();
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
@@ -1498,7 +1498,7 @@ async function sendMessage(text, fromEl, how) {
     try { text = await fileLongText(r, text, pastes); }
     catch (x) { restorePastes(key, pastes); toast("Couldn’t save the long text: " + x.message, true); return; }
   }
-  if (how !== "steer" && r.status === "working" && isAgent(r)) {
+  if (how === "later" && r.status === "working" && isAgent(r)) {
     fromEl.value = ""; autosize(fromEl); S.drafts.delete(key); closeSlash();
     try { await api("/api/queue", { op: "add", key, text }); toast("Queued. It goes when the agent finishes this turn."); }
     catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true); }
@@ -1526,7 +1526,7 @@ $("reply").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($
 for (const [id, form] of [["cText", "composer"], ["replyText", "reply"]]) {
   $(id).addEventListener("input", (e) => { autosize(e.target); if (S.sel) S.drafts.set(S.sel, e.target.value); });
   $(id).addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.isComposing) { e.preventDefault(); return sendMessage(e.target.value.trim(), e.target, "steer"); }
+    if (e.key === "Enter" && e.altKey && !e.isComposing) { e.preventDefault(); return sendMessage(e.target.value.trim(), e.target, "later"); }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); $(form).requestSubmit(); }
     if (e.key === "Escape") e.target.blur();
   });
