@@ -24,6 +24,7 @@ import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
+import { createLeads } from "./leads";
 import { PushStore, endpointOk, type Message } from "./push";
 import { Automations } from "./automations";
 
@@ -92,6 +93,11 @@ const discover = createDiscover(
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   },
 );
+// Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
+const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
+  rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
+  saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
+});
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 let hubSeenAt = 0;
@@ -1074,6 +1080,7 @@ async function handle(req: Request): Promise<Response> {
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {

@@ -281,6 +281,19 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
     new Claude Code session, prefilled, that researches what exists and writes a plan (architecture, the exact
     repos and services, build order, costs and risks, first three tasks) to `~/.config/herdr-deck/ideas/<slug>.md`.
     **Sparks** are "what if" ideas combined from your interests, projects, connections and gems.
+  - **Leads:** find the people who need an idea (**Idea → people**), or what an audience needs (**People → ideas**).
+    The instant pass searches public posts on Hacker News, Reddit (its keyless search feed, one request a search,
+    rate limit respected), GitHub issues (two `gh` searches, sharing Discover's budget), Stack Exchange and App Store
+    reviews in parallel, each with a timeout, and streams them in with a status chip per source. Posts are scored for
+    pain ("is there an app", "I wish", "would pay"…) × engagement × recency, deduped, and clustered into pain themes,
+    each with quotes and links, an app idea, **Plan the app for them**, **Research & plan it**, **Save** and **Copy
+    evidence**. Also: where they hang out (subreddits, threads, repos, apps) and who's already building it.
+    **Deep dive with last30days** opens a prefilled session that runs the `last30days` skill (Reddit, X, YouTube,
+    TikTok, HN, Polymarket, web) and writes a report to `~/.config/herdr-deck/leads/<slug>.md`, listed under Reports.
+    Starters from your world, **Shuffle** and **Surprise me** (an audience picked from your interests). Only the query
+    words leave the machine; nothing is posted and nobody is contacted; emails and phone numbers are stripped.
+    Cached per query in `~/.config/herdr-deck/leads-cache.json`. ⌘K has it too; `leadsFor(text)` opens it from code.
+    Code: `src/leads.ts`.
   - **Ideas:** the plans, rendered, with the session that wrote them and **Start building**.
   - Only interest keywords and the words of your idea go to GitHub. Nothing starts until you confirm the
     dialog. Your chips, saves (repos and mixes) and dismissals live in `~/.config/herdr-deck/discover.json`.
