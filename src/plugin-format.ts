@@ -51,6 +51,9 @@ const READ_WORDS = new Set([
   "count", "stats", "status", "log", "diff", "ls", "cat", "resolve", "inspect", "preview",
   "check", "info", "whoami", "history",
 ]);
+/** Read words an MCP tool's name may start with. "resolve", "check" and "log" also name changes (resolve_issue,
+ *  check_item, log_work), so they don't count as reading there. */
+const MCP_READ_FIRST = new Set([...READ_WORDS].filter((w) => w !== "resolve" && w !== "check" && w !== "log"));
 
 const WRITE_WORDS = new Set([
   // Original WRITE_VERB verbs
@@ -75,10 +78,6 @@ function tokenize(s: string): string[] {
   return s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 }
 
-/** A name is read-only when it contains at least one READ_WORD and no WRITE_WORDS. */
-function readOnly(tokens: string[]): boolean {
-  return tokens.some((t) => READ_WORDS.has(t)) && !tokens.some((t) => WRITE_WORDS.has(t));
-}
 /** A scoped Bash command's words after the program: a read word, and nothing that changes things or chains. */
 function readOnlyRest(tokens: string[]): boolean {
   return tokens.some((t) => READ_WORDS.has(t)) && !tokens.some((t) => WRITE_WORDS.has(t) || JOIN_WORDS.has(t));
@@ -111,8 +110,11 @@ export function toolClass(t: string): ToolClass {
     if (/browser|playwright|puppeteer|selenium|chrome|fetch|http|scrape|crawl|navigate|url|web/i.test(server + " " + tool)) {
       return { ok: true, writes: true, web: true, machine: false, bash: false };
     }
-    // Otherwise default-deny: writes only if tool name clearly says read.
-    return { ok: true, writes: !readOnly(tokenize(tool)), web: false, machine: false, bash: false };
+    // Otherwise default-deny: it reads only when the tool's name starts with a read word and nothing in the whole
+    // name (server included, so mcp__srv__send__get counts) changes things or chains a second step.
+    const all = tokenize(t.slice("mcp__".length));
+    const reads = MCP_READ_FIRST.has(tokenize(tool)[0]) && !all.some((x) => WRITE_WORDS.has(x) || JOIN_WORDS.has(x));
+    return { ok: true, writes: !reads, web: false, machine: false, bash: false };
   }
   return no;
 }

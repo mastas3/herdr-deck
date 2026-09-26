@@ -47,6 +47,10 @@ describe("toolClass", () => {
     expect(toolClass("mcp__claude_ai_Gmail__unmark_message_spam").writes).toBe(true);
     expect(toolClass("mcp__claude_ai_Claude_Docs__batch").writes).toBe(true);
     expect(toolClass("mcp__x__do_thing").writes).toBe(true);
+    // A read word must lead the tool's name, and nothing may change things or chain a second step.
+    for (const t of ["resolve_issue", "log_work", "check_item", "search_and_destroy", "list_then_purge", "get_or_reset", "read_and_respond", "get_and_rotate_key"])
+      expect(toolClass(`mcp__x__${t}`).writes, t).toBe(true);
+    expect(toolClass("mcp__srv__send__get").writes).toBe(true); // the server part counts too
     // Browser/web tools are always dangerous
     expect(toolClass("mcp__plugin_playwright_playwright__browser_snapshot")).toEqual({
       ok: true, writes: true, web: true, machine: false, bash: false,
