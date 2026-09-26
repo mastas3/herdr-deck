@@ -511,12 +511,23 @@ function srcLine(r) {
 }
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
   const tip = why.k === "work" && why.t ? `Working since ${abs(why.t)}` : `Last active ${abs(r.lastActiveAt)}`;
   return `<span class="ago why" data-k="${why.k}"${why.t ? ` data-t="${why.t}" data-why="${why.k}"` : ""} title="${esc(tip)}">${esc(why.text)}</span>`;
+}
+const RADAR_PHASE = { exploring: "reading and searching", editing: "changing files", testing: "running tests or builds", debugging: "chasing a failure", wrapping_up: "wrapping up" };
+const RADAR_WHY = { repeat: "it made the same tool call 3 or more times in its last 8", errors: "3 or more of its last 6 tool calls failed", stall: "this turn has run over 10 minutes without editing a file" };
+/** Jev's stuck/drift read on a running session, as a small chip; nothing unless it's fairly sure (70%+). */
+function radarChip(r) {
+  const e = r.status === "working" && (S.radar ?? []).find((x) => x.key === r.key);
+  if (!e) return "";
+  const bits = [e.stuck >= 0.7 ? `looping ${Math.round(e.stuck * 100)}%` : "", e.offTask >= 0.7 ? `off task ${Math.round(e.offTask * 100)}%` : ""].filter(Boolean);
+  if (!bits.length) return "";
+  const tip = `Jev thinks this session may be ${e.stuck >= 0.7 && e.offTask >= 0.7 ? "stuck and off task" : e.stuck >= 0.7 ? "stuck" : "off task"}${e.phase ? `; it looks like it's mostly ${RADAR_PHASE[e.phase] ?? e.phase}` : ""}.\nThe deck asked because ${RADAR_WHY[e.trigger] ?? "it looked unusual"}.\nJust a heads-up: nothing happens on its own.`;
+  return `<span class="rchip" title="${esc(tip)}">${esc(bits.join(" · "))}</span>`;
 }
 function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now())) {
   if (S.simple) return simpleRow(r);
@@ -540,8 +551,9 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  const rc = radarChip(r);
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
 }
 let lastOrder = "", queued = false;
 function render() {
@@ -663,7 +675,7 @@ function renderList() {
     }
     const ask = pendingAsk(r);
     const why = reasonOf(r, ask?.kind, now);
-    const ctx = JSON.stringify(ask ?? "") + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const ctx = JSON.stringify(ask ?? "") + radarChip(r) + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
     const sig = JSON.stringify(r) + ctx;
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
@@ -1237,7 +1249,7 @@ function renderDetail() {
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length, radarChip(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -1283,6 +1295,7 @@ function renderHead(r, d, tab) {
   const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
+    radarChip(r),
     `<button class="pj" data-dact="journey" style="--pc:${pc(r.project)}" title="${esc(where)} · open the project page">${esc(r.project)}</button>`,
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
@@ -2196,8 +2209,15 @@ function jevLine(d) {
     const cls = p >= 70 ? "ok" : p >= 40 ? "mid" : "bad";
     return `<div class="jev ${cls}"><span class="jb">Jev</span> ${p}% really done${j.next ? ` · suggests <b>${j.next === "accept" ? "accept" : j.next === "send_back" ? "send it back" : "ask a question"}</b>` : ""}</div>`;
   }
-  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}</div>`;
+  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}${riskChip(j)}</div>`;
   return "";
+}
+/** How reversible Jev thinks the terminal prompt is, as a small chip (deck-prompt only; nothing when the risk feature is off or Jev skipped). */
+function riskChip(j) {
+  if (j.risk == null) return "";
+  if (j.riskP != null && j.riskP < 0.5) return ` <span class="risk unclear">risk unclear</span>`;
+  const label = j.risk === "read_only" ? "read-only" : j.risk === "reversible" ? "reversible" : "irreversible";
+  return ` <span class="risk${j.risk === "irreversible" ? " irr" : ""}">${esc(label)}</span>`;
 }
 // <inbox-keys> Pure: what a triage key means on a decision. No DOM, no globals (test/inbox-keys.test.ts runs this block).
 const YES_RE = /^\W*(yes|y|allow|approve|accept|ok|okay|confirm|proceed|continue|go ahead|trust|sure)\b/i;
@@ -2269,6 +2289,12 @@ function jevBar(j) {
   const label = j.available ? `Jev · ${j.calls ?? 0}/${j.cap ?? "–"} today` : "Jev is off on this machine";
   return `<div class="jevbar"><button class="jevtog" data-jevtog aria-expanded="${!!S.jevOpen}"><span class="jb">Jev</span>${esc(label.replace(/^Jev · /, ""))}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>${S.jevOpen ? jevPanel(S.jevStats, j) : ""}`;
 }
+// What each Jev feature sends, so you can switch off any of them.
+const JEV_FEATS = [
+  ["risk", "Risk level on permission prompts", "adds one question to the prompt check it already sends"],
+  ["radar", "Stuck radar", "sends the last tool calls of a running session when it looks stuck"],
+  ["route", "Send by description", "sends your message and your sessions' titles and what each is doing when you ask it to route"],
+];
 function jevPanel(st, j) {
   if (!st) return `<section class="jevp"><p class="hint">${S.jevErr ? esc(S.jevErr) : "Reading the receipts…"}</p></section>`;
   const span = (t, x) => `<div class="jst"><span class="jl">${t}</span><b>${x.calls}</b><span>call${x.calls === 1 ? "" : "s"}</span><span class="jm">${ktok(x.inputTokens)} tok · ${money(x.cost)}</span>${x.repeats ? `<span class="jm jwarn" title="Asked again with the exact same state (before the dedupe fix)">${x.repeats} repeat${x.repeats === 1 ? "" : "s"}</span>` : ""}</div>`;
@@ -2282,6 +2308,7 @@ function jevPanel(st, j) {
     return `<li><span class="jt" data-t="${x.at}">${esc(agoText(x.at))}</span><span class="jk">${KS[x.kind]}${rep}</span><span class="jq">${x.label ? esc(x.label) : `<span class="hint">–</span>`}</span><span class="js">Jev <b>${esc(x.suggestion)}</b>${x.pickTitle ? ` <span class="hint">${esc(x.pickTitle)}</span>` : ""}</span><span class="ja">${x.actual ? `You <b>${esc(x.actual)}</b>${x.actualTitle ? ` <span class="hint">${esc(x.actualTitle)}</span>` : ""}` : `<span class="hint">no answer recorded</span>`}</span>${mark}</li>`;
   }).join("") : `<li class="hint">No deck decisions in the receipts yet.</li>`;
   const cap = st.cap;
+  const feats = JEV_FEATS.map(([k, title, sends]) => `<label class="nchk"><input type="checkbox" data-jevfeat="${k}" ${j.features?.[k] !== false ? "checked" : ""}><span><b>${title}</b>${st.features ? ` <span class="hint">${st.features[k] ?? 0} today</span>` : ""}<small>${sends}</small></span></label>`).join("");
   return `<section class="jevp" aria-label="Jev">
     <div class="jgrid">${span("Today", st.today)}${span("7 days", st.week)}${span("All time", st.total)}</div>
     <div class="jcols">
@@ -2291,6 +2318,7 @@ function jevPanel(st, j) {
     <h4>Last ${st.recent.length} decisions</h4>
     <ul class="jrec">${recent}</ul>
     <form class="jcap"><label>Daily cap <input type="number" min="0" max="100000" step="1" value="${cap.cap}" inputmode="numeric" aria-label="Jev calls per day"></label><button class="btn">Save</button><span class="hint">${cap.used} used today · at the cap ≈ ${money(cap.cap * 1200 * st.price.perMillionInput / 1e6)}/day${cap.source === "env" ? " · from DECK_JEV_DAILY until you save" : ""}</span></form>
+    <div class="jfeat">${feats}</div>
     <p class="hint jfoot">${st.asked} decisions asked, ${st.answered} answered in the deck. All Jev use today: ${st.allAgentsToday.calls} calls, ${money(st.allAgentsToday.cost)}. $${st.price.perMillionInput} per million input tokens, output free.</p>
   </section>`;
 }
@@ -2493,6 +2521,12 @@ $("dbody").addEventListener("click", async (e) => {
   }
   const act = e.target.closest("[data-dact2]")?.dataset.dact2;
   if (act) inboxAct(key, act);
+});
+$("dbody").addEventListener("change", async (e) => {
+  const f = e.target.closest?.("[data-jevfeat]");
+  if (!f) return;
+  const on = f.checked;
+  try { const r = await api("/api/jev/feature", { name: f.dataset.jevfeat, on }); S.jev = r.jev; toast(`${JEV_FEATS.find((x) => x[0] === f.dataset.jevfeat)?.[1] ?? "Jev feature"}: ${on ? "on" : "off"}`); } catch (x) { f.checked = !on; toast(x.message, true); }
 });
 $("dbody").addEventListener("submit", async (e) => {
   const cap = e.target.closest(".jcap");
@@ -5873,6 +5907,7 @@ function focusTerminal() {
 let palItems = [], palIndex = 0;
 function openPalette(initial = "") {
   const d = $("palette");
+  if (palRoute) routeReset();
   $("palQ").value = initial;
   if (!d.open) d.showModal();
   renderPalette();
@@ -5891,6 +5926,8 @@ function fuzzy(text, q) {
 }
 function paletteItems(q) {
   const out = [];
+  // A sentence rather than a search: offer to have Jev find the session it's meant for.
+  if (routeOn() && q.split(/\s+/).filter(Boolean).length >= 3) out.push({ html: `<span>Send to the right session…</span><small>Jev suggests, you confirm</small>`, keep: true, route: true, run: () => routeAsk(q) });
   const cur = rowOf(S.sel);
   const n = targets().length;
   const sessions = [...S.rows.values()].map((r) => ({ r, s: fuzzy(`${r.title} ${r.project} ${r.launch ?? ""} ${paneName(r)} ${machineLabel(r.machine)} ${r.agent} ${r.branch ?? ""}`, q) }))
@@ -5935,9 +5972,9 @@ function paletteItems(q) {
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },
     { t: "Idea lab: research and plan any idea", run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },
     { t: "Ideas: plans your agents wrote", run: () => { S.disc.tab = "ideas"; setMode("discover"); } },
-    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, run: () => { setMode("discover"); ideaSearch(q); } },
+    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, echo: true, run: () => { setMode("discover"); ideaSearch(q); } },
     { t: "Leads: who needs an idea, or what an audience needs", run: () => { leadsFor(""); setTimeout(() => $("dbody").querySelector("[data-lq]")?.focus(), 60); } },
-    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, run: () => leadsFor(q, "idea") },
+    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, echo: true, run: () => leadsFor(q, "idea") },
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Notifications on this device…", run: openNotifications },
     { t: "Automations: alerts, morning digest, empty sessions, proof of done", run: openAutomations },
@@ -5947,7 +5984,7 @@ function paletteItems(q) {
     !isPhone() && { t: "Keyboard shortcuts", k: "?", run: () => $("help").showModal() },
     ...(multiMachine() ? [["all", "all machines"], ...S.summary.machines.map((m) => [m.id, m.label])].map(([id, label]) => ({ t: `Show ${label}`, run: () => setMachine(id) })) : []),
   ].filter(Boolean).map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, q ? 8 : 6);
-  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, run: c.run })));
+  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, echo: c.echo, run: c.run })));
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
     if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
@@ -5960,7 +5997,10 @@ function paletteItems(q) {
 }
 function renderPalette() {
   palItems = paletteItems($("palQ").value.trim());
-  palIndex = palItems.findIndex((x) => !x.head);
+  // Enter runs the top match. Routing (a Jev call) is the default only when nothing else matches; the Idea lab
+  // item echoes any long query, so it doesn't count as a match, and comes last.
+  const at = (f) => palItems.findIndex((x) => !x.head && f(x));
+  palIndex = [at((x) => !x.route && !x.echo), at((x) => x.route), at(() => true)].find((i) => i >= 0) ?? -1;
   $("palList").innerHTML = palItems.map((it, idx) => it.head ? `<div class="mh">${esc(it.head)}</div>` : `<button role="option" data-p="${idx}" class="${idx === palIndex ? "on" : ""}">${it.html}</button>`).join("") || `<div class="empty-state">Nothing found</div>`;
 }
 function palMove(d) {
@@ -5970,15 +6010,134 @@ function palMove(d) {
   for (const b of $("palList").querySelectorAll("[data-p]")) b.classList.toggle("on", Number(b.dataset.p) === palIndex);
   $("palList").querySelector(".on")?.scrollIntoView({ block: "nearest" });
 }
-function palRun(i = palIndex) { const it = palItems[i]; if (!it || it.head) return; $("palette").close(); it.run(); }
+function palRun(i = palIndex) { const it = palItems[i]; if (!it || it.head) return; if (!it.keep) $("palette").close(); it.run(); }
 $("palQ").addEventListener("input", renderPalette);
 $("palQ").addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") { e.preventDefault(); palMove(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); palMove(-1); }
-  else if (e.key === "Enter") { e.preventDefault(); palRun(); }
+  else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); palRun(); } // the route view it may open mustn't see this Enter
 });
 $("palList").addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) palRun(Number(b.dataset.p)); });
 $("palette").addEventListener("click", (e) => { if (e.target === $("palette")) $("palette").close(); });
+
+// ── send by description ──────────────────────────────────────────────────
+// Jev suggests which session a message is for; nothing is sent until you press Enter or Send here.
+let palRoute = null;
+let routeDraft = null; // the message as you last edited it, kept when you go back to the list
+const PAL_FOOT = $("palette").querySelector(".pal-foot").innerHTML;
+const routeOn = () => !!S.jev?.available && S.jev?.features?.route !== false;
+const ROUTE_SURE = 0.6;
+const ROUTE_SETTLE_MS = 400; // Enter does nothing this long after the picks appear, so a held or double Enter can't send
+const ROUTE_WHY = { no_sessions: "No coding-agent session is running to send it to.", one_session: "Only one session can take it.", timeout: "Jev took too long.", deck_daily_cap: "Jev’s daily cap for the deck is used up.", unavailable: "Jev isn’t available." };
+// Without Jev's picks you still choose, from the most recent sessions that can take a message.
+const routeRecent = () => [...S.rows.values()].filter((r) => isAgent(r) && !r.empty && r.status !== "empty" && !r.app && !r.hist)
+  .sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)).slice(0, 6).map((r) => ({ key: r.key }));
+async function routeAsk(q) {
+  const m = palRoute = { q, busy: true, list: [], sel: null };
+  $("palQ").hidden = true;
+  $("palette").querySelector(".pal-foot").innerHTML = `<span><kbd>↑</kbd> <kbd>↓</kbd> pick</span><span><kbd>↵</kbd> send</span><span><kbd>esc</kbd> back</span>`;
+  $("palList").innerHTML = `<div class="proute"><textarea id="palMsg" rows="3" aria-label="Message to send" spellcheck="true"></textarea><div class="mh" id="palWhy"></div><div id="palPicks" role="listbox" aria-label="Sessions"></div>
+    <div class="proute-f"><button type="button" class="btn" data-rback>Back</button><button type="button" class="btn primary" data-rsend>Send</button></div></div>`;
+  $("palMsg").value = routeDraft?.q === q ? routeDraft.text : q;
+  $("palMsg").focus();
+  renderRoute();
+  try {
+    const r = await api("/api/jev/route", { text: q }, 20_000);
+    if (palRoute !== m) return; // you went back or closed the palette meanwhile
+    const picks = (r.picks ?? []).filter((x) => S.rows.has(x.key));
+    if (picks.length) {
+      m.list = picks;
+      m.sel = picks[0].p >= ROUTE_SURE && !routeBlocked(picks[0].key) ? picks[0].key : null;
+      m.why = m.sel ? `Jev’s pick${r.ms != null ? ` · ${r.ms} ms` : ""}` : picks[0].p >= ROUTE_SURE ? "Jev’s pick is waiting on a prompt, so it isn’t preselected" : "Jev isn’t sure, pick one";
+    } else {
+      m.list = routeRecent();
+      // Only one session can take it: pick it for you, Enter still sends.
+      if (r.fallback === "one_session" && m.list.length === 1 && !routeBlocked(m.list[0].key)) m.sel = m.list[0].key;
+      m.why = `${ROUTE_WHY[r.fallback] ?? "Jev couldn’t pick one."}${m.list.length && !m.sel ? " Pick one." : ""}`;
+    }
+  } catch (x) {
+    if (palRoute !== m) return;
+    m.list = routeRecent();
+    m.why = `${x.message}${m.list.length ? " Pick one." : ""}`;
+  }
+  m.busy = false;
+  m.readyAt = Date.now() + ROUTE_SETTLE_MS;
+  renderRoute();
+}
+// A session waiting on a prompt could take the message as its answer ("yes, and…"): flag it, never preselect it.
+const routeBlocked = (key) => rowOf(key)?.status === "blocked";
+function renderRoute() {
+  const m = palRoute;
+  if (!m) return;
+  $("palWhy").textContent = m.busy ? "Asking Jev which session…" : m.why;
+  $("palPicks").innerHTML = m.list.map((x) => {
+    const r = rowOf(x.key);
+    if (!r) return "";
+    return `<button type="button" role="option" data-rk="${esc(x.key)}" class="${x.key === m.sel ? "on" : ""}" aria-selected="${x.key === m.sel}"><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.project)} · ${esc(r.title || r.agent)}${x.p != null ? ` — ${Math.round(x.p * 100)}%` : ""}</span><small>${multiMachine() ? esc(machineLabel(r.machine)) + " · " : ""}${r.status === "blocked" ? `<b>${pendingAsk(r)?.kind === "question" ? "waiting on your answer to a question" : "waiting on a permission prompt"}</b>` : esc(STATUS_NAME[r.status] ?? r.status)}</small></button>`;
+  }).join("");
+  $("palette").querySelector("[data-rsend]").disabled = m.busy || !m.sel;
+}
+function routeMove(d) {
+  const m = palRoute;
+  if (!m?.list.length) return;
+  const i = m.list.findIndex((x) => x.key === m.sel);
+  m.sel = m.list[i < 0 ? (d > 0 ? 0 : m.list.length - 1) : (i + d + m.list.length) % m.list.length].key;
+  renderRoute();
+  $("palPicks").querySelector(".on")?.scrollIntoView({ block: "nearest" });
+}
+function routeBack() {
+  const q = palRoute?.q ?? "";
+  if (palRoute) routeDraft = { q, text: $("palMsg").value };
+  routeReset();
+  $("palQ").value = q;
+  renderPalette();
+  $("palQ").focus();
+}
+function routeReset() {
+  palRoute = null;
+  $("palQ").hidden = false;
+  $("palette").querySelector(".pal-foot").innerHTML = PAL_FOOT;
+}
+async function routeSend() {
+  const m = palRoute;
+  if (!m || m.busy || m.sending) return;
+  const r = rowOf(m.sel), text = $("palMsg").value.trim();
+  if (!r) return toast("Pick a session first", true);
+  if (!text) return toast("Type a message first", true);
+  m.sending = true;
+  try {
+    // The same path as the message box: long text travels as a file.
+    await api("/api/send", { key: r.key, text: text.length > LONG_SEND ? await fileLongText(r, text, []) : text });
+    routeDraft = null;
+    $("palette").close();
+    toast(`Sent to ${r.project}: “${plain(text).slice(0, 50)}${text.length > 50 ? "…" : ""}”`);
+    if (S.sel === r.key) setTimeout(() => chatTick(true), 250);
+  } catch (x) { m.sending = false; toast("Send failed: " + x.message, true); }
+}
+$("palette").addEventListener("keydown", (e) => {
+  if (!palRoute) return;
+  const t = e.target;
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); routeBack(); }
+  else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    if (t.closest?.("[data-rback], [data-rsend]")) return; // the button's own click
+    if (t.id === "palMsg" && isPhone()) return; // a new line, like the message box on a phone
+    e.preventDefault();
+    // Only a fresh press after Jev's picks have settled sends: not the Enter that opened this view, nor one held down.
+    if (palRoute.busy || e.repeat || Date.now() < (palRoute.readyAt ?? Infinity)) return;
+    if (t.dataset?.rk) { palRoute.sel = t.dataset.rk; renderRoute(); }
+    routeSend();
+  } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(t.id === "palMsg" && t.value.includes("\n"))) { e.preventDefault(); routeMove(e.key === "ArrowDown" ? 1 : -1); }
+});
+$("palList").addEventListener("click", (e) => {
+  if (!palRoute) return;
+  const b = e.target.closest("[data-rk]");
+  if (b) { palRoute.sel = b.dataset.rk; renderRoute(); return; }
+  if (e.target.closest("[data-rback]")) routeBack();
+  else if (e.target.closest("[data-rsend]")) routeSend();
+});
+// Esc on some browsers, and the back gesture on Android, arrive as a cancel: go back rather than close.
+$("palette").addEventListener("cancel", (e) => { if (palRoute) { e.preventDefault(); routeBack(); } });
+$("palette").addEventListener("close", () => { if (palRoute) routeReset(); });
 
 // ── new session ──────────────────────────────────────────────────────────
 const KINDS = [["claude", "Claude Code"], ["codex", "Codex"], ["opencode", "OpenCode"], ["shell", "Shell"]];
@@ -6332,7 +6491,7 @@ new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return !$("palette").open ? openPalette() : palRoute ? routeBack() : $("palette").close(); } // in the route view: back, like Esc
   if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.mode === "inbox" && inboxKeydown(e)) return;
@@ -6501,6 +6660,7 @@ function applyFull(data) {
   S.usage = data.usage ?? {};
   S.hist = data.history ?? {};
   S.decisions = data.decisions ?? [];
+  S.radar = data.radar ?? [];
   S.jev = data.jev ?? {};
   S.canShare = !!data.canShare;
   S.publicUrl = data.publicUrl ?? "";
@@ -6550,6 +6710,7 @@ function connect() {
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
   es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
+  es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
   es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
   es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
   es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });

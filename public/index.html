@@ -580,6 +580,10 @@ body.moving { cursor: grabbing; user-select: none; }
 .jev { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-2); margin: 6px 0; }
 .jev .jb { font: 700 11px/1 var(--sans, system-ui); padding: 3px 6px; border-radius: 5px; background: color-mix(in oklch, var(--accent) 20%, transparent); color: var(--accent); }
 .jev.ok b, .jev.ok { color: var(--working); } .jev.bad { color: var(--blocked); } .jev.mid { color: var(--ink); }
+.jev .risk { font: 600 11px var(--sans, system-ui); border: 1px solid color-mix(in oklch, var(--ink-3) 45%, transparent); border-radius: 99px; padding: 1px 7px; color: var(--ink-2); }
+.jev .risk.irr { color: var(--blocked); border-color: color-mix(in oklch, var(--blocked) 45%, transparent); background: color-mix(in oklch, var(--blocked) 12%, transparent); }
+/* The radar chip on a running session (Jev thinks it may be looping or off task): same look as an irreversible risk chip. */
+.rchip { display: inline-block; flex: none; font: 600 11px/1.5 var(--sans, system-ui); border: 1px solid color-mix(in oklch, var(--blocked) 45%, transparent); border-radius: 99px; padding: 0 7px; margin-inline: 4px; vertical-align: 1px; white-space: nowrap; color: var(--blocked); background: color-mix(in oklch, var(--blocked) 12%, transparent); cursor: default; }
 .dcheck { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border-radius: 9px; background: var(--raise); font-size: 13.5px; }
 .dcheck.pass { color: var(--working); } .dcheck.fail { color: var(--blocked); }
 .dcheck details { flex-basis: 100%; } .dcheck pre { max-height: 220px; overflow: auto; font: 12px/1.4 var(--mono); color: var(--ink-2); }
@@ -950,6 +954,14 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
 .pal-list button.on { background: var(--sel); }
 .pal-list button small { color: var(--ink-3); font-size: 13px; margin-left: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 55%; }
 .pal-foot { display: flex; gap: 14px; padding: 8px 16px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--ink-3); }
+.proute { display: flex; flex-direction: column; gap: 2px; padding: 6px 4px; }
+.proute textarea { width: 100%; min-height: 64px; max-height: 30vh; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--ink); padding: 10px 12px; font: inherit; font-size: 15px; outline: none; }
+.proute textarea:focus { border-color: var(--accent); }
+.proute .mh { padding: 10px 10px 3px; }
+.proute-f { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 4px 2px; }
+.pal-list .proute-f .btn { width: auto; flex: 0 0 auto; padding: 7px 16px; border: 1px solid var(--line-2); background: var(--raise); font-size: 14.5px; }
+.pal-list .proute-f .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.pal-list .proute-f .btn:disabled { opacity: .45; cursor: default; }
 .recipes-ed .r { display: grid; grid-template-columns: 1fr auto; gap: 6px; padding: 10px 0; border-top: 1px solid var(--line); }
 .recipes-ed .r:first-child { border-top: 0; }
 .recipes-ed input, .recipes-ed textarea { background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 9px; font-size: 14.5px; color: var(--ink); width: 100%; }
@@ -1036,7 +1048,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
   .palette[open] { display: flex; flex-direction: column; }
   .palette .pal-list { flex: 1; max-height: none; }
   .pal-foot { display: none; }
-  .field input, .field textarea, .field select, .palette input { font-size: 16px; }
+  .field input, .field textarea, .field select, .palette input, .proute textarea { font-size: 16px; }
   .toast { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: none; }
   .menu { left: 8px !important; right: 8px; max-width: none; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom)); }
 }
