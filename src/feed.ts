@@ -52,6 +52,8 @@ export type FeedDeps = {
   timeoutMs?: number; now?: () => number;
   /** Where every idea is kept for good (the feed itself only holds today). */
   archive?: { put: (idea: any) => void; score: (id: string, score: number, dropped: boolean) => void };
+  /** Founder Library evidence for a batch (what real founders did), or "" (src/library.ts). */
+  evidence?: (rows: string[]) => Promise<string>;
 };
 
 export function createFeed(deps: FeedDeps) {
@@ -97,8 +99,9 @@ export function createFeed(deps: FeedDeps) {
     let last = 0;
     const timer = setTimeout(() => b.abort.abort(), TIMEOUT);
     try {
+      const ev = deps.evidence ? await deps.evidence(rows).catch(() => "") : "";
       const r = await rc({
-        system: `${FEED_SYSTEM}\n\n${buildCatalog(all)}`, user: feedPrompt(rowDefs, perRow, combos, store.ideas.map((x) => x.title)),
+        system: `${FEED_SYSTEM}\n\n${buildCatalog(all)}${ev ? `\n\n${ev}\nLet this evidence shape prices and launch channels; don't copy these businesses.` : ""}`, user: feedPrompt(rowDefs, perRow, combos, store.ideas.map((x) => x.title)),
         timeoutMs: TIMEOUT, signal: b.abort.signal, model: "haiku",
         onText: (t) => { if (now() - last < 400) return; last = now(); admit(b, parseReply(t, all, { source: "claude" }).blocks.flatMap((x) => (x.t === "build" ? [x.b] : [])), counted); },
       });

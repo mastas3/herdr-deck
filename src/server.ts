@@ -25,6 +25,7 @@ import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
 import { createLeads } from "./leads";
+import { createLibrary, feedQuery } from "./library";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
 import { PushStore, endpointOk, type Message } from "./push";
@@ -87,6 +88,11 @@ const saveGraves = () => writeFileSync(GRAVE_FILE, JSON.stringify(graveyard.slic
 const deck = new Deck();
 await deck.start();
 
+// Founder Library (Discover → Library): its own module; the server routes /api/library/* to it, and the Studio, the
+// ideas feed and the MCP tool read it as evidence. Its worker resumes only if you left it running.
+const library = createLibrary();
+if (!process.env.DECK_NO_LIBRARY) library.autostart();
+
 // Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
 const discover = createDiscover(
   { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
@@ -95,6 +101,8 @@ const discover = createDiscover(
     // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
     items: async () => { const inv = enrich(await inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
+    studio: { evidence: async (text) => (await library.evidence(text, 4, "studio")).text },
+    feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
   },
 );
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
@@ -298,19 +306,22 @@ setInterval(() => {
 // ── HTML ─────────────────────────────────────────────────────────────────────
 // app.js is served under a content hash so browsers (and the service worker) keep it forever.
 const APP_PATH = new URL("../public/app.js", import.meta.url).pathname;
+// Client blocks kept in their own files ship inside app.js (their JS) and the page (their CSS).
+const CLIENT_PARTS = ["library"].map((n) => new URL(`../public/${n}`, import.meta.url).pathname);
 let appJs = { mtime: 0, body: new Uint8Array(), gz: new Uint8Array(), hash: "" };
 /** Loaded once at startup, like the HTML, so a running service never mixes new JS with an old page. DEV reloads. */
 function appAsset() {
-  const m = appJs.mtime && !DEV ? appJs.mtime : statSync(APP_PATH).mtimeMs;
+  const m = appJs.mtime && !DEV ? appJs.mtime : Math.max(statSync(APP_PATH).mtimeMs, ...CLIENT_PARTS.map((p) => statSync(`${p}.js`).mtimeMs));
   if (m !== appJs.mtime) {
-    const body = new Uint8Array(readFileSync(APP_PATH));
+    const body = new TextEncoder().encode([readFileSync(APP_PATH, "utf8"), ...CLIENT_PARTS.map((p) => readFileSync(`${p}.js`, "utf8"))].join("\n"));
     appJs = { mtime: m, body, gz: Bun.gzipSync(body), hash: Bun.hash(body).toString(36) };
   }
   return appJs;
 }
-let htmlTemplate = readFileSync(HTML_PATH, "utf8");
+const readTemplate = () => readFileSync(HTML_PATH, "utf8").replace("</head>", `<style>\n${CLIENT_PARTS.map((p) => readFileSync(`${p}.css`, "utf8")).join("\n")}</style>\n</head>`);
+let htmlTemplate = readTemplate();
 function page() {
-  if (DEV) htmlTemplate = readFileSync(HTML_PATH, "utf8");
+  if (DEV) htmlTemplate = readTemplate();
   const boot = JSON.stringify(fullState()).replace(/</g, "\\u003c");
   return htmlTemplate.replace("/*__BOOT__*/", `window.__BOOT__=${boot};`).replace('src="/app.js"', `src="/app.js?v=${appAsset().hash}"`);
 }
@@ -938,6 +949,7 @@ const mcpCtx: McpCtx = {
     return r;
   },
   audit: (e) => { appendAudit(e); broadcast("audit", readAudit(30)); },
+  library: async (q, k) => (await library.evidence(q, k, "research")).text,
 };
 
 const DAY = "public, max-age=86400";
@@ -1103,6 +1115,7 @@ async function handle(req: Request): Promise<Response> {
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/library/")) { const d = await library.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);

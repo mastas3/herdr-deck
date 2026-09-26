@@ -351,6 +351,19 @@ describe("the studio: conversations, jobs, fallbacks", () => {
     expect(saved.messages[0].use).toEqual([{ id: "c:svc:telegram", kind: "conn", name: "Telegram" }]);
     expect(s.list()[0]).toMatchObject({ id: r1.convo.id, turns: 2 });
   });
+  test("Founder Library evidence joins the system prompt when there is some, and nothing changes when there isn't", async () => {
+    const f = fake(REPLY);
+    const asked: string[] = [];
+    const dir = `${root}/ev${Math.random().toString(36).slice(2, 8)}`;
+    const s = createStudio({ dir, projectsDir: "/p", ingredients: async () => ALL, engines: async () => ({ claude: true, ollama: [] }), runClaude: f.run, runOllama: f.run,
+      evidence: async (t) => { asked.push(t); return t.includes("telegram") ? "Founder Library: 1. GymBot — Telegram bot (https://www.youtube.com/watch?v=x&t=12s)" : ""; } });
+    await wait(s, (await s.send({ text: "a telegram bot for gyms" })).job.id);
+    await wait(s, (await s.send({ text: "something else" })).job.id);
+    expect(asked).toEqual(["a telegram bot for gyms", "something else"]);
+    expect(f.calls[0].system).toContain("GymBot — Telegram bot (https://www.youtube.com/watch?v=x&t=12s)");
+    expect(f.calls[0].system).toContain("cite its links");
+    expect(f.calls[1].system).not.toContain("Founder Library");
+  });
   test("rename, delete, list; bad ids are refused", async () => {
     const { s, dir } = mk(fake(REPLY).run);
     const a = await s.send({ text: "one" }); await wait(s, a.job.id);
