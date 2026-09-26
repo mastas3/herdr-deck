@@ -1,0 +1,5071 @@
+{
+ "D-asset:1:afterlightarcademobile:d0e": {
+  "jevP10": 0.44,
+  "jevShip": 0.63,
+  "jevRun": "r1:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Mobile game market highly saturated; one-time purchase gaming rarely converts"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.21
+ },
+ "A0-template:1:godseyeviewthroughadobe:lru": {
+  "jevP10": 0.1,
+  "jevShip": 0.22,
+  "jevRun": "r1:1",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No product definition, buyer, or use case—just a tech pairing"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.82
+ },
+ "A2-random-schema:1:oraclematchreports:uyz": {
+  "jevP10": 0.41,
+  "jevShip": 0.65,
+  "jevRun": "r1:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Instagram DM cold outreach rarely converts to paid PDF buyers reliably"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.36
+ },
+ "B-pain:1:zdainupremiumcouplescomp:e2t": {
+  "jevP10": 0.42,
+  "jevShip": 0.69,
+  "jevRun": "r1:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.2,
+   "flaw": "Same challenge as i8: one-time buy, no repeat revenue engine"
+  },
+  "jevGeneric": 0.2
+ },
+ "A0-template:1:whatiftresbecametheengin:68d": {
+  "jevP10": 0.11,
+  "jevShip": 0.26,
+  "jevRun": "r1:0",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.01,
+   "flaw": "Technical refactor idea, not a product with a buyer"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.74,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.02,
+   "flaw": "No buyer, no offer, no price—this is a tech note not a product",
+   "generic": 4
+  },
+  "rubric2Run": "5"
+ },
+ "E-remix:1:olimalertsgovernmenthous:jtq": {
+  "jevP10": 0.37,
+  "jevShip": 0.73,
+  "jevRun": "r1:0",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 4,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Gov.il scraping fragile; niche audience may not pay recurring fee"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.22
+ },
+ "B-pain:1:falafelrushadscasualplay:cdo": {
+  "jevP10": 0.32,
+  "jevShip": 0.65,
+  "jevRun": "r1:0",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Free casual game with tiny cosmetics revenue unlikely to hit 10 payers fast"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.35
+ },
+ "G-constraint:1:falafelrushreferralboost:4c5": {
+  "jevP10": 0.42,
+  "jevShip": 0.84,
+  "jevRun": "r1:0",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Bored olim unlikely to pay for casual game boosters at scale"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Casual game boosters rarely converts strangers without existing install base",
+   "generic": 3
+  },
+  "rubric2Run": "1",
+  "jevSingleP10": 0.4
+ },
+ "G-constraint:1:tenderalerthotline:qbd": {
+  "jevP10": 0.41,
+  "jevShip": 0.77,
+  "jevRun": "r1:2",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.3,
+   "flaw": "Scraping gov site reliably and filtering relevance is harder than it sounds"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.23
+ },
+ "G-constraint:1:3dgamecosmeticpasses:ql1": {
+  "jevP10": 0.36,
+  "jevShip": 0.72,
+  "jevRun": "r1:2",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "No existing player base to sell cosmetics to yet"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.29
+ },
+ "B-pain:1:yttranscriberproclipstud:8ox": {
+  "jevP10": 0.4,
+  "jevShip": 0.43,
+  "jevRun": "r1:2",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Saturated market with many established clip-tool competitors"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.38
+ },
+ "A1-mixer:1:intimatedatacanvas:3m6": {
+  "jevP10": 0.14,
+  "jevShip": 0.38,
+  "jevRun": "r1:2",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, no price, unclear standalone value beyond zdainu itself"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.57,
+  "jevSingleP10": 0.21
+ },
+ "A0-template:1:whatifadailyichingortaro:rrp": {
+  "jevP10": 0.22,
+  "jevShip": 0.43,
+  "jevRun": "r1:4",
+  "rubric": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "No buyer, price, or distribution specified at all"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.79,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, price, or channel stated at all",
+   "generic": 5
+  },
+  "rubric2Run": "3"
+ },
+ "A0-template:1:zdainufor3dwebglgmail:hx4": {
+  "jevP10": 0.14,
+  "jevShip": 0.35,
+  "jevRun": "r1:4",
+  "rubric": {
+   "spec": 1,
+   "feasible": 1,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 1,
+   "p10": 0.01,
+   "flaw": "Incoherent combination of unrelated tags; no real product"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.83
+ },
+ "B-pain:1:herdrdeckagentsessioncom:haf": {
+  "jevP10": 0.45,
+  "jevShip": 0.67,
+  "jevRun": "r1:4",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche audience unlikely to pay $12/mo for a dashboard they can build themselves"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "Solves builder's own pain but market of paying devs unproven",
+   "generic": 2
+  },
+  "rubric2Run": "0"
+ },
+ "A1-mixer:1:viralclipmemoryindex:wki": {
+  "jevP10": 0.13,
+  "jevShip": 0.36,
+  "jevRun": "r1:4",
+  "rubric": {
+   "spec": 2,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.03,
+   "flaw": "No stated buyer or reason anyone would pay for a personal clip archive"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.63,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No stated buyer, pain, or price at all",
+   "generic": 5
+  },
+  "rubric2Run": "1",
+  "jevSingleP10": 0.17
+ },
+ "B-pain:1:hdatlaszerodowntimerelia:ylg": {
+  "jevP10": 0.57,
+  "jevShip": 0.4,
+  "jevRun": "r1:5",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "One-time purchase caps revenue; small addressable Hebrew HD niche"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.15,
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.7,
+   "distribution": 0.35,
+   "fit": 0.78,
+   "small": 0.81,
+   "price": 0.66,
+   "durable": 0.54,
+   "repeat": 0.19
+  }
+ },
+ "A1-mixer:1:workflowautopilotcoach:9cr": {
+  "jevP10": 0.1,
+  "jevShip": 0.29,
+  "jevRun": "r1:5",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, no pain, no price defined at all"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.8,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, no pain, no price stated—entirely unspecified concept",
+   "generic": 5
+  },
+  "rubric2Run": "2"
+ },
+ "A1-mixer:1:3dbodycompatibilitygame:7sb": {
+  "jevP10": 0.15,
+  "jevShip": 0.2,
+  "jevRun": "r1:5",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.01,
+   "flaw": "No buyer, pain, or monetization defined at all"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.68,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.01,
+   "flaw": "No buyer, pain, price, or channel defined at all",
+   "generic": 4
+  },
+  "rubric2Run": "4"
+ },
+ "A1-mixer:1:encryptedcliplibrary:77v": {
+  "jevP10": 0.11,
+  "jevShip": 0.37,
+  "jevRun": "r1:5",
+  "rubric": {
+   "spec": 2,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.03,
+   "flaw": "No stated buyer or reason anyone would pay"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.58,
+  "jevSingleP10": 0.16
+ },
+ "E-remix:1:couplesvibecheck:lfu": {
+  "jevP10": 0.51,
+  "jevShip": 0.77,
+  "jevRun": "r1:3",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.12,
+   "flaw": "Impulse buy at ₪29 with no retention, needs viral traffic it can't guarantee"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.52
+ },
+ "A2-random-schema:1:panchangamplanner:n10": {
+  "jevP10": 0.3,
+  "jevShip": 0.68,
+  "jevRun": "r1:3",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Extremely narrow niche, unclear how many Russian Israelis want this"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.34
+ },
+ "G-constraint:1:grouparchivegrowthreport:ug7": {
+  "jevP10": 0.25,
+  "jevShip": 0.67,
+  "jevRun": "r1:3",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "Scraper fragility plus unclear willingness to pay monthly for group stats"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.44
+ },
+ "C-audience:1:herdrconsole:kz2": {
+  "jevP10": 0.41,
+  "jevShip": 0.72,
+  "jevRun": "r1:3",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 4,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.25,
+   "flaw": "Same niche audience as i10; overlapping product cannibalizes itself"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "Niche audience of multi-session Claude Code power users may be too small",
+   "generic": 2
+  },
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.65,
+   "distribution": 0.25,
+   "fit": 0.72,
+   "small": 0.77,
+   "price": 0.62,
+   "durable": 0.44,
+   "repeat": 0.51
+  }
+ },
+ "C-audience:1:groupguard:vxm": {
+  "jevP10": 0.33,
+  "jevShip": 0.73,
+  "jevRun": "r1:6",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Scraping Facebook groups likely violates ToS, legal/access risk"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.29,
+  "jevSingleP10": 0.29
+ },
+ "D-asset:1:grouparchiverprofacebook:d9e": {
+  "jevP10": 0.35,
+  "jevShip": 0.7,
+  "jevRun": "r1:6",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "Facebook ToS/scraping legal risk could kill this fast"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.06,
+   "flaw": "Legally risky scraping of FB data, admins unlikely to pay",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "G-constraint:1:grouparchivalsaas:f5a": {
+  "jevP10": 0.31,
+  "jevShip": 0.69,
+  "jevRun": "r1:6",
+  "rubric": {
+   "spec": 4,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Facebook scraping at scale for SaaS risks account bans and legal exposure"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.33
+ },
+ "B-pain:1:hdatlaspremiumofflineheb:l9y": {
+  "jevP10": 0.56,
+  "jevShip": 0.83,
+  "jevRun": "r1:6",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Niche audience size in Israel likely too small for 10 paying customers fast"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.14
+ },
+ "A2-random-schema:1:linkedinjobsniper:qpg": {
+  "jevP10": 0.3,
+  "jevShip": 0.75,
+  "jevRun": "r1:7",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "Crowded job-alert space, LinkedIn scraping is fragile and gets blocked"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.62,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "LinkedIn scraping fragile/ToS-risk, crowded job-alert space",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "A0-template:1:whatifyttranscriberandla:47f": {
+  "jevP10": 0.13,
+  "jevShip": 0.29,
+  "jevRun": "r1:7",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.01,
+   "flaw": "No concrete product defined, just two unrelated projects mashed together"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.78
+ },
+ "B-pain:1:fbgroupscraperproarchive:dgo": {
+  "jevP10": 0.28,
+  "jevShip": 0.37,
+  "jevRun": "r1:7",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Legal/ToS risk scraping Facebook groups could get accounts banned"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.24,
+  "jevSingleP10": 0.28
+ },
+ "C-audience:1:whatsappbizboost:f0o": {
+  "jevP10": 0.41,
+  "jevShip": 0.77,
+  "jevRun": "r1:7",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.22,
+   "flaw": "Crowded WhatsApp bot market, hard to stand out from local competitors"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.62
+ },
+ "H-boring:1:tendermatch:5au": {
+  "jevP10": 0.31,
+  "jevShip": 0.44,
+  "jevRun": "r1:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Gov tender data is messy and legal accuracy risk is high for low willingness to pay"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.21
+ },
+ "H-boring:1:clinicremind:mqi": {
+  "jevP10": 0.37,
+  "jevShip": 0.52,
+  "jevRun": "r1:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.22,
+   "flaw": "Needs calendar integrations and sales calls builder dislikes doing"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.36,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.25,
+   "flaw": "Requires clinic booking-system integration and cold outreach in a trust-heavy market",
+   "generic": 2
+  },
+  "rubric2Run": "4"
+ },
+ "B-pain:1:agentdecksessionorchestr:1co": {
+  "jevP10": 0.43,
+  "jevShip": 0.63,
+  "jevRun": "r1:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.2,
+   "flaw": "Crowded dev-tool space, developers reluctant to pay for tab management"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 5,
+   "p10": 0.06,
+   "flaw": "Needs new Swift macOS app built from scratch, not owned inventory",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "E-remix:1:esotericaiwhitelabel:hh8": {
+  "jevP10": 0.3,
+  "jevShip": 0.59,
+  "jevRun": "r1:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Practitioners are small in number and hard to convert to recurring SaaS"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.41,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Niche buyer with low budgets and no established willingness to pay $67/mo",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "A2-random-schema:1:gradientcardcreator:2ny": {
+  "jevP10": 0.44,
+  "jevShip": 0.78,
+  "jevRun": "r1:9",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Canva and free tools already dominate this exact use case"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.56
+ },
+ "C-audience:1:hdquickread:iy7": {
+  "jevP10": 0.61,
+  "jevShip": 0.82,
+  "jevRun": "r1:9",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.25,
+   "flaw": "One-off ₪50 purchase, hard to build recurring revenue base"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.21,
+  "patterns": {
+   "spend": 0.77,
+   "narrow": 0.72,
+   "distribution": 0.31,
+   "fit": 0.76,
+   "small": 0.87,
+   "price": 0.66,
+   "durable": 0.45,
+   "repeat": 0.33
+  }
+ },
+ "D-asset:1:forecastlabproosintpredi:fbq": {
+  "jevP10": 0.21,
+  "jevShip": 0.51,
+  "jevRun": "r1:9",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "OSINT hobbyists rarely pay $49-149/month for tools"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.3
+ },
+ "F-gem:1:herdrpro:67g": {
+  "jevP10": 0.35,
+  "jevShip": 0.43,
+  "jevRun": "r1:9",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "Many similar agent-observability tools already competing hard"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.24
+ },
+ "D-asset:1:hdcontentstudiodoneforyo:rq1": {
+  "jevP10": 0.33,
+  "jevShip": 0.78,
+  "jevRun": "r1:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Selling done-for-you content to coaches requires trust and quality bar unmet by generic pipeline"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.39,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.06,
+   "flaw": "Depends on Zapier/Notion glue and vague content quality; tiny addressable buyer pool",
+   "generic": 4
+  },
+  "rubric2Run": "4"
+ },
+ "E-remix:1:indiefounderofficehours:9j": {
+  "jevP10": 0.31,
+  "jevShip": 0.58,
+  "jevRun": "r1:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Coaching cohort needs an audience/credibility builder doesn't have"
+  },
+  "jevGeneric": 0.69,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Founder has no track record selling cohorts; crowded coaching market",
+   "generic": 4
+  },
+  "rubric2Run": "5"
+ },
+ "D-asset:1:herdrproagentdashboardsa:7fj": {
+  "jevP10": 0.34,
+  "jevShip": 0.7,
+  "jevRun": "r1:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.12,
+   "flaw": "Overlaps with i1; dev tool market saturated with free alternatives"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.26,
+  "jevSingleP10": 0.37
+ },
+ "A2-random-schema:1:ragsecurityauditor:3qg": {
+  "jevP10": 0.24,
+  "jevShip": 0.6,
+  "jevRun": "r1:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Indie hackers rarely pay for security audits pre-revenue"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.61
+ },
+ "C-audience:1:funrushmobile:7b2": {
+  "jevP10": 0.25,
+  "jevShip": 0.72,
+  "jevRun": "r1:11",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.03,
+   "flaw": "Free casual game with no real monetization path to 10 payers"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.35
+ },
+ "A2-random-schema:1:aitarotreadingstudio:xfk": {
+  "jevP10": 0.31,
+  "jevShip": 0.58,
+  "jevRun": "r1:11",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Readers may not trust AI to represent their brand/style authentically"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.44
+ },
+ "C-audience:1::hmi": {
+  "jevP10": 0.42,
+  "jevShip": 0.74,
+  "jevRun": "r1:11",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Accuracy risk on bureaucracy advice with no liability coverage"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.29
+ },
+ "C-audience:1:clipsubs:se3": {
+  "jevP10": 0.41,
+  "jevShip": 0.78,
+  "jevRun": "r1:11",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Saturated market with many similar tools already free or cheap"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.27,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "Crowded clip-tool market, differentiation on languages is thin",
+   "generic": 2
+  },
+  "rubric2Run": "0"
+ },
+ "D-asset:1:stasclawtelegrambotperso:5ou": {
+  "jevP10": 0.31,
+  "jevShip": 0.78,
+  "jevRun": "r1:12",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Free tier cannibalizes paid; niche audience with low willingness to pay"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.4
+ },
+ "A1-mixer:1:transcriptpoweredagentme:40w": {
+  "jevP10": 0.12,
+  "jevShip": 0.32,
+  "jevRun": "r1:12",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.02,
+   "flaw": "No buyer, no price, purely an internal tooling experiment"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.54
+ },
+ "A0-template:1:godseyeviewforvisualizat:i9p": {
+  "jevP10": 0.13,
+  "jevShip": 0.3,
+  "jevRun": "r1:12",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No product definition, buyer, or use case—just a tech pairing"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.8
+ },
+ "G-constraint:1:hdatlastelegrambot:g1y": {
+  "jevP10": 0.47,
+  "jevShip": 0.86,
+  "jevRun": "r1:12",
+  "rubric": {
+   "spec": 5,
+   "feasible": 5,
+   "buyer": 4,
+   "distribution": 4,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.35,
+   "flaw": "Tiny addressable market of Hebrew HD Telegram users limits revenue ceiling"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.19,
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.72,
+   "distribution": 0.57,
+   "fit": 0.79,
+   "small": 0.88,
+   "price": 0.53,
+   "durable": 0.44,
+   "repeat": 0.44
+  }
+ },
+ "C-audience:1:datesync:bq7": {
+  "jevP10": 0.47,
+  "jevShip": 0.76,
+  "jevRun": "r1:13",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Couples paying $9.99 for novelty compatibility quiz is unproven"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Niche interest (HD) intersecting with couples is a very thin market",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "D-asset:1:couplesynccompatibilityp:avq": {
+  "jevP10": 0.48,
+  "jevShip": 0.76,
+  "jevRun": "r1:13",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Couples quiz market crowded, one-time purchase, weak organic reach"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.32
+ },
+ "A1-mixer:1:aiagentmemorydebugger:o55": {
+  "jevP10": 0.12,
+  "jevShip": 0.23,
+  "jevRun": "r1:13",
+  "rubric": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.02,
+   "flaw": "No named buyer or price, niche dev-tool visualization nobody asked for"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.64
+ },
+ "D-asset:1:astrachartshdreadingsasa:pdv": {
+  "jevP10": 0.48,
+  "jevShip": 0.68,
+  "jevRun": "r1:13",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "HD niche buyers may not pay for automated video vs free readings"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.31,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.1,
+   "flaw": "Competes with free 1-hour YouTube HD readings already serving this audience",
+   "generic": 3
+  },
+  "rubric2Run": "1",
+  "patterns": {
+   "spend": 0.72,
+   "narrow": 0.63,
+   "distribution": 0.27,
+   "fit": 0.68,
+   "small": 0.77,
+   "price": 0.72,
+   "durable": 0.37,
+   "repeat": 0.3
+  }
+ },
+ "H-boring:1:menusync:g46": {
+  "jevP10": 0.35,
+  "jevShip": 0.35,
+  "jevRun": "r1:14",
+  "rubric": {
+   "spec": 4,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Google/Meta API access and approval for business posting is nontrivial"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.51
+ },
+ "A0-template:1:byterovercliforlocalfirs:62k": {
+  "jevP10": 0.09,
+  "jevShip": 0.2,
+  "jevRun": "r1:14",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.01,
+   "flaw": "No product defined, just tech name-dropping with no buyer"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.83
+ },
+ "C-audience:1:herdralert:if3": {
+  "jevP10": 0.36,
+  "jevShip": 0.76,
+  "jevRun": "r1:14",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Crowded devtool space with many free alternatives already"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.21,
+  "jevSingleP10": 0.35
+ },
+ "E-remix:1:communityarchivedonefory:2ts": {
+  "jevP10": 0.27,
+  "jevShip": 0.48,
+  "jevRun": "r1:14",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Facebook scraping is fragile and ToS-hostile, breaks constantly"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.38
+ },
+ "A0-template:1:whatifacrewofagentsranyo:qnj": {
+  "jevP10": 0.14,
+  "jevShip": 0.43,
+  "jevRun": "r1:15",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.02,
+   "flaw": "Internal tool with no buyer, price, or distribution defined"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.62
+ },
+ "H-boring:1:courseclip:yc2": {
+  "jevP10": 0.39,
+  "jevShip": 0.59,
+  "jevRun": "r1:15",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Small niche of Hebrew course creators, unclear repeat volume of videos"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.29
+ },
+ "E-remix:1:3darenabrowserrushgame:js2": {
+  "jevP10": 0.26,
+  "jevShip": 0.39,
+  "jevRun": "r1:15",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Multiplayer adds real complexity; sponsorship revenue unrealistic at this stage"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.53,
+  "rubric2": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 4,
+   "p10": 0.03,
+   "flaw": "No paying buyer defined; free game monetization via sponsorship is speculative",
+   "generic": 4
+  },
+  "rubric2Run": "4"
+ },
+ "F-gem:1:tenderbot:j7n": {
+  "jevP10": 0.35,
+  "jevShip": 0.52,
+  "jevRun": "r1:15",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.25,
+   "flaw": "Duplicate of i2 with added complexity that may not be needed"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.19,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Same tender-scraping fragility and unproven willingness-to-pay as i3",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "B-pain:1:storyreelpremiumhdshorts:r": {
+  "jevP10": 0.44,
+  "jevShip": 0.5,
+  "jevRun": "r1:16",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.16,
+   "flaw": "Directly competes with well-funded incumbents like Opus Clip"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.31,
+  "patterns": {
+   "spend": 0.84,
+   "narrow": 0.66,
+   "distribution": 0.18,
+   "fit": 0.67,
+   "small": 0.79,
+   "price": 0.62,
+   "durable": 0.27,
+   "repeat": 0.71
+  }
+ },
+ "A2-random-schema:1:shrinegameshub:4v": {
+  "jevP10": 0.32,
+  "jevShip": 0.71,
+  "jevRun": "r1:16",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Free casual game hub with weak monetization path"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.37
+ },
+ "A1-mixer:1:codingagentsurveillance:ddx": {
+  "jevP10": 0.13,
+  "jevShip": 0.3,
+  "jevRun": "r1:16",
+  "rubric": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.02,
+   "flaw": "No buyer, no price, unclear who pays for a visualization toy"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.62
+ },
+ "F-gem:1:growthkit:1ty": {
+  "jevP10": 0.37,
+  "jevShip": 0.75,
+  "jevRun": "r1:16",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Meta-product for indie hackers is oversaturated, low differentiation"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.75
+ },
+ "F-gem:1:mobileverse:8x": {
+  "jevP10": 0.32,
+  "jevShip": 0.36,
+  "jevRun": "r1:17",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Free casual games rarely convert to any paying customers"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.35,
+  "jevSingleP10": 0.38
+ },
+ "F-gem:1:soulmatch:9x4": {
+  "jevP10": 0.29,
+  "jevShip": 0.36,
+  "jevRun": "r1:17",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Dating apps need critical mass of users; cold-start problem is brutal"
+  },
+  "jevGeneric": 0.41,
+  "jevSingleP10": 0.36
+ },
+ "H-boring:1:podready:arb": {
+  "jevP10": 0.29,
+  "jevShip": 0.51,
+  "jevRun": "r1:17",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Small Hebrew/Russian podcast studio market is very thin"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.27,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Small niche market (HE/RU podcasts) with real editing quality bar",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "F-gem:1:groupvault:uf1": {
+  "jevP10": 0.33,
+  "jevShip": 0.57,
+  "jevRun": "r1:17",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Facebook scraping violates ToS, legal/access risk high"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.19
+ },
+ "H-boring:1:quotesnap:908": {
+  "jevP10": 0.39,
+  "jevShip": 0.38,
+  "jevRun": "r1:18",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Contractors are hard to reach/convert and slow to adopt new tools"
+  },
+  "jevGeneric": 0.36
+ },
+ "G-constraint:1:bodygraphchartprintbundl:qng": {
+  "jevP10": 0.54,
+  "jevShip": 0.87,
+  "jevRun": "r1:18",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Physical/print product with fulfillment friction for low ticket size"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.2
+ },
+ "A2-random-schema:1:viralshortsstudio:3p0": {
+  "jevP10": 0.43,
+  "jevShip": 0.69,
+  "jevRun": "r1:18",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Directly competes with many established, cheaper clip tools"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.45,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Crowded clip-tool market with entrenched free/cheap incumbents like Opus",
+   "generic": 3
+  },
+  "rubric2Run": "2",
+  "jevSingleP10": 0.42
+ },
+ "E-remix:1:dailytarothoroscopesubsc:o38": {
+  "jevP10": 0.32,
+  "jevShip": 0.48,
+  "jevRun": "r1:18",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Needs practitioners to trust AI content and onboard client lists"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.42,
+  "jevSingleP10": 0.36
+ },
+ "F-gem:1:teleimigrant:71t": {
+  "jevP10": 0.35,
+  "jevShip": 0.66,
+  "jevRun": "r1:19",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Legal/liability risk giving government/tax advice via unverified bot"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.34
+ },
+ "G-constraint:1:podcastclipstudiomembers:tzq": {
+  "jevP10": 0.51,
+  "jevShip": 0.86,
+  "jevRun": "r1:19",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.2,
+   "flaw": "Crowded clip-tool market (Opus, Vizard) with better funded competitors"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.28,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Nearly identical to i7 and i11; commodity clip-tool market, hard to stand out",
+   "generic": 3
+  },
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.66,
+   "distribution": 0.13,
+   "fit": 0.64,
+   "small": 0.83,
+   "price": 0.66,
+   "durable": 0.33,
+   "repeat": 0.79
+  }
+ },
+ "B-pain:1:agentcostmonitorrealtime:kia": {
+  "jevP10": 0.41,
+  "jevShip": 0.79,
+  "jevRun": "r1:19",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 4,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.25,
+   "flaw": "Small niche of paranoid Claude Code power users, may not pay"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.33
+ },
+ "H-boring:1:zimmerfill:4jn": {
+  "jevP10": 0.29,
+  "jevShip": 0.3,
+  "jevRun": "r1:19",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Requires manual outreach/sales into a skeptical offline-first market"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.3,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Requires real B2B sales to skeptical small business owners in Hebrew",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:1:sourcechain:gch": {
+  "jevP10": 0.25,
+  "jevShip": 0.62,
+  "jevRun": "r1:20",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "OSINT researchers are cash-poor and tool sprawl already crowded"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.46
+ },
+ "A0-template:1:whatifhebrewspeakingaudi:jb4": {
+  "jevP10": 0.11,
+  "jevShip": 0.21,
+  "jevRun": "r1:20",
+  "rubric": {
+   "spec": 1,
+   "feasible": 1,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 1,
+   "p10": 0.01,
+   "flaw": "Completely unspecified, no product, buyer, or offer stated"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.84
+ },
+ "F-gem:1:codestudio:xk0": {
+  "jevP10": 0.28,
+  "jevShip": 0.21,
+  "jevRun": "r1:20",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Competing with well-funded dev tooling incumbents, no differentiation edge"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.51
+ },
+ "H-boring:1:groupguard:qfc": {
+  "jevP10": 0.31,
+  "jevShip": 0.4,
+  "jevRun": "r1:20",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Admins are unpaid volunteers unlikely to pay monthly fee"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.41
+ },
+ "A0-template:1:yttranscriberforvisualiz:rkj": {
+  "jevP10": 0.14,
+  "jevShip": 0.39,
+  "jevRun": "r1:21",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 1,
+   "fun": 1,
+   "p10": 0.02,
+   "flaw": "Entirely unspecified template idea with no real product"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.77
+ },
+ "D-asset:1:bodygraphliverealtimehdc:2sc": {
+  "jevP10": 0.53,
+  "jevShip": 0.81,
+  "jevRun": "r1:21",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.12,
+   "flaw": "Niche buyer pool of HD readers in Israel is tiny"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.15
+ },
+ "B-pain:1:tenderaiproisraelismallb:emc": {
+  "jevP10": 0.34,
+  "jevShip": 0.64,
+  "jevRun": "r1:21",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Gov tender scraping legal/reliability risk; unclear demand validation"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.34,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Scraping mr.gov.il reliably and getting business owners to pay is unproven",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "F-gem:1:cockpit:xa7": {
+  "jevP10": 0.37,
+  "jevShip": 0.49,
+  "jevRun": "r1:21",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.2,
+   "flaw": "Overlaps heavily with i10, same crowded market and payment resistance"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.23
+ },
+ "A1-mixer:1:relationshipnarrativebui:1at": {
+  "jevP10": 0.13,
+  "jevShip": 0.5,
+  "jevRun": "r1:22",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, pain, or price stated; pure concept mashup"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.71
+ },
+ "A0-template:1:whatifthedaysplanetarytr:gtu": {
+  "jevP10": 0.13,
+  "jevShip": 0.32,
+  "jevRun": "r1:22",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, no price, unclear what problem this solves"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.64
+ },
+ "D-asset:1:falafelrusharcademultipl:9fg": {
+  "jevP10": 0.31,
+  "jevShip": 0.49,
+  "jevRun": "r1:22",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Free ad-supported game unlikely to hit 10 paying customers"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.26,
+  "jevSingleP10": 0.34
+ },
+ "H-boring:1:receiptround:j0h": {
+  "jevP10": 0.34,
+  "jevShip": 0.46,
+  "jevRun": "r1:22",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.25,
+   "flaw": "Requires client-side WhatsApp adoption which accountants can't force"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.23
+ },
+ "A2-random-schema:1:freelancersragcoach:jp6": {
+  "jevP10": 0.27,
+  "jevShip": 0.63,
+  "jevRun": "r1:23",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Fiverr sellers won't pay for unproven tool to change proven workflows"
+  },
+  "rubricRun": "r1:1",
+  "jevGeneric": 0.61,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Vague RAG wrapper, unclear demand, Fiverr ToS scraping risk",
+   "generic": 4
+  },
+  "rubric2Run": "0"
+ },
+ "F-gem:1:bizdocs:khl": {
+  "jevP10": 0.49,
+  "jevShip": 0.76,
+  "jevRun": "r1:23",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Crowded OCR/data-extraction category with many free/cheap alternatives"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.56
+ },
+ "E-remix:1:tendertemplatepack:wgw": {
+  "jevP10": 0.41,
+  "jevShip": 0.85,
+  "jevRun": "r1:23",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 1,
+   "p10": 0.1,
+   "flaw": "Static template pack has weak perceived value and no repeat revenue"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.31
+ },
+ "D-asset:1:clipfactorypodcastyoutub:g9o": {
+  "jevP10": 0.45,
+  "jevShip": 0.76,
+  "jevRun": "r1:23",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Crowded category dominated by well-funded competitors like Opus and Descript"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.31
+ },
+ "F-gem:1:hdatlaspro:h4": {
+  "jevP10": 0.59,
+  "jevShip": 0.79,
+  "jevRun": "r1:24",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Nearly identical to i10, splits same tiny addressable market"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.16,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "One-time ₪79 purchase caps revenue; small addressable Hebrew HD audience",
+   "generic": 2
+  },
+  "rubric2Run": "1"
+ },
+ "E-remix:1:opusforpodcasters:r3v": {
+  "jevP10": 0.31,
+  "jevShip": 0.41,
+  "jevRun": "r1:24",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Opus.pro and rivals already dominate this exact space"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.3
+ },
+ "H-boring:1:realtorpost:x4y": {
+  "jevP10": 0.34,
+  "jevShip": 0.31,
+  "jevRun": "r1:24",
+  "rubric": {
+   "spec": 4,
+   "feasible": 2,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "FB group auto-posting likely violates ToS, risks account bans"
+  },
+  "jevGeneric": 0.27
+ },
+ "A1-mixer:1:privacyfirstcreatorstudi:mkk": {
+  "jevP10": 0.13,
+  "jevShip": 0.24,
+  "jevRun": "r1:24",
+  "rubric": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer or price defined, niche desktop tool"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.71
+ },
+ "G-constraint:1:herdrbreakdownreports:ohj": {
+  "jevP10": 0.31,
+  "jevShip": 0.8,
+  "jevRun": "r1:25",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Depends on i1 dashboard existing first; unclear standalone buyer"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.3,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.03,
+   "flaw": "Vague buyer; unclear anyone wants weekly PDF of their own coding sessions",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "G-constraint:1:couplecompatibilityquizu:kgb": {
+  "jevP10": 0.45,
+  "jevShip": 0.82,
+  "jevRun": "r1:25",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Free quiz funnel unproven, no existing traffic to convert"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.39
+ },
+ "A0-template:1:aidlcworkflowsfor3dwebgl:4z0": {
+  "jevP10": 0.08,
+  "jevShip": 0.2,
+  "jevRun": "r1:25",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.01,
+   "flaw": "No product, buyer, or use case defined at all"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.86,
+  "rubric2": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.01,
+   "flaw": "No buyer, no product, pure exploratory filler",
+   "generic": 5
+  },
+  "rubric2Run": "0"
+ },
+ "A2-random-schema:1:leadmagnetpwa:mbx": {
+  "jevP10": 0.31,
+  "jevShip": 0.69,
+  "jevRun": "r1:25",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Saturated no-code landing page market with much bigger incumbents"
+  },
+  "rubricRun": "r1:5",
+  "jevGeneric": 0.44,
+  "jevSingleP10": 0.36
+ },
+ "F-gem:1:vidsnipstudio:9u7": {
+  "jevP10": 0.44,
+  "jevShip": 0.47,
+  "jevRun": "r1:26",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Crowded market with many established clip-tool competitors already"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.38,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Near-duplicate of i1 in a saturated clip-tool space with weak differentiation",
+   "generic": 3
+  },
+  "rubric2Run": "5",
+  "jevSingleP10": 0.39
+ },
+ "C-audience:1:hdworkguide:x0o": {
+  "jevP10": 0.48,
+  "jevShip": 0.83,
+  "jevRun": "r1:26",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.22,
+   "flaw": "Niche HD audience unlikely to pay for generic job advice"
+  },
+  "rubricRun": "r1:0",
+  "jevGeneric": 0.42
+ },
+ "A1-mixer:1:agentworkflowvisualdebug:osk": {
+  "jevP10": 0.11,
+  "jevShip": 0.25,
+  "jevRun": "r1:26",
+  "rubric": {
+   "spec": 1,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.02,
+   "flaw": "No buyer, no pain, no price stated at all"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.78
+ },
+ "A2-random-schema:1:hebrewtypefaceeditor:zzh": {
+  "jevP10": 0.25,
+  "jevShip": 0.63,
+  "jevRun": "r1:26",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "Tiny willingness-to-pay for a free-adjacent developer tool niche"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.28
+ },
+ "A2-random-schema:1:agentsessionmanager:dmw": {
+  "jevP10": 0.36,
+  "jevShip": 0.54,
+  "jevRun": "r1:27",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Crowded devtool category, hard to beat existing agent dashboards"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.25
+ },
+ "G-constraint:1:hdcoachtoolkitbundle:zgm": {
+  "jevP10": 0.41,
+  "jevShip": 0.91,
+  "jevRun": "r1:27",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.25,
+   "flaw": "Small addressable market of HD coaches willing to pay $49"
+  },
+  "rubricRun": "r1:2",
+  "jevGeneric": 0.28
+ },
+ "E-remix:1:hdreaderdirectory:ihw": {
+  "jevP10": 0.3,
+  "jevShip": 0.74,
+  "jevRun": "r1:27",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Two-sided marketplace needs critical mass of readers before any value exists"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.28
+ },
+ "B-pain:1:sideprojectlaunchkitaudi:6vk": {
+  "jevP10": 0.4,
+  "jevShip": 0.87,
+  "jevRun": "r1:27",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Meta-advice product in oversaturated 'how to launch' niche, low differentiation"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.63
+ },
+ "E-remix:1:hdatlastelegrambot:hab": {
+  "jevP10": 0.44,
+  "jevShip": 0.77,
+  "jevRun": "r1:29",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.22,
+   "flaw": "Niche audience unlikely to pay monthly for bot vs free info"
+  },
+  "rubricRun": "r1:7",
+  "jevGeneric": 0.26
+ },
+ "D-asset:1:hdatlashebrewcharts:eqq": {
+  "jevP10": 0.39,
+  "jevShip": 0.74,
+  "jevRun": "r1:29",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Manual monthly deep-dives don't scale, builder becomes bottleneck"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.23
+ },
+ "E-remix:1:herdrdashboardpro:6ov": {
+  "jevP10": 0.37,
+  "jevShip": 0.73,
+  "jevRun": "r1:28",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Crowded niche market, unclear willingness to pay for context tool"
+  },
+  "rubricRun": "r1:3",
+  "jevGeneric": 0.26
+ },
+ "A1-mixer:1:globeintimacyatlas:5cs": {
+  "jevP10": 0.13,
+  "jevShip": 0.26,
+  "jevRun": "r1:28",
+  "rubric": {
+   "spec": 2,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.03,
+   "flaw": "No stated buyer, no market for a novelty mashup product"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.57,
+  "jevSingleP10": 0.15
+ },
+ "G-constraint:1:personalbodygraphnftcard:b0w": {
+  "jevP10": 0.23,
+  "jevShip": 0.67,
+  "jevRun": "r1:28",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.04,
+   "flaw": "NFT market for this niche is essentially dead, no real buyer demand"
+  },
+  "rubricRun": "r1:4",
+  "jevGeneric": 0.46
+ },
+ "C-audience:1:tarotref:o7f": {
+  "jevP10": 0.37,
+  "jevShip": 0.66,
+  "jevRun": "r1:28",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Crowded niche, unclear willingness to pay for simple lookup tool"
+  },
+  "rubricRun": "r1:6",
+  "jevGeneric": 0.47
+ },
+ "W-hybrid:2:hdbirthchartbot:l6t": {
+  "jevP10": 0.52,
+  "jevShip": 0.82,
+  "jevRun": "r2:0",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Crowded HD app niche; Telegram bot unlikely to convert to paid at scale"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.19
+ },
+ "W-hybrid:2:couplecompass:jgw": {
+  "jevP10": 0.42,
+  "jevShip": 0.77,
+  "jevRun": "r2:0",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Requires two people to engage simultaneously, high friction for conversion"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.23
+ },
+ "F-gem:2:claudeworkbenchmultiagen:fvh": {
+  "jevP10": 0.19,
+  "jevShip": 0.24,
+  "jevRun": "r2:0",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Dev tool niche with weak willingness-to-pay; free alternatives exist"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.33
+ },
+ "W-hybrid:2:falafelrushsponsorship:npa": {
+  "jevP10": 0.13,
+  "jevShip": 0.83,
+  "jevRun": "r2:0",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "No evidence of real 50k monthly players; sponsor claim unverified"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 1,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.03,
+   "flaw": "$2k/mo sponsorship needs real ad sales relationships he doesn't have",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:2:yourdayhddailystrategy:iew": {
+  "jevP10": 0.54,
+  "jevShip": 0.8,
+  "jevRun": "r2:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 4,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.22,
+   "flaw": "Very small addressable Hebrew HD market limits ceiling well under target"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.17,
+  "patterns": {
+   "spend": 0.54,
+   "narrow": 0.72,
+   "distribution": 0.42,
+   "fit": 0.8,
+   "small": 0.8,
+   "price": 0.55,
+   "durable": 0.4,
+   "repeat": 0.9
+  }
+ },
+ "C-audience:2:shortclipstudio:1ly": {
+  "jevP10": 0.47,
+  "jevShip": 0.81,
+  "jevRun": "r2:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Saturated market of clip tools; hard to stand out on quality alone"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.25
+ },
+ "B-pain:2:facebookgrouparchiverpro:l5c": {
+  "jevP10": 0.33,
+  "jevShip": 0.72,
+  "jevRun": "r2:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Facebook ToS/scraping risk could kill access anytime, buyer trust issue"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.19
+ },
+ "F-gem:2:tenderintelligenceisrael:naj": {
+  "jevP10": 0.26,
+  "jevShip": 0.35,
+  "jevRun": "r2:1",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Requires trust/credibility with SMEs; sales cycle likely slower than 60 days"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.17
+ },
+ "B-pain:2:transcriptcommandcenter:urh": {
+  "jevP10": 0.39,
+  "jevShip": 0.82,
+  "jevRun": "r2:2",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "crowded transcript/clip tool market with weak differentiation"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Crowded transcript/clip tool space; no differentiated hook to win against incumbents",
+   "generic": 3
+  },
+  "rubric2Run": "4"
+ },
+ "W-hybrid:2:hdreadersdirectory:82d": {
+  "jevP10": 0.32,
+  "jevShip": 0.81,
+  "jevRun": "r2:2",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.04,
+   "flaw": "two-sided marketplace cold-start with no existing reader supply"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Two-sided marketplace needs both readers and traffic, chicken-egg problem",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "F-gem:2:launchtrackerfirstcustom:t69": {
+  "jevP10": 0.24,
+  "jevShip": 0.69,
+  "jevRun": "r2:2",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Money-back guarantee model risks refunds eating margin fast at low price"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.46
+ },
+ "F-gem:2:olimtelegrambotisraeligo:za3": {
+  "jevP10": 0.17,
+  "jevShip": 0.48,
+  "jevRun": "r2:2",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.04,
+   "flaw": "free product with vague monetization, no real buyer defined"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Free bot with no clear monetization path to paying customers",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "W-hybrid:2:creatorworkshopshortsstu:r47": {
+  "jevP10": 0.45,
+  "jevShip": 0.82,
+  "jevRun": "r2:4",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "live cohort requires teaching time and audience the builder lacks"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.23
+ },
+ "B-pain:2:zdainucouplesreport:z7h": {
+  "jevP10": 0.45,
+  "jevShip": 0.8,
+  "jevRun": "r2:4",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Low $9.99 price needs high volume; distribution channel unowned"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.3
+ },
+ "C-audience:2:tenderaiscoutdailyalerts:8rl": {
+  "jevP10": 0.48,
+  "jevShip": 0.77,
+  "jevRun": "r2:4",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "WhatsApp Business API onboarding friction could stall launch"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.21
+ },
+ "B-pain:2:claudecodegitorchestrato:lbn": {
+  "jevP10": 0.29,
+  "jevShip": 0.57,
+  "jevRun": "r2:4",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Narrow niche of power users managing worktrees manually already exists"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.32
+ },
+ "F-gem:2:voxelexplorer3dminigamec:rkv": {
+  "jevP10": 0.34,
+  "jevShip": 0.36,
+  "jevRun": "r2:3",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Complex tool-building project unlikely to reach paying users in 60 days"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.27
+ },
+ "F-gem:2:podcastarchivestudio:d1l": {
+  "jevP10": 0.44,
+  "jevShip": 0.77,
+  "jevRun": "r2:3",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Crowded space (Descript, Opus Clip) with strong incumbents"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.17
+ },
+ "C-audience:2:dailytarotcardastroinsig:mdl": {
+  "jevP10": 0.4,
+  "jevShip": 0.76,
+  "jevRun": "r2:3",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Requires manual deck upload per reader, adoption friction is high"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.32
+ },
+ "C-audience:2:couplescompatibilitycard:x3q": {
+  "jevP10": 0.46,
+  "jevShip": 0.81,
+  "jevRun": "r2:3",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "one-time low-price purchase with no repeat revenue or real distribution"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.21
+ },
+ "C-audience:2:transittracker:gmd": {
+  "jevP10": 0.44,
+  "jevShip": 0.82,
+  "jevRun": "r2:5",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Low price point needs high volume; astrology-adjacent apps have low retention"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.25
+ },
+ "F-gem:2:humandesignchartreliabil:95l": {
+  "jevP10": 0.29,
+  "jevShip": 0.73,
+  "jevRun": "r2:5",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Few HD app devs actually need a paid API at this price"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.18
+ },
+ "F-gem:2:grouparchaeologyfacebook:b45": {
+  "jevP10": 0.38,
+  "jevShip": 0.75,
+  "jevRun": "r2:5",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Facebook scraping is fragile against platform changes and access restrictions"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.14,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Facebook API/ToS access for scraping at scale is legally risky and fragile",
+   "generic": 2
+  },
+  "rubric2Run": "2"
+ },
+ "B-pain:2:agentcostaudit:ub3": {
+  "jevP10": 0.39,
+  "jevShip": 0.82,
+  "jevRun": "r2:5",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "One-off $9 report has weak recurring value and thin market"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.36
+ },
+ "C-audience:2:agentstallalert:vye": {
+  "jevP10": 0.37,
+  "jevShip": 0.75,
+  "jevRun": "r2:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "tiny niche audience unlikely to number 10 paying users fast"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.21
+ },
+ "C-audience:2:sourcetimelineosint:ezo": {
+  "jevP10": 0.25,
+  "jevShip": 0.67,
+  "jevRun": "r2:8",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "OSINT researchers are a small, cheap, tool-fatigued market"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.28,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 4,
+   "fun": 4,
+   "p10": 0.1,
+   "flaw": "Tiny, skeptical OSINT niche unlikely to pay $49-199 without trust built first",
+   "generic": 2
+  },
+  "rubric2Run": "5"
+ },
+ "B-pain:2:transcriptbatchextractor:8bq": {
+  "jevP10": 0.52,
+  "jevShip": 0.85,
+  "jevRun": "r2:8",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "one-time $2.99 batch fee too low to justify acquisition effort"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "$2.99 one-time price too low to reach 10 paying customers profitably",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:2:falafelrushseasonsleader:tte": {
+  "jevP10": 0.39,
+  "jevShip": 0.72,
+  "jevRun": "r2:8",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Cash-prize payouts create cost/legal burden with no clear paying customer"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.19,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.03,
+   "flaw": "Free-to-play model with cash prizes has no clear path to 10 paying customers",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:2:agentsessionreplay:v8t": {
+  "jevP10": 0.43,
+  "jevShip": 0.75,
+  "jevRun": "r2:6",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.06,
+   "flaw": "Electron app adds real build time; niche buyer pool"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.19
+ },
+ "B-pain:2:hdatlasfreetier:927": {
+  "jevP10": 0.39,
+  "jevShip": 0.87,
+  "jevRun": "r2:6",
+  "rubric": {
+   "spec": 3,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Free tier gives away the product; premium conversion path is weak"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.25
+ },
+ "W-hybrid:2:zdainureport:gbo": {
+  "jevP10": 0.47,
+  "jevShip": 0.8,
+  "jevRun": "r2:6",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Adult/intimacy framing narrows buyer pool and complicates ad-based distribution"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.24
+ },
+ "C-audience:2:faqautoresponderforgroup:efg": {
+  "jevP10": 0.33,
+  "jevShip": 0.61,
+  "jevRun": "r2:6",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Facebook UI automation is fragile and violates ToS, likely to break"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.31
+ },
+ "B-pain:2:herdrdeckpro:987": {
+  "jevP10": 0.43,
+  "jevShip": 0.77,
+  "jevRun": "r2:7",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Tiny niche audience unlikely to pay $29/mo for internal dashboard"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.29
+ },
+ "B-pain:2:falafelrushadsnetwork:cuk": {
+  "jevP10": 0.24,
+  "jevShip": 0.64,
+  "jevRun": "r2:7",
+  "rubric": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "No upfront revenue and ad network needs scale on both sides to work"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.25
+ },
+ "W-hybrid:2:dailyhumandesigninsights:y50": {
+  "jevP10": 0.42,
+  "jevShip": 0.72,
+  "jevRun": "r2:7",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.1,
+   "flaw": "crowded astrology-app-style space, weak retention without real hook"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.3
+ },
+ "W-hybrid:2:agentdeckpro:3b1": {
+  "jevP10": 0.41,
+  "jevShip": 0.76,
+  "jevRun": "r2:7",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.09,
+   "flaw": "Nearly identical to i3/i4, splitting effort across duplicate ideas"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.22
+ },
+ "F-gem:2:agentcostdashboard:k50": {
+  "jevP10": 0.4,
+  "jevShip": 0.74,
+  "jevRun": "r2:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "stack mismatch (story-reel unrelated); API cost data access unclear"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.4
+ },
+ "W-hybrid:2:grouparchivechat:d6v": {
+  "jevP10": 0.29,
+  "jevShip": 0.56,
+  "jevRun": "r2:10",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Facebook API/ToS access for scraping+messenger bot is fragile and risky"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.21
+ },
+ "B-pain:2:indielaunchchecklist:ov8": {
+  "jevP10": 0.47,
+  "jevShip": 0.9,
+  "jevRun": "r2:10",
+  "rubric": {
+   "spec": 3,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.06,
+   "flaw": "generic advice PDF, saturated category, low willingness to pay"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.52
+ },
+ "F-gem:2:herdrpro:ji0": {
+  "jevP10": 0.36,
+  "jevShip": 0.39,
+  "jevRun": "r2:10",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche developer tool with small addressable market willing to pay monthly"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.18
+ },
+ "F-gem:2:tenderalertil:f6t": {
+  "jevP10": 0.44,
+  "jevShip": 0.83,
+  "jevRun": "r2:9",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.16,
+   "flaw": "near-duplicate of i6/i9, splitting focus across three tender ideas"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.14
+ },
+ "F-gem:2:humandesignpairingcompat:jzk": {
+  "jevP10": 0.46,
+  "jevShip": 0.82,
+  "jevRun": "r2:9",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.25,
+   "flaw": "Niche audience willing to pay for HD compatibility readings is small"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche HD-compatibility buyers are thin; distribution relies on cold outreach",
+   "generic": 2
+  },
+  "rubric2Run": "4"
+ },
+ "W-hybrid:2:tendersnipeco:fve": {
+  "jevP10": 0.4,
+  "jevShip": 0.8,
+  "jevRun": "r2:9",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "duplicate of i6/i15; same execution risk on WhatsApp delivery"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.17,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Government tender data quality/legal scraping risk plus weak retention incentive",
+   "generic": 2
+  },
+  "rubric2Run": "5"
+ },
+ "W-hybrid:2:agentcockpitpro:lkw": {
+  "jevP10": 0.39,
+  "jevShip": 0.75,
+  "jevRun": "r2:9",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Same niche/oversaturation as i3/i13, cannibalizes own ideas"
+  },
+  "rubricRun": "r2:2",
+  "jevGeneric": 0.2
+ },
+ "C-audience:2:dailyisraelnewsdigesttel:hvk": {
+  "jevP10": 0.43,
+  "jevShip": 0.81,
+  "jevRun": "r2:11",
+  "rubric": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "₪25/month too low, hard to convert free Telegram readers to paid"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.07,
+   "flaw": "Free Russian news alternatives already exist via Telegram/Google Translate",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "W-hybrid:2:creatorarchivechat:9g": {
+  "jevP10": 0.35,
+  "jevShip": 0.72,
+  "jevRun": "r2:11",
+  "rubric": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Revenue share model means creators must actively promote it themselves"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.32
+ },
+ "B-pain:2:humandesignchartsapi:u79": {
+  "jevP10": 0.42,
+  "jevShip": 0.81,
+  "jevRun": "r2:11",
+  "rubric": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Developers, not end consumers, are the real buyer—thin market for HD APIs"
+  },
+  "rubricRun": "r2:0",
+  "jevGeneric": 0.15,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.09,
+   "flaw": "Developer API market for niche HD data is tiny with few paying integrators",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:2:tenderaiprohebrewedition:ojx": {
+  "jevP10": 0.33,
+  "jevShip": 0.66,
+  "jevRun": "r2:11",
+  "rubric": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "WhatsApp business API approval and Hebrew form auto-fill are nontrivial"
+  },
+  "rubricRun": "r2:1",
+  "jevGeneric": 0.17
+ },
+ "T-early:3:claudecodetaskexecutor:qye": {
+  "jevP10": 0.43,
+  "jevShip": 0.74,
+  "jevRun": "r3:1",
+  "jevGeneric": 0.35,
+  "rubric2": {
+   "spec": 2,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Thin wrapper around Claude Code itself; buyers can just use Claude Code",
+   "generic": 4
+  },
+  "rubric2Run": "2"
+ },
+ "C-audience:3:hdcouplesynchebreweditio:jsm": {
+  "jevP10": 0.58,
+  "jevShip": 0.8,
+  "jevRun": "r3:1",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 4,
+   "novelty": 4,
+   "fun": 4,
+   "p10": 0.25,
+   "flaw": "Small addressable market and unproven willingness to pay for HD reports",
+   "generic": 2
+  },
+  "rubric2Run": "5"
+ },
+ "T-hot:3:tarotspreadinterpretatio:fnn": {
+  "jevP10": 0.45,
+  "jevShip": 0.75,
+  "jevRun": "r3:1",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 4,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Tarot readers skew skeptical of AI; unclear willingness to pay per read",
+   "generic": 2
+  },
+  "rubric2Run": "1"
+ },
+ "T-hot:3:agentsessionmonitorwebmo:qev": {
+  "jevP10": 0.39,
+  "jevShip": 0.78,
+  "jevRun": "r3:1",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche need; devs unlikely to pay monthly for a dashboard they can build themselves",
+   "generic": 3
+  },
+  "rubric2Run": "5"
+ },
+ "T-early:3:roomsketchplaytests:vuh": {
+  "jevP10": 0.36,
+  "jevShip": 0.63,
+  "jevRun": "r3:2",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 5,
+   "p10": 0.03,
+   "flaw": "No clear paying buyer; ₪29 download unlikely to convert casual TikTok viewers",
+   "generic": 3
+  },
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.4,
+   "narrow": 0.64,
+   "distribution": 0.45,
+   "fit": 0.73,
+   "small": 0.79,
+   "price": 0.43,
+   "durable": 0.36,
+   "repeat": 0.25
+  }
+ },
+ "T-hot:3:decisionapifortarotreadi:xfd": {
+  "jevP10": 0.41,
+  "jevShip": 0.64,
+  "jevRun": "r3:2",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Depends on unproven 'Laya' model tech and tiny reader budgets",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "T-early:3:calmzoomclone:htr": {
+  "jevP10": 0.25,
+  "jevShip": 0.47,
+  "jevRun": "r3:2",
+  "jevGeneric": 0.4,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "Competing against Zoom/Teams natively; no reason remote teams switch platforms",
+   "generic": 4
+  },
+  "rubric2Run": "4"
+ },
+ "C-audience:3:falafelfrenzyleaderboard:6fk": {
+  "jevP10": 0.42,
+  "jevShip": 0.78,
+  "jevRun": "r3:2",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 1,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Free game with cosmetics rarely converts to real paying customers",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:3:agentsentinelstallwatchd:ve7": {
+  "jevP10": 0.39,
+  "jevShip": 0.8,
+  "jevRun": "r3:0",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Crowded devtool niche; devs reluctant to pay for a small daemon",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "B-pain:3:clipautopilot:42u": {
+  "jevP10": 0.5,
+  "jevShip": 0.8,
+  "jevRun": "r3:0",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.3,
+   "flaw": "Crowded clip-tool market with many cheap/free alternatives already",
+   "generic": 2
+  },
+  "rubric2Run": "5"
+ },
+ "C-audience:3:herdrpromonitorrevive:si0": {
+  "jevP10": 0.43,
+  "jevShip": 0.81,
+  "jevRun": "r3:0",
+  "jevGeneric": 0.19,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.2,
+   "flaw": "Niche audience of multi-session agent power users may be too small",
+   "generic": 2
+  },
+  "rubric2Run": "2"
+ },
+ "T-hot:3:hdcompatibilityreportfor:9tu": {
+  "jevP10": 0.48,
+  "jevShip": 0.8,
+  "jevRun": "r3:0",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Same HD-compatibility niche as i6; unclear if market supports two competing offers",
+   "generic": 2
+  },
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.53,
+   "narrow": 0.72,
+   "distribution": 0.38,
+   "fit": 0.74,
+   "small": 0.87,
+   "price": 0.76,
+   "durable": 0.5,
+   "repeat": 0.2
+  }
+ },
+ "T-early:3:storyreelopusshorts:ofc": {
+  "jevP10": 0.43,
+  "jevShip": 0.74,
+  "jevRun": "r3:4",
+  "jevGeneric": 0.27,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Directly competes with well-funded incumbent Opus Clip on its own turf",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "T-hot:3:agentsessionrecorder:y0y": {
+  "jevP10": 0.37,
+  "jevShip": 0.74,
+  "jevRun": "r3:4",
+  "jevGeneric": 0.19,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche technical audience, crowded observability space forming fast",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:3:grouparchivesearch:69o": {
+  "jevP10": 0.35,
+  "jevShip": 0.73,
+  "jevRun": "r3:4",
+  "jevGeneric": 0.13,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Duplicate of i4; same Facebook scraping legality and access risk",
+   "generic": 2
+  },
+  "rubric2Run": "2"
+ },
+ "C-audience:3:makomdailyhebrewnewsaler:an4": {
+  "jevP10": 0.42,
+  "jevShip": 0.73,
+  "jevRun": "r3:4",
+  "jevGeneric": 0.23,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Free news alternatives abundant; ₪49/mo for headlines is a hard sell",
+   "generic": 3
+  },
+  "rubric2Run": "4"
+ },
+ "C-audience:3:cliploomautoshorts:pms": {
+  "jevP10": 0.52,
+  "jevShip": 0.82,
+  "jevRun": "r3:3",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.25,
+   "flaw": "Crowded market of clip tools; buyers churn fast and price-shop",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:3:herdrproagentsessionmana:jxh": {
+  "jevP10": 0.37,
+  "jevShip": 0.66,
+  "jevRun": "r3:3",
+  "jevGeneric": 0.23,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Overlaps with i1/herdr-deck already; crowded agent-tooling space",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "T-early:3:outcomediscoverycallnote:8yt": {
+  "jevP10": 0.42,
+  "jevShip": 0.82,
+  "jevRun": "r3:3",
+  "jevGeneric": 0.44,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.1,
+   "flaw": "Generic call-notes AI wrapper competing with Gong/Fireflies mindshare",
+   "generic": 4
+  },
+  "rubric2Run": "2"
+ },
+ "B-pain:3:falafelrushproarcade:zkm": {
+  "jevP10": 0.37,
+  "jevShip": 0.62,
+  "jevRun": "r3:3",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.03,
+   "flaw": "Real-money prize pools trigger gambling regulation risk; funding payouts from rake is fragile",
+   "generic": 3
+  },
+  "rubric2Run": "4"
+ },
+ "T-hot:3:makerportfolioleadlistex:rsv": {
+  "jevP10": 0.38,
+  "jevShip": 0.74,
+  "jevRun": "r3:5",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.06,
+   "flaw": "Weak buyer specificity, thin scraped dataset unlikely worth paying for",
+   "generic": 4
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:3:groupvaultfacebookbackup:u1a": {
+  "jevP10": 0.48,
+  "jevShip": 0.81,
+  "jevRun": "r3:5",
+  "jevGeneric": 0.13,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.18,
+   "flaw": "Facebook ToS/scraping risk could kill the service overnight",
+   "generic": 2
+  },
+  "rubric2Run": "5"
+ },
+ "C-audience:3:osintexposureaudit:5r4": {
+  "jevP10": 0.48,
+  "jevShip": 0.76,
+  "jevRun": "r3:5",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "OSINT audience skews DIY/free-tool users, low willingness to pay $19",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "B-pain:3:hdappreliabilitysla:3uw": {
+  "jevP10": 0.45,
+  "jevShip": 0.67,
+  "jevRun": "r3:5",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.07,
+   "flaw": "Competing on reliability alone rarely converts frustrated free-app users",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:3:dailydivinationtiktokcon:krq": {
+  "jevP10": 0.36,
+  "jevShip": 0.74,
+  "jevRun": "r3:7",
+  "jevGeneric": 0.35,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Video quality/template work is nontrivial; low willingness to pay $17",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:3:tenderaileadalerts:wj2": {
+  "jevP10": 0.49,
+  "jevShip": 0.8,
+  "jevRun": "r3:7",
+  "jevGeneric": 0.16,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.22,
+   "flaw": "Government site changes could break scraper anytime, fragile core",
+   "generic": 2
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:3:synccheckhdcompatibility:lmw": {
+  "jevP10": 0.56,
+  "jevShip": 0.8,
+  "jevRun": "r3:7",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.12,
+   "flaw": "Niche belief-based buyer, weak distribution beyond hashtags",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "T-early:3:futurematch:quw": {
+  "jevP10": 0.39,
+  "jevShip": 0.64,
+  "jevRun": "r3:7",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.06,
+   "flaw": "Dating marketplace needs critical mass of matched users; cold-start problem",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "T-hot:3:pokmonbattlegamehebrewru:tti": {
+  "jevP10": 0.35,
+  "jevShip": 0.58,
+  "jevRun": "r3:8",
+  "jevGeneric": 0.34,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.08,
+   "flaw": "Free ad-supported game, no clear path to paying customers",
+   "generic": 3
+  },
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.64,
+   "narrow": 0.51,
+   "distribution": 0.42,
+   "fit": 0.64,
+   "small": 0.57,
+   "price": 0.24,
+   "durable": 0.32,
+   "repeat": 0.5
+  }
+ },
+ "B-pain:3:hdatlaspro:nmb": {
+  "jevP10": 0.47,
+  "jevShip": 0.85,
+  "jevRun": "r3:8",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.1,
+   "flaw": "Free/cheap competitors abound, no forcing function to pay",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:3:opus55codegenerationsaas:h5q": {
+  "jevP10": 0.46,
+  "jevShip": 0.8,
+  "jevRun": "r3:8",
+  "jevGeneric": 0.39,
+  "rubric2": {
+   "spec": 2,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Thin wrapper around Claude with no moat; buyers can just use Claude directly",
+   "generic": 5
+  },
+  "rubric2Run": "5"
+ },
+ "T-early:3:makomaicitymatchreport:bem": {
+  "jevP10": 0.42,
+  "jevShip": 0.72,
+  "jevRun": "r3:8",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Relocation decisions rarely justified by one cheap AI report",
+   "generic": 3
+  },
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.58,
+   "narrow": 0.68,
+   "distribution": 0.55,
+   "fit": 0.67,
+   "small": 0.85,
+   "price": 0.62,
+   "durable": 0.45,
+   "repeat": 0.19
+  }
+ },
+ "C-audience:3:synccheckcompatibilityre:va0": {
+  "jevP10": 0.48,
+  "jevShip": 0.8,
+  "jevRun": "r3:9",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.1,
+   "flaw": "Impulse-buy price but distribution relies on organic reddit virality",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "T-early:3:dataprivacyauditforsmall:nw8": {
+  "jevP10": 0.39,
+  "jevShip": 0.84,
+  "jevRun": "r3:9",
+  "jevGeneric": 0.47,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.15,
+   "flaw": "Legal liability audit by non-lawyer, trust barrier too high",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:3:bizgenvalidatedcohortpro:cnt": {
+  "jevP10": 0.2,
+  "jevShip": 0.44,
+  "jevRun": "r3:9",
+  "jevGeneric": 0.39,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Service business needing manual interviews/intros, doesn't scale solo",
+   "generic": 3
+  },
+  "rubric2Run": "3"
+ },
+ "C-audience:3:hdtransitalerts:wm8": {
+  "jevP10": 0.51,
+  "jevShip": 0.78,
+  "jevRun": "r3:9",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 5,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Low price point makes 10 payers easy but revenue trivial, weak retention",
+   "generic": 2
+  },
+  "rubric2Run": "3"
+ },
+ "B-pain:3:tenderaiisraelismeeditio:vo": {
+  "jevP10": 0.39,
+  "jevShip": 0.7,
+  "jevRun": "r3:10",
+  "jevGeneric": 0.19,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 4,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Willingness to pay ₪150-300/mo for tenders unproven, needs scraping reliability",
+   "generic": 2
+  },
+  "rubric2Run": "4"
+ },
+ "B-pain:3:worktreeconciergedonefor:mxr": {
+  "jevP10": 0.25,
+  "jevShip": 0.73,
+  "jevRun": "r3:10",
+  "jevGeneric": 0.38,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Service business requiring manual hours-per-client work, doesn't scale like a product",
+   "generic": 3
+  },
+  "rubric2Run": "5"
+ },
+ "B-pain:3:transcriptcompanion:inu": {
+  "jevP10": 0.5,
+  "jevShip": 0.8,
+  "jevRun": "r3:10",
+  "jevGeneric": 0.23,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Many transcript-chat extensions exist already; weak differentiation",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "T-early:3:linkedincontentscheduler:7jp": {
+  "jevP10": 0.34,
+  "jevShip": 0.77,
+  "jevRun": "r3:10",
+  "jevGeneric": 0.48,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 1,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "Generic AI ghostwriting service, saturated market, manual bottleneck",
+   "generic": 4
+  },
+  "rubric2Run": "3"
+ },
+ "T-hot:3:podcastclipstudiofaceswa:5fh": {
+  "jevP10": 0.45,
+  "jevShip": 0.71,
+  "jevRun": "r3:6",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Face-swap clip quality/legal risk untested; crowded clip-tool market",
+   "generic": 2
+  },
+  "rubric2Run": "4"
+ },
+ "B-pain:3:aliyahhelperbottelegram:ykt": {
+  "jevP10": 0.17,
+  "jevShip": 0.44,
+  "jevRun": "r3:6",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Free product funded by vague referral links has no real revenue path",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "T-early:3:herdrcloudsync:gjg": {
+  "jevP10": 0.37,
+  "jevShip": 0.71,
+  "jevRun": "r3:6",
+  "jevGeneric": 0.2,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.05,
+   "flaw": "Requires new mobile app plus cloud sync infra not yet built",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "T-hot:3:applewalletcardcustomize:eu9": {
+  "jevP10": 0.49,
+  "jevShip": 0.77,
+  "jevRun": "r3:6",
+  "jevGeneric": 0.34,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "Digital business card market is saturated with free alternatives",
+   "generic": 3
+  },
+  "rubric2Run": "2"
+ },
+ "C-audience:4:myhdtypereport:ovf": {
+  "jevP10": 0.55,
+  "jevShip": 0.86,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Reddit beginners rarely pay $7 for a generated PDF",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:4:falafelrushads:lit": {
+  "jevP10": 0.35,
+  "jevShip": 0.68,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.27,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Cosmetics monetization on a casual game rarely converts to 10 payers fast",
+   "generic": 2
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:4:podcastdigestpro:68r": {
+  "jevP10": 0.4,
+  "jevShip": 0.76,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.4,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Crowded market of transcript/clip tools with free alternatives",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:4:herdrsessionsync:ycl": {
+  "jevP10": 0.4,
+  "jevShip": 0.71,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "Overlaps i1/i4, unclear differentiated pain worth $29/mo",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:4:tenderaialert:hqo": {
+  "jevP10": 0.46,
+  "jevShip": 0.8,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 5,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 4,
+   "fun": 3,
+   "p10": 0.3,
+   "flaw": "Requires trust/DM outreach conversion in a skeptical B2B niche",
+   "generic": 2
+  },
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.59,
+   "distribution": 0.24,
+   "fit": 0.62,
+   "small": 0.76,
+   "price": 0.64,
+   "durable": 0.42,
+   "repeat": 0.84
+  }
+ },
+ "C-audience:4:tarotdailydeck:83r": {
+  "jevP10": 0.44,
+  "jevShip": 0.85,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.43,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.12,
+   "flaw": "Tarot readers unlikely to pay recurring fee for content they can generate themselves",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:4:myhdchartinhebrew:vmv": {
+  "jevP10": 0.65,
+  "jevShip": 0.87,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 5,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 4,
+   "fun": 4,
+   "p10": 0.25,
+   "flaw": "Small underserved niche, uncertain how many will pay ₪49",
+   "generic": 1
+  },
+  "rubric2Run": "1",
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.68,
+   "distribution": 0.39,
+   "fit": 0.8,
+   "small": 0.89,
+   "price": 0.6,
+   "durable": 0.46,
+   "repeat": 0.18
+  }
+ },
+ "B-pain:4:sideprojectlaunchpad:gdq": {
+  "jevP10": 0.37,
+  "jevShip": 0.84,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.42,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Generic done-for-you launch service, saturated with agencies/templates",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:4:clipcaptionstudio:ws6": {
+  "jevP10": 0.45,
+  "jevShip": 0.88,
+  "jevRun": "r4:2",
+  "jevGeneric": 0.24,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Big creators already have editors/tools; hard to reach them via Reddit",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:4:zdainupremium:lir": {
+  "jevP10": 0.43,
+  "jevShip": 0.81,
+  "jevRun": "r4:2",
+  "jevGeneric": 0.28,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Adult/intimacy framing limits ad channels, low price, weak distribution",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:4:codexcostwatch:f33": {
+  "jevP10": 0.37,
+  "jevShip": 0.74,
+  "jevRun": "r4:2",
+  "jevGeneric": 0.23,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche tool; developers may just check Anthropic's own usage dashboard",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:4:worktreedashboard:fu2": {
+  "jevP10": 0.28,
+  "jevShip": 0.69,
+  "jevRun": "r4:2",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Niche dev tool market with many free alternatives (tmux/git scripts)",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:4:facebookgroupbackupservi:zvh": {
+  "jevP10": 0.34,
+  "jevShip": 0.78,
+  "jevRun": "r4:3",
+  "jevGeneric": 0.21,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 2,
+   "p10": 0.12,
+   "flaw": "Facebook scraping likely violates ToS, risk of account bans/legal",
+   "generic": 2
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:4:cliptubeinstant:9q8": {
+  "jevP10": 0.5,
+  "jevShip": 0.79,
+  "jevRun": "r4:3",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.2,
+   "flaw": "Crowded space with many free/cheap clip tools already",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:4:hdcompatibilityreading:udq": {
+  "jevP10": 0.49,
+  "jevShip": 0.84,
+  "jevRun": "r4:3",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.18,
+   "flaw": "Compatibility reading credibility depends on chart interpretation quality",
+   "generic": 2
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:4:herdrdashboardpro:tqt": {
+  "jevP10": 0.38,
+  "jevShip": 0.72,
+  "jevRun": "r4:3",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.1,
+   "flaw": "Niche dev tool with unclear pain severity vs free terminal tabs",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:4:herdrskillmarketplace:2lr": {
+  "jevP10": 0.35,
+  "jevShip": 0.78,
+  "jevRun": "r4:4",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 2,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.08,
+   "flaw": "No evidence anyone wants to pay for cross-session prompt reuse",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:4:falafelrushtiktokpack:hju": {
+  "jevP10": 0.23,
+  "jevShip": 0.87,
+  "jevRun": "r4:4",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 4,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 4,
+   "p10": 0.03,
+   "flaw": "No real buyer identified, revenue-share offer has no clear payer",
+   "generic": 3
+  },
+  "rubric2Run": "1"
+ },
+ "C-audience:4:claimslab:uot": {
+  "jevP10": 0.29,
+  "jevShip": 0.69,
+  "jevRun": "r4:4",
+  "jevGeneric": 0.39,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.05,
+   "flaw": "Fact-checking accuracy hard, niche audience unlikely to pay per report",
+   "generic": 4
+  },
+  "rubric2Run": "1"
+ },
+ "B-pain:4:hdatlasreader:fwr": {
+  "jevP10": 0.46,
+  "jevShip": 0.8,
+  "jevRun": "r4:4",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 5,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.12,
+   "flaw": "One-time $9.99 offline app is a hard sell against many free HD sites",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:4:tenderbotwhatsapp:puv": {
+  "jevP10": 0.37,
+  "jevShip": 0.78,
+  "jevRun": "r4:5",
+  "jevGeneric": 0.17,
+  "rubric2": {
+   "spec": 5,
+   "feasible": 4,
+   "buyer": 4,
+   "distribution": 3,
+   "novelty": 4,
+   "fun": 3,
+   "p10": 0.3,
+   "flaw": "Same core idea as i4; success hinges on WhatsApp group access and trust",
+   "generic": 2
+  },
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.81,
+   "narrow": 0.59,
+   "distribution": 0.16,
+   "fit": 0.6,
+   "small": 0.72,
+   "price": 0.61,
+   "durable": 0.35,
+   "repeat": 0.81
+  }
+ },
+ "B-pain:4:grouparchivebuilder:u57": {
+  "jevP10": 0.43,
+  "jevShip": 0.8,
+  "jevRun": "r4:5",
+  "jevGeneric": 0.18,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.15,
+   "flaw": "Facebook API/ToS restrictions make reliable scraping fragile and risky",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "B-pain:4:hdfreeguideseries:nw3": {
+  "jevP10": 0.13,
+  "jevShip": 0.32,
+  "jevRun": "r4:5",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 5,
+   "buyer": 1,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.05,
+   "flaw": "Free lead magnet has no direct revenue, not a paying-customer test",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "C-audience:4:ivritdailyhebrewforreall:gnu": {
+  "jevP10": 0.42,
+  "jevShip": 0.71,
+  "jevRun": "r4:5",
+  "jevGeneric": 0.22,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.15,
+   "flaw": "Olim niche small, unclear willingness to pay monthly for phrases",
+   "generic": 2
+  },
+  "rubric2Run": "1"
+ },
+ "T-hot:4:agentsessionarchive:g4a": {
+  "jevP10": 0.44,
+  "jevShip": 0.73,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.26,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.09,
+   "flaw": "Developers unlikely to pay monthly for local logging they could build themselves",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:4:agentharnesscomparison:ifu": {
+  "jevP10": 0.4,
+  "jevShip": 0.8,
+  "jevRun": "r4:1",
+  "jevGeneric": 0.31,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 2,
+   "fun": 2,
+   "p10": 0.08,
+   "flaw": "Thin one-time PDF product with no lasting differentiation or repeat revenue",
+   "generic": 4
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:4:decisionmodeldistiller:e9b": {
+  "jevP10": 0.34,
+  "jevShip": 0.62,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.29,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 2,
+   "buyer": 2,
+   "distribution": 2,
+   "novelty": 3,
+   "fun": 3,
+   "p10": 0.06,
+   "flaw": "Niche technical buyer unlikely to pay $49 one-time for unproven distillation quality",
+   "generic": 4
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:4:podcastcliplibrarian:sga": {
+  "jevP10": 0.52,
+  "jevShip": 0.81,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 4,
+   "feasible": 4,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 2,
+   "fun": 3,
+   "p10": 0.18,
+   "flaw": "Crowded clip-tool market with many free/cheap competitors already doing this well",
+   "generic": 3
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:4:pokmonbattlearena:79": {
+  "jevP10": 0.36,
+  "jevShip": 0.52,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.37,
+  "rubric2": {
+   "spec": 3,
+   "feasible": 3,
+   "buyer": 1,
+   "distribution": 2,
+   "novelty": 1,
+   "fun": 4,
+   "p10": 0.04,
+   "flaw": "IP risk using Pokémon brand plus no proven buyer willing to pay for browser clone",
+   "generic": 4
+  },
+  "rubric2Run": "0"
+ },
+ "T-hot:4:humandesignmatchreport:q89": {
+  "jevP10": 0.53,
+  "jevShip": 0.8,
+  "jevRun": "r4:0",
+  "jevGeneric": 0.25,
+  "rubric2": {
+   "spec": 5,
+   "feasible": 5,
+   "buyer": 3,
+   "distribution": 3,
+   "novelty": 3,
+   "fun": 4,
+   "p10": 0.22,
+   "flaw": "Low price point means needing many buyers; HD compatibility market size uncertain",
+   "generic": 2
+  },
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.61,
+   "distribution": 0.44,
+   "fit": 0.73,
+   "small": 0.83,
+   "price": 0.57,
+   "durable": 0.43,
+   "repeat": 0.21
+  }
+ },
+ "T-early:3:makomaicitymatchreport:bem:pm": {
+  "patterns": {
+   "spend": 0.6,
+   "narrow": 0.57,
+   "distribution": 0.43,
+   "fit": 0.69,
+   "small": 0.71,
+   "price": 0.67,
+   "durable": 0.46,
+   "repeat": 0.87
+  },
+  "jevP10": 0.41,
+  "jevShip": 0.8,
+  "jevGeneric": 0.29
+ },
+ "T-hot:3:pokmonbattlegamehebrewru:tti:pm": {
+  "patterns": {
+   "spend": 0.59,
+   "narrow": 0.76,
+   "distribution": 0.89,
+   "fit": 0.77,
+   "small": 0.7,
+   "price": 0.48,
+   "durable": 0.5,
+   "repeat": 0.79
+  },
+  "jevP10": 0.37,
+  "jevShip": 0.68,
+  "jevGeneric": 0.18
+ },
+ "G-constraint:1:hdatlastelegrambot:g1y:pm": {
+  "patterns": {
+   "spend": 0.55,
+   "narrow": 0.74,
+   "distribution": 0.62,
+   "fit": 0.81,
+   "small": 0.84,
+   "price": 0.63,
+   "durable": 0.48,
+   "repeat": 0.87
+  },
+  "jevP10": 0.54,
+  "jevShip": 0.82,
+  "jevGeneric": 0.18
+ },
+ "C-audience:4:tenderaialert:hqo:pm": {
+  "patterns": {
+   "spend": 0.83,
+   "narrow": 0.6,
+   "distribution": 0.18,
+   "fit": 0.66,
+   "small": 0.76,
+   "price": 0.78,
+   "durable": 0.49,
+   "repeat": 0.86
+  },
+  "jevP10": 0.2,
+  "jevShip": 0.63,
+  "jevGeneric": 0.27
+ },
+ "C-audience:4:myhdchartinhebrew:vmv:pm": {
+  "patterns": {
+   "spend": 0.7,
+   "narrow": 0.73,
+   "distribution": 0.37,
+   "fit": 0.8,
+   "small": 0.69,
+   "price": 0.55,
+   "durable": 0.55,
+   "repeat": 0.89
+  },
+  "jevP10": 0.52,
+  "jevShip": 0.82,
+  "jevGeneric": 0.21
+ },
+ "B-pain:1:hdatlaszerodowntimerelia:ylg:pm": {
+  "patterns": {
+   "spend": 0.78,
+   "narrow": 0.74,
+   "distribution": 0.42,
+   "fit": 0.76,
+   "small": 0.85,
+   "price": 0.57,
+   "durable": 0.58,
+   "repeat": 0.14
+  },
+  "jevGeneric": 0.14,
+  "jevP10": 0.54,
+  "jevShip": 0.78
+ },
+ "C-audience:1:herdrconsole:kz2:pm": {
+  "patterns": {
+   "spend": 0.77,
+   "narrow": 0.52,
+   "distribution": 0.18,
+   "fit": 0.7,
+   "small": 0.76,
+   "price": 0.78,
+   "durable": 0.46,
+   "repeat": 0.39
+  },
+  "jevGeneric": 0.23,
+  "jevP10": 0.23,
+  "jevShip": 0.74
+ },
+ "B-pain:4:tenderbotwhatsapp:puv:pm": {
+  "jevGeneric": 0.23,
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.61,
+   "distribution": 0.13,
+   "fit": 0.71,
+   "small": 0.75,
+   "price": 0.67,
+   "durable": 0.42,
+   "repeat": 0.85
+  },
+  "jevP10": 0.26,
+  "jevShip": 0.68
+ },
+ "B-pain:1:storyreelpremiumhdshorts:r:pm": {
+  "jevGeneric": 0.35,
+  "patterns": {
+   "spend": 0.73,
+   "narrow": 0.62,
+   "distribution": 0.17,
+   "fit": 0.65,
+   "small": 0.76,
+   "price": 0.62,
+   "durable": 0.31,
+   "repeat": 0.81
+  },
+  "jevP10": 0.36,
+  "jevShip": 0.7
+ },
+ "C-audience:1:hdquickread:iy7:pm": {
+  "jevGeneric": 0.24,
+  "patterns": {
+   "spend": 0.68,
+   "narrow": 0.68,
+   "distribution": 0.31,
+   "fit": 0.78,
+   "small": 0.85,
+   "price": 0.63,
+   "durable": 0.38,
+   "repeat": 0.64
+  },
+  "jevP10": 0.54,
+  "jevShip": 0.79
+ },
+ "D-asset:1:astrachartshdreadingsasa:pdv:pm": {
+  "jevGeneric": 0.28,
+  "patterns": {
+   "spend": 0.78,
+   "narrow": 0.69,
+   "distribution": 0.25,
+   "fit": 0.78,
+   "small": 0.86,
+   "price": 0.66,
+   "durable": 0.55,
+   "repeat": 0.21
+  },
+  "jevP10": 0.52,
+  "jevShip": 0.8
+ },
+ "C-audience:2:yourdayhddailystrategy:iew:pm": {
+  "jevP10": 0.58,
+  "jevShip": 0.83,
+  "jevGeneric": 0.23,
+  "patterns": {
+   "spend": 0.56,
+   "narrow": 0.75,
+   "distribution": 0.62,
+   "fit": 0.71,
+   "small": 0.81,
+   "price": 0.52,
+   "durable": 0.42,
+   "repeat": 0.86
+  }
+ },
+ "T-hot:4:humandesignmatchreport:q89:pm": {
+  "jevP10": 0.51,
+  "jevShip": 0.83,
+  "jevGeneric": 0.2,
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.65,
+   "distribution": 0.52,
+   "fit": 0.77,
+   "small": 0.86,
+   "price": 0.8,
+   "durable": 0.64,
+   "repeat": 0.16
+  }
+ },
+ "G-constraint:1:podcastclipstudiomembers:tzq:pm": {
+  "jevP10": 0.3,
+  "jevShip": 0.77,
+  "jevGeneric": 0.33,
+  "patterns": {
+   "spend": 0.61,
+   "narrow": 0.54,
+   "distribution": 0.14,
+   "fit": 0.52,
+   "small": 0.71,
+   "price": 0.52,
+   "durable": 0.4,
+   "repeat": 0.79
+  }
+ },
+ "T-hot:3:hdcompatibilityreportfor:9tu:pm": {
+  "jevP10": 0.17,
+  "jevShip": 0.34,
+  "patterns": {
+   "spend": 0.31,
+   "narrow": 0.12,
+   "distribution": 0.22,
+   "fit": 0.31,
+   "small": 0.46,
+   "price": 0.24,
+   "durable": 0.33,
+   "repeat": 0.2
+  },
+  "jevGeneric": 0.84
+ },
+ "T-early:3:roomsketchplaytests:vuh:pm": {
+  "jevP10": 0.23,
+  "jevShip": 0.55,
+  "patterns": {
+   "spend": 0.53,
+   "narrow": 0.57,
+   "distribution": 0.21,
+   "fit": 0.77,
+   "small": 0.54,
+   "price": 0.42,
+   "durable": 0.34,
+   "repeat": 0.7
+  },
+  "jevGeneric": 0.28
+ }
+}

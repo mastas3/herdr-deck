@@ -1,0 +1,451 @@
+{
+ "ideaId": "G-constraint:1:hdatlastelegrambot:g1y",
+ "slug": "hd-atlas-telegram-bot",
+ "at": 1790435490958,
+ "version": "k1",
+ "spec": {
+  "problem": "Users of the official Human Design app paid for subscriptions and got 'failure to connect to server' with no support response — as one user put it, 'It's Apps like this that pull stunts like this that make people reluctant to invest into any app.' They want a dependable, offline way to look up their gates, channels, and centers without depending on a fragile server.",
+  "buyer": "Hebrew-speaking Human Design fans in Israel active in Telegram/WhatsApp groups like HumandesignIsrael, many of whom already paid once for an app that broke.",
+  "jobs": [
+   "Look up a gate/channel/center by name or number and get an instant Hebrew explanation",
+   "Trust that the tool won't suddenly stop working after payment",
+   "Share quick answers inside WhatsApp/Telegram group chats without opening a broken app"
+  ],
+  "scopeIn": [
+   "Telegram bot answering card lookups by number or Hebrew name from the 42-card hd-atlas corpus",
+   "Free-text search fallback (fuzzy match on keywords)",
+   "Gumroad-based subscription check gating full corpus access after a free-tier limit",
+   "Basic /start, /help, /search commands"
+  ],
+  "scopeOut": [
+   "Full bodygraph calculation (that's bodygraph-3d's job, not this bot's)",
+   "Payment inside Telegram itself (Gumroad checkout link only)",
+   "iOS/Android app",
+   "Multi-language support beyond Hebrew"
+  ],
+  "metrics": [
+   {
+    "metric": "Landing page live with bot link",
+    "target": "1 page on Netlify",
+    "milestone": "landing live"
+   },
+   {
+    "metric": "Direct conversations with prospects in the FB/WhatsApp group",
+    "target": "10 conversations",
+    "milestone": "10 conversations"
+   },
+   {
+    "metric": "Paying subscriber via Gumroad",
+    "target": "1 paying customer",
+    "milestone": "first paying customer"
+   }
+  ]
+ },
+ "architecture": {
+  "summary": "A Telegram bot (Node.js, long-polling, no server hosting cost) reads Hebrew card data from the existing hd-atlas JSON corpus, matches user queries to cards, and returns Hebrew explanations. Payment status is checked against a Gumroad license/webhook list stored in a small JSON/SQLite file. Landing page is a static Netlify site linking to the bot and Gumroad checkout.",
+  "components": [
+   {
+    "name": "hd-atlas",
+    "does": "Source of truth: 42 curated Human Design cards with Hebrew descriptions and keywords, stored as JSON files",
+    "uses": "Read directly by the bot process at query time"
+   },
+   {
+    "name": "HD Atlas Telegram Bot (this project)",
+    "does": "Node.js bot using node-telegram-bot-api, matches queries to cards, enforces free-tier limit, replies in Hebrew",
+    "uses": "hd-atlas corpus, Gumroad subscriber list, Telegram Bot API"
+   },
+   {
+    "name": "Gumroad",
+    "does": "Collects ₪29/month or ₪250/year payments, sends webhook on sale/subscription events",
+    "uses": "Webhook endpoint hosted as a Netlify Function"
+   },
+   {
+    "name": "Netlify",
+    "does": "Hosts the static landing page and the Gumroad webhook receiver as a serverless function",
+    "uses": "Deployed via netlify-cli from ~/Documents/Projects/hd-atlas-telegram-bot"
+   }
+  ],
+  "dataModel": [
+   {
+    "entity": "Card",
+    "fields": [
+     "id",
+     "number",
+     "hebrew_name",
+     "keywords[]",
+     "description_he",
+     "type (gate/channel/center)"
+    ]
+   },
+   {
+    "entity": "Subscriber",
+    "fields": [
+     "telegram_user_id",
+     "gumroad_email",
+     "subscription_status",
+     "plan (monthly/yearly)",
+     "started_at"
+    ]
+   },
+   {
+    "entity": "QueryLog",
+    "fields": [
+     "telegram_user_id",
+     "query_text",
+     "matched_card_id",
+     "timestamp"
+    ]
+   }
+  ],
+  "flows": [
+   {
+    "name": "Card lookup",
+    "steps": [
+     "User sends card number or Hebrew keyword to bot",
+     "Bot searches hd-atlas JSON for exact or fuzzy match",
+     "If free-tier limit not exceeded or user is subscriber, bot replies with Hebrew description",
+     "If limit exceeded, bot replies with Gumroad checkout link"
+    ]
+   },
+   {
+    "name": "Subscription activation",
+    "steps": [
+     "User buys on Gumroad with Telegram user ID as custom field",
+     "Gumroad webhook fires to Netlify Function",
+     "Function updates Subscriber record (SQLite file or Netlify Blob)",
+     "Bot checks Subscriber table on next query"
+    ]
+   }
+  ]
+ },
+ "buildPlan": [
+  {
+   "id": "T1",
+   "title": "Set up bot project skeleton and inspect hd-atlas corpus format",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas-telegram-bot, run `ls ~/Documents/Projects/hd-atlas` and then `cat` one sample card JSON file from hd-atlas (find it with `find ~/Documents/Projects/hd-atlas -name '*.json' | head -5`) to inspect the real field names. Then create package.json with dependencies node-telegram-bot-api and dotenv, and a src/loadCards.js module that reads all card JSON files from ~/Documents/Projects/hd-atlas and normalizes them into the Card shape {id, number, hebrew_name, keywords, description_he, type}. Write a small test script scripts/test-load.js that loads and prints the count of cards and one sample.",
+   "accept": [
+    "`node scripts/test-load.js` prints exactly 42 cards loaded",
+    "Sample printed card has non-empty hebrew_name and description_he fields"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T2",
+   "title": "Build core Telegram bot with card search",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas-telegram-bot, create src/bot.js using node-telegram-bot-api with polling mode. Load BOT_TOKEN from .env. Implement /start (Hebrew welcome message), /help, and a message handler that takes free text, searches cards loaded via src/loadCards.js by number or fuzzy keyword match (simple includes() on hebrew_name and keywords), and replies with description_he. If no match, reply in Hebrew asking user to try a card number or name.",
+   "accept": [
+    "Sending a card number like '34' to the bot in a test chat returns the correct Hebrew description",
+    "Sending a random Hebrew word with no match returns the fallback message, not a crash"
+   ],
+   "dependsOn": [
+    "T1"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "Add free-tier limit and subscriber check",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas-telegram-bot, create src/subscribers.js backed by a local subscribers.json file with shape {telegram_user_id, gumroad_email, subscription_status, plan, started_at}. In src/bot.js, track per-user query count in memory (reset never, just count total). Allow 5 free lookups per telegram_user_id; after that, check subscribers.json for an active subscription; if none, reply with Hebrew message and the Gumroad checkout link https://gumroad.com/l/hd-atlas-bot (check it's the real product URL after creating it).",
+   "accept": [
+    "User under 5 queries gets normal card replies",
+    "User over 5 queries without subscription gets the Gumroad link message in Hebrew"
+   ],
+   "dependsOn": [
+    "T2"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "Create Netlify Function to receive Gumroad webhook",
+   "size": "S",
+   "prompt": "First run `curl -s https://gumroad.com/api/v2/sales -H 'Authorization: Bearer TEST'` to inspect the real shape of a Gumroad sale payload (or check Gumroad docs page source with curl if API key not yet set up). In ~/Documents/Projects/hd-atlas-telegram-bot, create netlify/functions/gumroad-webhook.js that accepts POST, reads the sale payload's email and a custom field 'telegram_user_id', and appends/updates a record in subscribers.json (or Netlify Blob if file writes aren't persistent) with subscription_status 'active'. Add netlify.toml pointing functions to netlify/functions.",
+   "accept": [
+    "`npx netlify dev` runs the function locally and a test curl POST with sample payload updates subscribers.json",
+    "Function returns 200 status on valid payload"
+   ],
+   "dependsOn": [
+    "T3"
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "Build and deploy landing page to Netlify",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas-telegram-bot, create index.html (plain HTML/CSS, no framework) with the Hebrew headline, subhead, 3 benefits, and CTA button linking to the Telegram bot (https://t.me/hd_atlas_bot — check it's the real bot username after creating it in BotFather) and a secondary link to the Gumroad page. Style with a simple centered layout, RTL direction. Deploy with `npx netlify-cli deploy --prod`.",
+   "accept": [
+    "`npx netlify-cli deploy --prod` completes and returns a live URL",
+    "Opening the URL shows RTL Hebrew text rendering correctly and both links are clickable"
+   ],
+   "dependsOn": [
+    "T4"
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "Post in HumandesignIsrael Facebook group and log first conversations",
+   "size": "S",
+   "prompt": "No code needed for this task. In ~/Documents/Projects/hd-atlas-telegram-bot, create a file OUTREACH_LOG.md and manually log each of the first 10 direct conversations you have in the HumandesignIsrael Facebook group or linked WhatsApp group after posting the bot link, including date, person's first name, and whether they tried the bot.",
+   "accept": [
+    "OUTREACH_LOG.md contains at least 10 dated entries",
+    "At least 1 entry marks a person as having sent a message to the bot"
+   ],
+   "dependsOn": [
+    "T5"
+   ]
+  }
+ ],
+ "connectors": {
+  "repos": [],
+  "services": [
+   {
+    "name": "Gumroad",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Shopify",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "TON",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Telegram",
+    "url": "",
+    "why": "Telegram bot",
+    "have": true
+   },
+   {
+    "name": "Twilio",
+    "url": "",
+    "why": "WhatsApp messages",
+    "have": true
+   },
+   {
+    "name": "WhatsApp",
+    "url": "",
+    "why": "WhatsApp messages",
+    "have": true
+   }
+  ],
+  "keys": [
+   {
+    "name": "GUMROAD_ACCESS_TOKEN",
+    "purpose": "payments",
+    "have": false
+   },
+   {
+    "name": "STRIPE_SECRET_KEY",
+    "purpose": "payments",
+    "have": false
+   },
+   {
+    "name": "TELEGRAM_BOT_TOKEN",
+    "purpose": "telegram-bot",
+    "have": true,
+    "where": "set in ~/.zshrc"
+   }
+  ],
+  "mcpAndSkills": [
+   {
+    "name": "gumroad (MCP)",
+    "use": "create the product and read sales"
+   }
+  ],
+  "missing": []
+ },
+ "scaffold": {
+  "folder": "~/Documents/Projects/hd-atlas-telegram-bot",
+  "base": "copy the patterns (not the code wholesale) from ~/Documents/Projects/hd-atlas",
+  "deploy": "Netlify (npx netlify-cli deploy; the CLI is signed in)",
+  "files": [
+   {
+    "path": "README.md",
+    "purpose": "what it is, who it's for, how to run it"
+   },
+   {
+    "path": "CLAUDE.md",
+    "purpose": "agent instructions: stack, commands, rules, where the owned projects live"
+   },
+   {
+    "path": "AGENTS.md",
+    "purpose": "same instructions for Codex and other agents"
+   },
+   {
+    "path": ".env.example",
+    "purpose": "the key names the project needs (no values)"
+   },
+   {
+    "path": "TASKS.md",
+    "purpose": "the build plan with paste-ready agent prompts and acceptance checks"
+   },
+   {
+    "path": "SPEC.md",
+    "purpose": "the PRD"
+   },
+   {
+    "path": "ARCHITECTURE.md",
+    "purpose": "components, data model, flows"
+   },
+   {
+    "path": "CONNECTORS.md",
+    "purpose": "repos, services, keys, MCP/skills, what's missing"
+   },
+   {
+    "path": "GTM.md",
+    "purpose": "landing copy, pricing, launch posts, outreach"
+   },
+   {
+    "path": "QUESTS.md",
+    "purpose": "the play loop and how each quest is verified"
+   },
+   {
+    "path": "graphics/PROMPTS.md",
+    "purpose": "codex-image prompts for logo, OG image and icon"
+   }
+  ]
+ },
+ "gtm": {
+  "landing": {
+   "headline": "מפת הדיזיין האנושי שלך, בעברית, תוך שנייה — בטלגרם",
+   "subhead": "נמאס לך מאפליקציות בתשלום שקורסות עם 'שגיאת שרת'? הבוט הזה עונה על כל שאלה על שערים, ערוצים ומרכזים - בלי שרת שנופל, בלי לחכות לתמיכה.",
+   "benefits": [
+    "תשובה מיידית בעברית על כל שער, ערוץ או מרכז - רק תכתבו מספר או שם",
+    "לא תלוי בשרת חיצוני שקורס - הבוט רץ על טלגרם, תמיד זמין",
+    "5 בדיקות חינם, ואז מנוי זול בהרבה מהאפליקציות הרשמיות"
+   ],
+   "cta": "התחילו לשוחח עם הבוט עכשיו ← @hd_atlas_bot (בדקו שזה שם…"
+  },
+  "pricing": [
+   {
+    "tier": "חינם",
+    "price": "₪0",
+    "includes": [
+     "5 חיפושי כרטיסים חינם",
+     "גישה לכל 42 הכרטיסים לבדיקה מוגבלת"
+    ]
+   },
+   {
+    "tier": "חודשי",
+    "price": "₪29/חודש",
+    "includes": [
+     "חיפושים ללא הגבלה",
+     "כל 42 כרטיסי הדיזיין האנושי בעברית",
+     "עדכונים שוטפים לקורפוס"
+    ]
+   },
+   {
+    "tier": "שנתי",
+    "price": "₪250/שנה",
+    "includes": [
+     "כל מה שבתוכנית החודשית",
+     "חיסכון של כ-₪98 לעומת תשלום חודשי",
+     "תמיכה ישירה מהמפתח"
+    ]
+   }
+  ],
+  "launchPosts": [
+   {
+    "channel": "HumandesignIsrael Facebook group",
+    "text": "היי לכולם, בניתי בוט טלגרם קטן שעונה תוך שנייה על שאלות על שערים, ערוצים ומרכזים - בעברית. יצא לי מזה כי נמאס לי מהאפליקציה הרשמית שקורסת עם שגיאות שרת בלי תמיכה. הבוט טוען ישר מקורפוס שאספתי ואימתתי בעצמי, 42 כרטיסים. אפשר לנסות חינם: @hd_atlas_bot (תבדקו שזה השם הנכון). אשמח לפידבק אם משהו לא עובד."
+   },
+   {
+    "channel": "WhatsApp group linked to HumandesignIsrael",
+    "text": "מישהו פה סובל מהאפליקציה הרשמית שנופלת? עשיתי בוט טלגרם פשוט שעונה על שאלות דיזיין אנושי בעברית תוך שנייה, בלי שרת שקורס. @hd_atlas_bot - נסו, זה חינם ל-5 חיפושים ראשונים."
+   },
+   {
+    "channel": "Telegram (announcement in own bot's /start message shared as post)",
+    "text": "הבוט עלה לאוויר! מחפשים שער, ערוץ או מרכז בדיזיין אנושי? פשוט שלחו לי מספר או שם בעברית ואני עונה מיד, בלי חיבור לשרת שנופל. נסו: @hd_atlas_bot"
+   }
+  ],
+  "outreach": "היי, ראיתי שכתבת פה על התסכול מהאפליקציה הרשמית שקרסה. בניתי בוט טלגרם קטן שעונה מיד על שאלות דיזיין אנושי בעברית - בלי שרת שנופל, בלי חיבור שנקטע. זה @hd_atlas_bot (תבדוק/י שזה השם הנכון), 5 חיפושים ראשונים חינם. אשמח אם תנסה/י ותגיד/י לי מה דעתך, גם אם זה ביקורת.",
+  "graphics": [
+   {
+    "asset": "logo",
+    "prompt": "Flat vector logo mark for \"HD Atlas Telegram Bot\": one simple symbol tied to hd, two colours, no text, readable at 32 px, on white"
+   },
+   {
+    "asset": "og-image",
+    "prompt": "1200×630 social preview for \"HD Atlas Telegram Bot\": the headline \"מפת הדיזיין האנושי שלך, בעברית, תוך שנייה — בטלגרם\" in large clean type on a plain background, one small product screenshot, no stock people"
+   },
+   {
+    "asset": "app-icon",
+    "prompt": "512×512 app icon for \"HD Atlas Telegram Bot\": the logo mark centred on a solid colour square, rounded corners, no text"
+   }
+  ]
+ },
+ "quests": [
+  {
+   "title": "Landing page live with a ₪29/month or ₪250/year checkout",
+   "verify": "the page returns 200 and a test purchase (or a published Gumroad product) goes through",
+   "done": false
+  },
+  {
+   "title": "10 conversations with buyers via HumandesignIsrael Facebook group and linked WhatsApp group—post the bot link with a screenshot showing instant Hebrew card lookups",
+   "verify": "10 replies logged in QUESTS.md with each person's words about the pain",
+   "done": false
+  },
+  {
+   "title": "First paying customer",
+   "verify": "a real payment in Gumroad/Stripe from someone you don't know",
+   "done": false
+  }
+ ],
+ "readiness": {
+  "score": 0.33,
+  "items": [
+   {
+    "label": "Spec, architecture and build plan",
+    "status": "ready"
+   },
+   {
+    "label": "Key GUMROAD_ACCESS_TOKEN",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key STRIPE_SECRET_KEY",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key TELEGRAM_BOT_TOKEN",
+    "status": "ready",
+    "how": "already set (set in ~/.zshrc)"
+   },
+   {
+    "label": "Graphics (logo, OG image, icon)",
+    "status": "needs-user",
+    "how": "run the prompts in graphics/PROMPTS.md with the codex-image skill"
+   },
+   {
+    "label": "Checkout product",
+    "status": "needs-user",
+    "how": "create the product at the price in GTM.md (the Gumroad MCP can do it on request)"
+   }
+  ]
+ },
+ "cost": {
+  "claudeCalls": 1,
+  "ms": 59854
+ },
+ "judge": {
+  "ready": 2,
+  "questions": [
+   "Does ~/Documents/Projects/hd-atlas actually exist with 42 JSON card files, and what are the real field names in that corpus?",
+   "Has the Telegram bot been created via BotFather yet, and what is the actual bot username/token?",
+   "Has the Gumroad product been created, and what is the real checkout URL and price ids to use?",
+   "Should subscribers.json be persisted via Netlify Blob instead of a local file, given Netlify Functions have ephemeral/no persistent filesystem?",
+   "How should the bot capture the Gumroad custom field 'telegram_user_id' at checkout since Telegram doesn't expose this to the user automatically?"
+  ],
+  "notes": "The plan is well-structured but depends on multiple unverified external resources (hd-atlas corpus format, BotFather bot, Gumroad product) and a functionally broken assumption (writing to subscribers.json from a Netlify Function without persistent storage), which will block a clean v1 implementation."
+ }
+}
