@@ -14,6 +14,7 @@ import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
 import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap } from "./jev";
+import { gameForServer } from "./game-server";
 import { statsFor } from "./jevstats";
 import { appendAudit, handleMcp, mcpToken, readAudit, type McpCtx } from "./mcp";
 import { Deck, type Row } from "./deck";
@@ -108,6 +109,7 @@ const journeys = createJourneys(
 );
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
+const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
 let hubSeenAt = 0;
 const isNode = () => process.env.DECK_ROLE === "node" || (process.env.DECK_ROLE !== "hub" && remotes.size === 0 && Date.now() - hubSeenAt < 15 * 60_000);
 /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
@@ -122,6 +124,7 @@ let auto: Automations | undefined = new Automations({
   viewing,
   ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => decisions.get(key)?.question }),
   canSend: () => !isNode(),
+  questLines: game.questLines,
 });
 /** Test-only rows (DECK_DEV): exercise alerts, the digest and the empty-session card without touching real sessions. */
 const fakeRows = new Map<string, Row>();
@@ -183,7 +186,7 @@ function fullState() {
   return {
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
     tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
-    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() },
+    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, game: game.summary(),
   };
 }
 
@@ -213,6 +216,7 @@ setInterval(refreshShared, 15_000);
 // A finished session that claims it's done gets its project's checks re-run (once you've approved them).
 for (const row of deck.rows.values()) { const r = row.projectRoot && resultFor(row.projectRoot); if (r) deck.checks.set(row.projectRoot!, r); }
 onCheck((root, r) => {
+  game.onCheck(root, r);
   deck.checks.set(root, r);
   deck.refresh();
   if (["pass", "fail", "error"].includes(r.state)) auto?.record("proof", `${root.split("/").pop()}: ${r.state === "pass" ? "checks passed" : r.state === "fail" ? `checks failed (exit ${r.exit})` : `couldn’t run (${r.reason ?? "error"})`} · ${r.cmd ?? ""}`, r.state === "pass");
@@ -1090,6 +1094,7 @@ async function handle(req: Request): Promise<Response> {
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      { const g = await game.route(url.pathname, body); if (g) return json(g.data, g.status); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
@@ -1448,6 +1453,7 @@ async function handle(req: Request): Promise<Response> {
         case "/api/new-options":
           return json(await newSessionOptions());
         case "/api/new":
+          game.mkdirRun(body); // a new run's folder, only now that you confirmed the dialog
           return json(await startSession(body));
         case "/api/detail": {
           const lr = localRow(body.key);
@@ -1549,6 +1555,7 @@ for (let attempt = 0; ; attempt++) {
 }
 for (const h of remotes.values()) h.start();
 auto.start();
+setInterval(game.tick, 60_000);
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 

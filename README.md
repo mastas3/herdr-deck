@@ -313,6 +313,28 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   open, at most daily after that, or on **Regenerate**; only titles, dates, commit subjects and counts are sent, and
   simple rules fill in without a model. `DECK_JOURNEY_AI=0` turns the model off; `DECK_JOURNEY_ENGINE=ollama` uses a
   local model. Cached in `~/.config/herdr-deck/journeys/` (your entries in `journeys/manual.json`). Code: `src/journey*.ts`.
+- **Quests** (`q`, the Quests tab, ⌘K, or the level chip in the list header): a quest board for turning projects into a
+  business. Pick one project as the **main quest**: its proofs count double, and switching within a day asks first. XP
+  comes only from evidence someone else could check, each ledger line linking it: a release or tag, a wiki entry that
+  says something shipped (not a draft, preview or plan), a milestone unlocked by a business number, each Gumroad sale, a
+  number you log with a note, a lead you contacted (its link), a conversation you logged (a note), a passing
+  proof-of-done check, a merge (checks and merges only a few a day). Never commits, sessions or lines of code; the same
+  evidence never pays twice (commits shared by worktrees of one repo pay once). Other projects are side quests, sharing
+  a daily allowance of 30% of the main quest's XP (at least 50). **Retire** a dead project for the "killed a zombie
+  project" achievement. Each day: three quests for the main quest, written by one headless Claude Code call (Haiku, no
+  tools) from its next milestone, its boss, fresh leads (Discover → Leads, only posts you can answer), the live site and
+  the product; a quest that names nothing real about the project ("engage with your audience") is thrown away, and
+  templates built from the same state fill in, or the board shows fewer. **Start** opens the New session dialog
+  prefilled; **Do it yourself** shows the checklist and the leads' links; **Done…** checks one off with a link or a
+  note; two **Rerolls** a day swap in spares. **Bosses** are the main quest's money and user milestones, with health
+  from the real number (Gumroad sales and 30-day revenue, or what you logged) and every proof that moved it as a hit.
+  **Founder levels** (Maker → Shipper → Seller → Founder → Operator) unlock only from business milestones across every
+  project; XP fills the bar inside a level. A streak counts days you shipped, sold or talked to users. The **season**:
+  a one-sentence goal for the week, a scoreboard, lessons, and Jev's read of whether the evidence meets the goal (you
+  can dispute it; that's recorded as a Jev outcome). `startRun(idea)` (for the gallery's Play button) turns an idea into
+  a project with a business milestone ladder and opens the New session dialog for its first quest; the folder is made
+  only when you confirm. Hub only; state in `~/.config/herdr-deck/game/` (`DECK_GAME_DIR` moves it; the ledger only
+  grows). `DECK_GAME_AI=0` writes quests from templates only. Code: `src/game*.ts`.
 - **Simple mode** (Settings, or ⌘K): big type, only the essentials (no terminal, tool calls, meters or
   tabs), friendly status words, and cheerful colors tuned for every theme.
 - **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin
@@ -392,7 +414,9 @@ no dependencies). The push service (Apple, Google, Mozilla) only relays cipherte
 when the phone can't reach the Mac; tapping it opens the session (`/s/<machine>/<agent>/<session>`).
 
 - **Settings → Notifications on this device…**: turn on (asks for permission and subscribes), send a test,
-  turn off, name the device, and choose what it gets: needs you, finished, the morning digest, quiet hours.
+  turn off, name the device, and choose what it gets: needs you, finished, the morning digest, quiet hours, today's
+  quests in the digest (on by default) and quest pushes (a quest done, a boss hit or defeated, an achievement, the
+  Sunday review; off by default).
   Other subscribed devices are listed and can be removed. Where push isn't available the old page-only alerts
   remain (they only work while the deck is open).
 - **iPhone:** open the tailnet link in Safari → Share → Add to Home Screen → open herdr deck from the Home

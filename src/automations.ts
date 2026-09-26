@@ -3,7 +3,7 @@
 // Everything here takes rows and a clock, so the rules are tested without a live deck.
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Row } from "./deck";
-import type { Message } from "./push";
+import type { Device, Message } from "./push";
 
 export type Rules = {
   alerts: { on: boolean; needs: boolean; done: boolean };
@@ -206,7 +206,7 @@ export function burstMessage(evs: AlertEvent[], c: Ctx): Message {
 export const digestMessage = (d: Digest, badge?: number): Message => ({ kind: "digest", title: d.title, body: d.body, tag: "digest", url: "/?digest=1", badge });
 
 // ── the rules engine on the hub ──────────────────────────────────────────
-export type Deliver = (m: Message, o?: { ttl?: number; urgency?: "very-low" | "low" | "normal" | "high"; topic?: string }) => Promise<{ sent: number; targets: number; dropped: number }>;
+export type Deliver = (m: Message, o?: { ttl?: number; urgency?: "very-low" | "low" | "normal" | "high"; topic?: string; filter?: (d: Device) => boolean }) => Promise<{ sent: number; targets: number; dropped: number }>;
 export type AutoDeps = {
   file: string;
   rows: () => Row[];
@@ -215,6 +215,8 @@ export type AutoDeps = {
   viewing: (key: string) => boolean;
   ctx: () => Ctx;
   canSend: () => boolean; // false on a node: only the hub sends pushes
+  /** Today's quests for the digest (the game, src/game.ts): pushed to devices that keep "quests in the digest" on. */
+  questLines?: () => Promise<string[]>;
   now?: () => number;
 };
 
@@ -292,7 +294,15 @@ export class Automations {
     if (push) {
       if (!this.d.canSend()) note += "; not pushed (this machine is a node)";
       else {
-        const res = await this.d.deliver(digestMessage(dg, rows.filter(needsYou).length), { ttl: 12 * 3600, urgency: "normal", topic: "digest" });
+        const badge = rows.filter(needsYou).length;
+        const quests = await this.d.questLines?.().catch(() => [] as string[]) ?? [];
+        const o = { ttl: 12 * 3600, urgency: "normal" as const, topic: "digest" };
+        let res = await this.d.deliver(digestMessage(dg, badge), quests.length ? { ...o, filter: (d) => d.prefs.questDigest === false } : o);
+        if (quests.length) {
+          const q = await this.d.deliver({ ...digestMessage(dg, badge), body: `${dg.body}\n\nToday's quests\n${quests.join("\n")}` }, { ...o, filter: (d) => d.prefs.questDigest !== false });
+          res = { sent: res.sent + q.sent, targets: res.targets + q.targets, dropped: res.dropped + q.dropped };
+          note += ", with today's quests";
+        }
         note += res.targets ? `, pushed to ${res.sent} of ${res.targets} device${res.targets === 1 ? "" : "s"}` : "; no device wants digest pushes";
       }
     }
