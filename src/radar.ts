@@ -15,6 +15,7 @@ type ChatTail = { messages: Msg[] };
 /** Only agents the deck reads transcripts for have tool calls to judge; a shell never triggers. */
 export const CODING_AGENTS = new Set(["claude", "codex", "opencode"]);
 const STALL_MS = 10 * 60_000;
+const TODO_TOOLS = /^todowrite$/i;
 export const ASK_EVERY_MS = 2 * 60_000; // at most one ask per session this often
 export const PUSH_EVERY_MS = 30 * 60_000; // at most one "looks stuck" push per session this often
 const READ_EVERY_MS = 10_000; // how often a running session's chat is re-read for the cheap check
@@ -35,7 +36,9 @@ export function radarTrigger(r: Pick<Row, "status" | "agent" | "turnStartedAt">,
   const tools = msgs.filter((m) => m.role === "tool");
   if (!tools.length) return; // nothing to judge (a long first think, or no transcript)
   const seen = new Map<string, number>();
+  // Editing one file several times, or rewriting the same todo, is progress, not a loop.
   for (const m of tools.slice(-8)) {
+    if (EDIT_TOOLS.test(m.tool ?? "") || TODO_TOOLS.test(m.tool ?? "")) continue;
     const k = `${m.tool ?? ""}\u0000${m.summary ?? ""}`;
     const n = (seen.get(k) ?? 0) + 1;
     if (n >= 3) return "repeat";
@@ -133,11 +136,14 @@ export class Radar {
   private asked = new Map<string, { at: number; fp: string }>();
   private busy = new Set<string>();
   private live = new Set<string>();
+  private seen = new Map<string, { lastActiveAt: number; msgs: Msg[] }>(); // the last chat read, reused while the row hasn't moved
+  private gen = new Map<string, number>(); // bumped when a session's state is dropped: answers from before are void
   constructor(private d: RadarDeps) {}
   private now() { return this.d.now?.() ?? Date.now(); }
   list() { return [...this.entries.values()]; }
   private drop(key: string) {
-    this.readAt.delete(key); this.asked.delete(key); this.rule.forget(key, this.now());
+    this.readAt.delete(key); this.asked.delete(key); this.seen.delete(key); this.rule.forget(key, this.now());
+    this.gen.set(key, (this.gen.get(key) ?? 0) + 1);
     return this.entries.delete(key);
   }
   /** One sweep over all rows. Never throws; Jev calls run per session without holding up the others. */
@@ -146,7 +152,7 @@ export class Radar {
     const working = new Map(rows.filter((r) => r.status === "working" && CODING_AGENTS.has(r.agent)).map((r) => [r.key, r]));
     this.live = new Set(on ? working.keys() : []);
     let dirty = false;
-    for (const k of new Set([...this.entries.keys(), ...this.readAt.keys(), ...this.asked.keys()])) if (!this.live.has(k)) dirty = this.drop(k) || dirty;
+    for (const k of new Set([...this.entries.keys(), ...this.readAt.keys(), ...this.asked.keys(), ...this.seen.keys()])) if (!this.live.has(k)) dirty = this.drop(k) || dirty;
     if (dirty) this.d.changed(this.list());
     if (!on) return;
     await Promise.all([...working.values()].map((r) => this.check(r).catch(() => {})));
@@ -157,12 +163,22 @@ export class Radar {
     const asked = this.asked.get(r.key);
     if (asked && now - asked.at < ASK_EVERY_MS) return;
     this.busy.add(r.key);
+    const g = this.gen.get(r.key) ?? 0;
+    const stale = () => (this.gen.get(r.key) ?? 0) !== g || !this.live.has(r.key); // it stopped working (maybe restarted) meanwhile
     try {
       this.readAt.set(r.key, now);
-      const msgs = (await this.d.chat(r).catch(() => undefined))?.messages ?? [];
+      const prev = this.seen.get(r.key);
+      let msgs = prev && r.lastActiveAt != null && prev.lastActiveAt === r.lastActiveAt ? prev.msgs : undefined;
+      if (!msgs) {
+        const c = await this.d.chat(r).catch(() => undefined);
+        if (!c?.messages || stale()) return; // a failed read says nothing about the session: keep what's shown
+        msgs = c.messages;
+        if (r.lastActiveAt != null) this.seen.set(r.key, { lastActiveAt: r.lastActiveAt, msgs });
+      }
       const trigger = radarTrigger(r, msgs, now);
       if (!trigger) {
-        // Healthy again: an old "looping" read no longer applies.
+        // Healthy again: an old "looping" read no longer applies, and the next stuck run starts from scratch.
+        this.rule.forget(r.key, now);
         if (this.entries.delete(r.key)) this.d.changed(this.list());
         return;
       }
@@ -171,7 +187,7 @@ export class Radar {
       if (asked?.fp === fp) return; // same request as last time: its answer is already on screen
       this.asked.set(r.key, { at: now, fp });
       const res = await (this.d.ask ?? jevAskOnce)(req.state, req.questions, req.kind, req.meta);
-      if (!this.live.has(r.key)) return; // it stopped working while Jev was thinking
+      if (stale()) return; // it stopped working while Jev was thinking
       const e = radarEntry(r.key, trigger, res, this.now());
       if (!e) return;
       this.entries.set(r.key, e);

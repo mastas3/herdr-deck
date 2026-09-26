@@ -12,7 +12,7 @@ import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCusto
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
-import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap, setJevFeature } from "./jev";
+import { RECEIPTS_FILE, cachedById, jevAvailable, jevFeature, jevUsage, setJevCap, setJevFeature } from "./jev";
 import { statsFor } from "./jevstats";
 import { appendAudit, handleMcp, mcpToken, readAudit, type McpCtx } from "./mcp";
 import { Deck, type Row } from "./deck";
@@ -261,6 +261,7 @@ let lastJevCalls = jevUsage().calls;
 const radar = new Radar({
   chat: chatTail,
   changed: (list) => broadcast("radar", list),
+  enabled: () => !isNode() && jevFeature("radar") && jevAvailable(), // only the hub asks
   push: (m, r) => {
     const rules = auto?.rules.alerts;
     if (isNode() || (rules && !(rules.on && rules.needs)) || viewing(r.key)) return;

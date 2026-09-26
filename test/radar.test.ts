@@ -22,6 +22,16 @@ describe("radarTrigger: the cheap check", () => {
     expect(radarTrigger(row(), old, NOW)).toBeUndefined();
   });
 
+  test("repeat ignores edits and todo updates: working on one file is progress", () => {
+    const edits = [tool("Edit", "src/a.ts"), tool("Read", "b"), tool("Edit", "src/a.ts"), tool("MultiEdit", "src/a.ts"), tool("Edit", "src/a.ts")];
+    expect(radarTrigger(row(), edits, NOW)).toBeUndefined();
+    const codex = [tool("apply_patch", "src/a.ts"), tool("apply_patch", "src/a.ts"), tool("apply_patch", "src/a.ts")];
+    expect(radarTrigger(row(), codex, NOW)).toBeUndefined();
+    const todos = [tool("TodoWrite", "Fixing the login"), tool("Bash", "x"), tool("TodoWrite", "Fixing the login"), tool("todowrite", "Fixing the login"), tool("TodoWrite", "Fixing the login")];
+    expect(radarTrigger(row(), todos, NOW)).toBeUndefined();
+    expect(radarTrigger(row(), [...edits, tool("Bash", "bun test"), tool("Bash", "bun test"), tool("Bash", "bun test")], NOW)).toBe("repeat");
+  });
+
   test("errors: 3 of the last 6 tool calls failed", () => {
     const m = [tool("Bash", "a", "error"), tool("Read", "b"), tool("Bash", "c", "error"), tool("Grep", "d"), tool("Bash", "e", "error"), tool("Read", "f")];
     expect(radarTrigger(row(), m, NOW)).toBe("errors");
@@ -132,19 +142,24 @@ describe("PushRule: two confident answers in a row, once per 30 minutes", () => 
 });
 
 describe("Radar: state, events and pushes", () => {
-  const setup = (answers: (n: number) => any = () => ({ stuck: { noul: 0.9 }, off_task: { noul: 0.1 }, phase: { choice: "debugging", probabilities: {} } })) => {
-    let t = NOW, n = 0, on = true;
+  const setup = (answers: (n: number) => any = () => ({ stuck: { noul: 0.9 }, off_task: { noul: 0.1 }, phase: { choice: "debugging", probabilities: {} } }), gate?: () => Promise<void>) => {
+    let t = NOW, n = 0, on = true, reads = 0;
+    let fail: "none" | "undefined" | "throw" = "none";
     const chats = new Map<string, Msg[]>();
     const events: RadarEntry[][] = [], pushes: any[] = [], asked: any[] = [];
     const radar = new Radar({
-      chat: async (r) => ({ messages: chats.get(r.key) ?? [] }),
+      chat: async (r) => {
+        reads++;
+        if (fail === "throw") throw new Error("tunnel down");
+        return fail === "undefined" ? undefined : { messages: chats.get(r.key) ?? [] };
+      },
       changed: (l) => events.push(l),
       push: (m) => pushes.push(m),
-      ask: async (state, questions, kind) => { asked.push({ state, questions, kind }); n++; return { id: `d-${n}`, fallback: null, answers: answers(n) }; },
+      ask: async (state, questions, kind) => { asked.push({ state, questions, kind }); n++; if (gate) await gate(); return { id: `d-${n}`, fallback: null, answers: answers(n) }; },
       enabled: () => on,
       now: () => t,
     });
-    return { radar, chats, events, pushes, asked, tick: (ms: number) => (t += ms), off: () => (on = false) };
+    return { radar, chats, events, pushes, asked, tick: (ms: number) => (t += ms), off: () => (on = false), fail: (f: typeof fail) => (fail = f), reads: () => reads };
   };
   const looping = (k: number) => [user("Fix the login bug"), tool("Bash", "bun test", "error"), tool("Bash", "bun test", "error"), tool("Bash", "bun test", "error"), said(`attempt ${k}`)];
 
@@ -207,6 +222,73 @@ describe("Radar: state, events and pushes", () => {
     await s.radar.pass([row({ key: "c" })]);
     expect(s.radar.list()).toEqual([]);
     expect(s.events.at(-1)).toEqual([]);
+  });
+
+  test("a failed chat read keeps what's shown instead of calling the session healthy", async () => {
+    const s = setup();
+    s.chats.set("a", looping(1));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.radar.list().length).toBe(1);
+    for (const f of ["undefined", "throw"] as const) {
+      s.fail(f);
+      s.tick(2 * 60_000 + 1);
+      await s.radar.pass([row({ key: "a" })]);
+      expect(s.radar.list().map((e) => e.key)).toEqual(["a"]);
+    }
+    expect(s.asked.length).toBe(1);
+  });
+
+  test("an unchanged row reuses its last chat read; stall still runs on the current time", async () => {
+    const s = setup();
+    const reads = ["a", "b", "c"].map((x) => tool("Read", x));
+    s.chats.set("a", reads);
+    const r = (over: any = {}) => row({ key: "a", lastActiveAt: 500, turnStartedAt: NOW - 5 * 60_000, ...over });
+    await s.radar.pass([r()]);
+    expect(s.reads()).toBe(1);
+    expect(s.asked.length).toBe(0);
+    s.tick(15_000);
+    await s.radar.pass([r()]);
+    expect(s.reads()).toBe(1); // nothing moved: no fetch
+    s.tick(6 * 60_000); // now a 11-minute turn with no edits, on the stored messages
+    await s.radar.pass([r()]);
+    expect(s.reads()).toBe(1);
+    expect(s.asked.length).toBe(1);
+    expect(s.radar.list()[0]?.trigger).toBe("stall");
+    s.tick(2 * 60_000 + 1);
+    await s.radar.pass([r({ lastActiveAt: 600 })]); // the row moved: read again
+    expect(s.reads()).toBe(2);
+  });
+
+  test("an answer that lands after the session stopped and restarted is dropped", async () => {
+    let release!: () => void;
+    const s = setup(undefined, () => new Promise<void>((ok) => (release = ok)));
+    s.chats.set("a", looping(1));
+    const first = s.radar.pass([row({ key: "a" })]);
+    await Bun.sleep(1);
+    expect(s.asked.length).toBe(1);
+    await s.radar.pass([row({ key: "a", status: "done" })]); // stops…
+    await s.radar.pass([row({ key: "a" })]); // …and starts a new turn while Jev is still out
+    release();
+    await first;
+    expect(s.radar.list()).toEqual([]);
+  });
+
+  test("a healthy gap resets the two-in-a-row push run", async () => {
+    const s = setup();
+    s.chats.set("a", looping(1));
+    await s.radar.pass([row({ key: "a" })]);
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", healthy());
+    await s.radar.pass([row({ key: "a" })]);
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", looping(2));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(2);
+    expect(s.pushes.length).toBe(0); // stuck, healthy, stuck: not two in a row
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", looping(3));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.pushes.length).toBe(1);
   });
 
   test("a session that recovers loses its chip; a Jev fallback leaves nothing behind", async () => {

@@ -526,7 +526,7 @@ function radarChip(r) {
   if (!e) return "";
   const bits = [e.stuck >= 0.7 ? `looping ${Math.round(e.stuck * 100)}%` : "", e.offTask >= 0.7 ? `off task ${Math.round(e.offTask * 100)}%` : ""].filter(Boolean);
   if (!bits.length) return "";
-  const tip = `Jev thinks this session may be ${e.stuck >= 0.7 ? "stuck" : "off task"}${e.phase ? `; it looks like it's mostly ${RADAR_PHASE[e.phase] ?? e.phase}` : ""}.\nThe deck asked because ${RADAR_WHY[e.trigger] ?? "it looked unusual"}.\nJust a heads-up: nothing happens on its own.`;
+  const tip = `Jev thinks this session may be ${e.stuck >= 0.7 && e.offTask >= 0.7 ? "stuck and off task" : e.stuck >= 0.7 ? "stuck" : "off task"}${e.phase ? `; it looks like it's mostly ${RADAR_PHASE[e.phase] ?? e.phase}` : ""}.\nThe deck asked because ${RADAR_WHY[e.trigger] ?? "it looked unusual"}.\nJust a heads-up: nothing happens on its own.`;
   return `<span class="rchip" title="${esc(tip)}">${esc(bits.join(" · "))}</span>`;
 }
 function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now())) {
