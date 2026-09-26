@@ -1,8 +1,13 @@
 {
   "name": "herdr-deck",
   "version": "0.1.0",
-  "private": true,
+  "description": "A live dashboard and phone app for every AI coding agent you run in herdr, across machines",
+  "license": "MIT",
   "type": "module",
+  "repository": { "type": "git", "url": "git+https://github.com/mastas3/herdr-deck.git" },
+  "homepage": "https://github.com/mastas3/herdr-deck#readme",
+  "engines": { "bun": ">=1.2" },
+  "os": ["darwin", "linux"],
   "scripts": {
     "start": "bun src/server.ts",
     "dev": "DECK_DEV=1 bun --watch src/server.ts",

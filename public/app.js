@@ -143,6 +143,8 @@ const statusVar = (s) => `var(--${s in STATUS_NAME ? s : "unknown"})`;
 const machineOf = (id) => S.summary.machines?.find((m) => m.id === id);
 const machineLabel = (id) => machineOf(id)?.label ?? id ?? "";
 const multiMachine = () => (S.summary.machines?.length ?? 0) > 1;
+/** First run: no herdr server answers on this machine. */
+const noHerdr = () => { const m = (S.summary.machines ?? []).find((x) => x.local); return !!m && Array.isArray(m.herdr) && !m.herdr.length; };
 const realMachines = () => (S.summary.machines ?? []).filter((m) => m.kind !== "app");
 const plain = (t) => String(t ?? "").replace(/^\s*\[\d{4}-\d\d-\d\d[^\]]*\]\s*/, "").replace(/[*_`#>]+/g, "").replace(/^\s*[-•]\s+/, "").replace(/\s+/g, " ").trim();
 const home = (p) => String(p ?? "").replace(/^\/(Users|home)\/[^/]+/, "~");
@@ -699,7 +701,7 @@ function renderList() {
     // A live reorder glides (FLIP below); only a change you made replays the sections' entrance.
     box.classList.toggle("settled", !force);
     box.replaceChildren(frag);
-    if (!rows.length) box.innerHTML = `<div class="empty-state">${S.rows.size ? "Nothing matches. Press Esc to clear the filter." : "No sessions yet. Press n to start one."}</div>`;
+    if (!rows.length) box.innerHTML = `<div class="empty-state">${S.rows.size ? "Nothing matches. Press Esc to clear the filter." : noHerdr() ? "herdr isn’t running on this machine yet. Open a terminal and run <code>herdr</code>, then start your agents inside it; they’ll show up here by themselves. New to herdr? See <a href=\"https://herdr.dev\" target=\"_blank\" rel=\"noopener\">herdr.dev</a>." : "No sessions yet. Press n to start one."}</div>`;
     if (before) flipRows(box, before);
     const born = box.querySelectorAll(".row.born");
     if (born.length) requestAnimationFrame(() => requestAnimationFrame(() => { for (const el of born) el.classList.remove("born"); }));
@@ -2717,7 +2719,7 @@ async function addConnection() {
   d.showModal();
 }
 async function suggestProjects() {
-  if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session in ~/wiki with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
+  if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session (in ~/wiki if you have one, otherwise your home folder) with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
   try { const r = await api("/api/suggest-projects", {}); toast("Starting a Claude session with your connections…"); if (r.key) pendingSelect = r.key; } catch (e) { toast(e.message, true); }
 }
 

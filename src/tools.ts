@@ -63,7 +63,7 @@ export const BUILTIN: Tool[] = [
   },
   {
     id: "wiki", label: "Update the wiki", group: "knowledge", icon: "book", kind: "prompt", multi: true,
-    hint: "Files what this session learned into your LLM wiki (~/wiki), following its rules",
+    hint: "Files what this session learned into your LLM wiki at ~/wiki (if you keep one), following its rules",
     prompt: "Update my LLM wiki at ~/wiki with what this session did and learned. Read ~/wiki/CLAUDE.md first and follow it exactly: update (or create) the page for {project} under projects/, touch the related concept/entity pages, refresh index.md and append one line to log.md. Summaries only; never copy secrets, tokens or .env contents. Tell me which pages you changed.",
   },
   {
