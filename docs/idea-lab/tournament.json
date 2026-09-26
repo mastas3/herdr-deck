@@ -1,0 +1,366 @@
+{
+ "field": [
+  "G-constraint:1:hdatlastelegrambot:g1y",
+  "C-audience:4:tenderaialert:hqo",
+  "T-hot:4:humandesignmatchreport:q89",
+  "G-constraint:1:podcastclipstudiomembers:tzq",
+  "C-audience:2:yourdayhddailystrategy:iew",
+  "C-audience:4:myhdchartinhebrew:vmv",
+  "C-audience:2:tenderaiscoutdailyalerts:8rl",
+  "B-pain:1:hdatlaszerodowntimerelia:ylg",
+  "C-audience:1:herdrconsole:kz2",
+  "B-pain:4:tenderbotwhatsapp:puv",
+  "B-pain:4:cliptubeinstant:9q8",
+  "B-pain:1:storyreelpremiumhdshorts:r",
+  "C-audience:1:hdquickread:iy7",
+  "D-asset:1:astrachartshdreadingsasa:pdv",
+  "W-hybrid:2:hdbirthchartbot:l6t",
+  "B-pain:1:agentdecksessionorchestr:1co",
+  "B-pain:1:hdatlaspremiumofflineheb:l9y",
+  "F-gem:2:tenderalertil:f6t",
+  "B-pain:1:herdrdeckagentsessioncom:haf",
+  "C-audience:2:shortclipstudio:1ly",
+  "B-pain:2:transcriptbatchextractor:8bq",
+  "B-pain:4:hdatlasreader:fwr",
+  "F-gem:2:podcastarchivestudio:d1l",
+  "F-gem:2:humandesignpairingcompat:jzk"
+ ],
+ "matches": [
+  {
+   "a": "G-constraint:1:hdatlastelegrambot:g1y",
+   "b": "C-audience:4:tenderaialert:hqo",
+   "pA": 0.93,
+   "winner": "G-constraint:1:hdatlastelegrambot:g1y",
+   "swapped": false
+  },
+  {
+   "a": "T-hot:4:humandesignmatchreport:q89",
+   "b": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "pA": 0.32999999999999996,
+   "winner": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:yourdayhddailystrategy:iew",
+   "b": "C-audience:4:myhdchartinhebrew:vmv",
+   "pA": 0.05,
+   "winner": "C-audience:4:myhdchartinhebrew:vmv",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "b": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "pA": 0.98,
+   "winner": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:1:herdrconsole:kz2",
+   "b": "B-pain:4:tenderbotwhatsapp:puv",
+   "pA": 0.22,
+   "winner": "B-pain:4:tenderbotwhatsapp:puv",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:4:cliptubeinstant:9q8",
+   "b": "B-pain:1:storyreelpremiumhdshorts:r",
+   "pA": 0.97,
+   "winner": "B-pain:4:cliptubeinstant:9q8",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:1:hdquickread:iy7",
+   "b": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "pA": 0.99,
+   "winner": "C-audience:1:hdquickread:iy7",
+   "swapped": false
+  },
+  {
+   "a": "W-hybrid:2:hdbirthchartbot:l6t",
+   "b": "B-pain:1:agentdecksessionorchestr:1co",
+   "pA": 0.99,
+   "winner": "W-hybrid:2:hdbirthchartbot:l6t",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "b": "F-gem:2:tenderalertil:f6t",
+   "pA": 0.84,
+   "winner": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "b": "C-audience:2:shortclipstudio:1ly",
+   "pA": 0.06999999999999995,
+   "winner": "C-audience:2:shortclipstudio:1ly",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:2:transcriptbatchextractor:8bq",
+   "b": "B-pain:4:hdatlasreader:fwr",
+   "pA": 0.7,
+   "winner": "B-pain:2:transcriptbatchextractor:8bq",
+   "swapped": false
+  },
+  {
+   "a": "F-gem:2:podcastarchivestudio:d1l",
+   "b": "F-gem:2:humandesignpairingcompat:jzk",
+   "pA": 0.48,
+   "winner": "F-gem:2:humandesignpairingcompat:jzk",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:1:hdquickread:iy7",
+   "b": "W-hybrid:2:hdbirthchartbot:l6t",
+   "pA": 0.72,
+   "winner": "C-audience:1:hdquickread:iy7",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "b": "B-pain:4:cliptubeinstant:9q8",
+   "pA": 0.39,
+   "winner": "B-pain:4:cliptubeinstant:9q8",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:4:myhdchartinhebrew:vmv",
+   "b": "G-constraint:1:hdatlastelegrambot:g1y",
+   "pA": 0.64,
+   "winner": "C-audience:4:myhdchartinhebrew:vmv",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:shortclipstudio:1ly",
+   "b": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "pA": 0.28,
+   "winner": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:4:tenderbotwhatsapp:puv",
+   "b": "B-pain:2:transcriptbatchextractor:8bq",
+   "pA": 0.14,
+   "winner": "B-pain:2:transcriptbatchextractor:8bq",
+   "swapped": true
+  },
+  {
+   "a": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "b": "F-gem:2:humandesignpairingcompat:jzk",
+   "pA": 0.9299999999999999,
+   "winner": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "swapped": true
+  },
+  {
+   "a": "F-gem:2:podcastarchivestudio:d1l",
+   "b": "T-hot:4:humandesignmatchreport:q89",
+   "pA": 0.1,
+   "winner": "T-hot:4:humandesignmatchreport:q89",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:4:hdatlasreader:fwr",
+   "b": "C-audience:1:herdrconsole:kz2",
+   "pA": 0.86,
+   "winner": "B-pain:4:hdatlasreader:fwr",
+   "swapped": false
+  },
+  {
+   "a": "F-gem:2:tenderalertil:f6t",
+   "b": "C-audience:4:tenderaialert:hqo",
+   "pA": 0.38,
+   "winner": "C-audience:4:tenderaialert:hqo",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "b": "C-audience:2:yourdayhddailystrategy:iew",
+   "pA": 0.040000000000000036,
+   "winner": "C-audience:2:yourdayhddailystrategy:iew",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:1:storyreelpremiumhdshorts:r",
+   "b": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "pA": 0.2,
+   "winner": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "swapped": false
+  },
+  {
+   "a": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "b": "B-pain:1:agentdecksessionorchestr:1co",
+   "pA": 0.4,
+   "winner": "B-pain:1:agentdecksessionorchestr:1co",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:1:hdquickread:iy7",
+   "b": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "pA": 0.71,
+   "winner": "C-audience:1:hdquickread:iy7",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:4:myhdchartinhebrew:vmv",
+   "b": "B-pain:4:cliptubeinstant:9q8",
+   "pA": 0.99,
+   "winner": "C-audience:4:myhdchartinhebrew:vmv",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:2:transcriptbatchextractor:8bq",
+   "b": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "pA": 0.71,
+   "winner": "B-pain:2:transcriptbatchextractor:8bq",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "b": "G-constraint:1:hdatlastelegrambot:g1y",
+   "pA": 0.18000000000000005,
+   "winner": "G-constraint:1:hdatlastelegrambot:g1y",
+   "swapped": true
+  },
+  {
+   "a": "W-hybrid:2:hdbirthchartbot:l6t",
+   "b": "T-hot:4:humandesignmatchreport:q89",
+   "pA": 0.96,
+   "winner": "W-hybrid:2:hdbirthchartbot:l6t",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:shortclipstudio:1ly",
+   "b": "B-pain:4:hdatlasreader:fwr",
+   "pA": 0.54,
+   "winner": "C-audience:2:shortclipstudio:1ly",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:yourdayhddailystrategy:iew",
+   "b": "B-pain:4:tenderbotwhatsapp:puv",
+   "pA": 0.94,
+   "winner": "C-audience:2:yourdayhddailystrategy:iew",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "b": "C-audience:4:tenderaialert:hqo",
+   "pA": 0.01,
+   "winner": "C-audience:4:tenderaialert:hqo",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:1:agentdecksessionorchestr:1co",
+   "b": "F-gem:2:humandesignpairingcompat:jzk",
+   "pA": 0.11,
+   "winner": "F-gem:2:humandesignpairingcompat:jzk",
+   "swapped": false
+  },
+  {
+   "a": "F-gem:2:podcastarchivestudio:d1l",
+   "b": "F-gem:2:tenderalertil:f6t",
+   "pA": 0.14,
+   "winner": "F-gem:2:tenderalertil:f6t",
+   "swapped": true
+  },
+  {
+   "a": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "b": "C-audience:1:herdrconsole:kz2",
+   "pA": 0.17,
+   "winner": "C-audience:1:herdrconsole:kz2",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:1:storyreelpremiumhdshorts:r",
+   "b": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "pA": 0.04,
+   "winner": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:4:myhdchartinhebrew:vmv",
+   "b": "C-audience:1:hdquickread:iy7",
+   "pA": 0.89,
+   "winner": "C-audience:4:myhdchartinhebrew:vmv",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:2:transcriptbatchextractor:8bq",
+   "b": "W-hybrid:2:hdbirthchartbot:l6t",
+   "pA": 0.57,
+   "winner": "B-pain:2:transcriptbatchextractor:8bq",
+   "swapped": false
+  },
+  {
+   "a": "G-constraint:1:hdatlastelegrambot:g1y",
+   "b": "C-audience:2:yourdayhddailystrategy:iew",
+   "pA": 0.91,
+   "winner": "G-constraint:1:hdatlastelegrambot:g1y",
+   "swapped": true
+  },
+  {
+   "a": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "b": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "pA": 0.5900000000000001,
+   "winner": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "swapped": true
+  },
+  {
+   "a": "C-audience:2:shortclipstudio:1ly",
+   "b": "C-audience:4:tenderaialert:hqo",
+   "pA": 0.91,
+   "winner": "C-audience:2:shortclipstudio:1ly",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:4:hdatlasreader:fwr",
+   "b": "B-pain:4:cliptubeinstant:9q8",
+   "pA": 0.54,
+   "winner": "B-pain:4:hdatlasreader:fwr",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "b": "F-gem:2:humandesignpairingcompat:jzk",
+   "pA": 0.76,
+   "winner": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "swapped": true
+  },
+  {
+   "a": "F-gem:2:tenderalertil:f6t",
+   "b": "T-hot:4:humandesignmatchreport:q89",
+   "pA": 0.48,
+   "winner": "T-hot:4:humandesignmatchreport:q89",
+   "swapped": false
+  },
+  {
+   "a": "C-audience:1:herdrconsole:kz2",
+   "b": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "pA": 0.74,
+   "winner": "C-audience:1:herdrconsole:kz2",
+   "swapped": true
+  },
+  {
+   "a": "B-pain:4:tenderbotwhatsapp:puv",
+   "b": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "pA": 0.97,
+   "winner": "B-pain:4:tenderbotwhatsapp:puv",
+   "swapped": false
+  },
+  {
+   "a": "B-pain:1:agentdecksessionorchestr:1co",
+   "b": "F-gem:2:podcastarchivestudio:d1l",
+   "pA": 0.23,
+   "winner": "F-gem:2:podcastarchivestudio:d1l",
+   "swapped": false
+  },
+  {
+   "a": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "b": "B-pain:1:storyreelpremiumhdshorts:r",
+   "pA": 0.63,
+   "winner": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "swapped": false
+  }
+ ]
+}

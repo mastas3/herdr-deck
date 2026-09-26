@@ -1,0 +1,2402 @@
+{
+ "at": 1790437167292,
+ "asRun": [
+  {
+   "round": 1,
+   "strategy": "A0-template",
+   "label": "Baseline: today's template sparks & mixes",
+   "version": "template",
+   "n": 12,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 10.25,
+   "qNoEvMedian": 13.65,
+   "pass": 0,
+   "rubric": 0.08333333333333333,
+   "rubricP10": 0.017499999999999998,
+   "jevP10": 0.13,
+   "evidence": 0,
+   "dims": {
+    "spec": 1.0833333333333333,
+    "feasible": 1.8333333333333333,
+    "buyer": 1,
+    "distribution": 1,
+    "novelty": 1.5833333333333333,
+    "fun": 1.9166666666666667,
+    "generic": null
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0,
+   "genMs": 20
+  },
+  {
+   "round": 1,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 60.15,
+   "qP25": 0,
+   "qP75": 73.92500000000001,
+   "qTop3": 74.8,
+   "rawMedian": 70.3,
+   "qNoEvMedian": 67.35,
+   "pass": 0.5833333333333334,
+   "rubric": 0.5023333333333334,
+   "rubricP10": 0.1525,
+   "jevP10": 0.415,
+   "evidence": 0.7885833333333333,
+   "dims": {
+    "spec": 3.75,
+    "feasible": 3.75,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.6666666666666665,
+    "novelty": 2,
+    "fun": 3.1666666666666665,
+    "generic": null
+   },
+   "vsA1": 0.7916666666666666,
+   "ciVsA1": [
+    0,
+    73.95
+   ],
+   "genCostUsd": 0.053766,
+   "genMs": 88579
+  },
+  {
+   "round": 1,
+   "strategy": "A1-mixer",
+   "label": "Baseline: today's Claude Mixer (random ingredients)",
+   "version": "mixer",
+   "n": 12,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 14.5,
+   "qNoEvMedian": 19.25,
+   "pass": 0,
+   "rubric": 0.14900000000000002,
+   "rubricP10": 0.021666666666666664,
+   "jevP10": 0.13,
+   "evidence": 0,
+   "dims": {
+    "spec": 1.5,
+    "feasible": 2.1666666666666665,
+    "buyer": 1,
+    "distribution": 1,
+    "novelty": 2.1666666666666665,
+    "fun": 2.5833333333333335,
+    "generic": null
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.01697,
+   "genMs": 31787
+  },
+  {
+   "round": 1,
+   "strategy": "A2-random-schema",
+   "label": "Control: random ingredients + new idea schema",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 19.833333333333332,
+   "rawMedian": 41.5,
+   "qNoEvMedian": 49,
+   "pass": 0.08333333333333333,
+   "rubric": 0.38258333333333333,
+   "rubricP10": 0.09583333333333337,
+   "jevP10": 0.31,
+   "evidence": 0.25975,
+   "dims": {
+    "spec": 3.1666666666666665,
+    "feasible": 3.0833333333333335,
+    "buyer": 2.1666666666666665,
+    "distribution": 2.1666666666666665,
+    "novelty": 1.8333333333333333,
+    "fun": 2.9166666666666665,
+    "generic": null
+   },
+   "vsA1": 0.5416666666666666,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.03599,
+   "genMs": 69344
+  },
+  {
+   "round": 1,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 60.2,
+   "qP25": 47.25,
+   "qP75": 67.075,
+   "qTop3": 73.2,
+   "rawMedian": 63,
+   "qNoEvMedian": 64.69999999999999,
+   "pass": 0.9166666666666666,
+   "rubric": 0.5024166666666667,
+   "rubricP10": 0.155,
+   "jevP10": 0.41,
+   "evidence": 0.5779166666666666,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.6666666666666665,
+    "buyer": 2.75,
+    "distribution": 2.6666666666666665,
+    "novelty": 2.1666666666666665,
+    "fun": 3.0833333333333335,
+    "generic": null
+   },
+   "vsA1": 0.9583333333333334,
+   "ciVsA1": [
+    44.900000000000006,
+    67.85
+   ],
+   "genCostUsd": 0.047383,
+   "genMs": 73027
+  },
+  {
+   "round": 1,
+   "strategy": "D-asset",
+   "label": "Asset leverage",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 57.75,
+   "qP25": 0,
+   "qP75": 65.575,
+   "qTop3": 70.03333333333335,
+   "rawMedian": 57.849999999999994,
+   "qNoEvMedian": 58,
+   "pass": 0.6666666666666666,
+   "rubric": 0.4583333333333333,
+   "rubricP10": 0.11583333333333336,
+   "jevP10": 0.37,
+   "evidence": 0.4994166666666667,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.4166666666666665,
+    "buyer": 2.3333333333333335,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.3333333333333335,
+    "fun": 3.25,
+    "generic": null
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    65.65
+   ],
+   "genCostUsd": 0.039493,
+   "genMs": 79000
+  },
+  {
+   "round": 1,
+   "strategy": "E-remix",
+   "label": "Market-proven remix",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 42.900000000000006,
+   "qP25": 0,
+   "qP75": 65.275,
+   "qTop3": 66.3,
+   "rawMedian": 54.150000000000006,
+   "qNoEvMedian": 56.7,
+   "pass": 0.5833333333333334,
+   "rubric": 0.47075,
+   "rubricP10": 0.14083333333333334,
+   "jevP10": 0.315,
+   "evidence": 0.5001666666666668,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.5833333333333335,
+    "buyer": 2.75,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.1666666666666665,
+    "fun": 2.75,
+    "generic": null
+   },
+   "vsA1": 0.7916666666666666,
+   "ciVsA1": [
+    0,
+    65.35
+   ],
+   "genCostUsd": 0.050329,
+   "genMs": 86944
+  },
+  {
+   "round": 1,
+   "strategy": "H-boring",
+   "label": "Boring-business automation",
+   "version": "v1",
+   "n": 10,
+   "qMedian": 22.35,
+   "qP25": 0,
+   "qP75": 60.8,
+   "qTop3": 62.800000000000004,
+   "rawMedian": 60.25,
+   "qNoEvMedian": 55.2,
+   "pass": 0.5,
+   "rubric": 0.49350000000000005,
+   "rubricP10": 0.15699999999999997,
+   "jevP10": 0.34,
+   "evidence": 0.6074999999999999,
+   "dims": {
+    "spec": 3.9,
+    "feasible": 3.1,
+    "buyer": 3.3,
+    "distribution": 2.7,
+    "novelty": 2.1,
+    "fun": 2.3,
+    "generic": null
+   },
+   "vsA1": 0.75,
+   "ciVsA1": [
+    0,
+    61.1
+   ],
+   "genCostUsd": 0.040626,
+   "genMs": 70778
+  },
+  {
+   "round": 1,
+   "strategy": "G-constraint",
+   "label": "Constraint ($1k in 30 days, ≤3 ingredients)",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 56.349999999999994,
+   "qP25": 52.050000000000004,
+   "qP75": 66.27499999999999,
+   "qTop3": 78,
+   "rawMedian": 56.349999999999994,
+   "qNoEvMedian": 60.9,
+   "pass": 1,
+   "rubric": 0.48616666666666664,
+   "rubricP10": 0.15416666666666665,
+   "jevP10": 0.41,
+   "evidence": 0.5894166666666667,
+   "dims": {
+    "spec": 3.9166666666666665,
+    "feasible": 3.6666666666666665,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.4166666666666665,
+    "novelty": 2.1666666666666665,
+    "fun": 2.8333333333333335,
+    "generic": null
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    51.900000000000006,
+    67.94999999999999
+   ],
+   "genCostUsd": 0.048716999999999996,
+   "genMs": 83305
+  },
+  {
+   "round": 1,
+   "strategy": "F-gem",
+   "label": "Gem-grounded",
+   "version": "v1",
+   "n": 12,
+   "qMedian": 51.25,
+   "qP25": 0,
+   "qP75": 67.525,
+   "qTop3": 68.43333333333332,
+   "rawMedian": 65.1,
+   "qNoEvMedian": 58.8,
+   "pass": 0.6666666666666666,
+   "rubric": 0.46291666666666664,
+   "rubricP10": 0.13500000000000004,
+   "jevP10": 0.35,
+   "evidence": 0.7655,
+   "dims": {
+    "spec": 3.5833333333333335,
+    "feasible": 3.3333333333333335,
+    "buyer": 2.8333333333333335,
+    "distribution": 2.4166666666666665,
+    "novelty": 1.9166666666666667,
+    "fun": 2.9166666666666665,
+    "generic": null
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    67.55
+   ],
+   "genCostUsd": 0.05673,
+   "genMs": 87482
+  },
+  {
+   "round": 2,
+   "strategy": "W-hybrid",
+   "label": "Hybrid: pain-first × proven model",
+   "version": "v2",
+   "n": 12,
+   "qMedian": 60.15,
+   "qP25": 56.85,
+   "qP75": 64.375,
+   "qTop3": 69.93333333333334,
+   "rawMedian": 60.15,
+   "qNoEvMedian": 58.95,
+   "pass": 0.9166666666666666,
+   "rubric": 0.4829166666666667,
+   "rubricP10": 0.11500000000000003,
+   "jevP10": 0.405,
+   "evidence": 0.5638333333333333,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.75,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.1666666666666665,
+    "novelty": 2.5,
+    "fun": 3.0833333333333335,
+    "generic": null
+   },
+   "vsA1": 0.9583333333333334,
+   "ciVsA1": [
+    56.3,
+    65.15
+   ],
+   "genCostUsd": 0.052946999999999994,
+   "genMs": 79125
+  },
+  {
+   "round": 2,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v2",
+   "n": 12,
+   "qMedian": 59.4,
+   "qP25": 0,
+   "qP75": 63.675,
+   "qTop3": 69.53333333333335,
+   "rawMedian": 61.849999999999994,
+   "qNoEvMedian": 57.05,
+   "pass": 0.6666666666666666,
+   "rubric": 0.44683333333333325,
+   "rubricP10": 0.09666666666666668,
+   "jevP10": 0.39,
+   "evidence": 0.6720833333333333,
+   "dims": {
+    "spec": 3.5833333333333335,
+    "feasible": 4.083333333333333,
+    "buyer": 2.3333333333333335,
+    "distribution": 2.0833333333333335,
+    "novelty": 2.0833333333333335,
+    "fun": 2.5833333333333335,
+    "generic": null
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    64.55
+   ],
+   "genCostUsd": 0.051914,
+   "genMs": 80806
+  },
+  {
+   "round": 2,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v2",
+   "n": 12,
+   "qMedian": 61.75,
+   "qP25": 51.2,
+   "qP75": 69.32499999999999,
+   "qTop3": 75.93333333333334,
+   "rawMedian": 61.75,
+   "qNoEvMedian": 61.05,
+   "pass": 1,
+   "rubric": 0.4684166666666667,
+   "rubricP10": 0.11166666666666668,
+   "jevP10": 0.43,
+   "evidence": 0.5851666666666667,
+   "dims": {
+    "spec": 3.5833333333333335,
+    "feasible": 3.5,
+    "buyer": 2.25,
+    "distribution": 2.5,
+    "novelty": 2.5,
+    "fun": 3.25,
+    "generic": null
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    50.8,
+    70.55
+   ],
+   "genCostUsd": 0.050251000000000004,
+   "genMs": 84801
+  },
+  {
+   "round": 2,
+   "strategy": "F-gem",
+   "label": "Gem-grounded",
+   "version": "v2",
+   "n": 12,
+   "qMedian": 52.85,
+   "qP25": 0,
+   "qP75": 59.95,
+   "qTop3": 71.36666666666667,
+   "rawMedian": 59.45,
+   "qNoEvMedian": 52.05,
+   "pass": 0.6666666666666666,
+   "rubric": 0.4483333333333334,
+   "rubricP10": 0.12166666666666666,
+   "jevP10": 0.35,
+   "evidence": 0.80525,
+   "dims": {
+    "spec": 3.5,
+    "feasible": 3.3333333333333335,
+    "buyer": 2.5,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.3333333333333335,
+    "fun": 2.9166666666666665,
+    "generic": null
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    62.9
+   ],
+   "genCostUsd": 0.06263600000000001,
+   "genMs": 112407
+  }
+ ],
+ "controlled": [
+  {
+   "round": 1,
+   "strategy": "A0-template",
+   "label": "Baseline: today's template sparks & mixes",
+   "version": "template",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 12.5,
+   "qNoEvMedian": 16.6,
+   "pass": 0,
+   "rubric": 0.11133333333333333,
+   "rubricP10": 0.016666666666666666,
+   "jevP10": 0.11,
+   "evidence": 0,
+   "dims": {
+    "spec": 1,
+    "feasible": 2,
+    "buyer": 1,
+    "distribution": 1,
+    "novelty": 2,
+    "fun": 2.3333333333333335,
+    "generic": 4.666666666666667
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0,
+   "genMs": 20
+  },
+  {
+   "round": 1,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 68.6,
+   "qP25": 65.6,
+   "qP75": 72.65,
+   "qTop3": 69.3,
+   "rawMedian": 68.6,
+   "qNoEvMedian": 63.9,
+   "pass": 1,
+   "rubric": 0.5186666666666667,
+   "rubricP10": 0.12999999999999998,
+   "jevP10": 0.43,
+   "evidence": 0.862,
+   "dims": {
+    "spec": 4,
+    "feasible": 3,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.6666666666666665,
+    "novelty": 3,
+    "fun": 3.6666666666666665,
+    "generic": 2.6666666666666665
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    62.6,
+    76.7
+   ],
+   "genCostUsd": 0.053766,
+   "genMs": 88579
+  },
+  {
+   "round": 1,
+   "strategy": "A1-mixer",
+   "label": "Baseline: today's Claude Mixer (random ingredients)",
+   "version": "mixer",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 14.5,
+   "qNoEvMedian": 19.3,
+   "pass": 0,
+   "rubric": 0.13566666666666669,
+   "rubricP10": 0.016666666666666666,
+   "jevP10": 0.13,
+   "evidence": 0,
+   "dims": {
+    "spec": 1,
+    "feasible": 2.3333333333333335,
+    "buyer": 1,
+    "distribution": 1,
+    "novelty": 2.3333333333333335,
+    "fun": 2.3333333333333335,
+    "generic": 4.666666666666667
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.01697,
+   "genMs": 31787
+  },
+  {
+   "round": 1,
+   "strategy": "A2-random-schema",
+   "label": "Control: random ingredients + new idea schema",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 43.2,
+   "qNoEvMedian": 51.8,
+   "pass": 0,
+   "rubric": 0.4043333333333334,
+   "rubricP10": 0.11,
+   "jevP10": 0.3,
+   "evidence": 0.18766666666666665,
+   "dims": {
+    "spec": 3,
+    "feasible": 3.3333333333333335,
+    "buyer": 2.3333333333333335,
+    "distribution": 2.3333333333333335,
+    "novelty": 2,
+    "fun": 2.6666666666666665,
+    "generic": 3.3333333333333335
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.03599,
+   "genMs": 69344
+  },
+  {
+   "round": 1,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 68.9,
+   "qP25": 61.150000000000006,
+   "qP75": 71.55000000000001,
+   "qTop3": 65.50000000000001,
+   "rawMedian": 68.9,
+   "qNoEvMedian": 69.5,
+   "pass": 1,
+   "rubric": 0.5893333333333334,
+   "rubricP10": 0.14666666666666667,
+   "jevP10": 0.41,
+   "evidence": 0.526,
+   "dims": {
+    "spec": 4,
+    "feasible": 4.333333333333333,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.6666666666666665,
+    "novelty": 3,
+    "fun": 4,
+    "generic": 2
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    53.4,
+    74.2
+   ],
+   "genCostUsd": 0.047383,
+   "genMs": 73027
+  },
+  {
+   "round": 1,
+   "strategy": "D-asset",
+   "label": "Asset leverage",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 33.9,
+   "qTop3": 22.599999999999998,
+   "rawMedian": 51.8,
+   "qNoEvMedian": 48,
+   "pass": 0.3333333333333333,
+   "rubric": 0.35800000000000004,
+   "rubricP10": 0.07333333333333333,
+   "jevP10": 0.35,
+   "evidence": 0.665,
+   "dims": {
+    "spec": 3.3333333333333335,
+    "feasible": 2.6666666666666665,
+    "buyer": 2,
+    "distribution": 2,
+    "novelty": 2.3333333333333335,
+    "fun": 2.6666666666666665,
+    "generic": 3.3333333333333335
+   },
+   "vsA1": 0.6666666666666666,
+   "ciVsA1": [
+    0,
+    67.8
+   ],
+   "genCostUsd": 0.039493,
+   "genMs": 79000
+  },
+  {
+   "round": 1,
+   "strategy": "E-remix",
+   "label": "Market-proven remix",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 35.5,
+   "qNoEvMedian": 46.5,
+   "pass": 0,
+   "rubric": 0.324,
+   "rubricP10": 0.07,
+   "jevP10": 0.3,
+   "evidence": 0.27366666666666667,
+   "dims": {
+    "spec": 2.6666666666666665,
+    "feasible": 2.6666666666666665,
+    "buyer": 1.6666666666666667,
+    "distribution": 2.3333333333333335,
+    "novelty": 1.6666666666666667,
+    "fun": 3,
+    "generic": 3.6666666666666665
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.050329,
+   "genMs": 86944
+  },
+  {
+   "round": 1,
+   "strategy": "H-boring",
+   "label": "Boring-business automation",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 44.7,
+   "qP25": 22.35,
+   "qP75": 52.3,
+   "qTop3": 34.86666666666667,
+   "rawMedian": 59.9,
+   "qNoEvMedian": 53.2,
+   "pass": 0.6666666666666666,
+   "rubric": 0.503,
+   "rubricP10": 0.15,
+   "jevP10": 0.29,
+   "evidence": 0.5323333333333333,
+   "dims": {
+    "spec": 4,
+    "feasible": 3.6666666666666665,
+    "buyer": 3.3333333333333335,
+    "distribution": 2.3333333333333335,
+    "novelty": 2,
+    "fun": 2.3333333333333335,
+    "generic": 2
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    59.9
+   ],
+   "genCostUsd": 0.040626,
+   "genMs": 70778
+  },
+  {
+   "round": 1,
+   "strategy": "G-constraint",
+   "label": "Constraint ($1k in 30 days, ≤3 ingredients)",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 53.7,
+   "qP25": 26.85,
+   "qP75": 62.75,
+   "qTop3": 41.833333333333336,
+   "rawMedian": 54.6,
+   "qNoEvMedian": 60.2,
+   "pass": 0.6666666666666666,
+   "rubric": 0.4043333333333334,
+   "rubricP10": 0.07666666666666666,
+   "jevP10": 0.42,
+   "evidence": 0.6883333333333334,
+   "dims": {
+    "spec": 3.3333333333333335,
+    "feasible": 3.6666666666666665,
+    "buyer": 2,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "generic": 3.3333333333333335
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    71.8
+   ],
+   "genCostUsd": 0.048716999999999996,
+   "genMs": 83305
+  },
+  {
+   "round": 1,
+   "strategy": "F-gem",
+   "label": "Gem-grounded",
+   "version": "v1",
+   "n": 3,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 31.95,
+   "qTop3": 21.3,
+   "rawMedian": 70.8,
+   "qNoEvMedian": 64.7,
+   "pass": 0.3333333333333333,
+   "rubric": 0.5003333333333334,
+   "rubricP10": 0.14,
+   "jevP10": 0.44,
+   "evidence": 0.8946666666666667,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.6666666666666665,
+    "buyer": 3,
+    "distribution": 2.6666666666666665,
+    "novelty": 2,
+    "fun": 2.6666666666666665,
+    "generic": 2.6666666666666665
+   },
+   "vsA1": 0.6666666666666666,
+   "ciVsA1": [
+    0,
+    63.9
+   ],
+   "genCostUsd": 0.05673,
+   "genMs": 87482
+  },
+  {
+   "round": 2,
+   "strategy": "W-hybrid",
+   "label": "Hybrid: pain-first × proven model",
+   "version": "v2",
+   "n": 3,
+   "qMedian": 51.4,
+   "qP25": 25.7,
+   "qP75": 59.150000000000006,
+   "qTop3": 39.43333333333334,
+   "rawMedian": 51.4,
+   "qNoEvMedian": 53.9,
+   "pass": 0.6666666666666666,
+   "rubric": 0.429,
+   "rubricP10": 0.10333333333333335,
+   "jevP10": 0.32,
+   "evidence": 0.39599999999999996,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.3333333333333335,
+    "buyer": 2.6666666666666665,
+    "distribution": 2,
+    "novelty": 2.3333333333333335,
+    "fun": 2.3333333333333335,
+    "generic": 2.6666666666666665
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    66.9
+   ],
+   "genCostUsd": 0.052946999999999994,
+   "genMs": 79125
+  },
+  {
+   "round": 2,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v2",
+   "n": 3,
+   "qMedian": 69.4,
+   "qP25": 63.900000000000006,
+   "qP75": 73,
+   "qTop3": 68.13333333333334,
+   "rawMedian": 69.4,
+   "qNoEvMedian": 63.1,
+   "pass": 1,
+   "rubric": 0.5,
+   "rubricP10": 0.12,
+   "jevP10": 0.42,
+   "evidence": 0.778,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 4.666666666666667,
+    "buyer": 2.3333333333333335,
+    "distribution": 2.3333333333333335,
+    "novelty": 2,
+    "fun": 3,
+    "generic": 3
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    58.4,
+    76.6
+   ],
+   "genCostUsd": 0.051914,
+   "genMs": 80806
+  },
+  {
+   "round": 2,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v2",
+   "n": 3,
+   "qMedian": 41.6,
+   "qP25": 40.650000000000006,
+   "qP75": 50.25,
+   "qTop3": 46.73333333333333,
+   "rawMedian": 41.6,
+   "qNoEvMedian": 51.2,
+   "pass": 1,
+   "rubric": 0.4103333333333334,
+   "rubricP10": 0.06666666666666667,
+   "jevP10": 0.39,
+   "evidence": 0.2743333333333333,
+   "dims": {
+    "spec": 3.3333333333333335,
+    "feasible": 3,
+    "buyer": 1.6666666666666667,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.6666666666666665,
+    "fun": 3.6666666666666665,
+    "generic": 2.6666666666666665
+   },
+   "vsA1": 1,
+   "ciVsA1": [
+    39.7,
+    58.9
+   ],
+   "genCostUsd": 0.050251000000000004,
+   "genMs": 84801
+  },
+  {
+   "round": 2,
+   "strategy": "F-gem",
+   "label": "Gem-grounded",
+   "version": "v2",
+   "n": 3,
+   "qMedian": 47.5,
+   "qP25": 23.75,
+   "qP75": 58.25,
+   "qTop3": 38.833333333333336,
+   "rawMedian": 67.2,
+   "qNoEvMedian": 60.4,
+   "pass": 0.6666666666666666,
+   "rubric": 0.5,
+   "rubricP10": 0.13333333333333333,
+   "jevP10": 0.38,
+   "evidence": 0.7403333333333334,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.6666666666666665,
+    "buyer": 2.6666666666666665,
+    "distribution": 2.3333333333333335,
+    "novelty": 3,
+    "fun": 3,
+    "generic": 2.3333333333333335
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    69
+   ],
+   "genCostUsd": 0.06263600000000001,
+   "genMs": 112407
+  },
+  {
+   "round": 3,
+   "strategy": "T-early",
+   "label": "Trend: just starting",
+   "version": "v3",
+   "n": 10,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 20.666666666666668,
+   "rawMedian": 61.2,
+   "qNoEvMedian": 56.05,
+   "pass": 0.1,
+   "rubric": 0.4067,
+   "rubricP10": 0.09000000000000001,
+   "jevP10": 0.39,
+   "evidence": 0.7048333333333333,
+   "dims": {
+    "spec": 3.2,
+    "feasible": 3.1,
+    "buyer": 2.2,
+    "distribution": 2.4,
+    "novelty": 2.1,
+    "fun": 2.9,
+    "generic": 3.4
+   },
+   "vsA1": 0.55,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.045928000000000004,
+   "genMs": 80976
+  },
+  {
+   "round": 3,
+   "strategy": "T-hot",
+   "label": "Trend: hot right now",
+   "version": "v3",
+   "n": 10,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 0,
+   "rawMedian": 64.2,
+   "qNoEvMedian": 62.7,
+   "pass": 0,
+   "rubric": 0.47030000000000005,
+   "rubricP10": 0.10499999999999998,
+   "jevP10": 0.43,
+   "evidence": 0.6813999999999999,
+   "dims": {
+    "spec": 3.5,
+    "feasible": 3.4,
+    "buyer": 2.4,
+    "distribution": 2.4,
+    "novelty": 2.6,
+    "fun": 3.4,
+    "generic": 3
+   },
+   "vsA1": 0.5,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.05514600000000001,
+   "genMs": 89225
+  },
+  {
+   "round": 3,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v3",
+   "n": 12,
+   "qMedian": 20.8,
+   "qP25": 0,
+   "qP75": 54.95,
+   "qTop3": 66.13333333333334,
+   "rawMedian": 65.85,
+   "qNoEvMedian": 61.150000000000006,
+   "pass": 0.5,
+   "rubric": 0.4615,
+   "rubricP10": 0.11666666666666668,
+   "jevP10": 0.38,
+   "evidence": 0.6960000000000001,
+   "dims": {
+    "spec": 3.5833333333333335,
+    "feasible": 3.5,
+    "buyer": 2.4166666666666665,
+    "distribution": 2.4166666666666665,
+    "novelty": 2.4166666666666665,
+    "fun": 2.9166666666666665,
+    "generic": 2.75
+   },
+   "vsA1": 0.75,
+   "ciVsA1": [
+    0,
+    58.3
+   ],
+   "genCostUsd": 0.055326,
+   "genMs": 85696
+  },
+  {
+   "round": 3,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v3",
+   "n": 12,
+   "qMedian": 0,
+   "qP25": 0,
+   "qP75": 0,
+   "qTop3": 17.266666666666666,
+   "rawMedian": 69.6,
+   "qNoEvMedian": 71.44999999999999,
+   "pass": 0.08333333333333333,
+   "rubric": 0.55875,
+   "rubricP10": 0.15333333333333335,
+   "jevP10": 0.48,
+   "evidence": 0.5700833333333334,
+   "dims": {
+    "spec": 3.9166666666666665,
+    "feasible": 4.083333333333333,
+    "buyer": 2.75,
+    "distribution": 2.8333333333333335,
+    "novelty": 2.6666666666666665,
+    "fun": 3.25,
+    "generic": 2.4166666666666665
+   },
+   "vsA1": 0.5416666666666666,
+   "ciVsA1": [
+    0,
+    0
+   ],
+   "genCostUsd": 0.052284000000000004,
+   "genMs": 89658
+  },
+  {
+   "round": 4,
+   "strategy": "C-audience",
+   "label": "Audience-first",
+   "version": "v4",
+   "n": 12,
+   "qMedian": 60.35,
+   "qP25": 0,
+   "qP75": 69.8,
+   "qTop3": 76.26666666666667,
+   "rawMedian": 64.15,
+   "qNoEvMedian": 66.35,
+   "pass": 0.6666666666666666,
+   "rubric": 0.50775,
+   "rubricP10": 0.15416666666666667,
+   "jevP10": 0.43,
+   "evidence": 0.6516666666666667,
+   "dims": {
+    "spec": 3.8333333333333335,
+    "feasible": 3.75,
+    "buyer": 2.5833333333333335,
+    "distribution": 2.4166666666666665,
+    "novelty": 2.6666666666666665,
+    "fun": 3.25,
+    "generic": 2.6666666666666665
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    70.1
+   ],
+   "genCostUsd": 0.046615000000000004,
+   "genMs": 80195
+  },
+  {
+   "round": 4,
+   "strategy": "B-pain",
+   "label": "Pain-first",
+   "version": "v4",
+   "n": 12,
+   "qMedian": 64.05,
+   "qP25": 0,
+   "qP75": 69.625,
+   "qTop3": 74.06666666666666,
+   "rawMedian": 66.19999999999999,
+   "qNoEvMedian": 61.5,
+   "pass": 0.6666666666666666,
+   "rubric": 0.48533333333333334,
+   "rubricP10": 0.13249999999999998,
+   "jevP10": 0.385,
+   "evidence": 0.7634166666666667,
+   "dims": {
+    "spec": 3.75,
+    "feasible": 3.8333333333333335,
+    "buyer": 2.4166666666666665,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.4166666666666665,
+    "fun": 3.1666666666666665,
+    "generic": 3.0833333333333335
+   },
+   "vsA1": 0.8333333333333334,
+   "ciVsA1": [
+    0,
+    70.44999999999999
+   ],
+   "genCostUsd": 0.055509,
+   "genMs": 92650
+  },
+  {
+   "round": 4,
+   "strategy": "T-hot",
+   "label": "Trend: hot right now",
+   "version": "v4",
+   "n": 6,
+   "qMedian": 31.85,
+   "qP25": 0,
+   "qP75": 66.7,
+   "qTop3": 70.63333333333333,
+   "rawMedian": 62.35,
+   "qNoEvMedian": 56.4,
+   "pass": 0.5,
+   "rubric": 0.44300000000000006,
+   "rubricP10": 0.11166666666666665,
+   "jevP10": 0.42000000000000004,
+   "evidence": 0.7535,
+   "dims": {
+    "spec": 3.6666666666666665,
+    "feasible": 3.3333333333333335,
+    "buyer": 2.1666666666666665,
+    "distribution": 2.3333333333333335,
+    "novelty": 2.3333333333333335,
+    "fun": 3.1666666666666665,
+    "generic": 3.3333333333333335
+   },
+   "vsA1": 0.75,
+   "ciVsA1": [
+    0,
+    74.1
+   ],
+   "genCostUsd": 0.019177,
+   "genMs": 30430
+  }
+ ],
+ "agree": {
+  "asRun": {
+   "n": 166,
+   "rho": 0.7060514305076684,
+   "llmN": 142,
+   "llmRho": 0.5388713832729085,
+   "llmP10Rho": 0.5074109972634974
+  },
+  "controlled": {
+   "n": 116,
+   "rho": 0.6125123853279383,
+   "llmN": 110,
+   "llmRho": 0.5474562526512273
+  },
+  "generic": {
+   "n": 116,
+   "rho": 0.5546131189313174
+  },
+  "r1VsR2": {
+   "n": 42,
+   "rho": 0.756551491473691,
+   "meanDiff": -0.018714285714285715
+  },
+  "evidenceVsRubric": 0.49052047345977673,
+  "batchVsSingle": {
+   "n": 16,
+   "spearman": 0.8603106562654215,
+   "meanAbsDiff": 0.036875000000000005,
+   "meanBatched": 0.29125,
+   "meanSingle": 0.311875
+  },
+  "tournament": {
+   "matches": 48,
+   "winnerHasHigherRubric": 0.5625,
+   "firstPositionWins": 0.3541666666666667,
+   "eloVsQuality": 0.15571989293905045
+  }
+ },
+ "cost": {
+  "claude": {
+   "calls": 40,
+   "kitCalls": 10,
+   "costUsd": 2.5935930000000003,
+   "inTok": 366684,
+   "outTok": 230580,
+   "ms": 2617344,
+   "byTag": {
+    "gen": {
+     "calls": 20,
+     "costUsd": 0.956914,
+     "inTok": 117744,
+     "outTok": 145961,
+     "ms": 1606645
+    },
+    "rubric": {
+     "calls": 11,
+     "costUsd": 0.51499,
+     "inTok": 93456,
+     "outTok": 14121,
+     "ms": 133027
+    },
+    "rubric2": {
+     "calls": 9,
+     "costUsd": 0.41719199999999995,
+     "inTok": 77392,
+     "outTok": 10766,
+     "ms": 115944
+    },
+    "kit": {
+     "calls": 10,
+     "costUsd": 0.49935799999999997,
+     "inTok": 53032,
+     "outTok": 28727,
+     "ms": 394177
+    },
+    "premortem": {
+     "calls": 2,
+     "costUsd": 0.205139,
+     "inTok": 25060,
+     "outTok": 31005,
+     "ms": 367551
+    }
+   }
+  },
+  "jev": {
+   "calls": 148,
+   "n": 148,
+   "inTok": 465645,
+   "outTok": 22176,
+   "latencyMs": 57066,
+   "usd": 0.01955709,
+   "byKind": {
+    "jev:": 61,
+    "jev-single": 16,
+    "generic": 40,
+    "pairs": 8,
+    "pm-": 12,
+    "patterns": 11
+   }
+  },
+  "ideas": 256,
+  "llmIdeas": 244
+ },
+ "slop": {
+  "by": {
+   "A0-template": {
+    "n": 12,
+    "pass": 0
+   },
+   "B-pain": {
+    "n": 51,
+    "pass": 31
+   },
+   "A1-mixer": {
+    "n": 12,
+    "pass": 0
+   },
+   "A2-random-schema": {
+    "n": 12,
+    "pass": 1
+   },
+   "C-audience": {
+    "n": 53,
+    "pass": 37
+   },
+   "D-asset": {
+    "n": 13,
+    "pass": 9
+   },
+   "E-remix": {
+    "n": 12,
+    "pass": 7
+   },
+   "H-boring": {
+    "n": 10,
+    "pass": 5
+   },
+   "G-constraint": {
+    "n": 14,
+    "pass": 14
+   },
+   "F-gem": {
+    "n": 24,
+    "pass": 16
+   },
+   "W-hybrid": {
+    "n": 12,
+    "pass": 11
+   },
+   "T-early": {
+    "n": 12,
+    "pass": 2
+   },
+   "T-hot": {
+    "n": 19,
+    "pass": 4
+   }
+  },
+  "reasons": {
+   "no named buyer": 25,
+   "no concrete price": 27,
+   "no specific first-customer channel": 27,
+   "no linked evidence": 36,
+   "Jev: a sharp founder would dismiss it as generic": 28,
+   "a clone of existing products with no stated difference": 16,
+   "no owned project behind it": 30,
+   "hype phrase": 8,
+   "buyer not tied to a reachable place": 2,
+   "unsourced statistic": 49,
+   "rubric: generic": 14
+  },
+  "rejectedGood": [
+   {
+    "id": "C-audience:3:tenderaileadalerts:wj2",
+    "name": "TenderAI: Lead Alerts",
+    "strategy": "C-audience",
+    "round": 3,
+    "quality": 0,
+    "raw": 79,
+    "jevP10": 0.49,
+    "jevGeneric": 0.16,
+    "rubric": {
+     "spec": 4,
+     "feasible": 4,
+     "buyer": 4,
+     "distribution": 3,
+     "novelty": 3,
+     "fun": 3,
+     "p10": 0.22,
+     "flaw": "Government site changes could break scraper anytime, fragile core",
+     "generic": 2
+    },
+    "evidence": 0.834,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"100k members\""
+     ]
+    }
+   },
+   {
+    "id": "F-gem:1:hdatlaspro:h4",
+    "name": "HD Atlas Pro",
+    "strategy": "F-gem",
+    "round": 1,
+    "quality": 0,
+    "raw": 77.3,
+    "jevP10": 0.59,
+    "jevGeneric": 0.16,
+    "rubric": {
+     "spec": 4,
+     "feasible": 4,
+     "buyer": 3,
+     "distribution": 3,
+     "novelty": 2,
+     "fun": 3,
+     "p10": 0.2,
+     "flaw": "Nearly identical to i10, splits same tiny addressable market"
+    },
+    "evidence": 0.893,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"500+ members\""
+     ]
+    }
+   },
+   {
+    "id": "B-pain:3:hdatlaspro:nmb",
+    "name": "HD Atlas Pro",
+    "strategy": "B-pain",
+    "round": 3,
+    "quality": 0,
+    "raw": 76.9,
+    "jevP10": 0.47,
+    "jevGeneric": 0.18,
+    "rubric": {
+     "spec": 4,
+     "feasible": 5,
+     "buyer": 2,
+     "distribution": 3,
+     "novelty": 3,
+     "fun": 4,
+     "p10": 0.1,
+     "flaw": "Free/cheap competitors abound, no forcing function to pay",
+     "generic": 3
+    },
+    "evidence": 0.863,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"95k members\""
+     ]
+    }
+   },
+   {
+    "id": "C-audience:3:hdtransitalerts:wm8",
+    "name": "HD Transit Alerts",
+    "strategy": "C-audience",
+    "round": 3,
+    "quality": 0,
+    "raw": 76.6,
+    "jevP10": 0.51,
+    "jevGeneric": 0.2,
+    "rubric": {
+     "spec": 5,
+     "feasible": 5,
+     "buyer": 3,
+     "distribution": 3,
+     "novelty": 3,
+     "fun": 4,
+     "p10": 0.15,
+     "flaw": "Low price point makes 10 payers easy but revenue trivial, weak retention",
+     "generic": 2
+    },
+    "evidence": 0.614,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"200k members\""
+     ]
+    }
+   },
+   {
+    "id": "T-hot:3:pokmonbattlegamehebrewru:tti:pm",
+    "name": "Falafel Rush Battles — Turn-Based Battle Mode (In-Game Event)",
+    "strategy": "T-hot",
+    "round": 5,
+    "quality": 0,
+    "raw": 75.8,
+    "jevP10": 0.37,
+    "jevGeneric": 0.18,
+    "evidence": 0.7803333333333332,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "buyer not tied to a reachable place",
+      "no specific first-customer channel",
+      "unsourced statistic \"5k+ monthly users\""
+     ]
+    }
+   },
+   {
+    "id": "C-audience:3:cliploomautoshorts:pms",
+    "name": "ClipLoom: Auto Shorts",
+    "strategy": "C-audience",
+    "round": 3,
+    "quality": 0,
+    "raw": 75.4,
+    "jevP10": 0.52,
+    "jevGeneric": 0.25,
+    "rubric": {
+     "spec": 4,
+     "feasible": 5,
+     "buyer": 3,
+     "distribution": 3,
+     "novelty": 2,
+     "fun": 3,
+     "p10": 0.25,
+     "flaw": "Crowded market of clip tools; buyers churn fast and price-shop",
+     "generic": 3
+    },
+    "evidence": 0.734,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"200k members\""
+     ]
+    }
+   },
+   {
+    "id": "B-pain:1:storyreelpremiumhdshorts:r:pm",
+    "name": "Story Reel Analytics — Turn Trending Segments into Ready Shorts",
+    "strategy": "B-pain",
+    "round": 5,
+    "quality": 0,
+    "raw": 74.5,
+    "jevP10": 0.36,
+    "jevGeneric": 0.35,
+    "evidence": 0.774,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"50k followers\""
+     ]
+    }
+   },
+   {
+    "id": "C-audience:3:hdcouplesynchebreweditio:jsm",
+    "name": "HD Couple Sync: Hebrew Edition",
+    "strategy": "C-audience",
+    "round": 3,
+    "quality": 0,
+    "raw": 74.2,
+    "jevP10": 0.58,
+    "jevGeneric": 0.18,
+    "rubric": {
+     "spec": 4,
+     "feasible": 4,
+     "buyer": 3,
+     "distribution": 4,
+     "novelty": 4,
+     "fun": 4,
+     "p10": 0.25,
+     "flaw": "Small addressable market and unproven willingness to pay for HD reports",
+     "generic": 2
+    },
+    "evidence": 0.52,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"5k members\""
+     ]
+    }
+   },
+   {
+    "id": "C-audience:3:groupvaultfacebookbackup:u1a",
+    "name": "GroupVault: Facebook Backup",
+    "strategy": "C-audience",
+    "round": 3,
+    "quality": 0,
+    "raw": 73.5,
+    "jevP10": 0.48,
+    "jevGeneric": 0.13,
+    "rubric": {
+     "spec": 4,
+     "feasible": 4,
+     "buyer": 3,
+     "distribution": 3,
+     "novelty": 3,
+     "fun": 2,
+     "p10": 0.18,
+     "flaw": "Facebook ToS/scraping risk could kill the service overnight",
+     "generic": 2
+    },
+    "evidence": 0.787,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"50k+ members\""
+     ]
+    }
+   },
+   {
+    "id": "T-early:3:makomaicitymatchreport:bem:pm",
+    "name": "MakomAI City Match — Monthly Relocation Planning Newsletter",
+    "strategy": "T-early",
+    "round": 5,
+    "quality": 0,
+    "raw": 73,
+    "jevP10": 0.41,
+    "jevGeneric": 0.29,
+    "evidence": 0.621,
+    "slop": {
+     "pass": false,
+     "reasons": [
+      "unsourced statistic \"5%\""
+     ]
+    }
+   }
+  ]
+ },
+ "top": [
+  {
+   "id": "G-constraint:1:hdatlastelegrambot:g1y",
+   "name": "HD Atlas Telegram Bot",
+   "strategy": "G-constraint",
+   "round": 1,
+   "quality": 83.4,
+   "raw": 83.4,
+   "jevP10": 0.47,
+   "jevGeneric": 0.19,
+   "rubric": {
+    "spec": 5,
+    "feasible": 5,
+    "buyer": 4,
+    "distribution": 4,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.35,
+    "flaw": "Tiny addressable market of Hebrew HD Telegram users limits revenue ceiling"
+   },
+   "evidence": 0.757,
+   "elo": 1531.4148105198797,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:4:tenderaialert:hqo",
+   "name": "TenderAI Alert",
+   "strategy": "C-audience",
+   "round": 4,
+   "quality": 81,
+   "raw": 81,
+   "jevP10": 0.46,
+   "jevGeneric": 0.22,
+   "rubric": {
+    "spec": 5,
+    "feasible": 4,
+    "buyer": 4,
+    "distribution": 3,
+    "novelty": 4,
+    "fun": 3,
+    "p10": 0.3,
+    "flaw": "Requires trust/DM outreach conversion in a skeptical B2B niche",
+    "generic": 2
+   },
+   "evidence": 0.867,
+   "elo": 1493.3801125540156,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "T-hot:4:humandesignmatchreport:q89",
+   "name": "Human Design Match Report",
+   "strategy": "T-hot",
+   "round": 4,
+   "quality": 80.5,
+   "raw": 80.5,
+   "jevP10": 0.53,
+   "jevGeneric": 0.25,
+   "rubric": {
+    "spec": 5,
+    "feasible": 5,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.22,
+    "flaw": "Low price point means needing many buyers; HD compatibility market size uncertain",
+    "generic": 2
+   },
+   "evidence": 0.7703333333333332,
+   "elo": 1494.0333302707222,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "G-constraint:1:podcastclipstudiomembers:tzq",
+   "name": "Podcast Clip Studio Membership",
+   "strategy": "G-constraint",
+   "round": 1,
+   "quality": 79.3,
+   "raw": 79.3,
+   "jevP10": 0.51,
+   "jevGeneric": 0.28,
+   "rubric": {
+    "spec": 4,
+    "feasible": 5,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 4,
+    "p10": 0.2,
+    "flaw": "Crowded clip-tool market (Opus, Vizard) with better funded competitors"
+   },
+   "evidence": 0.837,
+   "elo": 1514.5746923504375,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:2:yourdayhddailystrategy:iew",
+   "name": "היום שלך (Your Day) — HD Daily Strategy",
+   "strategy": "C-audience",
+   "round": 2,
+   "quality": 78.9,
+   "raw": 78.9,
+   "jevP10": 0.54,
+   "jevGeneric": 0.17,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 4,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.22,
+    "flaw": "Very small addressable Hebrew HD market limits ceiling well under target"
+   },
+   "evidence": 0.757,
+   "elo": 1502.0667287898198,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:4:myhdchartinhebrew:vmv",
+   "name": "My HD Chart in Hebrew",
+   "strategy": "C-audience",
+   "round": 4,
+   "quality": 77.1,
+   "raw": 77.1,
+   "jevP10": 0.65,
+   "jevGeneric": 0.18,
+   "rubric": {
+    "spec": 5,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 4,
+    "fun": 4,
+    "p10": 0.25,
+    "flaw": "Small underserved niche, uncertain how many will pay ₪49",
+    "generic": 1
+   },
+   "evidence": 0.668,
+   "elo": 1544.9340406527133,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:2:tenderaiscoutdailyalerts:8rl",
+   "name": "TenderAI Scout (Daily Alerts)",
+   "strategy": "C-audience",
+   "round": 2,
+   "quality": 75.9,
+   "raw": 75.9,
+   "jevP10": 0.48,
+   "jevGeneric": 0.21,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 3,
+    "p10": 0.18,
+    "flaw": "WhatsApp Business API onboarding friction could stall launch"
+   },
+   "evidence": 0.834,
+   "elo": 1509.101832409374,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:1:hdatlaszerodowntimerelia:ylg",
+   "name": "HD Atlas Zero-Downtime — Reliable Hebrew Reference",
+   "strategy": "B-pain",
+   "round": 1,
+   "quality": 75.5,
+   "raw": 75.5,
+   "jevP10": 0.57,
+   "jevGeneric": 0.15,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.18,
+    "flaw": "One-time purchase caps revenue; small addressable Hebrew HD niche"
+   },
+   "evidence": 0.818,
+   "elo": 1465.0867870841876,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:1:herdrconsole:kz2",
+   "name": "herdr Console",
+   "strategy": "C-audience",
+   "round": 1,
+   "quality": 75.4,
+   "raw": 75.4,
+   "jevP10": 0.41,
+   "jevGeneric": 0.2,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 4,
+    "novelty": 2,
+    "fun": 4,
+    "p10": 0.25,
+    "flaw": "Same niche audience as i10; overlapping product cannibalizes itself"
+   },
+   "evidence": 0.883,
+   "elo": 1497.2798939449342,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:4:tenderbotwhatsapp:puv",
+   "name": "TenderBot WhatsApp",
+   "strategy": "B-pain",
+   "round": 4,
+   "quality": 75.1,
+   "raw": 75.1,
+   "jevP10": 0.37,
+   "jevGeneric": 0.17,
+   "rubric": {
+    "spec": 5,
+    "feasible": 4,
+    "buyer": 4,
+    "distribution": 3,
+    "novelty": 4,
+    "fun": 3,
+    "p10": 0.3,
+    "flaw": "Same core idea as i4; success hinges on WhatsApp group access and trust",
+    "generic": 2
+   },
+   "evidence": 0.848,
+   "elo": 1498.2804990608115,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:4:cliptubeinstant:9q8",
+   "name": "Clip.tube Instant",
+   "strategy": "B-pain",
+   "round": 4,
+   "quality": 75,
+   "raw": 75,
+   "jevP10": 0.5,
+   "jevGeneric": 0.25,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.2,
+    "flaw": "Crowded space with many free/cheap clip tools already",
+    "generic": 3
+   },
+   "evidence": 0.898,
+   "elo": 1501.7979282336587,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:1:storyreelpremiumhdshorts:r",
+   "name": "Story Reel Premium — HD Shorts Studio",
+   "strategy": "B-pain",
+   "round": 1,
+   "quality": 74.9,
+   "raw": 74.9,
+   "jevP10": 0.44,
+   "jevGeneric": 0.31,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 4,
+    "p10": 0.16,
+    "flaw": "Directly competes with well-funded incumbents like Opus Clip"
+   },
+   "evidence": 0.89,
+   "elo": 1457.9683357064107,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:1:hdquickread:iy7",
+   "name": "HDישראל Quick Read",
+   "strategy": "C-audience",
+   "round": 1,
+   "quality": 74.8,
+   "raw": 74.8,
+   "jevP10": 0.61,
+   "jevGeneric": 0.21,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.25,
+    "flaw": "One-off ₪50 purchase, hard to build recurring revenue base"
+   },
+   "evidence": 0.791,
+   "elo": 1516.7982046626962,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "D-asset:1:astrachartshdreadingsasa:pdv",
+   "name": "Astra Charts—HD Readings as a Service",
+   "strategy": "D-asset",
+   "round": 1,
+   "quality": 74.8,
+   "raw": 74.8,
+   "jevP10": 0.48,
+   "jevGeneric": 0.31,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.18,
+    "flaw": "HD niche buyers may not pay for automated video vs free readings"
+   },
+   "evidence": 0.742,
+   "elo": 1475.1490466579426,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "W-hybrid:2:hdbirthchartbot:l6t",
+   "name": "HD Birth Chart Bot",
+   "strategy": "W-hybrid",
+   "round": 2,
+   "quality": 74.2,
+   "raw": 74.2,
+   "jevP10": 0.52,
+   "jevGeneric": 0.19,
+   "rubric": {
+    "spec": 4,
+    "feasible": 5,
+    "buyer": 3,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.2,
+    "flaw": "Crowded HD app niche; Telegram bot unlikely to convert to paid at scale"
+   },
+   "evidence": 0.784,
+   "elo": 1519.9366905832242,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:1:agentdecksessionorchestr:1co",
+   "name": "Agent Deck — Session Orchestrator",
+   "strategy": "B-pain",
+   "round": 1,
+   "quality": 74,
+   "raw": 74,
+   "jevP10": 0.43,
+   "jevGeneric": 0.24,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.2,
+    "flaw": "Crowded dev-tool space, developers reluctant to pay for tab management"
+   },
+   "evidence": 0.828,
+   "elo": 1467.937221890572,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:1:hdatlaspremiumofflineheb:l9y",
+   "name": "HD Atlas Premium — Offline Hebrew Human Design",
+   "strategy": "B-pain",
+   "round": 1,
+   "quality": 73.9,
+   "raw": 73.9,
+   "jevP10": 0.56,
+   "jevGeneric": 0.14,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.2,
+    "flaw": "Niche audience size in Israel likely too small for 10 paying customers fast"
+   },
+   "evidence": 0.756,
+   "elo": 1508.7211898825994,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "F-gem:2:tenderalertil:f6t",
+   "name": "TenderAlert IL",
+   "strategy": "F-gem",
+   "round": 2,
+   "quality": 73.8,
+   "raw": 73.8,
+   "jevP10": 0.44,
+   "jevGeneric": 0.14,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.16,
+    "flaw": "near-duplicate of i6/i9, splitting focus across three tender ideas"
+   },
+   "evidence": 0.895,
+   "elo": 1496.0075155737736,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:1:herdrdeckagentsessioncom:haf",
+   "name": "Herdr Deck — Agent Session Command Center",
+   "strategy": "B-pain",
+   "round": 1,
+   "quality": 73,
+   "raw": 73,
+   "jevP10": 0.45,
+   "jevGeneric": 0.21,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 2,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 4,
+    "p10": 0.15,
+    "flaw": "Niche audience unlikely to pay $12/mo for a dashboard they can build themselves"
+   },
+   "evidence": 0.888,
+   "elo": 1479.585526126259,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:2:shortclipstudio:1ly",
+   "name": "Short Clip Studio",
+   "strategy": "C-audience",
+   "round": 2,
+   "quality": 73,
+   "raw": 73,
+   "jevP10": 0.47,
+   "jevGeneric": 0.25,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.2,
+    "flaw": "Saturated market of clip tools; hard to stand out on quality alone"
+   },
+   "evidence": 0.893,
+   "elo": 1519.582307848674,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:2:transcriptbatchextractor:8bq",
+   "name": "Transcript Batch Extractor",
+   "strategy": "B-pain",
+   "round": 2,
+   "quality": 72.9,
+   "raw": 72.9,
+   "jevP10": 0.52,
+   "jevGeneric": 0.2,
+   "rubric": {
+    "spec": 4,
+    "feasible": 5,
+    "buyer": 2,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 2,
+    "p10": 0.08,
+    "flaw": "one-time $2.99 batch fee too low to justify acquisition effort"
+   },
+   "evidence": 0.883,
+   "elo": 1525.7858867775876,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:4:hdatlasreader:fwr",
+   "name": "HD Atlas Reader",
+   "strategy": "B-pain",
+   "round": 4,
+   "quality": 72.1,
+   "raw": 72.1,
+   "jevP10": 0.46,
+   "jevGeneric": 0.18,
+   "rubric": {
+    "spec": 4,
+    "feasible": 5,
+    "buyer": 2,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.12,
+    "flaw": "One-time $9.99 offline app is a hard sell against many free HD sites",
+    "generic": 3
+   },
+   "evidence": 0.898,
+   "elo": 1505.45606834512,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "F-gem:2:humandesignpairingcompat:jzk",
+   "name": "Human Design Pairing: Compatibility Readings",
+   "strategy": "F-gem",
+   "round": 2,
+   "quality": 71.5,
+   "raw": 71.5,
+   "jevP10": 0.46,
+   "jevGeneric": 0.25,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.25,
+    "flaw": "Niche audience willing to pay for HD compatibility readings is small"
+   },
+   "evidence": 0.655,
+   "elo": 1491.3162363232366,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "G-constraint:1:tenderalerthotline:qbd",
+   "name": "Tender Alert Hotline",
+   "strategy": "G-constraint",
+   "round": 1,
+   "quality": 71.3,
+   "raw": 71.3,
+   "jevP10": 0.41,
+   "jevGeneric": 0.23,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 4,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 2,
+    "p10": 0.3,
+    "flaw": "Scraping gov site reliably and filtering relevance is harder than it sounds"
+   },
+   "evidence": 0.82,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:4:hdcompatibilityreading:udq",
+   "name": "HD Compatibility Reading",
+   "strategy": "C-audience",
+   "round": 4,
+   "quality": 70.7,
+   "raw": 70.7,
+   "jevP10": 0.49,
+   "jevGeneric": 0.26,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.18,
+    "flaw": "Compatibility reading credibility depends on chart interpretation quality",
+    "generic": 2
+   },
+   "evidence": 0.552,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "D-asset:1:couplesynccompatibilityp:avq",
+   "name": "Couple Sync—Compatibility Profiles & Guides",
+   "strategy": "D-asset",
+   "round": 1,
+   "quality": 69.5,
+   "raw": 69.5,
+   "jevP10": 0.48,
+   "jevGeneric": 0.32,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.18,
+    "flaw": "Couples quiz market crowded, one-time purchase, weak organic reach"
+   },
+   "evidence": 0.728,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:4:ivritdailyhebrewforreall:gnu",
+   "name": "Ivrit Daily: Hebrew for Real Life",
+   "strategy": "C-audience",
+   "round": 4,
+   "quality": 69.5,
+   "raw": 69.5,
+   "jevP10": 0.42,
+   "jevGeneric": 0.22,
+   "rubric": {
+    "spec": 4,
+    "feasible": 3,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 3,
+    "fun": 4,
+    "p10": 0.15,
+    "flaw": "Olim niche small, unclear willingness to pay monthly for phrases",
+    "generic": 2
+   },
+   "evidence": 0.754,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "C-audience:1:hdworkguide:x0o",
+   "name": "HD Work Guide",
+   "strategy": "C-audience",
+   "round": 1,
+   "quality": 69.4,
+   "raw": 69.4,
+   "jevP10": 0.48,
+   "jevGeneric": 0.42,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.22,
+    "flaw": "Niche HD audience unlikely to pay for generic job advice"
+   },
+   "evidence": 0.622,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "F-gem:1:herdrpro:67g",
+   "name": "Herdr Pro",
+   "strategy": "F-gem",
+   "round": 1,
+   "quality": 69.4,
+   "raw": 69.4,
+   "jevP10": 0.35,
+   "jevGeneric": 0.24,
+   "rubric": {
+    "spec": 4,
+    "feasible": 4,
+    "buyer": 3,
+    "distribution": 3,
+    "novelty": 2,
+    "fun": 4,
+    "p10": 0.18,
+    "flaw": "Many similar agent-observability tools already competing hard"
+   },
+   "evidence": 0.888,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  },
+  {
+   "id": "B-pain:2:humandesignchartsapi:u79",
+   "name": "Human Design Charts API",
+   "strategy": "B-pain",
+   "round": 2,
+   "quality": 69.4,
+   "raw": 69.4,
+   "jevP10": 0.42,
+   "jevGeneric": 0.15,
+   "rubric": {
+    "spec": 4,
+    "feasible": 5,
+    "buyer": 2,
+    "distribution": 2,
+    "novelty": 2,
+    "fun": 3,
+    "p10": 0.1,
+    "flaw": "Developers, not end consumers, are the real buyer—thin market for HD APIs"
+   },
+   "evidence": 0.883,
+   "slop": {
+    "pass": true,
+    "reasons": []
+   }
+  }
+ ]
+}
