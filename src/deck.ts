@@ -2,7 +2,7 @@
 // (dates, memory, context, git, terminal tail) and emits row-level patches.
 import { basename } from "node:path";
 import { call, discoverSessions, subscribe, type HerdrSession } from "./herdr";
-import { childrenIndex, readProcs, treeUsage, type Proc } from "./procs";
+import { childrenIndex, readListening, readProcs, treePids, treeUsage, type Listen, type Proc } from "./procs";
 import { claudeMeta, codexMeta, opencodeMeta, resumeCommand, type AgentMeta } from "./agents";
 import { cleanTail, isShellOnly } from "./tail";
 import { insightFor, type Insight } from "./insight";
@@ -64,6 +64,9 @@ export type Row = {
   approx: boolean;
   seen?: boolean; // you opened it (in the deck) since it last changed: a finished session no longer needs you
   app?: "codex"; // a Codex desktop app thread: no pane, no terminal; open it in the app or resume in herdr
+  ports?: { port: number; addr: string; cmd: string; url?: string }[]; // servers this session is running (url: shared on the tailnet)
+  check?: any; // proof-of-done result for its project (verify.ts)
+  hist?: string; // a past session from the history index: its transcript file
 };
 
 type FgProc = { pid: number; name?: string; argv0?: string; cmdline?: string };
@@ -95,6 +98,9 @@ export class Deck {
   appThreads: AppThread[] = [];
   hiddenApp = new Set<string>((() => { try { return JSON.parse(readFileSync(HIDDEN_FILE, "utf8")); } catch { return []; } })());
   private insightStamp = new Map<string, string>();
+  listening: Listen[] = [];
+  shared = new Map<number, string>(); // local port → tailnet URL (set by the server from `tailscale serve status`)
+  checks = new Map<string, any>(); // project root → proof-of-done result (set by the server)
 
   onPatch(fn: (p: Patch) => void) {
     this.listeners.add(fn);
@@ -117,12 +123,54 @@ export class Deck {
     setInterval(() => this.refreshYoungProcInfo(), 2_000);
     setInterval(() => this.refreshMetas(), 4_000);
     setInterval(() => this.refreshGit(), 45_000);
+    this.refreshPorts();
+    setInterval(() => this.refreshPorts(), 6_000);
     if (codexAppInstalled()) {
       await this.refreshApp();
       setInterval(() => this.refreshApp(), 2_000);
     }
     this.refreshInsights(true);
     setInterval(() => this.refreshInsights(false), 1_500);
+  }
+
+  // ── dev servers ─────────────────────────────────────────────────────────
+  private portsBusy = false;
+  private async refreshPorts() {
+    if (this.portsBusy) return;
+    this.portsBusy = true;
+    try {
+      const l = await readListening();
+      const sig = JSON.stringify(l.map((x) => [x.pid, x.port, x.cwd]));
+      if (sig !== JSON.stringify(this.listening.map((x) => [x.pid, x.port, x.cwd]))) { this.listening = l; this.scheduleRebuild(); }
+    } catch {}
+    this.portsBusy = false;
+  }
+  /** Ports owned by the pane's process tree; then servers started from its project folder that no pane owns. */
+  private attachPorts(rows: Map<string, Row>) {
+    const self = Number(process.env.DECK_PORT ?? 4747);
+    // Dev servers, not plumbing: no ephemeral ports (MCP servers and helpers), one entry per port.
+    const listen = this.listening.filter((x, i, a) => a.findIndex((y) => y.port === x.port) === i).filter((x) => x.port !== self && x.port >= 1024 && x.port < 32768 && !/mcp|^iii$/i.test(x.cmd) && !/^(ollama|Tailscale|tailscaled|rapportd|ControlCenter|Spotify|Dropbox|com\.docker|figma_agent|redis-server|postgres|mysqld|herdr|OneDrive|Code Helper|Cursor|Electron|node_repl)$/i.test(x.cmd));
+    const owned = new Set<number>();
+    for (const s of this.sessions.values()) {
+      for (const [paneId, pi] of s.procInfo) {
+        const row = rows.get(`${s.name}/${paneId}`);
+        if (!row) continue;
+        const pids = new Set(treePids(pi.shellPid, this.kids));
+        const mine = listen.filter((x) => pids.has(x.pid));
+        mine.forEach((x) => owned.add(x.pid));
+        if (mine.length) row.ports = mine.map((x) => ({ port: x.port, addr: x.addr, cmd: x.cmd }));
+      }
+    }
+    const byRecent = [...rows.values()].filter((r) => r.projectRoot && !r.app).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
+    for (const x of listen) {
+      if (owned.has(x.pid) || !x.cwd) continue;
+      const r = byRecent.find((r) => x.cwd === r.projectRoot || x.cwd!.startsWith(r.projectRoot + "/") || x.cwd === r.cwd);
+      if (r && !(r.ports ?? []).some((p) => p.port === x.port)) (r.ports ??= []).push({ port: x.port, addr: x.addr, cmd: x.cmd });
+    }
+    for (const r of rows.values()) {
+      if (r.ports) { r.ports.sort((a, b) => a.port - b.port); for (const p of r.ports) p.url = this.shared.get(p.port); }
+      if (r.projectRoot && this.checks.has(r.projectRoot)) r.check = this.checks.get(r.projectRoot);
+    }
   }
 
   // ── Codex desktop app threads ────────────────────────────────────────────
@@ -485,6 +533,7 @@ export class Deck {
       bySession.set(k, [...(bySession.get(k) ?? []), r]);
     }
     for (const group of bySession.values()) if (group.length > 1) for (const r of group) r.duplicate = true;
+    this.attachPorts(rows);
 
     this.rows = rows;
     this.emit();
@@ -522,6 +571,9 @@ export class Deck {
     for (const fn of this.listeners) fn({ upsert, remove, summary });
   }
   private lastSummary = "";
+
+  /** Public so the server can push new tailnet links / check results into the rows. */
+  refresh() { this.scheduleRebuild(); }
 
   find(key: string) {
     const r = this.rows.get(key);

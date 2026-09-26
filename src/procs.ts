@@ -69,3 +69,64 @@ export function treeUsage(root: number, procs: Map<number, Proc>, kids: Map<numb
   }
   return { rssKB, cpu, count };
 }
+
+/** Every pid in a process tree. */
+export function treePids(root: number, kids: Map<number, number[]>): number[] {
+  const out: number[] = [];
+  const stack = [root];
+  const seen = new Set<number>();
+  while (stack.length) {
+    const pid = stack.pop()!;
+    if (seen.has(pid)) continue;
+    seen.add(pid);
+    out.push(pid);
+    for (const k of kids.get(pid) ?? []) stack.push(k);
+  }
+  return out;
+}
+
+export type Listen = { pid: number; port: number; addr: string; cmd: string; cwd?: string };
+
+/** TCP ports in LISTEN state, with the process and its folder. macOS/Linux via lsof, Linux fallback ss. */
+export async function readListening(): Promise<Listen[]> {
+  const run = async (cmd: string[]) => {
+    try {
+      const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore" });
+      const t = setTimeout(() => p.kill(9), 4000);
+      const out = await new Response(p.stdout).text();
+      clearTimeout(t);
+      return out;
+    } catch { return ""; }
+  };
+  const out: Listen[] = [];
+  const lsof = await run(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN", "-F", "pcn"]);
+  if (lsof) {
+    let pid = 0, cmd = "";
+    for (const line of lsof.split("\n")) {
+      if (line[0] === "p") pid = Number(line.slice(1));
+      else if (line[0] === "c") cmd = line.slice(1);
+      else if (line[0] === "n") {
+        const m = line.slice(1).match(/^(.*):(\d+)$/);
+        if (m && !out.some((x) => x.pid === pid && x.port === Number(m[2]))) out.push({ pid, port: Number(m[2]), addr: m[1], cmd });
+      }
+    }
+  } else if (process.platform === "linux") {
+    for (const line of (await run(["ss", "-ltnpH"])).split("\n")) {
+      const m = line.match(/\s(\S+):(\d+)\s+\S+\s+users:\(\("([^"]+)",pid=(\d+)/);
+      if (m) out.push({ pid: Number(m[4]), port: Number(m[2]), addr: m[1], cmd: m[3] });
+    }
+  }
+  // Each listener's working folder: that's how a server started in the background gets tied to its session.
+  const pids = [...new Set(out.map((x) => x.pid))];
+  if (pids.length && process.platform === "darwin") {
+    const cw = await run(["lsof", "-a", "-d", "cwd", "-p", pids.join(","), "-F", "pn"]);
+    let pid = 0;
+    const cwd = new Map<number, string>();
+    for (const line of cw.split("\n")) { if (line[0] === "p") pid = Number(line.slice(1)); else if (line[0] === "n") cwd.set(pid, line.slice(1)); }
+    for (const x of out) x.cwd = cwd.get(x.pid);
+  } else if (process.platform === "linux") {
+    const { readlinkSync } = await import("node:fs");
+    for (const x of out) { try { x.cwd = readlinkSync(`/proc/${x.pid}/cwd`); } catch {} }
+  }
+  return out;
+}

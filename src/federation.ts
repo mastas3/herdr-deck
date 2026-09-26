@@ -180,6 +180,13 @@ export class RemoteHost {
     return { status: res.status, data: await res.json().catch(() => ({})) };
   }
 
+  /** Raw bytes (uploads). */
+  async raw(pathAndQuery: string, bytes: Uint8Array): Promise<{ status: number; data: any }> {
+    if (!this.online) throw new Error(`${this.conf.label} is offline: ${this.error ?? "not connected"}`);
+    const res = await fetch(`${this.base}${pathAndQuery}`, { method: "POST", headers: { authorization: `Bearer ${this.token}`, "content-type": "application/octet-stream" }, body: bytes, signal: AbortSignal.timeout(120_000) });
+    return { status: res.status, data: await res.json().catch(() => ({})) };
+  }
+
   async get(pathAndQuery: string): Promise<Response> {
     return fetch(`${this.base}${pathAndQuery}`, { headers: { authorization: `Bearer ${this.token}` } });
   }

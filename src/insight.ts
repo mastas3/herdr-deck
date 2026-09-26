@@ -7,16 +7,16 @@ import {
   opencodeDetail, opencodeImage, opencodeSubagents, type Detail, type Sub,
 } from "./transcript";
 
-export type Who = { agent: string; sessionId?: string; cwd: string };
+export type Who = { agent: string; sessionId?: string; cwd: string; file?: string }; // file: a past session found by the history index
 
 export async function detailFor(w: Who): Promise<Detail | undefined> {
   if (!w.sessionId) return;
   if (w.agent === "claude") {
-    const f = findClaudeFile(w.sessionId);
+    const f = w.file ?? findClaudeFile(w.sessionId);
     return f ? claudeDetail(f) : undefined;
   }
   if (w.agent === "codex") {
-    const f = findCodexFile(w.sessionId);
+    const f = w.file ?? findCodexFile(w.sessionId);
     const d = f ? await codexDetail(f) : undefined;
     if (d) attachGenerated(d, w.sessionId);
     return d;
@@ -26,7 +26,7 @@ export async function detailFor(w: Who): Promise<Detail | undefined> {
 
 export async function subDetailFor(w: Who, subId: string): Promise<Detail | undefined> {
   if (w.agent === "claude" && w.sessionId) {
-    const f = findClaudeFile(w.sessionId);
+    const f = w.file ?? findClaudeFile(w.sessionId);
     const sf = f && claudeSubFile(f, subId);
     return sf ? claudeSubDetail(sf) : undefined;
   }
@@ -36,11 +36,11 @@ export async function subDetailFor(w: Who, subId: string): Promise<Detail | unde
 export async function imageFor(w: Who, id: string, subId?: string) {
   if (!w.sessionId) return;
   if (id.startsWith("c:")) {
-    const f = findClaudeFile(w.sessionId);
+    const f = w.file ?? findClaudeFile(w.sessionId);
     const path = f && subId ? claudeSubFile(f, subId) : f;
     return path ? claudeImage(path, id) : undefined;
   }
-  if (id.startsWith("x:")) { const f = findCodexFile(w.sessionId); return f ? codexImage(f, id) : undefined; }
+  if (id.startsWith("x:")) { const f = w.file ?? findCodexFile(w.sessionId); return f ? codexImage(f, id) : undefined; }
   if (id.startsWith("g:")) return codexGeneratedImage(w.sessionId, id);
   if (id.startsWith("o:")) return opencodeImage(id);
 }
@@ -48,7 +48,7 @@ export async function imageFor(w: Who, id: string, subId?: string) {
 export async function subagentsFor(w: Who, d?: Detail): Promise<Sub[]> {
   if (!w.sessionId) return [];
   if (w.agent === "claude") {
-    const f = findClaudeFile(w.sessionId);
+    const f = w.file ?? findClaudeFile(w.sessionId);
     return f ? claudeSubagents(f, d) : [];
   }
   if (w.agent === "opencode") return opencodeSubagents(w.sessionId);

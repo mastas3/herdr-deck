@@ -323,6 +323,131 @@ body.moving { cursor: grabbing; user-select: none; }
 .thumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .thumbs button { width: 92px; height: 70px; padding: 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--term-bg); }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ── v7: views, decisions, history, tools, connections, status line, uploads ── */
+.views { display: flex; gap: 3px; padding: 0 10px 8px; overflow-x: auto; scrollbar-width: none; }
+.views::-webkit-scrollbar { display: none; }
+.views button { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid var(--line); background: transparent; color: var(--ink-2); border-radius: 9px; padding: 5px 7px; font: 500 12.5px/1 var(--sans, system-ui); cursor: pointer; }
+.views button svg { width: 14px; height: 14px; }
+.views button:hover { color: var(--ink); background: var(--raise); }
+.views button[aria-pressed="true"] { color: var(--ink); background: var(--raise); border-color: var(--accent); }
+.views button b { background: var(--blocked); color: #fff; border-radius: 9px; padding: 1px 6px; font-size: 11px; }
+.app.list-off .views { display: none; }
+.view { max-width: 980px; margin: 0 auto; padding: 22px 26px 60px; }
+.vh h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font: 650 22px/1.2 var(--sans, system-ui); }
+.vh h2 svg { width: 22px; height: 22px; color: var(--accent); }
+.vh > p { margin: 0 0 12px; color: var(--ink-2); font-size: 14.5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0 18px; }
+.chip { border: 1px solid var(--line-2); background: transparent; color: var(--ink-2); border-radius: 99px; padding: 5px 12px; font-size: 13px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip b { font-weight: 700; margin-left: 2px; }
+.empty-v { padding: 50px 0; text-align: center; color: var(--ink-3); }
+.dlist { display: grid; gap: 14px; }
+.dcard { border: 1px solid var(--line); border-left: 3px solid var(--kc); background: var(--side); border-radius: 12px; padding: 14px 16px; transition: opacity .18s, transform .18s; }
+.dcard.leaving { opacity: 0; transform: translateX(16px); }
+.dcard header { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.dcard .dk { color: var(--kc); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.dcard .dtitle { margin: 6px 0 2px; font: 600 15.5px/1.35 var(--sans, system-ui); }
+.dcard .dq { margin: 8px 0; font: 16px/1.5 var(--read); color: var(--ink); }
+.dctx summary { cursor: pointer; color: var(--ink-3); font-size: 13px; }
+.dctx .md { font-size: 14px; color: var(--ink-2); margin-top: 6px; }
+.dterm { background: var(--bg, #0b0f14); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font: 12.5px/1.45 var(--mono); overflow-x: auto; margin: 8px 0; max-height: 160px; }
+.dopts { display: grid; gap: 7px; margin: 10px 0; }
+.dopt { display: flex; gap: 10px; text-align: left; align-items: flex-start; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); border-radius: 10px; padding: 9px 12px; cursor: pointer; font: inherit; }
+.dopt:hover { border-color: var(--accent); }
+.dopt.jevpick { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.dopt .ol { flex: none; width: 24px; height: 24px; border-radius: 7px; display: grid; place-items: center; background: var(--line); font: 700 12px/1 var(--sans, system-ui); }
+.dopt .ob { display: grid; gap: 2px; }
+.dopt .ot { font-weight: 600; font-size: 14.5px; }
+.dopt .od { color: var(--ink-2); font-size: 13.5px; }
+.rp.jevp { background: color-mix(in oklch, var(--accent) 22%, transparent); color: var(--accent); }
+.jev { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-2); margin: 6px 0; }
+.jev .jb { font: 700 11px/1 var(--sans, system-ui); padding: 3px 6px; border-radius: 5px; background: color-mix(in oklch, var(--accent) 20%, transparent); color: var(--accent); }
+.jev.ok b, .jev.ok { color: var(--working); } .jev.bad { color: var(--blocked); } .jev.mid { color: var(--ink); }
+.dcheck { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border-radius: 9px; background: var(--raise); font-size: 13.5px; }
+.dcheck.pass { color: var(--working); } .dcheck.fail { color: var(--blocked); }
+.dcheck details { flex-basis: 100%; } .dcheck pre { max-height: 220px; overflow: auto; font: 12px/1.4 var(--mono); color: var(--ink-2); }
+.dacts { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.dacts .btn svg { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
+.dreply { display: flex; gap: 8px; margin-top: 10px; align-items: flex-end; }
+.dreply textarea { flex: 1; resize: none; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; font: 15px/1.45 var(--read); color: var(--ink); }
+.chk { border: 1px solid var(--line-2); background: transparent; border-radius: 99px; padding: 1px 8px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
+.chk.ok { color: var(--working); border-color: color-mix(in oklch, var(--working) 45%, transparent); }
+.chk.bad { color: var(--blocked); border-color: color-mix(in oklch, var(--blocked) 45%, transparent); }
+.chk.ask { color: var(--accent); }
+.port { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--line-2); background: transparent; border-radius: 99px; padding: 1px 9px; font: 12.5px/1.5 var(--mono); color: var(--ink-2); cursor: pointer; text-decoration: none; }
+.port svg { width: 13px; height: 13px; }
+.port.on { border-style: solid; color: var(--working); border-color: color-mix(in oklch, var(--working) 50%, transparent); }
+.port-x { border: 0; background: none; color: var(--ink-3); cursor: pointer; padding: 0 4px; }
+.hfilters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 16px; }
+.hfilters .find { flex: 1 1 320px; }
+.hfilters select { background: var(--raise); color: var(--ink); border: 1px solid var(--line-2); border-radius: 9px; padding: 6px 8px; font-size: 13.5px; max-width: 220px; }
+.hlist { display: grid; gap: 6px; }
+.hitem { display: grid; gap: 4px; text-align: left; border: 1px solid var(--line); border-left: 3px solid var(--pc); background: var(--side); color: var(--ink); border-radius: 10px; padding: 10px 13px; cursor: pointer; font: inherit; }
+.hitem:hover { border-color: var(--line-2); background: var(--raise); }
+.hitem .ht { font: 600 15px/1.35 var(--sans, system-ui); }
+.hitem .hm { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--ink-3); }
+.hitem .hs { font: 14px/1.45 var(--read); color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hitem .hs.dim { color: var(--ink-3); }
+.hitem mark { background: color-mix(in oklch, var(--accent) 30%, transparent); color: var(--ink); border-radius: 3px; padding: 0 2px; }
+.tgroup h3 { margin: 22px 0 10px; font: 600 13px/1 var(--sans, system-ui); color: var(--ink-3); text-transform: uppercase; letter-spacing: .05em; }
+.tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.tcard { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); background: var(--side); border-radius: 12px; padding: 13px 14px; text-align: left; color: var(--ink); font: inherit; }
+.tcard .tt { display: flex; align-items: center; gap: 8px; }
+.tcard .tt svg { width: 18px; height: 18px; color: var(--accent); flex: none; }
+.tcard .tk { margin-left: auto; font-size: 11px; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 99px; padding: 1px 7px; }
+.tcard p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.45; flex: 1; }
+.tcard details summary { cursor: pointer; color: var(--ink-3); font-size: 12.5px; }
+.tcard pre { white-space: pre-wrap; font: 12.5px/1.45 var(--mono); color: var(--ink-2); background: var(--raise); border-radius: 8px; padding: 8px; max-height: 240px; overflow: auto; }
+.tcard .tacts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.tcard.add { border-style: dashed; cursor: pointer; }
+.tcard.add svg { width: 18px; height: 18px; color: var(--accent); }
+.tmi { display: flex; gap: 10px; align-items: flex-start; }
+.tmi svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--accent); }
+.csec { margin: 22px 0; }
+.csec h3 { margin: 0 0 4px; font: 600 16px/1.3 var(--sans, system-ui); display: flex; align-items: center; gap: 8px; }
+.csec h3 .n { font-size: 12px; color: var(--ink-3); font-weight: 500; }
+.csec > .hint { margin: 0 0 10px; font-size: 13px; }
+.cgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 7px; }
+.citem { display: grid; gap: 2px; border: 1px solid var(--line); background: var(--side); border-radius: 9px; padding: 8px 10px; min-width: 0; }
+.citem.off { opacity: .55; }
+.citem .cn { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citem .cg, .citem .cnote { font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.citem .cd { font-size: 12.5px; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mcpcmd { display: flex; gap: 8px; align-items: center; background: var(--raise); border: 1px solid var(--line-2); border-radius: 9px; padding: 8px 10px; }
+.mcpcmd code { flex: 1; font: 12px/1.45 var(--mono); overflow-x: auto; white-space: nowrap; filter: blur(0); }
+.audit { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 6px; font-size: 13.5px; }
+.statusline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 22px; border-top: 1px solid var(--line); background: var(--side); font-size: 12.5px; color: var(--ink-2); flex: none; }
+.statusline .pj { font-weight: 600; }
+.meter { display: inline-flex; align-items: center; gap: 6px; }
+.meter .ml { color: var(--ink-3); }
+.meter .mb { width: 74px; height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.meter .mb i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--working), color-mix(in oklch, var(--working) 70%, var(--accent))); transition: width .4s ease; }
+.meter.warm .mb i { background: linear-gradient(90deg, #d9a441, #e8b04a); }
+.meter.hot .mb i { background: linear-gradient(90deg, #e36a4f, var(--blocked)); }
+.meter b { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sl-m { color: var(--ink-3); font-family: var(--mono); font-size: 12px; }
+.detail.dropping::after { content: "Drop files to attach them to your message"; position: absolute; inset: 10px; border: 2px dashed var(--accent); border-radius: 14px; background: color-mix(in oklch, var(--accent) 12%, transparent); display: grid; place-items: center; font: 600 17px/1.3 var(--sans, system-ui); color: var(--ink); z-index: 20; pointer-events: none; }
+dialog.ask { border: 1px solid var(--line-2); border-radius: 14px; background: var(--side); color: var(--ink); padding: 0; width: min(560px, calc(100vw - 32px)); }
+dialog.ask::backdrop { background: rgba(0,0,0,.45); }
+dialog.ask .inp { width: 100%; box-sizing: border-box; background: var(--raise); color: var(--ink); border: 1px solid var(--line-2); border-radius: 9px; padding: 8px 10px; font: 14px/1.45 var(--mono); }
+dialog.ask .hint { max-height: 50vh; overflow: auto; }
+@media (max-width: 760px) {
+  .view { padding: 14px 14px 80px; }
+  .statusline { padding: 6px 12px; gap: 9px; }
+  .meter .mb { width: 46px; }
+  .sl-m { display: none; }
+  .cgrid, .tgrid { grid-template-columns: 1fr; }
+}
+
+.dbody { overflow-anchor: none; }
+.detail { position: relative; }
+.jumpbtm { position: absolute; right: 18px; bottom: 90px; z-index: 6; width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); display: grid; place-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.28); cursor: pointer; transition: transform .15s ease, opacity .15s ease; }
+.jumpbtm:hover { transform: translateY(-1px); }
+.jumpbtm svg { width: 17px; height: 17px; }
+.jumpbtm .n { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--accent-ink, #fff); font: 600 11px/18px var(--sans, system-ui); display: none; }
+.jumpbtm.has-new .n { display: block; }
+.jumpbtm[hidden] { display: none; }
 .newpill { position: sticky; bottom: 10px; align-self: center; z-index: 3; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); border-radius: 99px; padding: 5px 14px; font-size: 13.5px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 .subcrumb { display: flex; gap: 8px; align-items: center; padding: 8px 22px; border-bottom: 1px solid var(--line); background: var(--raise); font-size: 14px; }
 .nowbar { display: flex; align-items: center; gap: 10px; padding: 7px 22px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--working) 7%, var(--bg)); font-size: 13.5px; min-width: 0; flex: none; }
@@ -631,6 +756,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
         <button class="ib keep-mini keep" id="paletteMini" title="Search and commands (⌘K)" aria-label="Search and commands"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg></button>
         <button class="ib keep" id="newBtn" title="New session (n)" aria-label="New session"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg></button>
       </div>
+      <nav class="views" id="views" aria-label="Views"></nav>
       <div class="machines" id="machines" role="tablist" aria-label="Machines"></div>
       <div class="lh-row"><label class="find" style="flex:1;min-width:0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="q" type="search" placeholder="Filter sessions" autocomplete="off" spellcheck="false" aria-label="Filter sessions"><button type="button" class="ib" id="paletteBtn" title="Commands and search everywhere (⌘K)" aria-label="Commands" style="width:auto;padding:0 4px"><kbd>⌘K</kbd></button></label><div class="seg2" id="groupSeg" role="tablist" aria-label="Group by"><button role="tab" data-group="priority" title="Attention order, like herdr (g)">Priority</button><button role="tab" data-group="project" title="Group by project (g)">Projects</button></div></div>
       <button class="livebar" id="live" hidden aria-pressed="false" title="Show the live board"></button>
@@ -650,11 +776,15 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
     <div class="dh" id="dh"></div>
     <div class="subcrumb" id="subcrumb" hidden></div>
     <div class="dbody" id="dbody"></div>
+    <button class="jumpbtm" id="jumpBottom" hidden aria-label="Jump to the latest message" title="Jump to the latest (End)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/></svg><span class="n"></span></button>
     <div class="nowbar" id="nowbar" hidden></div>
     <div class="askbox" id="askbox" hidden></div>
     <div class="appbar" id="appbar" hidden></div>
+    <div class="statusline" id="statusline" hidden></div>
     <form class="composer" id="composer" hidden>
-      <button type="button" class="ib" id="cRecipe" title="Recipes (.)" aria-label="Recipes"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8 9.5 6l4.3.2-3.4 2.7 1.2 4.2L8 10.7l-3.6 2.4 1.2-4.2L2.2 6.2 6.5 6z"/></svg></button>
+      <button type="button" class="ib" id="cAttach" title="Attach files (or drop them on the chat)" aria-label="Attach files"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m13 7.5-5.2 5.2a3.2 3.2 0 0 1-4.5-4.5L8.8 2.7a2.1 2.1 0 0 1 3 3L6.4 11.1a1 1 0 0 1-1.5-1.5L9.8 4.7"/></svg></button>
+      <input type="file" id="fileIn" multiple hidden>
+      <button type="button" class="ib" id="cRecipe" title="Tools (.)" aria-label="Tools"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8 9.5 6l4.3.2-3.4 2.7 1.2 4.2L8 10.7l-3.6 2.4 1.2-4.2L2.2 6.2 6.5 6z"/></svg></button>
       <textarea id="cText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>
       <button type="button" class="btn" id="cStop" hidden title="Interrupt the agent (Esc in its terminal)">Stop</button>
       <button class="btn primary" id="cSend">Send</button>

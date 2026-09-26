@@ -122,7 +122,7 @@ export function toolSummary(name: string, input: any): string {
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; mtime?: number; open: Map<string, Msg> };
+type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; mtime?: number; used?: number; open: Map<string, Msg> };
 const claudeStates = new Map<string, State>();
 
 function claudeAsk(o: any): string | undefined {
@@ -243,12 +243,24 @@ function addImage(st: { detail: Detail; cur?: Turn }, img: Img) {
  * (Claude does on some compactions), so a changed inode, changed first bytes, or a last position that
  * no longer sits right after a newline all mean "start over": stale offsets would point into garbage.
  */
+/** Old sessions opened from history must not pile up: keep the most recently used parses only. */
+const KEEP = Number(process.env.DECK_TRANSCRIPT_CACHE ?? 90);
+function trim(states: Map<string, State>) {
+  if (states.size <= KEEP) return;
+  const old = [...states.values()].sort((a, b) => (a.used ?? 0) - (b.used ?? 0)).slice(0, states.size - KEEP);
+  for (const st of old) states.delete(st.path);
+}
+/** Drops a parsed transcript (the history indexer uses this so its worker stays small). */
+export function forgetTranscript(path: string) {
+  claudeStates.delete(path); codexStates.delete(path); subStates.delete(path);
+}
+
 async function readIncremental(states: Map<string, State>, path: string, feed: (st: State, line: string, offset: number) => void): Promise<Detail> {
   const stat = statSync(path);
   const file = Bun.file(path);
   let st = states.get(path);
   const head = await file.slice(0, 64).text();
-  if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head) return st.detail; // untouched
+  if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head) { st.used = Date.now(); return st.detail; } // untouched
   let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head;
   if (!fresh && st!.pos > 0) {
     const prev = new Uint8Array(await file.slice(st!.pos - 1, st!.pos).arrayBuffer());
@@ -260,19 +272,33 @@ async function readIncremental(states: Map<string, State>, path: string, feed: (
   }
   const s = st!;
   s.mtime = stat.mtimeMs;
-  if (stat.size > s.pos) {
-    const bytes = new Uint8Array(await file.slice(s.pos, stat.size).arrayBuffer());
-    const lastNl = bytes.lastIndexOf(10);
-    if (lastNl >= 0) {
-      const dec = new TextDecoder();
-      let start = 0;
-      for (let i = 0; i <= lastNl; i++) {
-        if (bytes[i] !== 10) continue;
-        if (i > start) feed(s, dec.decode(bytes.subarray(start, i)), s.pos + start);
-        start = i + 1;
-      }
-      s.pos += lastNl + 1;
+  s.used = Date.now();
+  if (fresh) trim(states);
+  // Read in chunks: a first look at a 150 MB rollout shouldn't hold all of it in memory at once.
+  const CHUNK = 8 << 20;
+  const dec = new TextDecoder();
+  while (stat.size > s.pos) {
+    const end = Math.min(stat.size, s.pos + CHUNK);
+    let bytes = new Uint8Array(await file.slice(s.pos, end).arrayBuffer());
+    let lastNl = bytes.lastIndexOf(10);
+    if (lastNl < 0) {
+      if (end >= stat.size) break; // a line still being written
+      // One line longer than a chunk (inline images): read on to its end.
+      const rest = new Uint8Array(await file.slice(end, stat.size).arrayBuffer());
+      const nl = rest.indexOf(10);
+      if (nl < 0) break;
+      const joined = new Uint8Array(bytes.length + nl + 1);
+      joined.set(bytes); joined.set(rest.subarray(0, nl + 1), bytes.length);
+      bytes = joined;
+      lastNl = bytes.length - 1;
     }
+    let start = 0;
+    for (let i = 0; i <= lastNl; i++) {
+      if (bytes[i] !== 10) continue;
+      if (i > start) feed(s, dec.decode(bytes.subarray(start, i)), s.pos + start);
+      start = i + 1;
+    }
+    s.pos += lastNl + 1;
   }
   return s.detail;
 }

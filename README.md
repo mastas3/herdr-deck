@@ -49,12 +49,52 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.
-- **⌘K** searches sessions on every machine, recipes, projects and commands in one place.
-- **Reply** (`r`): a message box under the terminal. Enter sends it to the agent.
-- **Recipes** (`.`): saved prompts. The defaults are status, run tests, review diff, commit, handoff note,
-  wrap up, step back, continue and /compact, and all of them are editable. They go to the current session or to every
-  selected session (⌘-click or `s`). **Standup** asks every idle agent for a one-line status.
+- **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.
+- **Reply** (`r`): the message box under the chat. Enter sends it to the agent. Attach files with the paperclip,
+  by dropping them on the chat, or by pasting; they're saved on the session's machine and the agent gets the paths.
+- **Status line** above the message box: project, context used, and the plan limits for that agent
+  (Claude 5-hour and weekly from `~/.claude/rate-cache.json`, written by the Claude status line script;
+  Codex limits from its session files).
+- **Tools** (`.`, the Tools button, or the ☆): one click that makes the agent, or the deck, do something:
+  check my email for context, related past work (from History), attach files, handoff → compact (writes a
+  handoff note to `~/.config/herdr-deck/handoffs/`, waits, then compacts around it), status line, step back,
+  update the wiki, write a handoff note, verify it's done, run the tests, review your diff, Tailscale link,
+  show me what you built. Add your own in the Tools view. **Standup** asks every idle agent for a status line.
 - **Briefs** write themselves when you stay on a session for a moment (local Ollama, cached).
+
+## Views (top of the list)
+
+- **Inbox** (`i`): every session waiting on you, reduced to the decision. Permission prompts (numbered or
+  cursor menus) answer with one tap; a question with options shows the options; "done" gets **Looks good**,
+  **Send back**, **Verify now**. Filters: quick ones, permissions, questions, done.
+  - **Jev** (TypeSafe, via your `jev` CLI and its receipts) suggests which option you'd pick, whether a
+    decision is low-stakes, and how likely a "done" really is. It never answers for you. What you actually did
+    is recorded with `jev outcome`. The deck caps itself at `DECK_JEV_DAILY` calls a day (default 80).
+  - **Proof of done:** when an agent says it's done, the deck re-runs the project's own checks (detected from
+    package.json, Cargo, go.mod, pytest, Makefile). You approve the command once per project, or turn it off.
+    Results show on the row and in the Inbox. Stored in `~/.config/herdr-deck/checks.json`.
+- **History** (`h`): every past Claude Code and Codex conversation on every machine, full-text searchable.
+  Open one to read the whole chat, jump to the match, and **Resume** it in a new herdr tab. Each machine
+  indexes its own transcripts into `~/.config/herdr-deck/history.db` (SQLite FTS5), in a short-lived child
+  process that re-scans every minute.
+- **Tools**: what every tool does and exactly what it sends; add, edit and delete your own.
+- **Connections**: what each machine can reach. Coding agents, AI subscriptions, MCP servers and connectors,
+  signed-in CLIs, API key names (never values), browser profiles and skills. **Suggest mega projects**
+  starts a Claude session that proposes ambitious work using them.
+
+## MCP server
+
+Agents can use the deck: `POST http://127.0.0.1:4747/mcp` (streamable HTTP), with a bearer token from
+`~/.config/herdr-deck/mcp.token`. Tools: `deck_sessions`, `deck_session`, `deck_search`, `deck_history`,
+`deck_decisions`, `deck_connections`, `deck_send`, `deck_start`. Closing is not offered; `deck_start` can't ask
+for skip-permission modes; every send and start is logged to `~/.config/herdr-deck/mcp-audit.jsonl` and shown
+in the deck. The Connections view has the `claude mcp add` command.
+
+## Dev servers and tailnet links
+
+The deck sees which ports each session's processes listen on (and servers started from its project folder),
+and shows them in the session header. **Share** puts one on your tailnet with `tailscale serve` (never Funnel)
+and opens the link.
 
 ## The list
 
@@ -130,3 +170,5 @@ Binds to 127.0.0.1 only. Local requests must use a localhost `Host` header, whic
 Requests through `tailscale serve` are accepted only when Tailscale stamps them with the machine owner's login
 (`Tailscale-User-Login`; override with `DECK_TS_USERS`). Every action also needs a per-process token that only the page itself receives. The Closed list lives in
 `~/.config/herdr-deck/graveyard.json`.
+The MCP token only works on `/mcp`, which can't close anything. Jev gets trimmed recent output with home paths,
+emails and anything key-like scrubbed (and the `jev` CLI redacts again).

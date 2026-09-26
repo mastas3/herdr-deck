@@ -7,8 +7,11 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function store(k, v) { try { localStorage.setItem("deck:" + k, JSON.stringify(v)); } catch {} }
 function load(k, d) { try { const v = localStorage.getItem("deck:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } }
+/** Live rows, plus past sessions opened from History (kept out of the live list). */
+const rowOf = (k) => S.rows.get(k) ?? S.hrows.get(k);
 const S = {
-  token: "", self: "", rows: new Map(), summary: { herdr: [], machines: [] }, graveyard: [], recipes: [],
+  token: "", self: "", rows: new Map(), hrows: new Map(), summary: { herdr: [], machines: [] }, graveyard: [], tools: [], toolGroups: {},
+  mode: null, usage: {}, hist: {}, decisions: [], jev: {}, canShare: false, done: new Map(),
   machine: load("machine", "all"), q: "", sel: null, picked: new Set(), view: "inbox", group: load("group", "priority") === "project" ? "project" : "priority",
   tab: load("tab2", "chat"), closedSecs: load("closedSecs", { stale: true, empty: true }), closedProj: load("closedProj", {}),
   notify: false, fit: load("fit", true), autoBrief: load("autoBrief", true),
@@ -386,6 +389,7 @@ function renderNow() {
   renderLive();
   renderFooter();
   renderDetail();
+  renderViews();
   const n = [...S.rows.values()].filter(needsYou).length;
   document.title = (n ? `(${n}) ` : "") + "herdr deck";
 }
@@ -548,7 +552,7 @@ function resolveLink(path) {
   return { missing: true, grave: g };
 }
 function syncUrl() {
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   const path = S.board || !r ? "/" : linkPath(r);
   if (location.pathname !== path) history.replaceState(history.state, "", path);
 }
@@ -556,10 +560,11 @@ function syncUrl() {
 // ── selection & detail data ──────────────────────────────────────────────
 let briefTimer = null;
 function select(key, opts = {}) {
-  if (!key || !S.rows.has(key)) return;
+  if (!key || !rowOf(key)) return;
   const changed = S.sel !== key;
   S.sel = key;
   S.board = false;
+  S.mode = null;
   store("sel", key);
   if (changed) {
     S.sub = null;
@@ -568,7 +573,7 @@ function select(key, opts = {}) {
     chatDom.key = null;
     chatSel.clear(); lastPicked = null; $("msgbar")?.remove(); $("detail").classList.remove("selecting");
   }
-  const row = S.rows.get(key);
+  const row = rowOf(key);
   if (row && unseenDone(row)) { row.seen = true; api("/api/seen", { key }).catch(() => {}); }
   render();
   loadDetail(key);
@@ -586,7 +591,7 @@ async function loadDetail(key) {
   const p = (async () => {
     try {
       const data = await api("/api/detail", { key });
-      S.details.set(key, { data, stamp: S.rows.get(key)?.lastActiveAt, at: Date.now() });
+      S.details.set(key, { data, stamp: rowOf(key)?.lastActiveAt, at: Date.now() });
       if (data.chat) mergeChat(key, data.chat);
       if (S.sel === key) { headSig = ""; bodySig = ""; renderDetail(); maybeAutoBrief(key); }
     } catch {}
@@ -598,7 +603,7 @@ async function loadDetail(key) {
 /** Hovering or moving next to a session warms its detail, so opening it is instant. */
 function prefetch(key) {
   const c = S.details.get(key);
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   if (!r || (c && c.stamp === r.lastActiveAt && Date.now() - c.at < 60_000)) return;
   loadDetail(key);
 }
@@ -642,7 +647,7 @@ let chatTimer = null;
 async function chatTick(now) {
   clearTimeout(chatTimer);
   const key = S.sel, sub = S.sub;
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   if (!r) return;
   const visible = !S.board && S.tab === "chat" && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
   const c = chatOf(chatId(key, sub));
@@ -756,7 +761,7 @@ function renderChat() {
   if (!key || S.board || S.tab !== "chat") return;
   const id = chatId(key, S.sub);
   const c = chatOf(id);
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   if (c.gen == null && !c.msgs.size && !c.pending.length) {
     if (chatDom.key !== id + ":loading") {
       chatDom.key = id + ":loading";
@@ -765,12 +770,14 @@ function renderChat() {
     return;
   }
   const dref = S.details.get(key)?.data;
-  const st = S.rows.get(key)?.status;
+  const st = rowOf(key)?.status;
   if (chatDom.key === id && chatDom.v === c.v && chatDom.dref === dref && chatDom.st === st && chatDom.el && body.contains(chatDom.el)) return;
   chatDom.v = c.v; chatDom.dref = dref; chatDom.st = st;
   const blocks = chatBlocks(c);
-  const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
-  if (chatDom.key !== id || !chatDom.el || !body.contains(chatDom.el)) {
+  const nearBottom = scrollPin.stick;
+  const rebuilt = chatDom.key !== id || !chatDom.el || !body.contains(chatDom.el);
+  const anchor = !rebuilt && !nearBottom ? takeAnchor() : null;
+  if (rebuilt) {
     chatDom.key = id;
     chatDom.blocks = [];
     const wrap = document.createElement("div");
@@ -778,6 +785,8 @@ function renderChat() {
     wrap.innerHTML = `<button class="btn ghost more" data-earlier ${c.first > 0 ? "" : "hidden"}>Load earlier messages</button>`;
     body.replaceChildren(wrap);
     chatDom.el = wrap;
+    chatSizeObs.disconnect();
+    chatSizeObs.observe(wrap);
   }
   const wrap = chatDom.el;
   wrap.querySelector("[data-earlier]").hidden = !(c.first > 0);
@@ -805,13 +814,14 @@ function renderChat() {
   for (const o of old.values()) o.el.remove();
   chatDom.blocks = next;
   chatDom.data = blocks;
-  decorateLatest(wrap, blocks, S.rows.get(key));
+  decorateLatest(wrap, blocks, rowOf(key));
   const grew = next.length && next[next.length - 1].key !== chatDom.lastKey;
   chatDom.lastKey = next[next.length - 1]?.key;
-  if (applyJump()) chatDom.fresh = id;
-  else if (chatDom.fresh !== id) { chatDom.fresh = id; body.scrollTop = body.scrollHeight; }
-  else if (nearBottom) body.scrollTop = body.scrollHeight;
-  else if (grew) showNewPill();
+  if (applyJump()) { chatDom.fresh = id; scrollPin.stick = false; }
+  else if (chatDom.fresh !== id) { chatDom.fresh = id; toBottom(); }
+  else if (nearBottom) toBottom();
+  else { restoreAnchor(anchor); if (grew) scrollPin.unread++; }
+  renderJumpBtn();
 }
 /** Only the newest agent message is actionable: its choices become buttons, a closing question gets quick replies. */
 function decorateLatest(wrap, blocks, r) {
@@ -850,7 +860,7 @@ function decorateLatest(wrap, blocks, r) {
 // ── copy & select messages ───────────────────────────────────────────────
 const chatSel = new Set();
 function blockText(b, withHeader) {
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   const who = b.kind === "user" || b.kind === "pending" ? "You" : b.kind === "assistant" ? (r?.agent === "claude" ? "Claude" : r?.agent === "codex" ? "Codex" : r?.agent ?? "Agent") : b.kind === "tools" ? "Tools" : "Note";
   const body = b.kind === "tools" ? b.ms.map((t) => `${toolWords(t.tool).done} ${t.summary ?? ""}`.trim()).join("\n")
     : b.kind === "agent" ? `Subagent: ${b.ms[0].summary ?? ""}` : String(b.ms[0].text ?? "");
@@ -881,25 +891,76 @@ function renderSelBar() {
 }
 function clearPicks() { chatSel.clear(); lastPicked = null; renderSelBar(); }
 
-function showNewPill() {
-  if (chatDom.el?.querySelector(".newpill")) return;
-  const b = document.createElement("button");
-  b.className = "newpill";
-  b.textContent = "↓ New messages";
-  b.onclick = () => { $("dbody").scrollTo({ top: $("dbody").scrollHeight, behavior: "smooth" }); b.remove(); };
-  chatDom.el?.append(b);
+// ── keeping your place ───────────────────────────────────────────────────
+// At the bottom, the chat stays pinned there as messages arrive and images load. Scrolled up, the
+// message you're reading stays exactly where it is, whatever changes above or below it.
+const scrollPin = { stick: true, unread: 0, anchor: null, expect: null };
+/** The deck's own scrolls are recorded, so the scroll handler can tell them from yours. */
+function setScroll(top) { const b = $("dbody"); b.scrollTop = top; scrollPin.expect = b.scrollTop; }
+function takeAnchor() {
+  const body = $("dbody"), top = body.getBoundingClientRect().top;
+  for (const o of chatDom.blocks ?? []) {
+    const r = o.el.getBoundingClientRect();
+    if (r.bottom > top + 8) return { key: o.key, off: r.top - top };
+  }
+  return null;
 }
+function restoreAnchor(a) {
+  if (!a) return;
+  const body = $("dbody");
+  const el = chatDom.blocks?.find((o) => o.key === a.key)?.el;
+  if (!el?.isConnected) return;
+  const delta = el.getBoundingClientRect().top - body.getBoundingClientRect().top - a.off;
+  if (Math.abs(delta) > 0.5) setScroll(body.scrollTop + delta);
+}
+function toBottom(smooth) {
+  const body = $("dbody");
+  scrollPin.stick = true; scrollPin.unread = 0;
+  // While a smooth scroll is in flight its own scroll events mustn't unpin it (and redraws keep pinning).
+  if (smooth) { scrollPin.expect = null; scrollPin.flying = Date.now() + 700; body.scrollTo({ top: body.scrollHeight, behavior: "smooth" }); } else setScroll(body.scrollHeight);
+  renderJumpBtn();
+}
+function renderJumpBtn() {
+  const btn = $("jumpBottom");
+  if (!btn) return;
+  const show = S.tab === "chat" && !S.board && !S.mode && !scrollPin.stick && !!chatDom.el;
+  btn.hidden = !show;
+  if (show) btn.style.bottom = Math.max(14, $("detail").getBoundingClientRect().bottom - $("dbody").getBoundingClientRect().bottom + 14) + "px";
+  btn.classList.toggle("has-new", scrollPin.unread > 0);
+  btn.querySelector(".n").textContent = scrollPin.unread ? (scrollPin.unread > 9 ? "9+" : String(scrollPin.unread)) : "";
+}
+$("jumpBottom")?.addEventListener("click", () => toBottom(true));
 $("dbody").addEventListener("scroll", () => {
   const body = $("dbody");
+  const gap = body.scrollHeight - body.scrollTop - body.clientHeight;
+  const mine = scrollPin.expect != null && Math.abs(body.scrollTop - scrollPin.expect) < 2;
+  scrollPin.expect = null;
+  if (scrollPin.flying && Date.now() < scrollPin.flying) { if (gap < 2) scrollPin.flying = 0; }
+  else if (!mine) scrollPin.stick = gap < 40;
+  scrollPin.anchor = scrollPin.stick ? null : takeAnchor();
+  if (scrollPin.stick) scrollPin.unread = 0;
   if (S.tab === "chat" && body.scrollTop < 240) loadEarlier();
-  if (body.scrollHeight - body.scrollTop - body.clientHeight < 60) chatDom.el?.querySelector(".newpill")?.remove();
+  renderJumpBtn();
 }, { passive: true });
+// Late layout (images, code blocks, fonts): stay pinned, or keep the anchor still.
+new ResizeObserver(() => {
+  if (S.tab !== "chat" || S.board || S.mode || !chatDom.el) return;
+  if (scrollPin.stick) setScroll($("dbody").scrollHeight);
+  else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
+}).observe($("dbody"));
+const chatSizeObs = new ResizeObserver(() => {
+  if (S.tab !== "chat" || S.board || S.mode || !chatDom.el) return;
+  if (scrollPin.stick) setScroll($("dbody").scrollHeight);
+  else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
+});
 
 // ── session pane ─────────────────────────────────────────────────────────
 let headSig = "", bodySig = "";
 function renderDetail() {
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   const d = S.details.get(S.sel)?.data;
+  if (S.mode) return renderMode();
+  $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = S.tab === "images" && !d?.imagesTotal ? "chat" : S.tab === "agents" && !d?.subagents?.length ? "chat" : S.tab;
@@ -909,9 +970,11 @@ function renderDetail() {
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
   renderNowbar(r, d);
   renderAsk(r);
-  $("composer").hidden = !r || S.sub != null || !!r.app;
-  $("appbar").hidden = !r.app || S.sub != null;
-  if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
+  $("composer").hidden = !r || S.sub != null || !!r.app || !!r.hist;
+  $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
+  renderStatusLine(r);
+  if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
+  else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
   $("cStop").hidden = !(r.status === "working" && isAgent(r));
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
@@ -945,6 +1008,10 @@ function renderHead(r, d, tab) {
     `<span>${paneTag(r)}</span>`,
     r.branch ? `<span>${esc(r.branch)}${r.dirty ? ` · ${r.dirty} uncommitted` : ""}</span>` : "",
     r.duplicate ? `<span class="warn">another pane has this conversation</span>` : "",
+    ...(r.ports ?? []).map((p) => p.url
+      ? `<a class="port on" href="${esc(p.url)}" target="_blank" rel="noopener" title="Open on your tailnet: ${esc(p.url)}">${ICON.globe}${esc(String(p.port))} ↗</a><button class="port-x" data-dact="unshare" data-port="${p.port}" title="Stop sharing">×</button>`
+      : `<button class="port" data-dact="share" data-port="${p.port}" title="${esc(p.cmd)} is serving on :${p.port}. Share it on your tailnet">${ICON.globe}:${p.port} · share</button>`),
+    r.check ? checkChip(r.check) : "",
   ].join("");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
@@ -952,7 +1019,7 @@ function renderHead(r, d, tab) {
     created ? `<span>started <b>${esc(DF.format(new Date(created)))}</b></span>` : "",
     r.lastActiveAt ? `<span>active <b data-t="${r.lastActiveAt}" data-fmt="long">${agoText(r.lastActiveAt)}</b></span>` : "",
     d?.asks ? `<span><b>${d.asks}</b> ${d.asks === 1 ? "request" : "requests"}</span>` : "",
-    r.ctxTokens != null ? `<span><b>${tok(r.ctxTokens)}</b> context</span>` : "",
+    r.ctxTokens != null && !r.hist ? `<span><b>${tok(r.ctxTokens)}</b> context</span>` : "",
   ].filter(Boolean).join("");
   const subsRun = d?.subagents?.filter((x) => x.running).length;
   const tabs = [["chat", "Chat"], ["agents", "Subagents", d?.subagents?.length, subsRun], ["about", "About"], ["images", "Images", d?.imagesTotal], ["info", "Info"]]
@@ -961,7 +1028,7 @@ function renderHead(r, d, tab) {
   const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
   setHTML($("dh"), `<div class="dh-where">${where}</div>
     <div class="dh-top"><h1 class="dh-title">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts">${r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="recipes" title="Recipes (.)">${ICON.star}Recipes</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
+      <div class="dh-acts">${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.star}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
     <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
 }
@@ -984,7 +1051,7 @@ async function renderAsk(r) {
   if (askTimer) return;
   const tick = async () => {
     askTimer = null;
-    const cur = S.rows.get(S.sel);
+    const cur = rowOf(S.sel);
     if (!cur || cur.status !== "blocked") return;
     try {
       const res = await api("/api/read", { key: cur.key, lines: 40, hash: askHash });
@@ -996,9 +1063,11 @@ async function renderAsk(r) {
 }
 $("appbar").addEventListener("click", (e) => {
   const act = e.target.closest("[data-dact]")?.dataset.dact;
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   if (!r || !act) return;
   e.stopPropagation();
+  if (act === "histresume") return resumeHist(r);
+  if (act === "backhist") return setMode("history");
   if (act === "codexopen") codexAct("codex-open", r);
   if (act === "codexresume") codexAct("codex-resume", r);
   if (act === "codexhide") codexAct("codex-hide", r);
@@ -1062,6 +1131,8 @@ const imgUrl = (key, id, sub) => `/api/image?key=${encodeURIComponent(key)}&id=$
 // Live board: everything working or waiting, at a glance.
 function renderBoard() {
   $("dh").hidden = true; $("nowbar").hidden = true; $("askbox").hidden = true; $("composer").hidden = true; $("subcrumb").hidden = true;
+  $("statusline").hidden = true; $("appbar").hidden = true; $("jumpBottom").hidden = true;
+  $("dbody")._mode = null;
   chatDom.key = null;
   const rows = [...S.rows.values()].filter(inScope);
   const live = rows.filter((r) => r.status === "working" || r.status === "blocked").sort((a, b) => (a.status === "blocked" ? 0 : 1) - (b.status === "blocked" ? 0 : 1) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
@@ -1103,7 +1174,7 @@ async function writeBrief(key = S.sel, auto = false) {
 function autosize(el) { el.style.height = ""; el.style.height = Math.min(el.scrollHeight, innerHeight * 0.34) + "px"; }
 async function sendMessage(text, fromEl) {
   const key = S.sel;
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   if (!text || !r) return;
   const c = chatOf(chatId(key));
   const p = { role: "user", text, at: Date.now() };
@@ -1130,7 +1201,7 @@ for (const [id, form] of [["cText", "composer"], ["replyText", "reply"]]) {
     if (e.key === "Escape") e.target.blur();
   });
 }
-$("cRecipe").onclick = (e) => openRecipeMenu(e.currentTarget);
+$("cRecipe").onclick = (e) => openToolMenu(e.currentTarget);
 $("cStop").onclick = () => S.sel && api("/api/keys", { key: S.sel, keys: ["esc"] }).then(() => toast("Sent Esc to interrupt")).catch((x) => toast(x.message, true));
 function focusReply() {
   if (isPhone()) { if (app.dataset.mview !== "detail") { history.replaceState({ mview: "detail" }, ""); setMView("detail", false); } }
@@ -1148,7 +1219,7 @@ async function pollTerm(first) {
   clearTimeout(termTimer);
   const key = S.sel;
   if (!key || !S.rows.has(key)) return;
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   if (r.app) {
     $("screen").textContent = "This thread runs in the Codex app, so it has no terminal here.\nUse “Continue in herdr” to resume it in a terminal tab.";
     termText = ""; termHash = "";
@@ -1174,7 +1245,7 @@ async function pollTerm(first) {
   termTimer = setTimeout(pollTerm, typing ? 150 : r.status === "working" ? 500 : 1400);
 }
 function fitTerm() {
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   const el = $("screen");
   if (isPhone()) { el.style.fontSize = ""; return; }
   let size = 12.5;
@@ -1352,7 +1423,7 @@ async function copy(text, what) { try { await navigator.clipboard.writeText(text
 const targets = () => (S.picked.size ? [...S.picked] : S.sel ? [S.sel] : []);
 
 function askClose(keys) {
-  const all = keys.map((k) => S.rows.get(k)).filter(Boolean);
+  const all = keys.map((k) => rowOf(k)).filter(Boolean);
   const apps = all.filter((r) => r.app);
   if (apps.length && apps.length === all.length) return toast(apps.length === 1 ? "Codex app threads can’t be closed from here. Use Hide in its ⋯ menu." : "Codex app threads can’t be closed from here; use Hide on each.");
   const rows = all.filter((r) => !r.app);
@@ -1404,42 +1475,509 @@ function openSub(id) {
 }
 function setBoard(on) { S.board = on; headSig = ""; bodySig = ""; if (on && isPhone()) setMView("detail", true); render(); syncUrl(); if (!on) chatTick(true); }
 
-async function sendRecipe(recipe, keys = targets()) {
-  const rows = keys.map((k) => S.rows.get(k)).filter((r) => r && !r.app && r.agent !== "shell" && (!recipe.agents || recipe.agents.includes(r.agent)));
-  if (!rows.length) return toast("No agent session to send that to", true);
-  if (rows.length > 1 && !confirm(`Send “${recipe.label}” to ${rows.length} sessions?`)) return;
+// ── tools (replace recipes) ──────────────────────────────────────────────
+const TI2 = (d) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+Object.assign(ICON, {
+  globe: TI2('<circle cx="8" cy="8" r="5.8"/><path d="M2.3 8h11.4M8 2.2c1.7 1.7 2.4 3.6 2.4 5.8S9.7 12.1 8 13.8C6.3 12.1 5.6 10.2 5.6 8S6.3 3.9 8 2.2"/>'),
+  mail: TI2('<rect x="2" y="3.5" width="12" height="9" rx="1.5"/><path d="m2.5 4.5 5.5 4 5.5-4"/>'),
+  history: TI2('<path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M2.5 2.8v2.6h2.6M8 5v3.2l2.2 1.3"/>'),
+  clip: TI2('<path d="m13 7.5-5.2 5.2a3.2 3.2 0 0 1-4.5-4.5L8.8 2.7a2.1 2.1 0 0 1 3 3L6.4 11.1a1 1 0 0 1-1.5-1.5L9.8 4.7"/>'),
+  compact: TI2('<path d="M3 3h10M3 13h10M8 5v6M5.5 7 8 4.5 10.5 7M5.5 9 8 11.5 10.5 9"/>'),
+  pulse: TI2('<path d="M1.5 8.5h3l1.5-4 3 8 1.8-4.5h3.7"/>'),
+  book: TI2('<path d="M3 2.8h6.5A2.5 2.5 0 0 1 12 5.3v8H5.5A2.5 2.5 0 0 1 3 10.8z"/><path d="M3 10.8a2.5 2.5 0 0 1 2.5-2.5H12"/>'),
+  note: TI2('<path d="M4 2.5h5.5L12.5 5.5v8H4z"/><path d="M9.5 2.5v3h3M6 8.5h4.5M6 11h3"/>'),
+  check: TI2('<path d="m3 8.5 3 3 7-7.5"/>'),
+  flask: TI2('<path d="M6 2.5h4M6.8 2.5v4L3.2 12a1 1 0 0 0 .9 1.5h7.8a1 1 0 0 0 .9-1.5L9.2 6.5v-4"/>'),
+  eye: TI2('<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/>'),
+  play: TI2('<path d="M5 3.5v9l7.5-4.5z"/>'),
+  inbox: TI2('<path d="M2 9.5 3.8 3.5h8.4L14 9.5v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M2 9.5h3.5l1 1.5h3l1-1.5H14"/>'),
+  plug: TI2('<path d="M6 2v3.5M10 2v3.5M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11.5V14"/>'),
+  tools: TI2('<path d="M9.8 3.2a3 3 0 0 0-3.9 3.9L2.5 10.5a1.4 1.4 0 0 0 2 2l3.4-3.4a3 3 0 0 0 3.9-3.9L10 7l-1.9-.4L7.8 4.8z"/>'),
+  back2: TI2('<path d="M6.5 4 2.5 8l4 4M3 8h10.5"/>'),
+});
+const TOOL_ICON = { mail: "mail", history: "history", clip: "clip", compact: "compact", pulse: "pulse", back: "back2", book: "book", note: "note", check: "check", flask: "flask", eye: "eye", globe: "globe", play: "play", star: "star" };
+const toolGlyph = (t) => ICON[TOOL_ICON[t.icon] ?? "star"] ?? ICON.star;
+
+/** Runs a tool on sessions: a prompt or sequence goes to the agents; actions run in the deck. */
+async function runTool(tool, keys = targets()) {
+  if (tool.action === "upload") return pickFiles();
+  const rows = keys.map((k) => rowOf(k)).filter((r) => r && !r.hist);
+  const agentRows = rows.filter((r) => !r.app && isAgent(r) && (!tool.agents || tool.agents.includes(r.agent)));
+  if (tool.action === "share") { const r = rows[0]; return r ? shareRow(r) : toast("Pick a session first", true); }
+  if (tool.action === "verify") { const r = rows[0]; return r ? verifyRow(r, true) : toast("Pick a session first", true); }
+  if (!agentRows.length) return toast(rows.some((r) => r.app) ? "Codex app threads can’t take messages from the deck" : "No agent session to use that on", true);
+  if (agentRows.length > 1 && !(await askDialog({ title: `${tool.label} on ${agentRows.length} sessions?`, text: agentRows.map((r) => `• ${r.title} (${r.project})`).join("\n"), ok: "Send" }))) return;
   try {
-    const { results } = await api("/api/recipe", { keys: rows.map((r) => r.key), prompt: recipe.prompt });
+    const { results } = await api("/api/tool", { id: tool.id, keys: agentRows.map((r) => r.key) });
     const bad = results.filter((x) => !x.ok);
-    toast(bad.length ? `Sent to ${results.length - bad.length}; ${bad.length} failed: ${bad[0].error}` : rows.length === 1 ? `Sent “${recipe.label}”` : `Sent “${recipe.label}” to ${rows.length} sessions`, !!bad.length);
+    toast(bad.length ? `${tool.label}: ${results.length - bad.length} ok, ${bad.length} failed (${bad[0].error})` : tool.kind === "sequence" ? `${tool.label}: step 1 sent; step 2 follows when it’s done` : `${tool.label}: sent${agentRows.length > 1 ? ` to ${agentRows.length} sessions` : ""}`, !!bad.length);
     setTimeout(() => { pollTerm(); chatTick(true); }, 300);
   } catch (e) { toast(e.message, true); }
 }
-function openRecipeMenu(anchor) {
+function openToolMenu(anchor) {
   const n = targets().length;
-  if (!n) return toast("Pick a session first");
-  const items = S.recipes.map((r) => ({ html: `${esc(r.label)}${r.hint ? `<small>${esc(r.hint)}</small>` : ""}`, run: () => sendRecipe(r) }));
-  items.push("-", { html: "Edit recipes…", run: openRecipesEditor });
-  openMenu(anchor, items, n > 1 ? `Send to ${n} selected sessions` : "Send to this session");
+  const groups = S.toolGroups ?? {};
+  const items = [];
+  for (const g of Object.keys(groups)) {
+    const ts = S.tools.filter((t) => t.group === g);
+    if (!ts.length) continue;
+    if (items.length) items.push("-");
+    items.push(...ts.map((t) => ({ html: `<span class="tmi">${toolGlyph(t)}<span>${esc(t.label)}<small>${esc(t.hint ?? "")}</small></span></span>`, run: () => runTool(t) })));
+  }
+  items.push("-", { html: `<span class="tmi">${ICON.tools}<span>All tools…<small>What each one does; add your own</small></span></span>`, run: () => setMode("tools") });
+  openMenu(anchor, items, n > 1 ? `Tools for ${n} selected sessions` : n ? "Tools for this session" : "Tools");
 }
-function openRecipesEditor() {
-  const list = $("recList");
-  const row = (r = {}) => `<div class="r"><input placeholder="Name" value="${esc(r.label ?? "")}" data-f="label"><button type="button" class="btn ghost" data-del>Remove</button><textarea placeholder="Prompt" data-f="prompt">${esc(r.prompt ?? "")}</textarea><input placeholder="One-line hint (optional)" value="${esc(r.hint ?? "")}" data-f="hint" style="grid-column:1/-1"><input type="hidden" value="${esc(r.id ?? "")}" data-f="id"><input type="hidden" value="${esc((r.agents ?? []).join(","))}" data-f="agents"></div>`;
-  list.innerHTML = S.recipes.map(row).join("");
-  $("recAdd").onclick = () => { list.insertAdjacentHTML("beforeend", row()); list.lastElementChild.querySelector("input").focus(); };
-  list.onclick = (e) => { if (e.target.closest("[data-del]")) e.target.closest(".r").remove(); };
-  const d = $("recipesDlg");
-  d.returnValue = "";
-  d.onclose = async () => {
-    if (d.returnValue !== "ok") return;
-    const recipes = [...list.querySelectorAll(".r")].map((el) => {
-      const v = (f) => el.querySelector(`[data-f="${f}"]`).value.trim();
-      return { id: v("id") || undefined, label: v("label"), prompt: v("prompt"), hint: v("hint") || undefined, agents: v("agents") ? v("agents").split(",") : undefined };
-    });
-    try { S.recipes = (await api("/api/recipes", { recipes })).recipes; toast("Recipes saved"); } catch (e) { toast(e.message, true); }
-  };
-  d.showModal();
+
+// ── a small promise-based dialog (no browser pop-ups) ────────────────────
+function askDialog({ title, text = "", input, ok = "OK", danger = false, multiline = false }) {
+  return new Promise((resolve) => {
+    const d = document.createElement("dialog");
+    d.className = "ask";
+    d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${esc(title)}</h3>${text ? `<p class="hint" style="white-space:pre-wrap">${esc(text)}</p>` : ""}${input != null ? (multiline ? `<textarea class="inp" rows="4">${esc(input)}</textarea>` : `<input class="inp" value="${esc(input)}">`) : ""}</div><div class="dlg-f"><button class="btn" value="cancel">Cancel</button><button class="btn ${danger ? "danger" : "primary"}" value="ok">${esc(ok)}</button></div></form>`;
+    document.body.append(d);
+    d.addEventListener("close", () => { const v = d.returnValue === "ok" ? (input != null ? d.querySelector(".inp").value : true) : null; d.remove(); resolve(v); });
+    d.showModal();
+    d.querySelector(".inp")?.select?.();
+  });
 }
+
+// ── views: inbox, history, tools, connections ────────────────────────────
+function setMode(m) {
+  S.mode = m;
+  S.board = false;
+  headSig = ""; bodySig = ""; chatDom.key = null;
+  if (m === "history" && !S.histRes) loadHistory();
+  if (m === "connections") loadConnections();
+  if (isPhone() && m) setMView("detail", true);
+  render();
+  renderDetail();
+  renderViews();
+}
+function renderViews() {
+  const el = $("views");
+  if (!el) return;
+  const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
+  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["tools", "Tools", ICON.tools], ["connections", "Connections", ICON.plug]];
+  setHTML(el, v.map(([id, label, icon, count]) => `<button data-view="${id}" aria-pressed="${S.mode === id}" title="${label}${id === "inbox" ? " (i)" : id === "history" ? " (h)" : ""}">${icon}<span>${label}</span>${count ? `<b>${count}</b>` : ""}</button>`).join(""));
+}
+function renderMode() {
+  $("dh").hidden = true; $("nowbar").hidden = true; $("askbox").hidden = true; $("composer").hidden = true; $("subcrumb").hidden = true; $("appbar").hidden = true;
+  $("statusline").hidden = true; $("jumpBottom").hidden = true;
+  chatDom.key = null;
+  if (S.mode === "inbox") renderInbox();
+  else if (S.mode === "history") renderHistory();
+  else if (S.mode === "tools") renderTools();
+  else if (S.mode === "connections") renderConnections();
+}
+function modeHTML(html) {
+  const box = $("dbody");
+  if (box._mode !== S.mode) { box.innerHTML = `<div class="view" data-view="${S.mode}"></div>`; box._mode = S.mode; box._board = ""; box.scrollTop = 0; }
+  setHTML(box.firstElementChild, html);
+}
+
+// Inbox ────────────────────────────────────────────────────────────────────
+S.inboxFilter = load("inboxFilter", "all");
+const KIND = { prompt: ["Needs permission", "blocked"], question: ["Asks you", "done"], review: ["Says it’s done", "working"] };
+function checkChip(c) {
+  if (!c) return "";
+  const m = { pass: ["ok", `✓ checks pass`], fail: ["bad", `✗ checks fail`], running: ["run", `checking…`], queued: ["run", `check queued`], "needs-approval": ["ask", `verify?`], error: ["bad", "check error"], skipped: ["", ""] }[c.state] ?? ["", ""];
+  return m[1] ? `<button class="chk ${m[0]}" data-dact="check" title="${esc(c.cmd ?? "")}${c.at ? ` · ${esc(agoText(c.at))}` : ""}">${m[1]}</button>` : "";
+}
+function jevLine(d) {
+  const j = d.jev;
+  if (!j || j.state === "skipped") return "";
+  if (j.state === "pending") return `<div class="jev pending"><span class="spin"></span> Jev is looking…</div>`;
+  if (d.kind === "review" && j.done != null) {
+    const p = Math.round(j.done * 100);
+    const cls = p >= 70 ? "ok" : p >= 40 ? "mid" : "bad";
+    return `<div class="jev ${cls}"><span class="jb">Jev</span> ${p}% really done${j.next ? ` · suggests <b>${j.next === "accept" ? "accept" : j.next === "send_back" ? "send it back" : "ask a question"}</b>` : ""}</div>`;
+  }
+  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}</div>`;
+  return "";
+}
+function decisionCard(d) {
+  const r = rowOf(d.key);
+  if (!r) return "";
+  const [kindLabel, kindVar] = d.kind === "review" && !d.claim ? ["Finished", "idle"] : KIND[d.kind];
+  const pick = d.jev?.pick;
+  const opts = d.options.map((o) => `<button class="dopt${o.rec ? " rec" : ""}${pick === o.id ? " jevpick" : ""}" data-dopt="${esc(o.id)}"><span class="ol">${esc(String(o.id).toUpperCase())}</span><span class="ob"><span class="ot">${inline(o.title)}${o.rec ? '<span class="rp">Recommended</span>' : ""}${pick === o.id ? '<span class="rp jevp">Jev</span>' : ""}</span>${o.detail ? `<span class="od">${inline(o.detail)}</span>` : ""}</span></button>`).join("");
+  const c = r.check;
+  const check = d.kind === "review" ? (c?.state === "needs-approval"
+    ? `<div class="dcheck ask">The deck can re-run this project’s checks to prove it: <code>${esc(c.cmd)}</code><span class="spacer"></span><button class="btn primary" data-dcheck="allow">Allow for ${esc(r.project)}</button><button class="btn" data-dcheck="edit">Edit…</button><button class="btn ghost" data-dcheck="never">Never</button></div>`
+    : c && c.state !== "skipped" ? `<div class="dcheck ${c.state}">${c.state === "pass" ? "✓" : c.state === "fail" ? "✗" : '<span class="spin"></span>'} <code>${esc(c.cmd ?? "")}</code> ${c.state === "pass" ? `passed${c.ms ? ` in ${Math.round(c.ms / 1000)}s` : ""}` : c.state === "fail" ? `failed (exit ${c.exit})` : c.state}${c.at && (c.state === "pass" || c.state === "fail") ? ` · ${esc(agoText(c.at))}` : ""}${c.tail?.length && c.state === "fail" ? `<details><summary>Output</summary><pre>${esc(c.tail.slice(-25).join("\n"))}</pre></details>` : ""}</div>` : "") : "";
+  const acts = d.kind === "review"
+    ? `<button class="btn primary" data-dact2="accept">${ICON.check}Looks good</button><button class="btn" data-dact2="sendback">Send back…</button><button class="btn" data-dact2="verify">Verify now</button><button class="btn ghost" data-dact2="reply">Reply…</button>`
+    : `<button class="btn ghost" data-dact2="reply">Something else…</button>${d.kind === "prompt" ? `<button class="btn ghost" data-dact2="term">Show terminal</button>` : ""}`;
+  return `<article class="dcard" data-dkey="${esc(d.key)}" data-kind="${d.kind}" style="--pc:${pc(r.project)};--kc:var(--${kindVar})">
+    <header><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span><span class="dk">${kindLabel}</span>${multiMachine() ? `<span class="hint">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint" data-t="${d.at}">${esc(agoText(d.at))}</span><button class="ib" data-dact2="open" title="Open the session">${ICON.jump}</button></header>
+    <div class="dtitle">${esc(r.title)} <span class="hint">${paneTag(r)}</span></div>
+    <div class="dq">${inline(d.question)}</div>
+    ${d.context && d.kind !== "prompt" ? `<details class="dctx"><summary>Context</summary><div class="md">${md(d.context)}</div></details>` : d.kind === "prompt" ? `<pre class="dterm">${ansi((r.tail ?? []).slice(-6).join("\n"))}</pre>` : ""}
+    ${jevLine(d)}
+    ${opts ? `<div class="dopts">${opts}</div>` : ""}
+    ${check}
+    <div class="dacts">${acts}</div>
+    <form class="dreply" hidden><textarea rows="2" placeholder="Reply to the agent"></textarea><button class="btn primary">Send</button></form>
+  </article>`;
+}
+function renderInbox() {
+  const all = (S.decisions ?? []).filter((d) => rowOf(d.key) && !S.done.has(d.key)).sort((a, b) => ({ prompt: 0, question: 1, review: 2 })[a.kind] - ({ prompt: 0, question: 1, review: 2 })[b.kind] || b.at - a.at);
+  const quick = (d) => d.jev?.low >= 0.7 || (d.kind === "review" && (d.jev?.done ?? 0) >= 0.7);
+  const f = S.inboxFilter;
+  const list = all.filter((d) => f === "all" || (f === "quick" ? quick(d) : d.kind === f));
+  const count = (k) => all.filter((d) => (k === "quick" ? quick(d) : d.kind === k)).length;
+  const chips = [["all", "All", all.length], ["quick", "Quick ones", count("quick")], ["prompt", "Permissions", count("prompt")], ["question", "Questions", count("question")], ["review", "Done?", count("review")]]
+    .map(([k, l, n]) => `<button class="chip" data-ifilter="${k}" aria-pressed="${f === k}">${l}${n ? ` <b>${n}</b>` : ""}</button>`).join("");
+  const j = S.jev ?? {};
+  modeHTML(`<header class="vh"><h2>${ICON.inbox}Decisions</h2><p>${all.length ? `${all.length} waiting on you. Answer here; it goes straight to the agent.` : "Nothing is waiting on you."}${j.available ? ` <span class="hint">· Jev suggestions: ${j.calls}/${j.cap} today</span>` : ` <span class="hint">· Jev is off on this machine</span>`}</p><div class="chips">${chips}</div></header>
+    ${list.length ? `<div class="dlist">${list.map(decisionCard).join("")}</div>` : `<div class="empty-v"><p>${all.length ? "None in this filter." : "All clear. When an agent asks something, needs permission, or says it’s done, it shows up here."}</p></div>`}`);
+}
+async function decide(key, action, fn, choice) {
+  const card = document.querySelector(`.dcard[data-dkey="${CSS.escape(key)}"]`);
+  card?.classList.add("leaving");
+  try {
+    await fn();
+    S.done.set(key, Date.now());
+    api("/api/decide", { key, action, choice }).catch(() => {});
+    if (action !== "verify") api("/api/seen", { key }).catch(() => {});
+    setTimeout(() => { renderInbox(); renderViews(); }, 180);
+  } catch (e) { card?.classList.remove("leaving"); toast(e.message, true); }
+}
+setInterval(() => { for (const [k, t] of S.done) if (Date.now() - t > 20_000) S.done.delete(k); }, 5000);
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "inbox") return;
+  const chip = e.target.closest("[data-ifilter]");
+  if (chip) { S.inboxFilter = chip.dataset.ifilter; store("inboxFilter", S.inboxFilter); return renderInbox(); }
+  const card = e.target.closest(".dcard");
+  if (!card) return;
+  const key = card.dataset.dkey;
+  const d = S.decisions.find((x) => x.key === key);
+  const r = rowOf(key);
+  if (!d || !r) return;
+  const opt = e.target.closest("[data-dopt]");
+  if (opt) {
+    const o = d.options.find((x) => String(x.id) === opt.dataset.dopt);
+    if (!o) return;
+    if (d.kind === "prompt") return decide(key, "answer", () => api("/api/keys", { key, keys: o.keys ?? [String(o.id)] }), String(o.id));
+    return decide(key, "answer", () => api("/api/send", { key, text: o.send ?? o.title }), String(o.id));
+  }
+  const chk = e.target.closest("[data-dcheck]")?.dataset.dcheck;
+  if (chk) {
+    if (chk === "never") return api("/api/verify", { key, approve: false }).then(() => toast(`Checks off for ${r.project}`)).catch((x) => toast(x.message, true));
+    let cmd = r.check?.cmd;
+    if (chk === "edit") { cmd = await askDialog({ title: `Check command for ${r.project}`, text: "Runs in the project folder when an agent says it’s done. Only this command, only for this project.", input: cmd ?? "", ok: "Allow" }); if (!cmd) return; }
+    return api("/api/verify", { key, approve: true, cmd }).then(() => toast(`Checking ${r.project}…`)).catch((x) => toast(x.message, true));
+  }
+  const act = e.target.closest("[data-dact2]")?.dataset.dact2;
+  if (!act) return;
+  const form = card.querySelector(".dreply");
+  if (act === "open") return select(key, { scroll: true, open: true });
+  if (act === "term") { select(key, { open: true }); return showTerminal(); }
+  if (act === "accept") return decide(key, "accept", async () => {});
+  if (act === "verify") return verifyRow(r, true);
+  if (act === "sendback" || act === "reply") {
+    form.hidden = false;
+    const ta = form.querySelector("textarea");
+    if (act === "sendback" && !ta.value) ta.value = r.check?.state === "fail" ? `The checks fail (\`${r.check.cmd}\`, exit ${r.check.exit}). Fix it, re-run them, and show me the output.` : "Not done yet: run the tests and type checks, show me the output, and fix anything that fails.";
+    form.dataset.action = act;
+    ta.focus();
+    autosize(ta);
+  }
+});
+$("dbody").addEventListener("submit", (e) => {
+  const form = e.target.closest(".dreply");
+  if (!form) return;
+  e.preventDefault();
+  const key = form.closest(".dcard").dataset.dkey;
+  const text = form.querySelector("textarea").value.trim();
+  if (!text) return;
+  decide(key, form.dataset.action === "sendback" ? "sendback" : "reply", () => api("/api/send", { key, text }));
+});
+$("dbody").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey && e.target.matches(".dreply textarea")) { e.preventDefault(); e.target.form.requestSubmit(); }
+});
+
+// History ──────────────────────────────────────────────────────────────────
+S.hq = { q: "", machine: "all", agent: "", project: "" };
+let histSeq = 0, histTimer = null;
+async function loadHistory(more) {
+  const seq = ++histSeq;
+  const q = S.hq;
+  try {
+    const before = more ? S.histRes?.sessions?.[S.histRes.sessions.length - 1]?.last : undefined;
+    const res = await api("/api/history", { q: q.q, machine: q.machine, agent: q.agent || undefined, project: q.project || undefined, limit: 80, before: q.q ? undefined : before });
+    if (seq !== histSeq) return;
+    if (more && S.histRes) res.sessions = [...S.histRes.sessions, ...res.sessions.filter((x) => !S.histRes.sessions.some((y) => y.key === x.key))];
+    S.histRes = res;
+    if (S.mode === "history") renderHistory();
+  } catch (e) { toast(e.message, true); }
+}
+function renderHistStatus() {
+  const el = document.getElementById("histStatus");
+  if (!el) return;
+  const h = S.hist ?? {};
+  el.textContent = h.building ? `Indexing ${h.done ?? 0} of ${h.total ?? "?"} changed sessions…` : `${(h.indexed ?? 0).toLocaleString()} past sessions indexed on ${S.self ? machineLabel(S.self) : "this machine"}${multiMachine() ? " (other machines index their own)" : ""}`;
+}
+function hlite(snip) { return esc(snip).replace(/\u0002/g, "<mark>").replace(/\u0003/g, "</mark>"); }
+function renderHistory() {
+  const res = S.histRes;
+  const q = S.hq;
+  const projects = res?.projects ?? [];
+  const mach = realMachines();
+  const box = $("dbody");
+  const html = `<header class="vh"><h2>${ICON.history}History</h2><p id="histStatus"></p>
+    <div class="hfilters"><label class="find"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="hq" type="search" placeholder="Search everything you’ve ever done with an agent" value="${esc(q.q)}" autocomplete="off" spellcheck="false"></label>
+    ${mach.length > 1 ? `<select id="hmach"><option value="all">All machines</option>${mach.map((m) => `<option value="${esc(m.id)}" ${q.machine === m.id ? "selected" : ""}>${esc(m.label)}</option>`).join("")}</select>` : ""}
+    <select id="hagent"><option value="">Claude + Codex</option><option value="claude" ${q.agent === "claude" ? "selected" : ""}>Claude Code</option><option value="codex" ${q.agent === "codex" ? "selected" : ""}>Codex</option></select>
+    <select id="hproj"><option value="">All projects</option>${projects.map((p) => `<option value="${esc(p.project)}" ${q.project === p.project ? "selected" : ""}>${esc(p.project)} (${p.n})</option>`).join("")}</select></div></header>
+    <div class="hlist">${!res ? `<p class="hint">Loading…</p>` : res.sessions.length ? res.sessions.map((h) => `<button class="hitem" data-hkey="${esc(h.key)}" ${h.hit ? `data-hi="${h.hit.i}"` : ""} style="--pc:${pc(h.project)}">
+        <span class="ht">${esc(h.title || "(untitled)")}</span>
+        <span class="hm"><span class="pj" style="--pc:${pc(h.project)}">${esc(h.project || "no project")}</span><span>${h.agent === "claude" ? "Claude" : "Codex"}</span>${multiMachine() ? `<span>${esc(machineLabel(h.machine))}</span>` : ""}<span title="${esc(abs(h.last))}">${esc(h.last ? DF.format(new Date(h.last)) : "")}</span>${h.asks ? `<span>${h.asks} request${h.asks === 1 ? "" : "s"}</span>` : ""}${h.hits > 1 ? `<span>${h.hits} matches</span>` : ""}</span>
+        ${h.hit ? `<span class="hs">${hlite(h.hit.snippet)}</span>` : h.first && h.first !== h.title ? `<span class="hs dim">${esc(h.first.slice(0, 220))}</span>` : ""}
+      </button>`).join("") + (!q.q && res.sessions.length >= 80 ? `<button class="btn ghost more" data-hmore>Older sessions</button>` : "") : `<p class="hint">${q.q ? "No past session mentions that." : "No past sessions yet."}</p>`}</div>`;
+  const focused = document.activeElement?.id === "hq";
+  const caret = focused ? document.activeElement.selectionStart : null;
+  modeHTML(html);
+  renderHistStatus();
+  if (focused) { const i = $("hq"); i.focus(); i.setSelectionRange(caret, caret); }
+}
+$("dbody").addEventListener("input", (e) => {
+  if (e.target.id !== "hq") return;
+  S.hq.q = e.target.value;
+  clearTimeout(histTimer);
+  histTimer = setTimeout(() => loadHistory(), 180);
+});
+$("dbody").addEventListener("change", (e) => {
+  const id = e.target.id;
+  if (id === "hmach") S.hq.machine = e.target.value;
+  else if (id === "hagent") S.hq.agent = e.target.value;
+  else if (id === "hproj") S.hq.project = e.target.value;
+  else return;
+  loadHistory();
+});
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "history") return;
+  if (e.target.closest("[data-hmore]")) return loadHistory(true);
+  const b = e.target.closest("[data-hkey]");
+  if (b) openHist(b.dataset.hkey, b.dataset.hi != null ? Number(b.dataset.hi) : undefined);
+});
+async function openHist(key, i) {
+  try {
+    let row = S.hrows.get(key);
+    if (!row) {
+      const { row: r } = await api("/api/history-row", { key });
+      if (!r) return toast("That session is no longer in the index", true);
+      const machine = key.includes("|") ? key.split("|")[0] : S.self;
+      row = { ...r, key, machine };
+      S.hrows.set(key, row);
+    }
+    S.tab = "chat";
+    if (i != null) return jumpTo(key, i);
+    select(key, { open: true });
+  } catch (e) { toast(e.message, true); }
+}
+async function resumeHist(r) {
+  try {
+    const res = await api("/api/history-resume", { key: r.key });
+    toast("Resuming in a new herdr tab…");
+    if (res.key) pendingSelect = res.key;
+  } catch (e) { toast(e.message, true); }
+}
+
+// Tools view ────────────────────────────────────────────────────────────────
+function renderTools() {
+  const cur = rowOf(S.sel);
+  const target = cur && !cur.hist && !cur.app && isAgent(cur) ? cur : null;
+  const groups = Object.entries(S.toolGroups ?? {});
+  const card = (t) => `<div class="tcard" data-tool="${esc(t.id)}"><div class="tt">${toolGlyph(t)}<b>${esc(t.label)}</b>${t.kind === "action" ? '<span class="tk">runs in the deck</span>' : t.kind === "sequence" ? '<span class="tk">2 steps</span>' : ""}</div><p>${esc(t.hint ?? "")}</p>
+      ${t.prompt ? `<details><summary>What it sends</summary><pre>${esc(t.prompt)}${t.then ? `\n\n— then, when it’s done —\n\n${esc(t.then)}` : ""}</pre></details>` : ""}
+      <div class="tacts">${target || t.action === "upload" ? `<button class="btn primary" data-trun="${esc(t.id)}">Use on “${esc((target?.title ?? "this session").slice(0, 28))}”</button>` : `<span class="hint">Open a session to use it</span>`}${t.builtin ? "" : `<button class="btn ghost" data-tedit="${esc(t.id)}">Edit</button><button class="btn ghost" data-tdel="${esc(t.id)}">Delete</button>`}</div></div>`;
+  modeHTML(`<header class="vh"><h2>${ICON.tools}Tools</h2><p>One click makes the agent do something useful, or the deck does it for you. Use them from a session’s <b>Tools</b> button, the ☆ in the message box, <kbd>.</kbd>, or ⌘K. Select several sessions to use one on all of them.</p></header>
+    ${groups.map(([g, label]) => { const ts = S.tools.filter((t) => t.group === g); return ts.length || g === "custom" ? `<section class="tgroup"><h3>${esc(label)}</h3><div class="tgrid">${ts.map(card).join("")}${g === "custom" ? `<button class="tcard add" data-tnew>${ICON.star}<b>New tool</b><p>A prompt you send often, one click away. Use {project}, {branch}, {title} and {handoff}.</p></button>` : ""}</div></section>` : ""; }).join("")}`);
+}
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "tools") return;
+  const run = e.target.closest("[data-trun]")?.dataset.trun;
+  if (run) { const t = S.tools.find((x) => x.id === run); if (t) runTool(t, S.sel ? [S.sel] : []); return; }
+  const edit = e.target.closest("[data-tedit]")?.dataset.tedit;
+  const del = e.target.closest("[data-tdel]")?.dataset.tdel;
+  const custom = S.tools.filter((t) => !t.builtin);
+  if (del) { if (await askDialog({ title: "Delete this tool?", ok: "Delete", danger: true })) saveTools(custom.filter((t) => t.id !== del)); return; }
+  if (edit || e.target.closest("[data-tnew]")) {
+    const t = custom.find((x) => x.id === edit) ?? {};
+    const label = await askDialog({ title: edit ? "Edit tool" : "New tool", text: "Its name", input: t.label ?? "", ok: "Next" });
+    if (!label) return;
+    const prompt = await askDialog({ title: label, text: "What it sends to the agent. {project}, {branch}, {title} and {handoff} are filled in.", input: t.prompt ?? "", ok: "Save", multiline: true });
+    if (!prompt) return;
+    saveTools(edit ? custom.map((x) => (x.id === edit ? { ...x, label, prompt } : x)) : [...custom, { label, prompt, hint: prompt.slice(0, 120) }]);
+  }
+});
+async function saveTools(custom) {
+  try { S.tools = (await api("/api/tools", { tools: custom })).tools; renderTools(); toast("Saved"); } catch (e) { toast(e.message, true); }
+}
+
+// Connections ───────────────────────────────────────────────────────────────
+S.conn = { machine: null, data: new Map(), mcp: null };
+async function loadConnections(refresh) {
+  const m = S.conn.machine ?? S.self;
+  try {
+    const [inv, mcp] = await Promise.all([api("/api/connections", { machine: m, refresh }), S.conn.mcp ? null : api("/api/mcp-info", {}).catch(() => null)]);
+    S.conn.data.set(m, inv);
+    if (mcp) { S.conn.mcp = mcp; S.audit = mcp.audit; }
+    if (S.mode === "connections") renderConnections();
+  } catch (e) { toast(e.message, true); }
+}
+function renderConnections() {
+  const m = S.conn.machine ?? S.self;
+  const inv = S.conn.data.get(m);
+  const mach = realMachines();
+  const sect = (s) => `<section class="csec" data-sec="${s.id}"><h3>${esc(s.title)} <span class="n">${s.items.length}</span></h3><p class="hint">${esc(s.hint)}</p>
+    <div class="cgrid">${s.items.map((i) => `<div class="citem${i.ok === false ? " off" : ""}" title="${esc([i.detail, i.note].filter(Boolean).join(" · "))}"><span class="cn">${s.id === "keys" ? "🔑 " : ""}${esc(i.name)}</span>${i.group && !["cli"].includes(s.id) ? `<span class="cg">${esc(i.group)}</span>` : ""}${i.detail ? `<span class="cd">${esc(i.detail)}</span>` : ""}${i.note ? `<span class="cnote">${esc(i.note)}</span>` : ""}</div>`).join("") || '<span class="hint">None found</span>'}</div></section>`;
+  const mcp = S.conn.mcp;
+  const audit = (S.audit ?? []).slice(0, 8);
+  modeHTML(`<header class="vh"><h2>${ICON.plug}Connections</h2><p>Everything ${esc(inv?.machine ?? "this machine")} can reach: agents, subscriptions, MCP servers, signed-in tools, keys (names only), browser accounts, skills. Agents can read this too, through the deck’s MCP server.</p>
+      <div class="chips">${mach.length > 1 ? mach.map((x) => `<button class="chip" data-cmach="${esc(x.id)}" aria-pressed="${x.id === m}">${esc(x.label)}</button>`).join("") : ""}<span class="spacer"></span><button class="btn" data-crefresh>Refresh</button><button class="btn primary" data-csuggest>${ICON.star}Suggest mega projects</button></div></header>
+    ${!inv ? `<p class="hint">Looking around ${esc(machineLabel(m))}… (takes a few seconds the first time)</p>` : inv.error ? `<p class="hint">${esc(inv.error)}</p>` : inv.sections.map(sect).join("")}
+    ${mcp ? `<section class="csec"><h3>Let agents use the deck (MCP)</h3><p class="hint">Agents can list and read every session, search all history, see your decisions and connections, message other agents and start new sessions. Closing sessions stays yours. Every message or start is logged here.</p>
+      <div class="mcpcmd"><code>${esc(mcp.claude)}</code><button class="btn" data-ccopy>Copy</button></div>
+      ${audit.length ? `<h4 class="hint" style="margin-top:14px">Recent agent actions</h4><ul class="audit">${audit.map((a) => `<li><b>${esc(a.tool.replace("deck_", ""))}</b> ${esc(a.target ?? "")} <span class="hint">${esc(agoText(a.at))}</span>${a.text ? `<div class="hint">${esc(a.text)}</div>` : ""}</li>`).join("")}</ul>` : ""}</section>` : ""}`);
+}
+$("dbody").addEventListener("click", (e) => {
+  if (S.mode !== "connections") return;
+  const cm = e.target.closest("[data-cmach]")?.dataset.cmach;
+  if (cm) { S.conn.machine = cm; renderConnections(); return loadConnections(); }
+  if (e.target.closest("[data-crefresh]")) { toast("Looking again…"); return loadConnections(true); }
+  if (e.target.closest("[data-csuggest]")) return suggestProjects();
+  if (e.target.closest("[data-ccopy]")) return copy(S.conn.mcp?.claude ?? "", "command");
+});
+async function suggestProjects() {
+  if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session in ~/wiki with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
+  try { const r = await api("/api/suggest-projects", {}); toast("Starting a Claude session with your connections…"); if (r.key) pendingSelect = r.key; } catch (e) { toast(e.message, true); }
+}
+
+// ── status line: project, context, plan limits ──────────────────────────────
+function ctxWindow(r) {
+  if (r.ctxWindow) return r.ctxWindow;
+  if (/\[1m\]|1m/i.test(r.model ?? "") || (r.ctxTokens ?? 0) > 200_000) return 1_000_000;
+  if (r.agent === "codex") return 272_000;
+  return 200_000;
+}
+function meter(pct, label, title, resets) {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  const cls = p >= 85 ? "hot" : p >= 60 ? "warm" : "";
+  return `<span class="meter ${cls}" title="${esc(title)}${resets ? ` · resets ${esc(inText(resets))}` : ""}"><span class="ml">${esc(label)}</span><span class="mb"><i style="width:${p}%"></i></span><b>${p}%</b></span>`;
+}
+function inText(t) { const ms = t - Date.now(); if (ms <= 0) return "now"; const h = Math.floor(ms / 3600_000), m = Math.round((ms % 3600_000) / 60_000); return h >= 24 ? `in ${Math.floor(h / 24)}d ${h % 24}h` : h ? `in ${h}h ${m}m` : `in ${m}m`; }
+function renderStatusLine(r) {
+  const el = $("statusline");
+  if (!el) return;
+  if (!r || r.hist || S.sub || S.mode || S.board) { el.hidden = true; return; }
+  el.hidden = false;
+  const parts = [`<span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>`];
+  if (r.ctxTokens != null && isAgent(r)) { const w = ctxWindow(r); parts.push(meter((r.ctxTokens / w) * 100, "context", `${tok(r.ctxTokens)} of ${tok(w)} tokens`)); }
+  const u = S.usage ?? {};
+  if (r.agent === "claude" && u.claude) {
+    const stale = u.claude.at && Date.now() - u.claude.at > 6 * 3600_000;
+    if (u.claude.fiveHour != null) parts.push(meter(u.claude.fiveHour, "5h", `Claude 5-hour limit${stale ? " (last seen " + agoText(u.claude.at) + ")" : ""}`, u.claude.fiveHourResets));
+    if (u.claude.weekly != null) parts.push(meter(u.claude.weekly, "week", "Claude weekly limit", u.claude.weeklyResets));
+  } else if (r.agent === "codex" && u.codex?.windows?.length) {
+    for (const w of u.codex.windows) parts.push(meter(w.pct, w.label === "Weekly" ? "week" : w.label, `Codex ${w.label.toLowerCase()} limit${u.codex.plan ? ` (${u.codex.plan})` : ""}`, w.resets));
+  }
+  if (r.model) parts.push(`<span class="sl-m">${esc(r.model.replace(/^claude-/, ""))}</span>`);
+  if (r.branch) parts.push(`<span class="sl-m">${esc(r.branch)}${r.dirty ? ` · ${r.dirty}±` : ""}</span>`);
+  setHTML(el, parts.join(""));
+}
+
+// ── uploads: attach button, drag and drop, paste ─────────────────────────────
+function pickFiles() {
+  const r = rowOf(S.sel);
+  if (!r || r.hist || r.app) return toast("Open a live session to attach files", true);
+  $("fileIn").value = "";
+  $("fileIn").click();
+}
+async function uploadFiles(files) {
+  const r = rowOf(S.sel);
+  if (!r || r.hist || r.app) return toast("Open a live session to attach files", true);
+  const list = [...files].slice(0, 20);
+  if (!list.length) return;
+  const ta = $("cText");
+  toast(`Uploading ${list.length} file${list.length > 1 ? "s" : ""}…`);
+  const paths = [];
+  for (const f of list) {
+    try {
+      const res = await fetch(`/api/upload?key=${encodeURIComponent(r.key)}&name=${encodeURIComponent(f.name || "pasted.png")}`, { method: "POST", headers: { "x-deck-token": S.token, "content-type": "application/octet-stream" }, body: f });
+      const j = await res.json();
+      if (!res.ok || j.error) throw new Error(j.error ?? res.statusText);
+      paths.push(j.path);
+    } catch (e) { toast(`${f.name}: ${e.message}`, true); }
+  }
+  if (!paths.length) return;
+  const block = paths.map((p) => `[Attached: ${p}]`).join("\n");
+  ta.value = ta.value.trim() ? `${ta.value.trimEnd()}\n${block}\n` : `${block}\n`;
+  autosize(ta);
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+  toast(`Attached ${paths.length}. Add a note and send.`);
+}
+$("fileIn").addEventListener("change", (e) => uploadFiles(e.target.files));
+$("cAttach").onclick = pickFiles;
+{
+  let depth = 0;
+  const det = $("detail");
+  const canDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files") && !S.mode && rowOf(S.sel) && !rowOf(S.sel).hist && !rowOf(S.sel).app;
+  det.addEventListener("dragenter", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth++; det.classList.add("dropping"); });
+  det.addEventListener("dragover", (e) => { if (canDrop(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+  det.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) det.classList.remove("dropping"); });
+  det.addEventListener("drop", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth = 0; det.classList.remove("dropping"); uploadFiles(e.dataTransfer.files); });
+  $("cText").addEventListener("paste", (e) => { const fs = [...(e.clipboardData?.files ?? [])]; if (fs.length) { e.preventDefault(); uploadFiles(fs); } });
+}
+
+// ── sharing a dev server, verifying ──────────────────────────────────────────
+async function shareRow(r, port) {
+  if (!S.canShare && r.machine === S.self) return toast("Tailscale isn’t installed on this machine", true);
+  const p = port || r.ports?.[0]?.port;
+  if (!p) {
+    const tool = S.tools.find((t) => t.id === "show-me");
+    if (tool && (await askDialog({ title: "No server running", text: "The deck can’t see a server this session runs. Ask the agent to start it and share a tailnet link?", ok: "Ask the agent" }))) runTool(tool, [r.key]);
+    return;
+  }
+  try {
+    toast(`Sharing :${p} on your tailnet…`);
+    const res = await api("/api/share", { key: r.key, port: p });
+    await copy(res.url, "tailnet link");
+    window.open(res.url, "_blank", "noopener");
+  } catch (e) { toast(e.message, true); }
+}
+async function unshareRow(r, port) {
+  try { await api("/api/share", { key: r.key, port, off: true }); toast(`Stopped sharing :${port}`); } catch (e) { toast(e.message, true); }
+}
+async function verifyRow(r, force) {
+  try {
+    const res = await api("/api/verify", { key: r.key, force });
+    const c = res.check;
+    if (c?.state === "needs-approval") {
+      const cmd = await askDialog({ title: `Verify ${r.project}?`, text: "The deck will run this in the project folder now, and again whenever an agent there says it’s done. You can edit it; it’s remembered for this project only.", input: c.cmd, ok: "Allow and run" });
+      if (!cmd) return;
+      await api("/api/verify", { key: r.key, approve: true, cmd, force: true });
+      return toast(`Checking ${r.project}…`);
+    }
+    toast(c?.state === "skipped" ? c.reason ?? "Nothing to check" : c?.state === "queued" || c?.state === "running" ? `Checking ${r.project}…` : `Last check: ${c?.state}`);
+  } catch (e) { toast(e.message, true); }
+}
+function checkMenu(anchor, r) {
+  const c = r.check;
+  if (!c) return verifyRow(r, true);
+  if (c.state === "needs-approval") return verifyRow(r, false);
+  openMenu(anchor, [
+    { html: `<span>${esc(c.cmd ?? "")}</span><small>${esc(c.state)}${c.at ? ` · ${esc(agoText(c.at))}` : ""}${c.ms ? ` · ${Math.round(c.ms / 1000)}s` : ""}</small>`, run: () => {} },
+    c.tail?.length && { html: "Show the output", run: () => askDialog({ title: `${c.cmd} → ${c.state}`, text: c.tail.slice(-40).join("\n"), ok: "Close" }) },
+    { html: "Run again", run: () => verifyRow(r, true) },
+    { html: "Change the command…", run: async () => { const cmd = await askDialog({ title: `Check command for ${r.project}`, input: c.cmd ?? "", ok: "Save and run" }); if (cmd) api("/api/verify", { key: r.key, approve: true, cmd, force: true }).catch((x) => toast(x.message, true)); } },
+    { html: "Turn checks off for this project", danger: true, run: () => api("/api/verify", { key: r.key, approve: false }).then(() => toast("Checks off")) },
+  ].filter(Boolean));
+}
+$("views")?.addEventListener("click", (e) => { const v = e.target.closest("[data-view]")?.dataset.view; if (v) setMode(S.mode === v ? null : v); });
+
 
 let menuEl = null;
 function openMenu(anchor, items, heading) {
@@ -1466,7 +2004,7 @@ function openMenu(anchor, items, heading) {
 function closeMenu() { menuEl?.remove(); menuEl = null; }
 addEventListener("pointerdown", (e) => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
 function moreMenu(anchor) {
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   if (!r) return;
   if (r.app) return openMenu(anchor, [
     { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
@@ -1497,7 +2035,8 @@ function settingsMenu(anchor) {
     { html: `Auto briefs: ${S.autoBrief ? "on" : "off"}<small>Write a brief when you open a session</small>`, run: () => { S.autoBrief = !S.autoBrief; store("autoBrief", S.autoBrief); toast(`Auto briefs ${S.autoBrief ? "on" : "off"}`); } },
     !isPhone() && { html: `Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}<small>Move it (\\)</small>`, run: () => layoutMenu(anchor) },
     { html: "Close candidates<small>Select empty, duplicate and week-old sessions</small>", run: suggestClose },
-    { html: "Edit recipes…", run: openRecipesEditor },
+    { html: "Tools<small>What each tool does; add your own</small>", run: () => setMode("tools") },
+    { html: "Connections<small>Everything this setup can reach</small>", run: () => setMode("connections") },
     !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
   ].filter(Boolean));
 }
@@ -1537,8 +2076,8 @@ function suggestClose() {
 async function standup() {
   const rows = [...S.rows.values()].filter(inScope).filter((r) => isAgent(r) && !r.app && (r.status === "idle" || r.status === "done") && !r.empty && !r.stale);
   if (!rows.length) return toast("No idle agents to ask");
-  const rc = S.recipes.find((x) => x.id === "status") ?? { label: "Status", prompt: "In one line: what are you working on, and what's left?" };
-  await sendRecipe(rc, rows.map((r) => r.key));
+  const tool = S.tools.find((x) => x.id === "status");
+  if (tool) await runTool(tool, rows.map((r) => r.key));
 }
 function setGroup(g) { S.group = g; store("group", g); lastOrder = ""; render(); }
 function focusTerminal() {
@@ -1570,7 +2109,7 @@ function fuzzy(text, q) {
 }
 function paletteItems(q) {
   const out = [];
-  const cur = S.rows.get(S.sel);
+  const cur = rowOf(S.sel);
   const n = targets().length;
   const sessions = [...S.rows.values()].map((r) => ({ r, s: fuzzy(`${r.title} ${r.project} ${r.launch ?? ""} ${paneName(r)} ${machineLabel(r.machine)} ${r.agent} ${r.branch ?? ""}`, q) }))
     .filter((x) => x.s).sort((a, b) => b.s - a.s || (b.r.lastActiveAt ?? 0) - (a.r.lastActiveAt ?? 0)).slice(0, q ? 8 : 5);
@@ -1579,8 +2118,8 @@ function paletteItems(q) {
     run: () => { if (!inScope(r)) setMachine("all"); S.view = "inbox"; select(r.key, { scroll: true, open: true }); },
   })));
   if (n) {
-    const recipes = S.recipes.map((rc) => ({ rc, s: fuzzy(`${rc.label} ${rc.hint ?? ""} recipe send`, q) })).filter((x) => x.s).slice(0, q ? 6 : 4);
-    if (recipes.length) out.push({ head: n > 1 ? `Send to ${n} selected` : `Send to “${cur?.title ?? "session"}”` }, ...recipes.map(({ rc }) => ({ html: `<span>${esc(rc.label)}</span><small>${esc(rc.hint ?? "")}</small>`, run: () => sendRecipe(rc) })));
+    const tools = S.tools.filter((t) => t.action !== "upload").map((t) => ({ t, s: fuzzy(`${t.label} ${t.hint ?? ""} tool`, q) })).filter((x) => x.s).slice(0, q ? 6 : 4);
+    if (tools.length) out.push({ head: n > 1 ? `Tools for ${n} selected` : `Tools for “${cur?.title ?? "session"}”` }, ...tools.map(({ t }) => ({ html: `<span>${esc(t.label)}</span><small>${esc(t.hint ?? "")}</small>`, run: () => runTool(t) })));
   }
   const cmds = [
     { t: "New session", k: "n", run: openNew },
@@ -1599,7 +2138,11 @@ function paletteItems(q) {
     { t: "Select close candidates", run: suggestClose },
     { t: "Close all empty sessions…", run: () => askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)) },
     { t: "Show closed sessions", k: "c", run: () => { S.view = "closed"; render(); } },
-    { t: "Edit recipes", run: openRecipesEditor },
+    { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
+    { t: "History: search every past session", k: "h", run: () => setMode("history") },
+    { t: "Tools: what each one does", run: () => setMode("tools") },
+    { t: "Connections: everything this setup can reach", run: () => setMode("connections") },
+    { t: "Suggest mega projects from my connections", run: suggestProjects },
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Toggle light / dark", run: toggleTheme },
     ...THEMES.map(([id, label]) => ({ t: `Theme: ${label}`, run: () => setTheme(id) })),
@@ -1641,7 +2184,7 @@ let newOpts = null, newKind = load("newKind", "claude"), newMachine = null, pend
 let nSel = { model: "", effort: "", mode: "" };
 async function loadNewOptions() {
   try { newOpts = await api("/api/new-options", { machine: newMachine }); } catch (e) { newOpts = { recent: [], projects: [], argHints: {}, choices: {} }; toast(e.message, true); }
-  const cur = S.rows.get(S.sel);
+  const cur = rowOf(S.sel);
   const saved = load("newCwd:" + newMachine, "");
   $("nCwd").value = saved || (cur && cur.machine === newMachine ? home(cur.projectRoot ?? cur.cwd) : "") || home(newOpts.recent[0] ?? "");
   $("nCwdList").innerHTML = [...new Set([...newOpts.recent, ...newOpts.projects])].map((p) => `<option value="${esc(home(p))}">`).join("");
@@ -1651,7 +2194,7 @@ async function loadNewOptions() {
   renderKinds();
 }
 async function openNew() {
-  const cur = S.rows.get(S.sel);
+  const cur = rowOf(S.sel);
   newMachine = (S.machine !== "all" ? S.machine : cur?.machine) ?? S.self;
   const ms = realMachines();
   if (!ms.some((m) => m.id === newMachine)) newMachine = S.self;
@@ -1824,9 +2367,14 @@ $("detail").addEventListener("click", (e) => {
   if (!b) return;
   const act = b.dataset.dact;
   if (act === "new") return openNew();
-  const r = S.rows.get(S.sel);
+  const r = rowOf(S.sel);
   if (!r) return;
-  if (act === "recipes") openRecipeMenu(b);
+  if (act === "tools") openToolMenu(b);
+  if (act === "share") shareRow(r, Number(b.dataset.port));
+  if (act === "unshare") unshareRow(r, Number(b.dataset.port));
+  if (act === "histresume") resumeHist(r);
+  if (act === "backhist") setMode("history");
+  if (act === "check") checkMenu(b, r);
   if (act === "showterm") showTerminal();
   if (act === "link") copy(linkUrl(r), "link");
   if (act === "codexopen") codexAct("codex-open", r);
@@ -1843,7 +2391,7 @@ $("lf").addEventListener("click", (e) => {
   if (a === "closed") { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); }
   if (a === "menu") settingsMenu(e.target.closest("[data-lf]"));
 });
-$("selRecipe").onclick = (e) => openRecipeMenu(e.currentTarget);
+$("selRecipe").onclick = (e) => openToolMenu(e.currentTarget);
 $("selClose").onclick = () => askClose([...S.picked]);
 $("selClear").onclick = () => { S.picked.clear(); render(); };
 let deepTimer = null, deepSeq = 0;
@@ -1877,7 +2425,7 @@ $("termToggle").onclick = () => { app.classList.toggle("term-off"); store("termO
 
 let fileCtx = null;
 async function openFile(path, key = S.sel) {
-  const r = S.rows.get(key);
+  const r = rowOf(key);
   try {
     const f = await api("/api/file", { key, path });
     fileCtx = { key, path: f.path, raw: path };
@@ -1961,15 +2509,17 @@ document.addEventListener("keydown", (e) => {
   else if (k === "j" || k === "ArrowDown") { e.preventDefault(); moveSel(1); }
   else if (k === "k" || k === "ArrowUp") { e.preventDefault(); moveSel(-1); }
   else if (k === "r" && cur) { e.preventDefault(); focusReply(); }
-  else if (k === "." && (cur || S.picked.size)) { e.preventDefault(); openRecipeMenu(document.querySelector('[data-dact="recipes"]') ?? $("cRecipe")); }
+  else if (k === "." && (cur || S.picked.size)) { e.preventDefault(); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe")); }
+  else if (k === "i") setMode(S.mode === "inbox" ? null : "inbox");
+  else if (k === "h") setMode(S.mode === "history" ? null : "history");
   else if (k === "t" && cur) { e.preventDefault(); focusTerminal(); }
   else if (k === "`" && S.tpos === "tab") { e.preventDefault(); setMain(S.main === "chat" ? "term" : "chat"); }
   else if (k === "\\") { e.preventDefault(); setTpos(TPOS[(TPOS.indexOf(S.tpos) + 1) % TPOS.length]); toast(`Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}`); }
   else if (k === "g") setGroup(S.group === "project" ? "priority" : "project");
   else if (k === "l") setBoard(!S.board);
   else if (k === "n") { e.preventDefault(); openNew(); }
-  else if (k === "f" && cur) S.rows.get(cur)?.app ? codexAct("codex-open", S.rows.get(cur)) : focusPane(cur);
-  else if (k === "y" && cur) copy(linkUrl(S.rows.get(cur)), "link");
+  else if (k === "f" && cur) rowOf(cur)?.app ? codexAct("codex-open", rowOf(cur)) : focusPane(cur);
+  else if (k === "y" && cur) copy(linkUrl(rowOf(cur)), "link");
   else if (k === "x" && (S.picked.size || cur)) askClose(targets());
   else if (k === "s" && cur) togglePick(cur);
   else if (k === "b" && cur) writeBrief(cur);
@@ -2045,7 +2595,13 @@ function applyFull(data) {
   S.rows = new Map(data.rows.map((r) => [r.key, r]));
   S.summary = data.summary;
   S.graveyard = data.graveyard ?? [];
-  S.recipes = data.recipes ?? [];
+  S.tools = data.tools ?? [];
+  S.toolGroups = data.toolGroups ?? {};
+  S.usage = data.usage ?? {};
+  S.hist = data.history ?? {};
+  S.decisions = data.decisions ?? [];
+  S.jev = data.jev ?? {};
+  S.canShare = !!data.canShare;
   S.publicUrl = data.publicUrl ?? "";
   if (!S.linkDone && location.pathname.startsWith("/s/")) {
     S.linkDone = true;
@@ -2058,7 +2614,7 @@ function applyFull(data) {
   S.linkDone = true;
   if (S.machine !== "all" && !S.summary.machines?.some((m) => m.id === S.machine)) S.machine = "all";
   lastOrder = "";
-  if (!S.sel || !S.rows.has(S.sel)) {
+  if (!S.sel || !rowOf(S.sel)) {
     S.sel = null;
     const saved = load("sel", null);
     if (saved && S.rows.has(saved) && !isPhone()) return select(saved);
@@ -2076,15 +2632,19 @@ function connect() {
   es.addEventListener("full", (e) => { $("conn").classList.remove("off"); applyFull(JSON.parse(e.data)); });
   es.addEventListener("patch", (e) => {
     const p = JSON.parse(e.data);
-    for (const r of p.upsert) { notifyTransitions(S.rows.get(r.key), r); S.rows.set(r.key, r); }
+    for (const r of p.upsert) { notifyTransitions(rowOf(r.key), r); S.rows.set(r.key, r); }
     for (const k of p.remove) { S.rows.delete(k); S.details.delete(k); }
     S.summary = p.summary;
-    if (pendingSelect && S.rows.has(pendingSelect)) { const k = pendingSelect; pendingSelect = null; select(k, { scroll: true, open: true }); return; }
-    if (S.sel && !S.rows.has(S.sel)) { S.sel = null; const next = S.visible?.find((r) => S.rows.has(r.key))?.key; if (next && !isPhone()) return select(next); }
+    if (pendingSelect && rowOf(pendingSelect)) { const k = pendingSelect; pendingSelect = null; select(k, { scroll: true, open: true }); return; }
+    if (S.sel && !rowOf(S.sel)) { S.sel = null; const next = S.visible?.find((r) => S.rows.has(r.key))?.key; if (next && !isPhone()) return select(next); }
     if (S.sel && p.upsert.some((r) => r.key === S.sel)) chatTick();
     render();
   });
   es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
+  es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
+  es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
+  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") renderInbox(); });
+  es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });
   es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");
   es.onerror = () => {
