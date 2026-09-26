@@ -24,6 +24,7 @@ import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
+import { createCovers } from "./covers";
 import { createLeads } from "./leads";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
@@ -97,6 +98,9 @@ const discover = createDiscover(
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   },
 );
+// Cover images for Discover ideas, a few a day from Codex on the hub (src/covers.ts). DECK_COVERS_DIR moves them and their covers.json (tests).
+const COVERS_DIR = process.env.DECK_COVERS_DIR || `${process.env.DECK_DISCOVER_DIR || DATA_DIR}/covers`;
+const covers = createCovers({ dir: COVERS_DIR, confFile: process.env.DECK_COVERS_DIR ? `${COVERS_DIR}/covers.json` : `${DATA_DIR}/covers.json`, dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, enabled: () => !isNode() });
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
 const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
@@ -1005,6 +1009,8 @@ async function handle(req: Request): Promise<Response> {
     // Host check blocks DNS-rebinding; the token blocks cross-site POSTs.
     if (!allowedHost(req)) return new Response("forbidden host", { status: 403 });
     const url = new URL(req.url);
+    const cover = await covers.route(req, url, req.headers.get("x-deck-token") === TOKEN || hasApiToken(req));
+    if (cover) return cover;
 
     if (req.method === "GET") {
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
@@ -1102,7 +1108,7 @@ async function handle(req: Request): Promise<Response> {
         const choice = d && choiceFromInput(d, { text: body.text, keys: body.keys });
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
-      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
@@ -1574,6 +1580,7 @@ for (let attempt = 0; ; attempt++) {
 }
 for (const h of remotes.values()) h.start();
 auto.start();
+covers.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 
