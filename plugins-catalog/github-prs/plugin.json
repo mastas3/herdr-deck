@@ -1,0 +1,37 @@
+{
+  "deck": 1,
+  "id": "github-prs",
+  "name": "GitHub pull requests",
+  "version": "0.1.0",
+  "kind": "integration",
+  "author": "herdr deck",
+  "description": "Open pull requests waiting for your review, and your own, across every repo. Read with the GitHub CLI (gh).",
+  "icon": { "glyph": "PR", "color": "#6e40c9" },
+  "requires": { "connections": [{ "label": "GitHub", "any": ["svc:github"] }] },
+  "grants": {
+    "gh.read": { "tools": ["Bash(gh search prs:*)"] }
+  },
+  "sources": [{
+    "id": "prs", "prompt": "prompts/prs.md", "grants": ["gh.read"], "refresh": "15m", "model": "haiku",
+    "schema": {
+      "type": "array", "maxItems": 60,
+      "items": {
+        "type": "object",
+        "properties": {
+          "url": { "type": "string" }, "title": { "type": "string", "maxLength": 300 }, "repo": { "type": "string" },
+          "author": { "type": "string" }, "updated": { "type": "string" }, "review": { "type": "string", "enum": ["review requested", "yours"] }
+        },
+        "required": ["url", "title", "repo"]
+      }
+    }
+  }],
+  "views": [{
+    "id": "prs", "title": "Pull requests", "template": "list", "source": "prs", "pin": true,
+    "item": { "id": "$.url", "title": "$.title", "subtitle": "$.repo", "badge": "$.review", "time": "$.updated", "url": "$.url" },
+    "actions": ["review"]
+  }],
+  "actions": [{
+    "id": "review", "label": "Review with agent", "mode": "session",
+    "prompt": "Review this pull request and tell me what needs attention before it merges. Don't approve, comment or merge anything: just report back.\n\n{item}"
+  }]
+}

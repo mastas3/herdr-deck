@@ -1,0 +1,38 @@
+{
+  "deck": 1,
+  "id": "gmail-inbox",
+  "name": "Gmail inbox",
+  "version": "0.1.0",
+  "kind": "integration",
+  "author": "herdr deck",
+  "description": "Your Gmail inbox as a deck view. An agent reads your latest threads through the Gmail connector. Replies are drafted by an agent and only sent after you've read them.",
+  "icon": { "glyph": "G", "color": "#d93025" },
+  "requires": { "connections": [{ "label": "Gmail", "any": ["svc:gmail"] }] },
+  "grants": {
+    "gmail.read": { "tools": ["mcp__claude_ai_Gmail__search_threads", "mcp__claude_ai_Gmail__get_thread"] },
+    "gmail.reply": { "tools": ["mcp__claude_ai_Gmail__reply"], "writes": true }
+  },
+  "sources": [{
+    "id": "inbox", "prompt": "prompts/inbox.md", "grants": ["gmail.read"], "refresh": "10m", "model": "haiku",
+    "schema": {
+      "type": "array", "maxItems": 30,
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" }, "subject": { "type": "string", "maxLength": 300 }, "from": { "type": "string", "maxLength": 200 },
+          "date": { "type": "string" }, "snippet": { "type": "string", "maxLength": 400 }, "unread": { "type": "boolean" }, "viewUrl": { "type": "string" }
+        },
+        "required": ["id", "subject"]
+      }
+    }
+  }],
+  "views": [{
+    "id": "inbox", "title": "Gmail", "template": "inbox", "source": "inbox", "pin": true,
+    "item": { "id": "$.id", "title": "$.subject", "from": "$.from", "time": "$.date", "snippet": "$.snippet", "unread": "$.unread", "url": "$.viewUrl" },
+    "actions": ["reply"]
+  }],
+  "actions": [{
+    "id": "reply", "label": "Reply with agent", "mode": "draft", "prompt": "prompts/reply.md", "grants": ["gmail.reply"],
+    "draftSchema": { "type": "object", "properties": { "threadId": { "type": "string" }, "body": { "type": "string", "maxLength": 5000 } }, "required": ["threadId", "body"] }
+  }]
+}
