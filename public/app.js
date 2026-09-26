@@ -3092,7 +3092,7 @@ function renderDiscover() {
   const tab = S.disc.tab;
   const nIdeas = d?.ideas?.length ?? 0, nSaved = d?.saved?.length ?? 0;
   const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Repos worth forking, picked for what you build. Any idea, searched against what already exists and planned by an agent.</p>
-    <nav class="ccats dtabs">${DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("")}</nav></header>`;
+    <nav class="seg dtabs">${DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("")}</nav></header>`;
   let body = "";
   if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
