@@ -13,7 +13,7 @@ import { upsertAccount } from "./accounts";
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
-import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap } from "./jev";
+import { RECEIPTS_FILE, cachedById, jevAvailable, jevFeature, jevUsage, setJevCap, setJevFeature } from "./jev";
 import { statsFor } from "./jevstats";
 import { appendAudit, handleMcp, mcpToken, readAudit, type McpCtx } from "./mcp";
 import { Deck, type Row } from "./deck";
@@ -25,8 +25,12 @@ import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
 import { createLeads } from "./leads";
+import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
+import { HISTORY_DB } from "./history-schema";
 import { PushStore, endpointOk, type Message } from "./push";
-import { Automations } from "./automations";
+import { Automations, linkPath } from "./automations";
+import { Radar } from "./radar";
+import { routeMessage } from "./route";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -98,6 +102,12 @@ const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
 });
+// Project pages (journeys): their own module; the server only routes to it.
+const journeyHist = localHistory(HISTORY_DB, SELF.id);
+const journeys = createJourneys(
+  { dataDir: DATA_DIR, cacheDir: process.env.DECK_JOURNEY_DIR || undefined, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
+  { sessions: (p) => projectSessions(p, historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
+);
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 let hubSeenAt = 0;
@@ -174,7 +184,7 @@ const PUBLIC_URL = (process.env.DECK_PUBLIC_URL ?? "").replace(/\/$/, "");
 function fullState() {
   return {
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
-    tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
+    tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], radar: radar.list(), jev: jevUsage(), canShare: canShare(),
     auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() },
   };
 }
@@ -243,7 +253,8 @@ const screenOf = async (row: Row): Promise<string[] | undefined> => {
   return text ? String(text).replace(/\x1b\[[0-9;?]*[A-Za-z]/g, "").split("\n").slice(-60) : undefined;
 };
 let decTimer: Timer | undefined;
-const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(rebuildDecisions, 350); };
+// The radar runs on the same beat but on its own: the decisions rebuild never waits for it.
+const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(() => { rebuildDecisions(); radar.pass(allRows()).catch(() => {}); }, 350); };
 async function rebuildDecisions() {
   const rows = allRows().filter(needsYou);
   const next = new Map<string, Decision>();
@@ -261,6 +272,18 @@ async function rebuildDecisions() {
   if (u.calls !== lastJevCalls) { lastJevCalls = u.calls; broadcast("jev", u); }
 }
 let lastJevCalls = jevUsage().calls;
+// Stuck and drift radar: running sessions that look stuck get a Jev read, shown as a chip; two confident
+// "stuck" reads in a row push once (as a "needs you" alert, so device choices and quiet hours apply).
+const radar = new Radar({
+  chat: chatTail,
+  changed: (list) => broadcast("radar", list),
+  enabled: () => !isNode() && jevFeature("radar") && jevAvailable(), // only the hub asks
+  push: (m, r) => {
+    const rules = auto?.rules.alerts;
+    if (isNode() || (rules && !(rules.on && rules.needs)) || viewing(r.key)) return;
+    push.deliver({ ...m, url: linkPath(r) }, { urgency: "high", ttl: 6 * 3600, topic: `r${Bun.hash(r.key).toString(36)}` }).catch(() => {});
+  },
+});
 deck.onPatch(scheduleDecisions);
 setInterval(scheduleDecisions, 10_000);
 
@@ -985,7 +1008,7 @@ async function handle(req: Request): Promise<Response> {
 
     if (req.method === "GET") {
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
-      if (url.pathname === "/" || url.pathname.startsWith("/s/")) return send(req, page(), "text/html; charset=utf-8");
+      if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/")) return send(req, page(), "text/html; charset=utf-8");
       if (url.pathname === "/app.js") {
         const a = appAsset();
         const cache = url.searchParams.get("v") === a.hash ? "public, max-age=31536000, immutable" : "no-cache";
@@ -1081,6 +1104,7 @@ async function handle(req: Request): Promise<Response> {
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
@@ -1354,6 +1378,16 @@ async function handle(req: Request): Promise<Response> {
           try { setJevCap(Number(body.cap)); } catch (e: any) { return json({ error: e.message }, 400); }
           broadcast("jev", jevUsage());
           return json({ ok: true, jev: jevUsage() });
+        }
+        case "/api/jev/feature": {
+          try { setJevFeature(String(body.name), body.on); } catch (e: any) { return json({ error: e.message }, 400); }
+          broadcast("jev", jevUsage());
+          return json({ ok: true, jev: jevUsage() });
+        }
+        case "/api/jev/route": {
+          // Jev suggests which session a message is for; the palette asks you before anything is sent.
+          const r = await routeMessage(body.text, allRows());
+          return json(r.body, r.status);
         }
         case "/api/mcp-info":
           return json({ url: `http://127.0.0.1:${PORT}/mcp`, token: MCP_TOKEN, audit: readAudit(30), claude: `claude mcp add --scope user --transport http herdr-deck http://127.0.0.1:${PORT}/mcp --header "Authorization: Bearer ${MCP_TOKEN}"` });

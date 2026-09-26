@@ -332,7 +332,7 @@ describe("Discover routes for the mixer", () => {
     expect(JSON.parse(readFileSync(`${root}/dd/discover.json`, "utf8")).mixes).toHaveLength(1);
     const st = await d.handle("/api/discover", {});
     expect(st.mixes.saved).toHaveLength(1);
-    expect(st.mixes.forYou.mixes.length).toBeGreaterThan(0);
+    expect(st.mixes.forYou).toBeUndefined(); // "Ideas for you" is its own route now (src/feed.ts)
     expect((await d.handle("/api/discover/mix-save", { op: "unsave", id: s.mixes[0].id })).mixes).toHaveLength(0);
   });
 });

@@ -511,12 +511,23 @@ function srcLine(r) {
 }
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
   const tip = why.k === "work" && why.t ? `Working since ${abs(why.t)}` : `Last active ${abs(r.lastActiveAt)}`;
   return `<span class="ago why" data-k="${why.k}"${why.t ? ` data-t="${why.t}" data-why="${why.k}"` : ""} title="${esc(tip)}">${esc(why.text)}</span>`;
+}
+const RADAR_PHASE = { exploring: "reading and searching", editing: "changing files", testing: "running tests or builds", debugging: "chasing a failure", wrapping_up: "wrapping up" };
+const RADAR_WHY = { repeat: "it made the same tool call 3 or more times in its last 8", errors: "3 or more of its last 6 tool calls failed", stall: "this turn has run over 10 minutes without editing a file" };
+/** Jev's stuck/drift read on a running session, as a small chip; nothing unless it's fairly sure (70%+). */
+function radarChip(r) {
+  const e = r.status === "working" && (S.radar ?? []).find((x) => x.key === r.key);
+  if (!e) return "";
+  const bits = [e.stuck >= 0.7 ? `looping ${Math.round(e.stuck * 100)}%` : "", e.offTask >= 0.7 ? `off task ${Math.round(e.offTask * 100)}%` : ""].filter(Boolean);
+  if (!bits.length) return "";
+  const tip = `Jev thinks this session may be ${e.stuck >= 0.7 && e.offTask >= 0.7 ? "stuck and off task" : e.stuck >= 0.7 ? "stuck" : "off task"}${e.phase ? `; it looks like it's mostly ${RADAR_PHASE[e.phase] ?? e.phase}` : ""}.\nThe deck asked because ${RADAR_WHY[e.trigger] ?? "it looked unusual"}.\nJust a heads-up: nothing happens on its own.`;
+  return `<span class="rchip" title="${esc(tip)}">${esc(bits.join(" · "))}</span>`;
 }
 function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now())) {
   if (S.simple) return simpleRow(r);
@@ -540,8 +551,9 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  const rc = radarChip(r);
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
 }
 let lastOrder = "", queued = false;
 function render() {
@@ -663,7 +675,7 @@ function renderList() {
     }
     const ask = pendingAsk(r);
     const why = reasonOf(r, ask?.kind, now);
-    const ctx = JSON.stringify(ask ?? "") + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const ctx = JSON.stringify(ask ?? "") + radarChip(r) + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
     const sig = JSON.stringify(r) + ctx;
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
@@ -694,8 +706,9 @@ function renderList() {
       const dots = g.proj ? `<span class="dots">${nb ? `<span class="dot" style="--c:var(--blocked)" title="${nb} need you"></span>` : ""}${nw ? `<span class="dot" style="--c:var(--working)" title="${nw} working"></span>` : ""}</span>` : "";
       const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>`
         : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
+      const jour = g.proj ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${J_ICON.journey}</span>` : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
-      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${extra}</button><div class="sec-b"></div>`;
+      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
       for (const r of g.rows) body.append(rowCache.get(r.key).el);
       frag.append(sec);
@@ -802,7 +815,7 @@ function resolveLink(path) {
 }
 function syncUrl() {
   const r = rowOf(S.sel);
-  const path = S.board || !r ? "/" : linkPath(r);
+  const path = S.mode === "project" && S.jp?.name ? `/p/${encodeURIComponent(S.jp.name)}` : S.mode === "projects" ? "/p" : S.board || !r ? "/" : linkPath(r);
   if (location.pathname !== path) history.replaceState(history.state, "", path);
 }
 
@@ -1236,7 +1249,7 @@ function renderDetail() {
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length, radarChip(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -1282,7 +1295,8 @@ function renderHead(r, d, tab) {
   const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
-    `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
+    radarChip(r),
+    `<button class="pj" data-dact="journey" style="--pc:${pc(r.project)}" title="${esc(where)} · open the project page">${esc(r.project)}</button>`,
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
     r.duplicate ? `<span class="wchip" title="Two panes are attached to this one conversation">${ICON.warn}duplicate</span>` : "",
@@ -2144,11 +2158,14 @@ function setMode(m) {
   if (m === "history" && !S.histRes) loadHistory();
   if (m === "connections") loadConnections();
   if (m === "discover") loadDiscover();
+  if (m === "project") loadJourney(S.jp.name, { force: true }); // journey: cached on the server, so this is instant
+  if (m === "projects") loadProjects();
   if (m === "inbox" && S.jevOpen) loadJevStats(true);
   if (isPhone() && m) setMView("detail", true);
   render();
   renderDetail();
   renderViews();
+  if (m === "project" || m === "projects" || location.pathname.startsWith("/p")) syncUrl(); // journey: /p/<project>
 }
 function renderViews() {
   const el = $("views");
@@ -2166,6 +2183,8 @@ function renderMode() {
   else if (S.mode === "tools") renderTools();
   else if (S.mode === "connections") renderConnections();
   else if (S.mode === "discover") renderDiscover();
+  else if (S.mode === "project") renderJourney();
+  else if (S.mode === "projects") renderProjects();
 }
 function modeHTML(html) {
   const box = $("dbody");
@@ -2190,8 +2209,15 @@ function jevLine(d) {
     const cls = p >= 70 ? "ok" : p >= 40 ? "mid" : "bad";
     return `<div class="jev ${cls}"><span class="jb">Jev</span> ${p}% really done${j.next ? ` · suggests <b>${j.next === "accept" ? "accept" : j.next === "send_back" ? "send it back" : "ask a question"}</b>` : ""}</div>`;
   }
-  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}</div>`;
+  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}${riskChip(j)}</div>`;
   return "";
+}
+/** How reversible Jev thinks the terminal prompt is, as a small chip (deck-prompt only; nothing when the risk feature is off or Jev skipped). */
+function riskChip(j) {
+  if (j.risk == null) return "";
+  if (j.riskP != null && j.riskP < 0.5) return ` <span class="risk unclear">risk unclear</span>`;
+  const label = j.risk === "read_only" ? "read-only" : j.risk === "reversible" ? "reversible" : "irreversible";
+  return ` <span class="risk${j.risk === "irreversible" ? " irr" : ""}">${esc(label)}</span>`;
 }
 // <inbox-keys> Pure: what a triage key means on a decision. No DOM, no globals (test/inbox-keys.test.ts runs this block).
 const YES_RE = /^\W*(yes|y|allow|approve|accept|ok|okay|confirm|proceed|continue|go ahead|trust|sure)\b/i;
@@ -2263,6 +2289,12 @@ function jevBar(j) {
   const label = j.available ? `Jev · ${j.calls ?? 0}/${j.cap ?? "–"} today` : "Jev is off on this machine";
   return `<div class="jevbar"><button class="jevtog" data-jevtog aria-expanded="${!!S.jevOpen}"><span class="jb">Jev</span>${esc(label.replace(/^Jev · /, ""))}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>${S.jevOpen ? jevPanel(S.jevStats, j) : ""}`;
 }
+// What each Jev feature sends, so you can switch off any of them.
+const JEV_FEATS = [
+  ["risk", "Risk level on permission prompts", "adds one question to the prompt check it already sends"],
+  ["radar", "Stuck radar", "sends the last tool calls of a running session when it looks stuck"],
+  ["route", "Send by description", "sends your message and your sessions' titles and what each is doing when you ask it to route"],
+];
 function jevPanel(st, j) {
   if (!st) return `<section class="jevp"><p class="hint">${S.jevErr ? esc(S.jevErr) : "Reading the receipts…"}</p></section>`;
   const span = (t, x) => `<div class="jst"><span class="jl">${t}</span><b>${x.calls}</b><span>call${x.calls === 1 ? "" : "s"}</span><span class="jm">${ktok(x.inputTokens)} tok · ${money(x.cost)}</span>${x.repeats ? `<span class="jm jwarn" title="Asked again with the exact same state (before the dedupe fix)">${x.repeats} repeat${x.repeats === 1 ? "" : "s"}</span>` : ""}</div>`;
@@ -2276,6 +2308,7 @@ function jevPanel(st, j) {
     return `<li><span class="jt" data-t="${x.at}">${esc(agoText(x.at))}</span><span class="jk">${KS[x.kind]}${rep}</span><span class="jq">${x.label ? esc(x.label) : `<span class="hint">–</span>`}</span><span class="js">Jev <b>${esc(x.suggestion)}</b>${x.pickTitle ? ` <span class="hint">${esc(x.pickTitle)}</span>` : ""}</span><span class="ja">${x.actual ? `You <b>${esc(x.actual)}</b>${x.actualTitle ? ` <span class="hint">${esc(x.actualTitle)}</span>` : ""}` : `<span class="hint">no answer recorded</span>`}</span>${mark}</li>`;
   }).join("") : `<li class="hint">No deck decisions in the receipts yet.</li>`;
   const cap = st.cap;
+  const feats = JEV_FEATS.map(([k, title, sends]) => `<label class="nchk"><input type="checkbox" data-jevfeat="${k}" ${j.features?.[k] !== false ? "checked" : ""}><span><b>${title}</b>${st.features ? ` <span class="hint">${st.features[k] ?? 0} today</span>` : ""}<small>${sends}</small></span></label>`).join("");
   return `<section class="jevp" aria-label="Jev">
     <div class="jgrid">${span("Today", st.today)}${span("7 days", st.week)}${span("All time", st.total)}</div>
     <div class="jcols">
@@ -2285,6 +2318,7 @@ function jevPanel(st, j) {
     <h4>Last ${st.recent.length} decisions</h4>
     <ul class="jrec">${recent}</ul>
     <form class="jcap"><label>Daily cap <input type="number" min="0" max="100000" step="1" value="${cap.cap}" inputmode="numeric" aria-label="Jev calls per day"></label><button class="btn">Save</button><span class="hint">${cap.used} used today · at the cap ≈ ${money(cap.cap * 1200 * st.price.perMillionInput / 1e6)}/day${cap.source === "env" ? " · from DECK_JEV_DAILY until you save" : ""}</span></form>
+    <div class="jfeat">${feats}</div>
     <p class="hint jfoot">${st.asked} decisions asked, ${st.answered} answered in the deck. All Jev use today: ${st.allAgentsToday.calls} calls, ${money(st.allAgentsToday.cost)}. $${st.price.perMillionInput} per million input tokens, output free.</p>
   </section>`;
 }
@@ -2487,6 +2521,12 @@ $("dbody").addEventListener("click", async (e) => {
   }
   const act = e.target.closest("[data-dact2]")?.dataset.dact2;
   if (act) inboxAct(key, act);
+});
+$("dbody").addEventListener("change", async (e) => {
+  const f = e.target.closest?.("[data-jevfeat]");
+  if (!f) return;
+  const on = f.checked;
+  try { const r = await api("/api/jev/feature", { name: f.dataset.jevfeat, on }); S.jev = r.jev; toast(`${JEV_FEATS.find((x) => x[0] === f.dataset.jevfeat)?.[1] ?? "Jev feature"}: ${on ? "on" : "off"}`); } catch (x) { f.checked = !on; toast(x.message, true); }
 });
 $("dbody").addEventListener("submit", async (e) => {
   const cap = e.target.closest(".jcap");
@@ -3161,7 +3201,7 @@ async function suggestProjects() {
 ICON.compass = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="m10.7 5.3-1.6 3.8-3.8 1.6 1.6-3.8z"/></svg>';
 ICON.bulb = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4h4M6.6 14.4h2.8M8 1.7a4.4 4.4 0 0 0-2.6 8c.4.3.6.8.6 1.3v.4h4V11c0-.5.2-1 .6-1.3A4.4 4.4 0 0 0 8 1.7z"/></svg>';
 S.disc = { data: null, loading: false, tab: load("discTab", "you"), filter: null, idea: load("discIdea", ""), ideaRes: null, ideaBusy: false, open: null, plans: new Map(), shuffle: 0, pending: null, more: false };
-const DTABS = [["you", "For you"], ["mix", "Mix"], ["lab", "Idea lab"], ["leads", "Leads"], ["ideas", "Ideas"], ["saved", "Saved"]];
+const DTABS = [["you", "For you"], ["mix", "Studio"], ["lab", "Idea lab"], ["leads", "Leads"], ["ideas", "Ideas"], ["saved", "Saved"]];
 const kfmt = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
 function dHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
@@ -3175,7 +3215,7 @@ async function loadDiscover(opts = {}) {
   S.disc.loading = false;
   if (S.mode !== "discover") return;
   // The mixer keeps its own regions up to date; a background refresh doesn't rebuild it (and the phone keyboard) mid-typing.
-  if (S.disc.tab !== "mix" || !$("dbody").querySelector("#mixtray")) renderDiscover();
+  if (S.disc.tab !== "mix" || !$("dbody").querySelector("#studio")) renderDiscover();
   // While GitHub is being searched, or today's mixes are being made, check back every few seconds.
   const fy = S.disc.data?.mixes?.forYou;
   if (S.disc.data?.refreshing || fy?.running || fy?.waiting) loadDiscover.t = setTimeout(() => { if (S.mode === "discover") loadDiscover(); }, 3000);
@@ -3215,8 +3255,8 @@ function renderDiscover() {
   const tab = S.disc.tab;
   const nIdeas = d?.ideas?.length ?? 0, nSaved = (d?.saved?.length ?? 0) + (d?.mixes?.saved?.length ?? 0);
   const tabs = DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("");
-  // The mixer, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
-  if (tab === "mix" && d && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #mixtray")) {
+  // The Studio, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
+  if (tab === "mix" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #studio")) {
     const nav = $("dbody").querySelector(".dtabs");
     if (nav) setHTML(nav, tabs);
     return mixPatch();
@@ -3227,14 +3267,14 @@ function renderDiscover() {
     <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
   if (tab === "leads") body = discLeads();
+  else if (tab === "mix") body = discMix(); // the Studio paints at once from its own cache; it doesn't wait for Discover's data
   else if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
-  else if (tab === "mix") body = discMix();
   else if (tab === "ideas") body = discIdeas(d);
   else if (tab === "saved") body = discSaved(d, nSaved);
   else body = discForYou(d);
-  const ta = document.activeElement?.matches?.("[data-didea], [data-mixdir], [data-mixq]") ? document.activeElement : null;
-  const taSel = ta ? [...["didea", "mixdir", "mixq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
+  const ta = document.activeElement?.matches?.("[data-didea], [data-stq], [data-stdq]") ? document.activeElement : null;
+  const taSel = ta ? [...["didea", "stq", "stdq"].filter((k) => k in ta.dataset).map((k) => `[data-${k}]`), ta.selectionStart, ta.selectionEnd] : null;
   // Cards animate in when a tab (or a new idea result) first appears, not on every background update.
   const animKey = `${tab}|${S.disc.ideaRes?.text ?? ""}|${!!d}`;
   const calm = S.disc.animKey === animKey && $("dbody")._mode === "discover";
@@ -3247,7 +3287,7 @@ function renderDiscover() {
   $("dbody").querySelectorAll(".dstrip").forEach((x, i) => { if (strips[i]) x.scrollLeft = strips[i]; });
   $("dbody").querySelector(":scope > .view")?.classList.toggle("calm", calm);
   if (taSel) { const t = $("dbody").querySelector(taSel[0]); t?.focus(); try { t?.setSelectionRange(taSel[1], taSel[2]); } catch {} }
-  if (tab === "mix" && d && !S.disc.mix.ings && !S.disc.mix.loading) mixEnter();
+  if (tab === "mix") { mixPatch("log", "drawer"); if (!S.disc.mix.ings && !S.disc.mix.loading) mixEnter(); }
 }
 function discForYou(d) {
   const p = d.profile;
@@ -3410,7 +3450,7 @@ $("dbody").addEventListener("click", async (e) => {
   const g = gemBy(card.dataset.gfull);
   if (!g) return;
   if (t.closest("[data-gfork]")) return discStart("fork", { repo: g }, `Fork & explore ${g.full}`);
-  if (t.closest("[data-gmix]")) return mixOpenWith([{ id: `r:${g.full}`, kind: "repo", name: g.full, desc: g.desc ?? "" }], { add: true, toastText: `Added ${g.full} to the mixer` });
+  if (t.closest("[data-gmix]")) return mixOpenWith([{ id: `r:${g.full}`, kind: "repo", name: g.full, desc: g.desc ?? "" }], { add: true, toastText: `Added ${g.full} to your Studio picks` });
   if (t.closest("[data-gsave]")) { await discRepo(isSaved(g.full) ? "unsave" : "save", g); toast(isSaved(g.full) ? `Saved ${g.full}` : `Removed ${g.full} from Saved`); return renderDiscover(); }
   if (t.closest("[data-gdis]")) {
     card.classList.add("gone");
@@ -3430,41 +3470,72 @@ $("dbody").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ideaResearch(e.target.value); }
   else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ideaSearch(e.target.value); }
 });
-// ── Mixer: pick projects, repos, connections, tools and interests; get ideas only that mix makes possible ──
-// Server side: src/mix.ts. The model sees only the names and one-line descriptions you pick, plus your direction.
-S.disc.mix = { sel: load("mixSel", []), dir: load("mixDir", ""), engine: load("mixEngine", "claude"), q: "", all: false, ings: null, engines: null, connLoading: false, loading: false, job: null, res: null, open: new Set(), seen: new Set(), more: new Set(), peeked: "" };
+// ── Studio: a chat that assembles builds out of everything you have ──────────────────────────
+// Server side: src/studio.ts (conversations, jobs, block parsing) and src/studio-prompts.ts (the assembler prompt,
+// the starter deck, Dice). The tray of picked ingredients is the Mixer's selection (S.disc.mix.sel), so "Mix this" on
+// a gem, "Mix these" in Connections and "Open in Studio" on a mix all land here. The model sees names and one-liners.
+S.disc.mix = { sel: load("mixSel", []), q: "", all: false, ings: null, engines: null, connLoading: false, loading: false, open: new Set(), seen: new Set(), more: new Set() };
 const MIX_KINDS = [["project", "Your projects"], ["repo", "Gems & trending"], ["conn", "Connections & services"], ["tool", "Tools & skills"], ["interest", "Interests"]];
 const MIX_PREFIX = { p: "project", r: "repo", c: "conn", t: "tool", i: "interest" };
 const mixKindOf = (id) => MIX_PREFIX[String(id)[0]] ?? "conn";
-const MIX_DIRS = ["make money", "for my HD audience", "weekend hack", "privacy-first", "wow on a phone", "runs itself"];
 const MIX_DIFF = { weekend: "Weekend", week: "A week", month: "A month" };
 const MIX_TOOL_CATS = new Set(["ai", "mcp", "skills"]);
 const ingLite = (x) => ({ id: String(x.id), kind: x.kind, name: String(x.name), desc: String(x.desc ?? "").slice(0, 140) });
 const mixIsSel = (id) => S.disc.mix.sel.some((x) => x.id === id);
 function mixSetSel(sel) { S.disc.mix.sel = sel.slice(0, 16); store("mixSel", S.disc.mix.sel); }
-function mixEngineParts() { const e = S.disc.mix.engine; return e.startsWith("ollama:") ? ["ollama", e.slice(7)] : [e, undefined]; }
 function mixEngineLabel(engine, model) { return engine === "ollama" ? `Ollama · ${model ?? "local"}` : engine === "template" ? "templates" : `Claude${model ? ` ${model[0].toUpperCase()}${model.slice(1)}` : ""}`; }
-/** The mixer regions update in place, so typing in the direction or search box never loses the keyboard. */
+
+Object.assign(ICON, {
+  dice: TI2('<rect x="2.5" y="2.5" width="11" height="11" rx="2.6"/><circle cx="5.6" cy="5.6" r=".55" fill="currentColor"/><circle cx="8" cy="8" r=".55" fill="currentColor"/><circle cx="10.4" cy="10.4" r=".55" fill="currentColor"/>'),
+  wild: TI2('<path d="M8 1.8 9.3 6.7 14.2 8 9.3 9.3 8 14.2 6.7 9.3 1.8 8 6.7 6.7z"/><path d="M13 1.8v2.4M11.8 3h2.4"/>'),
+  send: TI2('<path d="M8 13.2V3M3.6 7.4 8 3l4.4 4.4"/>'),
+  stop: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.6"/></svg>',
+  shuffle: TI2('<path d="M2 4.6h2.3c3.6 0 3.8 6.8 7.4 6.8H14M2 11.4h2.3c1.3 0 2.1-.9 2.8-2.1M9 6.7c.7-1.2 1.5-2.1 2.8-2.1H14M12.2 2.8 14 4.6l-1.8 1.8M12.2 9.6l1.8 1.8-1.8 1.8"/>'),
+  chat: TI2('<path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 13.5 4v5.5A1.5 1.5 0 0 1 12 11H7l-3 2.5V11a1.5 1.5 0 0 1-1.5-1.5z"/>'),
+  pencil: TI2('<path d="m10.2 2.8 3 3-7.7 7.7H2.5v-3z"/>'),
+  trash: TI2('<path d="M2.8 4.3h10.4M6.3 4.3V2.8h3.4v1.5M4.2 4.3l.6 9h6.4l.6-9"/>'),
+  copy: TI2('<rect x="5.5" y="5.5" width="8" height="8" rx="1.5"/><path d="M10.5 5.5V3.9a1.4 1.4 0 0 0-1.4-1.4H3.9a1.4 1.4 0 0 0-1.4 1.4v5.2a1.4 1.4 0 0 0 1.4 1.4h1.6"/>'),
+  coin: TI2('<circle cx="8" cy="8" r="5.8"/><path d="M9.9 6.1c-.3-.7-1-1.1-1.9-1.1-1.1 0-1.9.6-1.9 1.5 0 2.1 3.9 1.1 3.9 3.1 0 .9-.9 1.5-2 1.5-.9 0-1.7-.4-2-1.2M8 4v1M8 11v1"/>'),
+});
+S.studio = {
+  home: load("studioHome", null), cur: load("studioConvo", null), job: null, engine: load("studioEngine", "claude:haiku"),
+  intent: load("studioIntent", "all"), seed: load("studioSeed", 0), dk: load("studioKind", "project"),
+  drawer: false, menu: false, more: false, wide: false, savedIds: new Map(), t: {}, homeLoading: false,
+};
+const ST_SHORT = { project: "Projects", repo: "Gems", conn: "Services", tool: "Tools", interest: "Interests" };
+const stEngineParts = () => { const e = S.studio.engine; const i = e.indexOf(":"); return i < 0 ? [e, undefined] : [e.slice(0, i), e.slice(i + 1)]; };
+const stView = () => $("dbody").querySelector(":scope > .view");
+const stReduce = () => reduceMotion.matches;
+const stSaved = (id) => (S.studio.savedIds.has(id) ? S.studio.savedIds.get(id) : mixSaved(id));
+
+/** Studio is patched region by region once on screen, so the message box and the drawer's search are never rebuilt under your fingers. */
 function mixPatch(...ids) {
   if (S.mode !== "discover" || S.disc.tab !== "mix") return;
-  const view = $("dbody").querySelector(":scope > .view");
-  const f = { mixtray: mixTrayHTML, mixopts: mixOptsHTML, mixres: mixResHTML, mixlist: mixListHTML };
-  let n = 0;
-  for (const id of ids.length ? ids : Object.keys(f)) {
-    const el = view?.querySelector(`#${id}`);
-    if (!el) continue;
-    n++;
-    const prog = id === "mixres" && S.disc.mix.job && el.querySelector(".mixprog");
-    if (prog) { const st = prog.querySelector(".mstage"); if (st.textContent !== (S.disc.mix.job.stage ?? "")) st.textContent = S.disc.mix.job.stage ?? ""; setHTML(el.querySelector("#mixgrid"), mixGridHTML(S.disc.mix.job.mixes ?? [])); }
-    else setHTML(el, f[id]());
-  }
-  if (!n) return renderDiscover();
-  if (view) view._h = null; // the whole-view cache no longer matches what's on screen
+  const view = stView();
+  const root = view?.querySelector("#studio");
+  if (!root) return renderDiscover();
+  stSizes(root);
+  const all = !ids.length, has = (k) => all || ids.includes(k);
+  if (has("bar")) setHTML(root.querySelector("#stbar"), stBarHTML());
+  if (has("log")) stRenderLog(root.querySelector("#stlog"));
+  if (has("tray")) setHTML(root.querySelector("#sttray"), stTrayHTML());
+  if (has("act")) setHTML(root.querySelector("#stact"), stActHTML());
+  if (has("drawer")) stRenderDrawer(root);
+  view._h = null; // the whole-view cache no longer matches what's on screen
 }
-async function mixEnter() {
+/** The chat fills the visible height (the composer sits at the bottom even when the log is short); the rail is as tall as the view. */
+function stSizes(root) {
+  const box = $("dbody");
+  const top = root.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
+  root.style.setProperty("--stmin", `${Math.max(320, Math.round(box.clientHeight - top))}px`);
+  root.style.setProperty("--dbh", `${box.clientHeight}px`);
+}
+function mixEnter() {
   const m = S.disc.mix;
   if (!m.ings && !m.loading) loadMixIngs();
-  mixPeek();
+  loadStudioHome();
+  const cur = S.studio.cur;
+  if (cur?.id && !S.studio.job) stOpen(cur.id, { quiet: true });
 }
 async function loadMixIngs(wait) {
   const m = S.disc.mix;
@@ -3476,132 +3547,75 @@ async function loadMixIngs(wait) {
     // Fresher descriptions for what's already picked.
     const by = new Map(m.ings.map((x) => [x.id, x]));
     mixSetSel(m.sel.map((x) => (by.has(x.id) ? ingLite(by.get(x.id)) : x)));
-    if (m.engine === "claude" && !m.engines.claude) m.engine = m.engines.ollama[0] ? `ollama:${m.engines.ollama[0]}` : "template";
   } catch (e) { toast(e.message, true); }
   m.loading = false;
-  mixPatch();
+  mixPatch("drawer", "bar");
   // The connections scan wasn't done yet: ask once more, waiting longer.
   if (m.connLoading && !wait) setTimeout(() => { if (S.mode === "discover") { m.ings && (m.connLoading = false); loadMixIngs(9000); } }, 800);
 }
-/** Show the cached result for this exact selection, direction and engine, if there is one. */
-async function mixPeek() {
-  const m = S.disc.mix;
-  if (m.sel.length < 2 || m.job) return;
-  const [engine, model] = mixEngineParts();
-  const sig = JSON.stringify([m.sel.map((x) => x.id).sort(), m.dir.trim().toLowerCase(), m.engine]);
-  if (m.peeked === sig) return;
-  m.peeked = sig;
-  try { const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, peek: true }, 8000); if (r.cached && !m.job) { m.res = { ...r.result, cached: true }; mixPatch("mixres"); } } catch {}
-}
-async function mixStart(force = false) {
-  const m = S.disc.mix;
-  if (m.sel.length < 2) { toast("Pick at least two ingredients", true); return; }
-  if (m.job) return;
-  const [engine, model] = mixEngineParts();
-  m.job = { status: "running", stage: "Starting…", mixes: [], engine, model, t0: Date.now() };
-  mixPatch("mixres", "mixtray");
-  const res = $("dbody").querySelector("#mixres");
-  if (res && res.getBoundingClientRect().top > innerHeight * 0.6) res.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+async function loadStudioHome(wait) {
+  const st = S.studio;
+  if (st.homeLoading) return;
+  st.homeLoading = true;
+  let again = false;
   try {
-    const r = await api("/api/discover/mix", { ingredients: m.sel, direction: m.dir, engine, model, force }, 15_000);
-    if (r.cached) { m.job = null; m.res = { ...r.result, cached: true }; }
-    else { m.job = { ...r.job, t0: m.job.t0 }; m.peeked = ""; mixPoll(); }
-  } catch (e) { m.job = null; toast(e.message, true); }
-  mixPatch("mixres", "mixtray");
+    const r = await api("/api/discover/studio", { seed: st.seed || undefined, wait }, 25_000);
+    // The connections scan wasn't done: keep the cached deck on screen and ask once more, waiting longer.
+    if (!r.partial || !st.home || st.home.partial) { st.home = r; store("studioHome", r); } else if (st.home) st.home.convos = r.convos;
+    again = r.partial && !wait;
+  } catch (e) { if (!st.home) toast(e.message, true); }
+  st.homeLoading = false;
+  stView()?.querySelector(".stdeck.shuf")?.classList.remove("shuf");
+  mixPatch("bar", "log");
+  if (again) loadStudioHome(12_000);
 }
-async function mixPoll() {
-  const m = S.disc.mix;
-  clearTimeout(mixPoll.t);
-  if (!m.job?.id) return;
-  const id = m.job.id;
-  try {
-    const j = await api("/api/discover/mix-status", { id }, 8000);
-    if (m.job?.id !== id) return;
-    if (j.status === "running") m.job = { ...j, t0: m.job.t0 };
-    else {
-      if (j.mixes.length) m.res = { mixes: j.mixes, note: j.status === "cancelled" ? "Stopped: these arrived before you cancelled." : j.note, engine: j.engine, model: j.model, ms: j.elapsed };
-      else if (j.status === "cancelled") toast("Mix cancelled");
-      m.job = null;
-    }
-  } catch (e) { if (m.job?.id === id) { toast(e.message, true); m.job = null; } }
-  mixPatch("mixres", "mixtray");
-  if (m.job) mixPoll.t = setTimeout(mixPoll, 650);
-}
-async function mixCancel() {
-  const m = S.disc.mix;
-  const id = m.job?.id;
-  if (!id) { m.job = null; return mixPatch("mixres", "mixtray"); }
-  try { await api("/api/discover/mix-cancel", { id }, 5000); } catch {}
-  mixPoll();
-}
-function mixSurprise() {
-  const m = S.disc.mix;
-  if (!m.ings) return;
-  const pick = (xs) => xs[Math.floor(Math.random() * xs.length)];
-  const of = (k, n) => m.ings.filter((x) => x.kind === k && x.ready).slice(0, n);
-  const pools = [of("project", 12), of("repo", 16), of("conn", 60), Math.random() < 0.5 ? of("tool", 60) : of("interest", 14)];
-  if (Math.random() < 0.4) pools.push(of("interest", 14));
-  const out = [];
-  for (const p of pools) { const x = p.length && pick(p); if (x && !out.some((y) => y.id === x.id)) out.push(ingLite(x)); }
-  mixSetSel(out);
-  m.res = null; m.peeked = "";
-  mixPatch("mixtray", "mixopts", "mixlist", "mixres");
-  mixPeek();
-}
-/** Put ingredients in the mixer (added to, or instead of, what's there) and open it. */
-function mixOpenWith(xs, { add = false, toastText } = {}) {
+/** Put ingredients in the Studio's tray (added to, or instead of, what's there) and open it; optionally with a message ready to send. */
+function mixOpenWith(xs, { add = false, toastText, text } = {}) {
   const m = S.disc.mix;
   const cur = add ? [...m.sel] : [];
   for (const x of xs) if (!cur.some((y) => y.id === x.id)) cur.push(ingLite(x));
   mixSetSel(cur);
-  m.peeked = "";
-  if (!add) m.res = null;
+  if (!add && S.studio.cur?.messages?.length) { S.studio.cur = null; S.studio.job = null; store("studioConvo", null); }
+  if (text != null) stSetDraft(text);
   S.disc.tab = "mix"; store("discTab", "mix");
   if (S.mode !== "discover") setMode("discover"); else { renderDiscover(); $("dbody").scrollTop = 0; }
-  mixSyncDir();
   mixEnter();
   if (toastText) toast(toastText);
 }
 const mixFromCard = (x) => x.ids.map((id, i) => { const k = S.disc.mix.ings?.find((y) => y.id === id); return k ? ingLite(k) : { id, kind: mixKindOf(id), name: x.ingredients[i] ?? id, desc: "" }; });
 function mixText(x) {
-  return [`${x.title}: ${x.pitch}`, "", `Ingredients: ${x.ingredients.join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`), x.why_novel ? `Why it’s new: ${x.why_novel}` : "", x.first_steps?.length ? `First steps:\n${x.first_steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", `Size: ${MIX_DIFF[x.difficulty] ?? x.difficulty} · wow ${x.wow}/5`].filter(Boolean).join("\n");
+  const plan = [x.customer ? `Customer: ${x.customer}` : "", x.problem ? `Problem: ${x.problem}` : "", x.offer ? `Offer: ${x.offer}` : "", x.price ? `Pricing: ${[x.price, x.model].filter(Boolean).join(" · ")}` : "", x.cost ? `Cost to run: ${x.cost}` : "", x.first_dollar ? `First dollar: ${x.first_dollar}` : "",
+    x.mvp?.length ? `MVP:\n${x.mvp.map((s) => `- ${s}`).join("\n")}` : "", x.launch?.length ? `First 10 customers:\n${x.launch.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", x.week?.length ? `First week:\n${x.week.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", x.risks?.length ? `Risks:\n${x.risks.map((s) => `- ${s}`).join("\n")}` : ""].filter(Boolean);
+  if (plan.length) return [`${x.title}: ${x.pitch}`, "", ...plan, "", `Stack: ${[...x.ingredients, ...(x.extra ?? []).map((e) => `${e} (new)`)].join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`)].join("\n");
+  return [`${x.title}: ${x.pitch}`, "", `Ingredients: ${[...x.ingredients, ...(x.extra ?? []).map((e) => `${e} (new)`)].join(" + ")}`, ...(x.how ?? []).map((h) => `- ${h.name}: ${h.role}`), x.why_novel ? `Why it’s worth it: ${x.why_novel}` : "", x.money ? `How it earns: ${x.money}` : "", x.first_steps?.length ? `First steps:\n${x.first_steps.map((s, i) => `${i + 1}. ${s}`).join("\n")}` : "", `Size: ${MIX_DIFF[x.difficulty] ?? x.difficulty} · wow ${x.wow}/5`].filter(Boolean).join("\n");
 }
-/** "Research & plan it": the same research flow as the Idea lab, with the mix as the idea (the dialog opens prefilled; nothing starts before you confirm). */
+/** "Research & plan it": the same research flow as the Idea lab, with the build as the idea (the dialog opens prefilled; nothing starts before you confirm). */
 function mixResearch(x) {
-  const dir = x.direction ?? S.disc.mix.dir;
-  const text = `${x.title}: ${x.pitch} Combine ${x.how.map((h) => `${h.name} (${h.role})`).join("; ")}.${x.why_novel ? ` Why it’s new: ${x.why_novel}` : ""}${dir?.trim() ? ` Direction: ${dir.trim()}.` : ""} First steps I have in mind: ${x.first_steps.join("; ")}.`;
+  const how = (x.how ?? []).length ? x.how.map((h) => `${h.name} (${h.role})`).join("; ") : x.ingredients.join(", ");
+  const text = `${x.title}: ${x.pitch}${x.customer ? ` For: ${x.customer}.` : ""}${x.price ? ` Pricing: ${x.price}.` : ""}${x.mvp?.length ? ` MVP: ${x.mvp.join("; ")}.` : ""} Combine ${how}.${x.extra?.length ? ` New pieces: ${x.extra.join(", ")}.` : ""}${x.why_novel ? ` Why it’s worth it: ${x.why_novel}` : ""}${x.money ? ` How it earns: ${x.money}.` : ""}${x.direction?.trim() ? ` Direction: ${x.direction.trim()}.` : ""}${x.first_steps?.length ? ` First steps I have in mind: ${x.first_steps.join("; ")}.` : ""}`;
   const repos = x.ids.filter((id) => id.startsWith("r:")).map((id) => gemBy(id.slice(2)) ?? { full: id.slice(2), stars: "?" });
   const projects = x.ids.filter((id) => id.startsWith("p:")).map((id) => id.slice(2));
-  return discStart("research", { text, slug: x.title, repos, projects }, "Research & plan this mix");
+  return discStart("research", { text, slug: x.title, repos, projects }, "Research & plan this");
 }
-const allMixes = () => [...(S.disc.mix.res?.mixes ?? []), ...(S.disc.mix.job?.mixes ?? []), ...(S.disc.data?.mixes?.forYou?.mixes ?? []), ...(S.disc.data?.mixes?.saved ?? [])];
+const allMixes = () => [...(S.disc.data?.mixes?.forYou?.mixes ?? []), ...(S.disc.data?.mixes?.saved ?? [])];
 const mixSaved = (id) => (S.disc.data?.mixes?.saved ?? []).some((x) => x.id === id);
 async function mixSave(x) {
-  const op = mixSaved(x.id) ? "unsave" : "save";
+  const op = stSaved(x.id) ? "unsave" : "save";
   try {
-    const r = await api("/api/discover/mix-save", { op, mix: x, direction: x.direction ?? S.disc.mix.dir });
+    const r = await api("/api/discover/mix-save", { op, mix: x, direction: x.direction });
     if (S.disc.data) S.disc.data.mixes = { ...(S.disc.data.mixes ?? {}), saved: r.mixes };
+    S.studio.savedIds.set(x.id, op === "save");
     toast(op === "save" ? `Saved “${x.title}”` : `Removed “${x.title}” from Saved`);
   } catch (e) { toast(e.message, true); }
-}
-
-/** The direction box lives outside the patched regions: set it (and the suggestion chips) directly. */
-function mixSyncDir() {
-  const m = S.disc.mix;
-  const inp = $("dbody").querySelector("[data-mixdir]");
-  if (inp && inp.value !== m.dir) inp.value = m.dir;
-  for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
-  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
 }
 function mixCard(x, i, ctx) {
   const m = S.disc.mix;
   const seenKey = `${ctx}:${x.id}`;
   const fresh = !m.seen.has(seenKey);
   m.seen.add(seenKey);
-  const saved = mixSaved(x.id);
-  const acts = ctx === "fy" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>`
-    : ctx === "sv" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in mixer</button><button class="btn ghost" data-mcopy>Copy</button><button class="btn ghost" data-msave aria-pressed="true">Remove</button>`
-    : `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mremix title="Keep these ingredients selected and mix again">Remix</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-mcopy>Copy</button>`;
+  const saved = stSaved(x.id);
+  const acts = ctx === "fy" ? `<button class="btn primary" data-mplan>Research &amp; plan it</button><button class="btn ghost" data-mopen>Open in Studio</button><button class="btn ghost" data-msave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button>`
+    : `${x.customer ? '<button class="btn primary" data-mview>Open plan</button><button class="btn ghost" data-mplan>Research &amp; plan it</button>' : '<button class="btn primary" data-mplan>Research &amp; plan it</button>'}<button class="btn ghost" data-mopen>Open in Studio</button><button class="btn ghost" data-mcopy>Copy</button><button class="btn ghost" data-msave aria-pressed="true">Remove</button>`;
   return `<article class="mixcard${fresh ? "" : " still"}" data-mix="${esc(x.id)}" style="--h:${dHue(x.title)};--i:${Math.min(i, 8)}">
     <h4>${esc(x.title)}</h4>
     <div class="mbadges"><span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" role="img" aria-label="Wow ${x.wow} of 5" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span>${x.source === "template" ? '<span class="msrc" title="From the quick template combiner, not a model">template</span>' : ""}</div>
@@ -3615,95 +3629,522 @@ function mixCard(x, i, ctx) {
     <div class="gacts">${acts}</div>
   </article>`;
 }
-function mixesForYou(d) {
-  const fy = d.mixes?.forYou;
-  if (!fy?.mixes?.length) return "";
-  const status = fy.running ? '<span class="spin"></span> mixing today’s set with Claude… these are quick picks meanwhile'
-    : fy.generated ? `from your top interests, projects, gems and connections · ${esc(mixEngineLabel(fy.engine, fy.model))}, ${esc(agoText(fy.at))}`
-    : "quick picks from your top interests, projects, gems and connections";
-  return `<h3 class="dsub">Mixes for you <span class="hint mfyst">${status}</span> <button class="link" data-dtab="mix">Open the mixer</button></h3>
-    <div class="dstrip mstrip">${fy.mixes.map((x, i) => mixCard(x, i, "fy")).join("")}</div>`;
+// ── "Ideas for you": the feed of ready-to-execute ideas on For you (server: src/feed.ts) ──────────────
+S.feed = { data: load("feedCache", null), loading: false, at: 0, auto: 0, t: null };
+const feedIdeas = () => (S.feed.data?.rows ?? []).flatMap((r) => r.ideas);
+async function loadFeed(op, row) {
+  const f = S.feed;
+  clearTimeout(f.t);
+  if (f.loading && !op) return;
+  f.loading = true;
+  try {
+    f.data = await api("/api/discover/feed", op ? { op, row } : {}, 20_000);
+    f.at = Date.now();
+    try { store("feedCache", f.data); } catch {}
+  } catch (e) { if (op) toast(e.message, true); }
+  f.loading = false;
+  feedPatch();
+  if (f.data?.running?.length) f.t = setTimeout(() => { if (S.mode === "discover") loadFeed(); }, 2500);
 }
-function mixChip(x) {
-  return `<button class="mchip k-${x.kind}${x.ready ? "" : " off"}" data-ing="${esc(x.id)}" aria-pressed="${mixIsSel(x.id)}" title="${esc([x.desc, x.ready ? "" : "not ready on this machine"].filter(Boolean).join(" · "))}">${esc(x.name)}</button>`;
+/** Only the feed's own region is redrawn while ideas stream in (the rest of For you, and where you swiped the rows to, stay put). */
+function feedPatch() {
+  if (S.mode !== "discover" || S.disc.tab !== "you") return;
+  const el = $("dbody").querySelector("#feed");
+  if (!el) return;
+  const strips = [...el.querySelectorAll(".fstrip")].map((x) => [x.dataset.row, x.scrollLeft]);
+  setHTML(el, feedInner());
+  for (const [row, left] of strips) { const x = el.querySelector(`.fstrip[data-row="${row}"]`); if (x && left) x.scrollLeft = left; }
+  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+  feedWatchEnd(el);
 }
-function mixTrayHTML() {
-  const m = S.disc.mix;
-  const n = m.sel.length;
-  // Only a chip that was just added animates in; redraws of the tray don't replay the others.
-  const fresh = m.justAdded; m.justAdded = null;
-  return `<div class="mtray" aria-label="Picked">${n ? m.sel.map((x) => `<span class="mpick k-${esc(x.kind)}${x.id === fresh ? " fresh" : ""}"><span>${esc(x.name)}</span><button data-mixrm="${esc(x.id)}" aria-label="Remove ${esc(x.name)}">${ICON.x}</button></span>`).join("") : '<span class="hint">Nothing picked yet: tap things below, or <button class="link" data-mixsurprise>Surprise me</button></span>'}</div>
-    <button class="btn primary mgo" data-mixgo ${n < 2 || m.job ? "disabled" : ""} title="${n < 2 ? "Pick at least two" : "Mix them"}">${m.job ? '<span class="spin"></span>Mixing' : `Mix${n ? ` ${n}` : ""}`}</button>`;
+function mixesForYou() {
+  const f = S.feed;
+  if (!f.loading && (!f.at || Date.now() - f.at > 60_000)) setTimeout(() => loadFeed(), 0);
+  setTimeout(() => feedWatchEnd($("dbody").querySelector("#feed")), 0);
+  return `<section class="feed" id="feed">${feedInner()}</section>`;
 }
-const mixGridHTML = (got) => `${got.map((x, i) => mixCard(x, i, "res")).join("")}${Array.from({ length: Math.max(0, 6 - got.length) }, () => '<div class="mixcard skel"></div>').join("")}`;
-function mixResHTML() {
-  const m = S.disc.mix;
-  const j = m.job;
-  // While mixing, the progress bar is drawn once and then only its words and clock change (mixPatch), so Cancel is always tappable.
-  if (j) return `<div class="mixprog" role="status"><span class="spin"></span><b>Mixing with ${esc(mixEngineLabel(j.engine, j.model))}</b><span class="hint mstage">${esc(j.stage ?? "")}</span><span class="mclock" data-since="${j.t0}">${clock(Date.now() - j.t0)}</span><span class="spacer"></span><button class="btn ghost" data-mixcancel>Cancel</button></div>
-      <div class="mgrid" id="mixgrid">${mixGridHTML(j.mixes ?? [])}</div>`;
-  const r = m.res;
-  if (!r) return `<p class="hint mempty">${m.sel.length < 2 ? "Pick two or more things below, add a direction if you like, then press <b>Mix</b>." : "Ready: press <b>Mix</b>."} Only the names and one-line descriptions of what you pick, and your direction, go to the model.</p>`;
-  const secs = r.ms ? `${(r.ms / 1000).toFixed(r.ms < 10_000 ? 1 : 0)}s` : "";
-  return `<div class="mixhead"><span><b>${r.mixes.length} mixes</b> · ${esc(mixEngineLabel(r.engine, r.model))}${r.cached ? ` · from cache${r.at ? `, ${esc(agoText(r.at))}` : ""}` : secs ? ` · ${secs}` : ""}</span><span class="spacer"></span><button class="btn ghost" data-mixagain ${m.sel.length < 2 ? "disabled" : ""}>Mix again</button></div>
-    ${r.note ? `<p class="mnote">${ICON.warn}${esc(r.note)}</p>` : ""}
-    <div class="mgrid">${r.mixes.map((x, i) => mixCard(x, i, "res")).join("")}</div>`;
+const feedKeys = (x) => `${x.price ? `<span class="fk price">${ICON.coin}${esc(x.price)}</span>` : ""}${x.first_dollar ? `<span class="fk first">First $ in ${esc(x.first_dollar.replace(/^(in|within)\s+/i, ""))}</span>` : ""}`;
+function feedCard(x, i) {
+  const saved = stSaved(x.id);
+  return `<article class="fcard" data-fid="${esc(x.id)}" style="--h:${dHue(x.title)};--i:${Math.min(i, 8)}" tabindex="0">
+    <h4>${esc(x.title)}</h4>
+    <p class="fpitch">${esc(x.pitch)}</p>
+    <div class="fkeys">${feedKeys(x)}${x.source === "template" ? '<span class="msrc">template</span>' : ""}</div>
+    <div class="mings">${x.ids.slice(0, 4).map((id, k) => `<span class="ming k-${mixKindOf(id)}">${esc(x.ingredients[k] ?? id)}</span>`).join("")}${x.ids.length > 4 ? `<span class="ming new">+${x.ids.length - 4}</span>` : ""}</div>
+    <div class="gacts"><button class="btn primary sm" data-fopen>Open plan</button><button class="btn ghost sm" data-fbuild>Build it now</button><button class="btn ghost sm" data-fsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button></div>
+  </article>`;
 }
-function mixListHTML() {
-  const m = S.disc.mix;
-  if (!m.ings) return `<div class="mchips">${Array.from({ length: 14 }, (_, i) => `<span class="mchip skel" style="width:${60 + ((i * 37) % 70)}px"></span>`).join("")}</div>`;
-  const q = m.q.trim().toLowerCase();
-  const match = (x) => !q || `${x.name} ${x.desc} ${x.group ?? ""}`.toLowerCase().includes(q);
-  const limit = (key, xs, n) => (q || m.more.has(key) || xs.length <= n + 2 ? xs : xs.slice(0, n));
-  const more = (key, xs, shown) => (xs.length > shown.length ? `<button class="mchip moremix" data-mixmore="${esc(key)}">+${xs.length - shown.length} more</button>` : "");
-  const out = [];
-  for (const [k, label] of MIX_KINDS) {
-    const all = m.ings.filter((x) => x.kind === k);
-    const xs = all.filter((x) => (m.all || x.ready || !["conn", "tool"].includes(k)) && match(x));
-    if (!xs.length && q) continue;
-    let body;
-    if (k === "conn" || k === "tool") {
-      const groups = new Map();
-      for (const x of xs) groups.set(x.group ?? "Other", [...(groups.get(x.group ?? "Other") ?? []), x]);
-      body = [...groups].map(([g, ys]) => { const shown = limit(`${k}:${g}`, ys, 10); return `<div class="mgrp"><span class="mgl">${esc(g)} <span class="n">${ys.length}</span></span><div class="mchips">${shown.map(mixChip).join("")}${more(`${k}:${g}`, ys, shown)}</div></div>`; }).join("");
-    } else { const shown = limit(k, xs, 18); body = `<div class="mchips">${shown.map(mixChip).join("")}${more(k, xs, shown)}</div>`; }
-    const nsel = m.sel.filter((x) => x.kind === k).length;
-    out.push(`<section class="mkind k-${k}"><h4><span class="kdot"></span>${esc(label)} <span class="n">${xs.length}${xs.length !== all.length && !q ? ` of ${all.length}` : ""}</span>${nsel ? `<span class="msel">${nsel} picked</span>` : ""}</h4>${xs.length ? body : `<p class="hint">${k === "repo" ? "No gems found yet: open For you and let it search GitHub." : (k === "conn" || k === "tool") && (m.connLoading || m.loading) ? '<span class="spin"></span> Scanning your connections…' : "Nothing here yet."}</p>`}</section>`);
-  }
-  return out.join("") || `<p class="hint">Nothing matches “${esc(m.q)}”.</p>`;
+function feedInner() {
+  const d = S.feed.data;
+  const running = d?.running?.length ?? 0;
+  const skel = (n) => Array.from({ length: n }, () => '<div class="fcard skel"></div>').join("");
+  const status = !d ? '<span class="spin"></span> Reading what you have…'
+    : running ? `<span class="spin"></span> Writing ideas from new combinations… ${d.total} so far`
+    : `${d.total} ready-to-build ideas${d.model ? ` · Claude ${esc(d.model[0].toUpperCase() + d.model.slice(1))}` : ""}${d.at ? ` · ${esc(agoText(d.at))}` : ""}${d.dropped ? ` · ${d.dropped} weak ones left out` : ""}`;
+  const rows = (d?.rows ?? []).filter((r) => r.ideas.length || r.pending || running);
+  return `<div class="fdh"><h3>Ideas for you</h3><span class="hint">${status}</span><span class="spacer"></span><button class="btn ghost sm" data-frefresh ${running ? "disabled" : ""} title="A fresh set of ideas from new combinations">${ICON.shuffle}Fresh set</button><button class="btn ghost sm" data-dtab="mix">${ICON.wild}Studio</button></div>
+    ${d?.errors?.length && !d.total ? `<p class="mnote">${ICON.warn}${esc(d.errors[0])}</p>` : ""}
+    ${!d ? Array.from({ length: 3 }, () => `<div class="frow"><div class="frh"><h4><span class="stsk w40"></span></h4></div><div class="dstrip fstrip">${skel(3)}</div></div>`).join("")
+      : rows.map((r) => `<div class="frow" style="--rh:${r.hue}"><div class="frh"><h4><i></i>${esc(r.label)} <span class="n">${r.ideas.length}</span></h4><span class="spacer"></span><button class="btn ghost sm" data-fmore="${esc(r.id)}" ${r.pending || running >= 5 ? "disabled" : ""}>${r.pending ? '<span class="spin"></span>Writing…' : "More like this"}</button></div>
+        <div class="dstrip fstrip" data-row="${esc(r.id)}">${r.ideas.map(feedCard).join("")}${r.pending ? skel(r.ideas.length ? 1 : 3) : ""}</div></div>`).join("")}
+    ${d ? `<div class="fend" id="fend"><button class="btn" data-fmore="" ${running >= 5 ? "disabled" : ""}>${running ? '<span class="spin"></span>Writing more ideas…' : `${ICON.plus}More ideas`}</button><span class="hint">Every batch is about a dozen new ideas from new combinations of what you have.</span></div>` : ""}`;
 }
-function mixOptsHTML() {
-  const m = S.disc.mix;
-  const e = m.engines;
-  const opts = [["claude", "Claude (fast, default)", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} (private, local)`]), ["template", "Templates (instant, offline)"]];
-  if (!opts.some(([v]) => v === m.engine)) opts.push([m.engine, m.engine]);
-  return `<label class="mixeng"><span class="hint">Engine</span><select class="inp" data-mixeng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === m.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select></label>
-    <span class="spacer"></span><button class="btn ghost" data-mixsurprise>Surprise me</button><button class="btn ghost" data-mixclear ${m.sel.length ? "" : "disabled"}>Clear</button>`;
+/** Endless: reaching the end asks for the next batch (a few times per visit at most: each batch is a model call). */
+let feedObs;
+function feedWatchEnd(el) {
+  const end = el?.querySelector("#fend");
+  if (!end || !("IntersectionObserver" in window)) return;
+  feedObs?.disconnect();
+  feedObs = new IntersectionObserver((es) => {
+    const f = S.feed;
+    if (!es.some((e) => e.isIntersecting) || f.loading || f.data?.running?.length || f.auto >= 3 || (f.data?.total ?? 0) >= 250 || $("dbody").scrollTop < 200) return;
+    f.auto++;
+    loadFeed("more");
+  }, { root: $("dbody"), rootMargin: "0px 0px 200px 0px" });
+  feedObs.observe(end);
 }
-function discMix() {
-  const m = S.disc.mix;
-  // The picked tray is a direct child of the view, so it stays stuck to the top the whole way down.
-  return `<p class="hint dlead mixlead">Pick things you have or found: projects, repos, connections, tools, interests. Get ideas only that combination makes possible.</p>
-      <div class="mixbar" id="mixtray">${mixTrayHTML()}</div>
-      <div class="mixctl">
-        <input class="inp mixdir" data-mixdir type="text" enterkeyhint="go" maxlength="200" placeholder="Optional direction, e.g. “make money” or “for my HD audience”" value="${esc(m.dir)}" aria-label="Direction (optional)">
-        <div class="mixsugg">${MIX_DIRS.map((x) => `<button class="dtag" data-mixdirpick="${esc(x)}" aria-pressed="${m.dir.trim().toLowerCase() === x}">${esc(x)}</button>`).join("")}</div>
-        <div class="mixrow" id="mixopts">${mixOptsHTML()}</div>
-      </div>
-    <div id="mixres" class="mixres">${mixResHTML()}</div>
-    <section class="mixpick"><div class="mixsearch"><input class="inp" data-mixq type="search" placeholder="Search ingredients" value="${esc(m.q)}" autocomplete="off" aria-label="Search ingredients">
-      <label class="mixall"><input type="checkbox" data-mixall ${m.all ? "checked" : ""}> Show all connections, not only ready ones</label></div>
-      <div id="mixlist">${mixListHTML()}</div></section>`;
+/** The full plan: who it's for, the offer and price, the MVP, the stack on your things, the first 10 customers, the first week, the risks. */
+function planBodyHTML(x) {
+  const fact = (k, v) => (v ? `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>` : "");
+  const list = (h, xs, ol) => (xs?.length ? `<h5>${h}</h5><${ol ? "ol" : "ul"} class="plist">${xs.map((s) => `<li>${esc(s)}</li>`).join("")}</${ol ? "ol" : "ul"}>` : "");
+  const facts = [fact("Customer", x.customer), fact("Problem", x.problem), fact("Offer", x.offer), fact("Pricing", [x.price, x.model].filter(Boolean).join(" · ")), fact("Cost to run", x.cost), fact("First dollar", x.first_dollar), fact("How it earns", !x.price ? x.money : "")].join("");
+  const stack = x.how?.length || x.extra?.length ? `<h5>Stack: what you already have</h5><ul class="mhow">${(x.how ?? []).map((h) => `<li><span class="ming k-${mixKindOf(x.ids[x.ingredients.indexOf(h.name)] ?? "")}">${esc(h.name)}</span> ${esc(h.role)}</li>`).join("")}${(x.extra ?? []).map((e) => `<li><span class="ming new">+ new</span> ${esc(e)}</li>`).join("")}</ul>` : "";
+  return `<div class="plan">${facts ? `<dl class="pfacts">${facts}</dl>` : ""}
+    ${list("MVP scope", x.mvp)}${stack}${list("First 10 customers", x.launch, true)}${list("First week", x.week?.length ? x.week : x.first_steps, true)}${list("Risks", x.risks)}
+    ${x.why_novel ? `<p class="mwhy"><b>Why now</b> ${esc(x.why_novel)}</p>` : ""}</div>`;
+}
+function openPlan(x, from = "feed") {
+  const saved = stSaved(x.id);
+  const d = document.createElement("dialog");
+  d.className = "plandlg";
+  d.innerHTML = `<div class="pdh" style="--h:${dHue(x.title)}"><div class="pdt"><h3>${esc(x.title)}</h3><p>${esc(x.pitch)}</p><div class="fkeys">${feedKeys(x)}<span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span></div>
+      <div class="mings">${x.ids.map((id, k) => `<span class="ming k-${mixKindOf(id)}">${esc(x.ingredients[k] ?? id)}</span>`).join("")}</div></div><button class="ib" data-plx aria-label="Close">${ICON.x}</button></div>
+    <div class="pdb">${planBodyHTML(x)}</div>
+    <div class="pdf"><button class="btn primary" data-plbuild>${ICON.bolt}Build it now</button><button class="btn" data-plplan>${ICON.bulb}Research &amp; plan it</button><button class="btn ghost" data-plusers>Find users for it</button>${from !== "studio" ? `<button class="btn ghost" data-plstudio>${ICON.wild}Open in Studio</button>` : ""}<button class="btn ghost" data-plsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-plcopy>${ICON.copy}Copy</button></div>`;
+  document.body.append(d);
+  d.addEventListener("close", () => d.remove());
+  d.addEventListener("click", (e) => {
+    const t = e.target;
+    if (t === d || t.closest("[data-plx]")) return d.close();
+    if (t.closest("[data-plbuild]")) { d.close(); return stBuildNow(x); }
+    if (t.closest("[data-plplan]")) { d.close(); return mixResearch(x); }
+    if (t.closest("[data-plusers]")) { d.close(); return stFindUsers(x); }
+    if (t.closest("[data-plstudio]")) { d.close(); return mixOpenWith(mixFromCard(x), { text: `Take “${x.title}” further: ${x.pitch}`, toastText: "Opened in the Studio" }); }
+    if (t.closest("[data-plcopy]")) return copy(mixText(x), "the plan");
+    const sv = t.closest("[data-plsave]");
+    if (sv) mixSave(x).then(() => { const s = stSaved(x.id); sv.setAttribute("aria-pressed", String(s)); sv.textContent = s ? "Saved" : "Save"; feedPatch(); });
+  });
+  d.showModal();
+  d.querySelector(".pdb").scrollTop = 0;
 }
 function discSaved(d, n) {
-  if (!n) return `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem or a mix to keep it here.</div>`;
+  if (!n) return `<div class="empty-state">Nothing saved yet. <b>Save</b> a gem, a mix or a Studio build to keep it here.</div>`;
   const mixes = d.mixes?.saved ?? [];
-  return `${mixes.length ? `<h3 class="dsub">Mixes <span class="hint">ideas you kept from the mixer</span></h3><div class="mgrid">${mixes.map((x, i) => mixCard(x, i, "sv")).join("")}</div>` : ""}
+  return `${mixes.length ? `<h3 class="dsub">Builds &amp; mixes <span class="hint">ideas you kept from the Studio</span></h3><div class="mgrid">${mixes.map((x, i) => mixCard(x, i, "sv")).join("")}</div>` : ""}
     ${d.saved.length ? `<h3 class="dsub">Repos <span class="hint">they stay here until you remove them</span></h3><div class="dgrid">${d.saved.map((g, i) => gemCard(g, i, { saved: true })).join("")}</div>` : ""}`;
 }
-/** Clicks inside the mixer and on mix cards. Returns true when it handled the click. */
-function mixClick(t) {
+
+// ── Studio: the page ────────────────────────────────────────────────────────────
+function discMix() {
+  return `<div class="studio" id="studio">
+    <div class="stmain">
+      <div class="stbar" id="stbar">${stBarHTML()}</div>
+      <div class="stlog" id="stlog" aria-live="polite"></div>
+      <div class="stcomp" id="stcomp"><div class="stbox">
+        <div class="sttray" id="sttray">${stTrayHTML()}</div>
+        <textarea class="stq" data-stq rows="1" enterkeyhint="send" maxlength="4000" placeholder="Ask for anything, or roll the dice…" aria-label="Message the Studio">${esc(load("studioDraft", ""))}</textarea>
+        <div class="strow">
+          <button type="button" class="stpill" data-stadd title="Pick from everything you have">${ICON.plus}<span>Ingredients</span></button>
+          <button type="button" class="stic" data-stdice title="Dice: a sensible random combo" aria-label="Dice">${ICON.dice}</button>
+          <button type="button" class="stic" data-stwild title="Wildcard: somewhere unexpected" aria-label="Wildcard">${ICON.wild}</button>
+          <span class="spacer"></span><span class="hint stkeys">Enter to send · Shift+Enter for a new line</span>
+          <span id="stact">${stActHTML()}</span>
+        </div>
+      </div></div>
+    </div>
+    <aside class="strail" id="strail" aria-label="Ingredients"></aside>
+    <div class="stsheet" id="stsheet" hidden><div class="stscrim" data-stdone></div><div class="stsp" role="dialog" aria-label="Ingredients"></div></div>
+  </div>`;
+}
+function stBarHTML() {
+  const st = S.studio, cur = st.cur;
+  const convos = st.home?.convos ?? [];
+  const title = cur?.messages?.length ? cur.title || "Untitled" : "New conversation";
+  const e = S.disc.mix.engines ?? st.home?.engines;
+  const opts = [["claude:haiku", "Claude Haiku · fast", e && !e.claude], ["claude:sonnet", "Claude Sonnet · deeper", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} · private`]), ["template", "Templates · instant, offline"]];
+  if (!opts.some(([v]) => v === st.engine)) opts.push([st.engine, st.engine]);
+  return `<div class="stconv"><button class="stconvb" data-stmenu aria-expanded="${st.menu}" aria-haspopup="menu" title="Your conversations">${ICON.chat}<span class="stct">${esc(title)}</span>${convos.length ? `<span class="n">${convos.length}</span>` : ""}${ICON.chev}</button>${st.menu ? stMenuHTML(convos) : ""}</div>
+    <span class="spacer"></span>
+    <label class="steng"><span class="sr">Engine</span><select data-steng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === st.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select>${ICON.chev}</label>
+    <button class="btn sm stnew" data-stnew ${cur?.messages?.length ? "" : "disabled"} title="Start a new conversation">${ICON.plus}<span>New</span></button>`;
+}
+function stMenuHTML(convos) {
+  const cur = S.studio.cur?.id;
+  return `<div class="stmenu" role="menu"><button class="stmi new" data-stnew role="menuitem">${ICON.plus}New conversation</button>
+    ${convos.length ? convos.slice(0, 40).map((c) => `<div class="stmi${c.id === cur ? " on" : ""}"><button class="stmo" data-stopen="${esc(c.id)}" role="menuitem"><span class="stmt">${esc(c.title || "Untitled")}</span><span class="hint">${c.turns} message${c.turns === 1 ? "" : "s"} · ${esc(agoText(c.updated))}${c.running ? " · answering…" : ""}</span></button><button class="ib" data-stren="${esc(c.id)}" title="Rename" aria-label="Rename ${esc(c.title)}">${ICON.pencil}</button><button class="ib" data-stdel="${esc(c.id)}" title="Delete" aria-label="Delete ${esc(c.title)}">${ICON.trash}</button></div>`).join("")
+      : '<p class="hint stmh">Your conversations are kept here.</p>'}</div>`;
+}
+function stTrayHTML() {
   const m = S.disc.mix;
+  const fresh = m.justAdded; m.justAdded = null;
+  if (!m.sel.length) return "";
+  return `<span class="sttl">Use</span>${m.sel.map((x) => `<span class="mpick k-${esc(x.kind)}${x.id === fresh ? " fresh" : ""}"><span>${esc(x.name)}</span><button type="button" data-mixrm="${esc(x.id)}" aria-label="Remove ${esc(x.name)}">${ICON.x}</button></span>`).join("")}<button type="button" class="link sttclear" data-mixclear>Clear</button>`;
+}
+const stActHTML = () => (S.studio.job ? `<span class="mclock stclock" data-since="${S.studio.job.t0}">${clock(Date.now() - S.studio.job.t0)}</span><button type="button" class="stsend stop" data-ststop title="Stop" aria-label="Stop">${ICON.stop}</button>` : `<button type="button" class="stsend" data-stsend title="Send (Enter)" aria-label="Send">${ICON.send}</button>`);
+
+// ── the conversation log: keyed items, so streaming only touches what changed ─────────────
+function stRenderLog(el) {
+  if (!el) return;
+  const items = stLogItems();
+  const have = new Map([...el.children].map((c) => [c.dataset.k, c]));
+  let prev = null;
+  for (const it of items) {
+    let c = have.get(it.k);
+    if (!c) { c = document.createElement("div"); c.dataset.k = it.k; if (S.studio.calm) c.classList.add("calm"); }
+    have.delete(it.k);
+    const cls = `stitem ${it.cls ?? ""}${c.classList.contains("calm") ? " calm" : ""}`;
+    if (c.className !== cls) c.className = cls;
+    if (c._h !== it.html) { c.innerHTML = it.html; c._h = it.html; }
+    const want = prev ? prev.nextSibling : el.firstChild;
+    if (c !== want) el.insertBefore(c, want);
+    prev = c;
+  }
+  for (const c of have.values()) c.remove();
+  S.studio.calm = false;
+}
+function stLogItems() {
+  const st = S.studio, msgs = st.cur?.messages ?? [];
+  if (!msgs.length && !st.job) return [{ k: "home", cls: "sthomei", html: stHomeHTML() }];
+  const items = [];
+  let lastA = -1;
+  msgs.forEach((m, i) => { if (m.role === "assistant") lastA = i; });
+  msgs.forEach((m, i) => { if (m.role === "user") items.push({ k: `u${i}`, cls: "stu", html: stUserHTML(m) }); else stBotItems(m, i, i === lastA && !st.job, items); });
+  if (st.job) stBotItems({ blocks: st.job.blocks ?? [], refs: st.job.refs ?? {}, live: true }, msgs.length, true, items);
+  return items;
+}
+function stUserHTML(m) {
+  return `<div class="stbubble">${esc(m.text || "Assemble something out of these.")}</div>${m.use?.length ? `<div class="stuse">${m.use.map((x) => `<button class="ming k-${esc(x.kind)}" data-sting="${esc(x.id)}" title="Add to your picks">${esc(x.name)}</button>`).join("")}</div>` : ""}`;
+}
+function stBotItems(m, i, last, items) {
+  let nb = 0;
+  (m.blocks ?? []).forEach((b, j) => {
+    if (b.t === "next" && !last) return;
+    items.push({ k: `a${i}b${j}`, cls: `sta t-${b.t}${j === 0 ? " first" : ""}`, html: stBlockHTML(b, m, i, j, b.t === "build" ? nb++ : 0, last) });
+  });
+  items.push({ k: `a${i}m`, cls: "sta t-meta", html: m.live ? stLiveHTML(!(m.blocks ?? []).length) : stMetaHTML(m, last) });
+}
+/** Markdown, with [[inventory names]] as chips you can tap to add (swapped out before md(), which reads [[x]] as a wiki link). */
+function stMd(text, refs = {}) {
+  const names = [];
+  const src = String(text ?? "").replace(/\[\[([^\]\n]{1,80})\]\]/g, (_, n) => `STREF${names.push(n) - 1}Z`);
+  return md(src).replace(/STREF(\d+)Z/g, (_, i) => { const n = names[+i], r = refs[n]; return r ? `<button class="ming k-${esc(r.kind)} stref" data-sting="${esc(r.id)}" title="Add to your picks">${esc(n)}</button>` : `<b>${esc(n)}</b>`; });
+}
+function stBlockHTML(b, m, i, j, nb, last) {
+  const who = j === 0 ? `<div class="stwho">${ICON.wild}<span>Studio</span></div>` : "";
+  if (b.t === "text") return `${who}<div class="sttext md">${stMd(b.md, m.refs)}</div>`;
+  if (b.t === "build") return `${who}${stBuildHTML(b.b, `${i}:${j}`, nb)}`;
+  if (b.t === "ask") return `${who}<div class="stask"><p>${esc(b.q)}</p><div class="stopts">${b.options.map((o) => `<button class="stopt" data-stsay="${esc(o)}"${last ? "" : " disabled"}>${esc(o)}</button>`).join("")}${last ? '<button class="stopt ghost" data-stfocus>Something else…</button>' : ""}</div></div>`;
+  if (b.t === "next") return `<div class="stnext"><span class="stlbl">Keep going</span>${b.items.map((o) => `<button class="stchip" data-stsay="${esc(o)}">${esc(o)}</button>`).join("")}<button class="stchip dice" data-stdice>${ICON.dice}Roll the dice</button></div>`;
+  if (b.t === "pending") return `${who}${b.kind === "build" ? `<div class="stbuild skel"><span class="stsk w60"></span><span class="stsk w90"></span><span class="stsk w40"></span><span class="hint stsk-l"><span class="spin"></span>Assembling a build…</span></div>` : '<div class="stsk w50"></div>'}`;
+  return "";
+}
+function stBuildHTML(x, key, nb) {
+  const saved = stSaved(x.id);
+  const dkey = `st:${key}:${x.id}`;
+  const open = S.disc.mix.open.has(dkey);
+  return `<article class="stbuild" data-sb="${esc(key)}" style="--h:${dHue(x.title)};--i:${nb}">
+    <div class="stbh"><h4>${esc(x.title)}</h4><div class="mbadges"><span class="mdiff d-${esc(x.difficulty)}">${esc(MIX_DIFF[x.difficulty] ?? x.difficulty)}</span><span class="mwow" role="img" aria-label="Wow ${x.wow} of 5" title="Wow ${x.wow} of 5">${"★".repeat(x.wow)}<i>${"★".repeat(5 - x.wow)}</i></span>${x.source === "template" ? '<span class="msrc" title="From the instant template combiner, not a model">template</span>' : ""}</div></div>
+    ${x.pitch ? `<p class="mpitch">${esc(x.pitch)}</p>` : ""}
+    <div class="mings">${x.ids.map((id, k) => `<button class="ming k-${mixKindOf(id)}" data-sting="${esc(id)}" title="Add to your picks">${esc(x.ingredients[k] ?? id)}</button>`).join("")}${(x.extra ?? []).map((e) => `<span class="ming new" title="${esc(e)}: not something you have yet">+ ${esc(e.replace(/\s*\(.*$/, ""))}</span>`).join("")}</div>
+    ${x.price || x.first_dollar ? `<div class="fkeys">${feedKeys(x)}</div>` : x.money ? `<p class="stmoney">${ICON.coin}<span>${esc(x.money)}</span></p>` : ""}
+    ${x.customer ? `<p class="stfor"><b>For</b> ${esc(x.customer)}</p>` : ""}
+    <details class="mmore" data-mdet="${esc(dkey)}"${open ? " open" : ""}><summary>${x.customer ? "The full plan" : "How it fits &amp; first steps"}</summary>${planBodyHTML(x)}</details>
+    <div class="stacts"><button class="btn primary" data-sbplan>${ICON.bulb}Research &amp; plan it</button><button class="btn" data-sbbuild>${ICON.bolt}Build it now</button>
+      <span class="stacts2"><button class="btn ghost sm" data-sbusers>Find users</button><button class="btn ghost sm" data-sbriff>Riff on this</button><button class="btn ghost sm" data-sbsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost sm" data-sbcopy title="Copy" aria-label="Copy">${ICON.copy}</button></span></div>
+  </article>`;
+}
+function stLiveHTML(empty) {
+  const j = S.studio.job;
+  return `${empty ? `<div class="stwho">${ICON.wild}<span>Studio</span></div><div class="stthink"><span class="stsk w70"></span><span class="stsk w45"></span></div>` : ""}<div class="stlive" role="status"><span class="stdots" aria-hidden="true"><i></i><i></i><i></i></span><b>${esc(j?.stage && j.stage !== "Writing…" ? j.stage : j?.blocks?.length ? "Assembling" : "Thinking")}</b><span class="hint">${esc(mixEngineLabel(...stEngineParts()))}</span><span class="mclock" data-since="${j?.t0 ?? Date.now()}">${clock(Date.now() - (j?.t0 ?? Date.now()))}</span><span class="spacer"></span><button class="btn ghost sm" data-ststop>Stop</button></div>`;
+}
+function stMetaHTML(m, last) {
+  const secs = (ms) => `${(ms / 1000).toFixed(ms < 10_000 ? 1 : 0)}s`;
+  const bits = [mixEngineLabel(m.engine, m.model), m.ms ? secs(m.ms) : "", m.firstMs && m.engine !== "template" ? `first words in ${secs(m.firstMs)}` : ""].filter(Boolean);
+  return `<div class="stmeta"><span>${esc(bits.join(" · "))}</span>${m.note ? `<span class="stnote">${ICON.warn}${esc(m.note)}</span>` : ""}${last && (m.error || m.note) ? '<button class="link" data-stretry>Try again</button>' : ""}</div>`;
+}
+
+// ── the first screen: what you have, the dice, the deck ───────────────────────────────────
+function stHomeHTML() {
+  const h = S.studio.home;
+  const c = h?.counts;
+  const total = c ? Object.values(c).reduce((a, b) => a + b, 0) : 0;
+  const combos = total >= 3 ? Math.round((total * (total - 1) * (total - 2)) / 6) : 0;
+  const stat = (k, n) => `<button class="ststat k-${k}" data-stdk="${k}" data-stadd><b>${n}</b>${esc(ST_SHORT[k].toLowerCase())}</button>`;
+  const intents = h?.intents ?? [];
+  const pick = S.studio.intent;
+  const deck = stDeck(h?.starters ?? [], intents, pick);
+  const recent = (h?.convos ?? []).slice(0, 3);
+  return `<section class="sthome">
+    <div class="sthero"><div class="sthl"><p class="steye">${ICON.wild}Studio</p><h3>What shall we build?</h3>
+      <p class="stsub">${c ? `Everything you have, in one place.${combos ? ` That’s <b>${combos.toLocaleString()}</b> three-way combinations.` : ""}` : "Reading everything you have…"}</p>
+      <div class="ststats">${c ? ["project", "repo", "conn", "tool", "interest"].map((k) => stat(k, c[k] ?? 0)).join("") : Array.from({ length: 5 }, () => '<span class="ststat skel"></span>').join("")}</div></div>
+      <div class="stdice"><button class="stdie" data-stdice>${ICON.dice}<span><b>Dice</b><small>a sensible combo</small></span></button><button class="stdie wild" data-stwild>${ICON.wild}<span><b>Wildcard</b><small>somewhere nobody’s been</small></span></button></div></div>
+    <div class="stdeckh"><nav class="stints" aria-label="What for">${[["all", "All ideas", 215], ...intents.map((x) => [x.id, x.label, x.hue])].map(([id, label, hue]) => `<button data-stint="${esc(id)}" aria-pressed="${pick === id}" style="--h:${hue}"><i></i>${esc(label)}</button>`).join("")}</nav>
+      <button class="btn ghost sm stshuf" data-stshuffle title="New ideas from the same inventory">${ICON.shuffle}Shuffle</button></div>
+    <div class="stdeck">${h ? deck.cards || '<p class="hint">Nothing to suggest yet: add some interests on For you.</p>' : Array.from({ length: 6 }, () => '<div class="ststart skel"></div>').join("")}</div>
+    ${deck.more ? `<p class="stmore"><button class="btn" data-stmoreideas>Show ${deck.more} more ideas</button></p>` : ""}
+    ${recent.length ? `<h4 class="stsec">Pick up where you left off</h4><div class="strecent">${recent.map((x) => `<button class="strec" data-stopen="${esc(x.id)}">${ICON.chat}<span>${esc(x.title || "Untitled")}</span><span class="hint">${esc(agoText(x.updated))}</span></button>`).join("")}</div>` : ""}
+  </section>`;
+}
+/** The deck for an intent; "All" deals the intents round-robin so the first screen shows the whole range. */
+function stDeck(starters, intents, pick) {
+  const hue = Object.fromEntries(intents.map((x) => [x.id, x]));
+  let list = pick === "all" ? [] : starters.filter((s) => s.intent === pick);
+  if (pick === "all") {
+    const by = intents.map((x) => starters.filter((s) => s.intent === x.id));
+    for (let r = 0; by.some((xs) => xs[r]); r++) for (const xs of by) if (xs[r]) list.push(xs[r]);
+  }
+  const limit = S.studio.more || pick !== "all" ? list.length : isPhone() ? 6 : 9;
+  const cards = list.slice(0, limit).map((s, n) => `<button class="ststart" data-ststart="${esc(s.id)}" style="--h:${hue[s.intent]?.hue ?? 215};--i:${Math.min(n, 12)}"><span class="stint"><i></i>${esc(hue[s.intent]?.label ?? "")}</span><span class="stpt">${s.parts.map((p) => (p.ing ? `<span class="ming k-${esc(p.ing.kind)}">${esc(p.ing.name)}</span>` : esc(p.text))).join("")}</span><span class="stgo" aria-hidden="true">${ICON.send}</span></button>`).join("");
+  return { cards, more: Math.max(0, list.length - limit) };
+}
+
+// ── the ingredient drawer: a side rail when there's room, a bottom sheet when there isn't ─────
+function stRenderDrawer(root) {
+  const st = S.studio;
+  const wide = root.clientWidth >= 940;
+  if (wide !== st.wide) { st.wide = wide; root.classList.toggle("wide", wide); }
+  const rail = root.querySelector("#strail"), sheet = root.querySelector("#stsheet"), sp = sheet.querySelector(".stsp");
+  const open = wide || st.drawer;
+  sheet.hidden = wide || !st.drawer;
+  const host = wide ? rail : sp, other = wide ? sp : rail;
+  if (other.firstChild) other.replaceChildren();
+  if (!open) return;
+  if (!host.querySelector(".stdrawer")) host.innerHTML = `<div class="stdrawer"><div class="stdhd" id="stdh"></div><div class="stdsearch"><input class="inp" type="search" data-stdq placeholder="Search everything you have" value="${esc(S.disc.mix.q)}" autocomplete="off" enterkeyhint="search" aria-label="Search ingredients"></div><nav class="stdtabs" id="stdt" aria-label="Kinds"></nav><div class="stdl" id="stdl"></div></div>`;
+  setHTML(host.querySelector("#stdh"), stDrawerHead(!wide));
+  setHTML(host.querySelector("#stdt"), stDrawerTabs());
+  setHTML(host.querySelector("#stdl"), stDrawerList());
+}
+function stDrawerHead(sheet) {
+  const n = S.disc.mix.sel.length;
+  return `<b>Ingredients</b><span class="hint">${n ? `${n} picked` : "tap to pick"}</span><span class="spacer"></span><button class="link" data-stdall aria-pressed="${S.disc.mix.all}" title="Also list things that aren't set up on this machine">${S.disc.mix.all ? "Only ready ones" : "Show all"}</button>${sheet ? `<button class="btn primary sm" data-stdone>Done</button>` : ""}`;
+}
+const stNoise = (x) => /^(Background|Homebrew) service|SSH host|profile$/i.test(x.desc ?? "");
+function stPool(k) {
+  const m = S.disc.mix, q = m.q.trim().toLowerCase();
+  const xs = (m.ings ?? []).filter((x) => x.kind === k && (m.all || x.ready) && (!q || `${x.name} ${x.desc} ${x.group ?? ""}`.toLowerCase().includes(q)));
+  return [...xs.filter((x) => !stNoise(x)), ...xs.filter(stNoise)];
+}
+function stDrawerTabs() {
+  const m = S.disc.mix, q = m.q.trim();
+  return MIX_KINDS.map(([k]) => { const sel = m.sel.filter((x) => x.kind === k).length; return `<button class="k-${k}" data-stdk="${k}" aria-pressed="${!q && S.studio.dk === k}"><span class="kdot"></span>${ST_SHORT[k]} <span class="n">${m.ings ? stPool(k).length : "…"}</span>${sel ? `<b class="stdsel">${sel}</b>` : ""}</button>`; }).join("");
+}
+const stRow = (x) => `<button class="stdrow k-${esc(x.kind)}${x.ready ? "" : " off"}" data-ing="${esc(x.id)}" aria-pressed="${mixIsSel(x.id)}"><span class="kdot"></span><span class="stdt"><span class="stdn">${esc(x.name)}</span>${x.desc && !/^[>|]-?$/.test(x.desc.trim()) ? `<span class="stdd">${esc(x.desc)}</span>` : ""}</span><span class="stdck" aria-hidden="true">${ICON.check}</span></button>`;
+function stDrawerList() {
+  const m = S.disc.mix;
+  if (!m.ings) return Array.from({ length: 8 }, () => '<div class="stdrow skel"></div>').join("");
+  const q = m.q.trim();
+  const more = (key, xs, n) => (m.more.has(key) || xs.length <= n + 2 ? xs : xs.slice(0, n));
+  const moreBtn = (key, xs, shown) => (xs.length > shown.length ? `<button class="stdmore" data-mixmore="${esc(key)}">Show ${xs.length - shown.length} more</button>` : "");
+  const flat = (key, xs, n) => { const s = more(key, xs, n); return s.map(stRow).join("") + moreBtn(key, xs, s); };
+  const grouped = (k, xs, n) => { const g = new Map(); for (const x of xs) g.set(x.group ?? "Other", [...(g.get(x.group ?? "Other") ?? []), x]); return [...g].map(([name, ys]) => `<h5>${esc(name)} <span class="n">${ys.length}</span></h5>${flat(`${k}:${name}`, ys, n)}`).join(""); };
+  if (q) {
+    const out = MIX_KINDS.map(([k, label]) => { const xs = stPool(k); return xs.length ? `<h5 class="k-${k}"><span class="kdot"></span>${esc(label)} <span class="n">${xs.length}</span></h5>${flat(`q:${k}`, xs, 8)}` : ""; }).join("");
+    return out || `<p class="hint stdempty">Nothing matches “${esc(q)}”.${m.all ? "" : ' <button class="link" data-stdall>Include things not set up</button>'}</p>`;
+  }
+  const k = S.studio.dk;
+  const xs = stPool(k);
+  if (!xs.length) return `<p class="hint stdempty">${k === "repo" ? "No gems found yet: open For you and let it search GitHub." : (k === "conn" || k === "tool") && (m.connLoading || m.loading) ? '<span class="spin"></span> Scanning your connections…' : "Nothing here yet."}</p>`;
+  return k === "conn" || k === "tool" ? grouped(k, xs, 5) : flat(k, xs, 14);
+}
+function stOpenDrawer(kind) {
+  const st = S.studio;
+  if (kind) { st.dk = kind; store("studioKind", kind); S.disc.mix.q = ""; }
+  const root = stView()?.querySelector("#studio");
+  if (root && root.clientWidth >= 940) { mixPatch("drawer"); const s = root.querySelector("[data-stdq]"); if (kind && s) s.value = ""; s?.focus({ preventScroll: true }); return; }
+  st.drawer = true;
+  mixPatch("drawer");
+  const s = root?.querySelector("#stsheet [data-stdq]");
+  if (s && kind) s.value = "";
+  if (s && !isPhone()) s.focus({ preventScroll: true });
+}
+function stCloseDrawer() { S.studio.drawer = false; mixPatch("drawer"); }
+
+// ── actions ────────────────────────────────────────────────────────────────────────
+const stTa = () => stView()?.querySelector("[data-stq]");
+function stSetDraft(text) {
+  store("studioDraft", text);
+  const ta = stTa();
+  if (ta) { ta.value = text; stGrow(ta); }
+}
+function stGrow(ta) { ta.style.height = "auto"; ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`; }
+function stCache() {
+  const c = S.studio.cur;
+  store("studioConvo", c ? { ...c, messages: c.messages.slice(-40) } : null);
+}
+async function stSend(text, use) {
+  const st = S.studio, m = S.disc.mix;
+  if (st.job) { toast("Still answering: Stop it first, or wait a moment"); return; }
+  text = String(text ?? "").trim();
+  const fromTray = use === undefined;
+  use = (use ?? m.sel).map((x) => ({ id: x.id, kind: x.kind, name: x.name }));
+  if (!text && !use.length) { stTa()?.focus(); toast("Say what you want to make, or roll the dice"); return; }
+  const [engine, model] = stEngineParts();
+  const cur = st.cur ?? { id: null, title: "", messages: [] };
+  const draft = stTa()?.value ?? "", tray = [...m.sel];
+  cur.messages.push({ role: "user", text, use, at: Date.now() });
+  st.cur = cur;
+  st.job = { status: "running", stage: "Sending…", blocks: [], refs: {}, t0: Date.now() };
+  if (fromTray || draft.trim() === text) { stSetDraft(""); if (fromTray) mixSetSel([]); }
+  st.menu = false;
+  mixPatch("log", "tray", "act", "bar", "drawer");
+  const ta = stTa();
+  if (isPhone()) ta?.blur();
+  stScrollTo(`u${cur.messages.length - 1}`);
+  try {
+    const r = await api("/api/discover/studio/send", { id: cur.id, text, use, engine, model }, 20_000);
+    cur.id = r.convo.id; cur.title = r.convo.title;
+    st.job = { ...r.job, t0: st.job.t0 };
+    stCache();
+    stPoll();
+  } catch (e) {
+    cur.messages.pop();
+    st.job = null;
+    if (!cur.messages.length) st.cur = cur.id ? cur : null;
+    if (fromTray) mixSetSel(tray);
+    if (!stTa()?.value) stSetDraft(draft || text);
+    toast(e.message, true);
+  }
+  mixPatch("log", "tray", "act", "bar");
+}
+async function stPoll() {
+  const st = S.studio;
+  clearTimeout(st.t.poll);
+  const id = st.job?.id;
+  if (!id) return;
+  try {
+    const j = await api("/api/discover/studio/status", { job: id }, 8000);
+    if (st.job?.id !== id) return;
+    if (j.status === "running") st.job = { ...j, t0: st.job.t0 };
+    else {
+      st.job = null;
+      if (j.message && st.cur?.id === j.convo) st.cur.messages.push(j.message);
+      stCache();
+      loadStudioHome();
+    }
+  } catch (e) { if (st.job?.id === id) { st.job = null; toast(e.message, true); if (st.cur?.id) stOpen(st.cur.id, { quiet: true }); } }
+  mixPatch("log", "act");
+  if (st.job) st.t.poll = setTimeout(stPoll, 250);
+}
+async function stStop() {
+  const id = S.studio.job?.id;
+  if (!id) return;
+  try { await api("/api/discover/studio/stop", { job: id }, 5000); } catch {}
+  stPoll();
+}
+async function stOpen(id, { quiet = false } = {}) {
+  const st = S.studio;
+  try {
+    const r = await api("/api/discover/studio/convo", { id }, 10_000);
+    if (quiet && st.cur?.id && st.cur.id !== id) return; // you moved on meanwhile
+    const same = st.cur?.id === id && st.cur.messages.length === r.messages.length;
+    st.cur = { id: r.id, title: r.title, messages: r.messages };
+    if (r.job && !st.job) { st.job = { ...r.job, t0: Date.now() - (r.job.elapsed ?? 0) }; stPoll(); }
+    st.menu = false;
+    stCache();
+    if (!same) st.calm = true;
+    mixPatch("log", "bar", "act");
+    if (!quiet && !same) requestAnimationFrame(() => { const log = stView()?.querySelector("#stlog"); log?.lastElementChild?.scrollIntoView({ block: "end" }); });
+  } catch (e) {
+    if (st.cur?.id === id) { st.cur = null; stCache(); mixPatch("log", "bar"); }
+    if (!quiet) toast(e.message, true);
+  }
+}
+function stNew() {
+  const st = S.studio;
+  st.cur = null; st.job = null; st.menu = false;
+  clearTimeout(st.t.poll);
+  stCache();
+  mixPatch("log", "bar", "act");
+  $("dbody").scrollTop = 0;
+  if (!isPhone()) stTa()?.focus();
+}
+function stScrollTo(k) {
+  requestAnimationFrame(() => {
+    const el = stView()?.querySelector(`#stlog > [data-k="${k}"]`);
+    if (!el) return;
+    const box = $("dbody");
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+    box.scrollTo({ top, behavior: stReduce() ? "auto" : "smooth" });
+  });
+}
+async function stDice(wild, btn) {
+  btn?.classList.remove("rolling"); void btn?.offsetWidth; btn?.classList.add("rolling");
+  try {
+    const d = await api("/api/discover/studio/dice", { seed: Math.floor(Math.random() * 1e9), wild }, 10_000);
+    const by = new Map((S.disc.mix.ings ?? []).map((x) => [x.id, x]));
+    mixSetSel(d.parts.filter((p) => p.ing).map((p) => ingLite(by.get(p.ing.id) ?? p.ing)));
+    stSetDraft(d.text);
+    mixPatch("tray", "drawer");
+    const send = stView()?.querySelector("[data-stsend]");
+    send?.classList.remove("nudge"); void send?.offsetWidth; send?.classList.add("nudge");
+    if (!isPhone()) stTa()?.focus();
+  } catch (e) { toast(e.message, true); }
+}
+function stBuildAt(key) {
+  const [i, j] = String(key).split(":").map(Number);
+  const msgs = S.studio.cur?.messages ?? [];
+  const m = i < msgs.length ? msgs[i] : S.studio.job;
+  return m?.blocks?.[j]?.b;
+}
+async function stBuildNow(b) {
+  try {
+    const r = await api("/api/discover/studio/build-prompt", { build: b }, 10_000);
+    await openNew({ machine: S.self, cwd: r.cwd, project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
+    promptTop();
+  } catch (e) { toast(e.message, true); }
+}
+function stFindUsers(b) {
+  const text = `${b.title}: ${b.pitch}`;
+  if (typeof leadsFor === "function") return leadsFor(text);
+  S.disc.idea = text; store("discIdea", text);
+  S.disc.tab = "lab"; store("discTab", "lab");
+  renderDiscover(); $("dbody").scrollTop = 0;
+  ideaSearch(text);
+}
+function stAddIng(id, name) {
+  const m = S.disc.mix;
+  if (mixIsSel(id)) { toast(`${name} is already picked`); return; }
+  const x = m.ings?.find((y) => y.id === id) ?? { id, kind: mixKindOf(id), name, desc: "" };
+  mixSetSel([...m.sel, ingLite(x)]); m.justAdded = id;
+  mixPatch("tray", "drawer");
+  toast(`Added ${name}: it goes with your next message`);
+}
+async function stRename(id) {
+  const c = S.studio.home?.convos?.find((x) => x.id === id);
+  const t = await askDialog({ title: "Rename conversation", input: c?.title ?? S.studio.cur?.title ?? "", ok: "Rename" });
+  if (!t?.trim()) return;
+  try {
+    const r = await api("/api/discover/studio/rename", { id, title: t });
+    if (S.studio.home) S.studio.home.convos = r.convos;
+    if (S.studio.cur?.id === id) { S.studio.cur.title = t.trim(); stCache(); }
+    mixPatch("bar", "log");
+  } catch (e) { toast(e.message, true); }
+}
+async function stDelete(id) {
+  const c = S.studio.home?.convos?.find((x) => x.id === id);
+  if (!(await askDialog({ title: `Delete “${c?.title ?? "this conversation"}”?`, text: "Its messages are removed from this machine. Saved builds stay saved.", ok: "Delete", danger: true }))) return;
+  try {
+    const r = await api("/api/discover/studio/delete", { id });
+    if (S.studio.home) S.studio.home.convos = r.convos;
+    if (S.studio.cur?.id === id) stNew(); else mixPatch("bar", "log");
+  } catch (e) { toast(e.message, true); }
+}
+
+/** Clicks in the Studio and on mix cards. Returns true when it handled the click. */
+function mixClick(t) {
+  const m = S.disc.mix, st = S.studio;
+  if (st.menu && !t.closest(".stconv")) { st.menu = false; mixPatch("bar"); }
   const ing = t.closest("[data-ing]")?.dataset.ing;
   if (ing) {
     const x = m.ings?.find((y) => y.id === ing);
@@ -3711,65 +4152,109 @@ function mixClick(t) {
     if (mixIsSel(ing)) mixSetSel(m.sel.filter((y) => y.id !== ing));
     else if (m.sel.length >= 16) { toast("That’s plenty: 16 at most", true); return true; }
     else { mixSetSel([...m.sel, ingLite(x)]); m.justAdded = x.id; }
-    mixPatch("mixtray", "mixopts", "mixlist");
-    $("dbody").querySelector(`[data-ing="${CSS.escape(ing)}"]`)?.focus({ preventScroll: true });
-    mixPeek();
+    mixPatch("tray", "drawer");
+    stView()?.querySelector(`[data-ing="${CSS.escape(ing)}"]`)?.focus({ preventScroll: true });
     return true;
   }
   const rm = t.closest("[data-mixrm]")?.dataset.mixrm;
-  if (rm) { mixSetSel(m.sel.filter((y) => y.id !== rm)); mixPatch("mixtray", "mixopts", "mixlist"); return true; }
-  if (t.closest("[data-mixgo]")) { mixStart(false); return true; }
-  if (t.closest("[data-mixagain]")) { mixStart(true); return true; }
-  if (t.closest("[data-mixcancel]")) { mixCancel(); return true; }
-  if (t.closest("[data-mixsurprise]")) { mixSurprise(); return true; }
-  if (t.closest("[data-mixclear]")) { mixSetSel([]); m.res = null; mixPatch(); return true; }
+  if (rm) { mixSetSel(m.sel.filter((y) => y.id !== rm)); mixPatch("tray", "drawer"); return true; }
+  if (t.closest("[data-mixclear]")) { mixSetSel([]); mixPatch("tray", "drawer"); return true; }
   const more = t.closest("[data-mixmore]")?.dataset.mixmore;
-  if (more) { m.more.add(more); mixPatch("mixlist"); return true; }
-  const dp = t.closest("[data-mixdirpick]")?.dataset.mixdirpick;
-  if (dp != null) {
-    m.dir = m.dir.trim().toLowerCase() === dp ? "" : dp; store("mixDir", m.dir);
-    mixSyncDir();
-    mixPeek();
+  if (more) { m.more.add(more); mixPatch("drawer"); return true; }
+  const sting = t.closest("[data-sting]");
+  if (sting) { stAddIng(sting.dataset.sting, sting.textContent.trim()); return true; }
+  const dk = t.closest("[data-stdk]")?.dataset.stdk;
+  if (dk) { if (t.closest("[data-stadd]")) { stOpenDrawer(dk); return true; } st.dk = dk; store("studioKind", dk); m.q = ""; const s = stView()?.querySelector("[data-stdq]"); if (s) s.value = ""; mixPatch("drawer"); return true; }
+  if (t.closest("[data-stadd]")) { stOpenDrawer(); return true; }
+  if (t.closest("[data-stdone]")) { stCloseDrawer(); return true; }
+  if (t.closest("[data-stdall]")) { m.all = !m.all; mixPatch("drawer"); return true; }
+  if (t.closest("[data-stsend]")) { stSend(stTa()?.value ?? ""); return true; }
+  if (t.closest("[data-ststop]")) { stStop(); return true; }
+  if (t.closest("[data-stdice]")) { stDice(false, t.closest("[data-stdice]")); return true; }
+  if (t.closest("[data-stwild]")) { stDice(true, t.closest("[data-stwild]")); return true; }
+  const say = t.closest("[data-stsay]")?.dataset.stsay;
+  if (say != null) { stSend(say, []); return true; }
+  if (t.closest("[data-stfocus]")) { stTa()?.focus(); return true; }
+  if (t.closest("[data-stretry]")) { const u = [...(st.cur?.messages ?? [])].reverse().find((x) => x.role === "user"); if (u) stSend(u.text, u.use ?? []); return true; }
+  const start = t.closest("[data-ststart]")?.dataset.ststart;
+  if (start) {
+    const s = st.home?.starters?.find((x) => x.id === start);
+    if (s) { const ings = s.parts.filter((p) => p.ing).map((p) => p.ing); stSend(s.text, [...ings, ...m.sel.filter((x) => !ings.some((y) => y.id === x.id))]); if (m.sel.length) { mixSetSel([]); mixPatch("tray", "drawer"); } }
     return true;
   }
+  const intent = t.closest("[data-stint]")?.dataset.stint;
+  if (intent) { st.intent = intent; st.more = false; store("studioIntent", intent); mixPatch("log"); return true; }
+  if (t.closest("[data-stshuffle]")) { st.seed = Math.floor(Math.random() * 1e9); store("studioSeed", st.seed); t.closest(".sthome")?.querySelector(".stdeck")?.classList.add("shuf"); loadStudioHome(); return true; }
+  if (t.closest("[data-stmoreideas]")) { st.more = true; mixPatch("log"); return true; }
+  if (t.closest("[data-stmenu]")) { st.menu = !st.menu; mixPatch("bar"); return true; }
+  if (t.closest("[data-stnew]")) { stNew(); return true; }
+  const open = t.closest("[data-stopen]")?.dataset.stopen;
+  if (open) { if (st.cur?.id !== open) { st.job = null; clearTimeout(st.t.poll); } stOpen(open); return true; }
+  const ren = t.closest("[data-stren]")?.dataset.stren;
+  if (ren) { st.menu = false; mixPatch("bar"); stRename(ren); return true; }
+  const del = t.closest("[data-stdel]")?.dataset.stdel;
+  if (del) { st.menu = false; mixPatch("bar"); stDelete(del); return true; }
+  const sb = t.closest("[data-sb]");
+  if (sb && !t.closest("summary")) {
+    const b = stBuildAt(sb.dataset.sb);
+    if (!b) return true;
+    if (t.closest("[data-sbplan]")) mixResearch(b);
+    else if (t.closest("[data-sbbuild]")) stBuildNow(b);
+    else if (t.closest("[data-sbusers]")) stFindUsers(b);
+    else if (t.closest("[data-sbriff]")) stSend(`Riff on “${b.title}”: three variations, one wilder, one cheaper, one I can ship this weekend.`, mixFromCard(b));
+    else if (t.closest("[data-sbsave]")) mixSave(b).then(() => mixPatch("log"));
+    else if (t.closest("[data-sbcopy]")) copy(mixText(b), "the build");
+    return true;
+  }
+  const fc = t.closest("[data-fid]");
+  if (fc) {
+    const x = feedIdeas().find((y) => y.id === fc.dataset.fid);
+    if (!x) return true;
+    if (t.closest("[data-fbuild]")) stBuildNow(x);
+    else if (t.closest("[data-fsave]")) mixSave(x).then(feedPatch);
+    else if (!t.closest("a")) openPlan(x);
+    return true;
+  }
+  const fm = t.closest("[data-fmore]");
+  if (fm) { loadFeed("more", fm.dataset.fmore || undefined); return true; }
+  if (t.closest("[data-frefresh]")) { loadFeed("refresh"); return true; }
   const card = t.closest("[data-mix]");
   if (!card || t.closest("summary")) return false;
   const x = allMixes().find((y) => y.id === card.dataset.mix);
   if (!x) return false;
   if (t.closest("[data-mplan]")) { mixResearch(x); return true; }
+  if (t.closest("[data-mview]")) { openPlan(x, "saved"); return true; }
   if (t.closest("[data-mcopy]")) { copy(mixText(x), "the mix"); return true; }
-  if (t.closest("[data-mopen]")) { if (x.direction != null) { m.dir = x.direction; store("mixDir", m.dir); } mixOpenWith(mixFromCard(x), { toastText: "Opened in the mixer" }); return true; }
-  if (t.closest("[data-mremix]")) { mixSetSel(mixFromCard(x)); m.peeked = ""; mixPatch("mixtray", "mixopts", "mixlist"); mixStart(true); return true; }
-  if (t.closest("[data-msave]")) { mixSave(x).then(() => { if (S.disc.tab === "mix") mixPatch("mixres"); else renderDiscover(); }); return true; }
+  if (t.closest("[data-mopen]")) { mixOpenWith(mixFromCard(x), { text: `Take “${x.title}” further: ${x.pitch}`, toastText: "Opened in the Studio" }); return true; }
+  if (t.closest("[data-msave]")) { mixSave(x).then(() => renderDiscover()); return true; }
   return false;
 }
 $("dbody").addEventListener("toggle", (e) => {
   const k = e.target.dataset?.mdet;
   if (!k) return;
   if (e.target.open) S.disc.mix.open.add(k); else S.disc.mix.open.delete(k);
-  const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
+  const item = e.target.closest(".stitem"); if (item) item._h = null; // its html now differs from what's cached
+  const v = stView(); if (v) v._h = null;
 }, true);
 $("dbody").addEventListener("input", (e) => {
   if (S.mode !== "discover") return;
   const m = S.disc.mix;
-  if (e.target.matches("[data-mixq]")) { m.q = e.target.value; mixPatch("mixlist"); }
-  else if (e.target.matches("[data-mixdir]")) {
-    m.dir = e.target.value;
-    for (const b of $("dbody").querySelectorAll("[data-mixdirpick]")) b.setAttribute("aria-pressed", String(b.dataset.mixdirpick === m.dir.trim().toLowerCase()));
-    clearTimeout(m.saveT); m.saveT = setTimeout(() => { store("mixDir", m.dir); mixPeek(); }, 400);
-    const v = $("dbody").querySelector(":scope > .view"); if (v) v._h = null;
-  }
+  if (e.target.matches("[data-stq]")) { stGrow(e.target); clearTimeout(S.studio.t.draft); S.studio.t.draft = setTimeout(() => store("studioDraft", e.target.value), 300); }
+  else if (e.target.matches("[data-stdq]")) { m.q = e.target.value; clearTimeout(S.studio.t.q); S.studio.t.q = setTimeout(() => mixPatch("drawer"), 60); }
 });
 $("dbody").addEventListener("change", (e) => {
-  if (S.mode !== "discover") return;
-  const m = S.disc.mix;
-  if (e.target.matches("[data-mixeng]")) { m.engine = e.target.value; store("mixEngine", m.engine); m.res = null; mixPatch("mixres"); mixPeek(); }
-  else if (e.target.matches("[data-mixall]")) { m.all = e.target.checked; mixPatch("mixlist"); }
+  if (S.mode !== "discover" || !e.target.matches("[data-steng]")) return;
+  S.studio.engine = e.target.value; store("studioEngine", S.studio.engine);
 });
 $("dbody").addEventListener("keydown", (e) => {
-  if (S.mode !== "discover" || !e.target.matches("[data-mixdir]") || e.key !== "Enter" || e.isComposing) return;
-  e.preventDefault(); store("mixDir", S.disc.mix.dir); mixStart(false);
+  if (S.mode === "discover" && e.key === "Enter" && e.target.matches?.(".fcard")) { e.preventDefault(); const x = feedIdeas().find((y) => y.id === e.target.dataset.fid); if (x) openPlan(x); return; }
+  if (S.mode !== "discover" || S.disc.tab !== "mix") return;
+  if (e.key === "Escape" && (S.studio.drawer || S.studio.menu)) { e.preventDefault(); e.stopPropagation(); S.studio.menu = false; if (S.studio.drawer) stCloseDrawer(); else mixPatch("bar"); stTa()?.focus({ preventScroll: true }); return; }
+  if (e.target.matches("[data-stq]") && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); stSend(e.target.value); }
+  else if (e.target.matches("[data-stdq]") && e.key === "Enter") { e.preventDefault(); const first = stView()?.querySelector("#stdl [data-ing]"); first?.click(); }
 });
+// The layout follows the Studio's own width (the side rail needs room), not the window's.
+new ResizeObserver(() => { const r = S.mode === "discover" && S.disc.tab === "mix" && stView()?.querySelector("#studio"); if (!r) return; if ((r.clientWidth >= 940) !== S.studio.wide) mixPatch("drawer"); else stSizes(r); }).observe($("dbody"));
 // Connections → "Mix these": the picked store cards go to the mixer (key names stay out).
 $("dbody").addEventListener("click", (e) => {
   if (S.mode !== "connections" || !e.target.closest("[data-cmix]")) return;
@@ -4365,6 +4850,744 @@ async function toggleAlerts() {
   S.notify = !S.notify; store("notify", S.notify); toast(`Alerts ${S.notify ? "on" : "off"}`);
 }
 
+// ── Project page (journeys) ─────────────────────────────────────────────────── <journey>
+// Every project as a journey: origin → turns → now → where it's heading, with side quests branching off, milestone
+// flags on the line and a ladder of milestones that unlock from evidence. Data comes from /api/journey (src/journey.ts),
+// cached on the server; the graph is one inline SVG drawn from that data (no libraries), re-laid out on pan/zoom.
+S.jp = { name: null, data: new Map(), idx: null, q: "", all: false, loading: new Set(), polls: 0, intro: new Set(), card: null };
+const J_ICON = {
+  flag: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 14.5V2"/><path d="M3.5 2.5h8l-1.8 3 1.8 3h-8"/></svg>',
+  lock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  trophy: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6v3.5a3 3 0 0 1-6 0z"/><path d="M5 3.5H2.8v1a2.3 2.3 0 0 0 2.3 2.3M11 3.5h2.2v1a2.3 2.3 0 0 1-2.3 2.3M8 9v2.5M5.5 14h5M6.5 11.5h3V14h-3z"/></svg>',
+  git: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="2.4"/><path d="M1.5 8h4.1M10.4 8h4.1"/></svg>',
+  chat: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z"/></svg>',
+  doc: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M6.3 8.3h4M6.3 10.8h4"/></svg>',
+  turn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5c4 0 5-2 5.5-5.5S10 3 13.5 3"/><path d="M10.8 1.8 13.5 3l-1.3 2.6"/></svg>',
+  branch: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="5.5" r="1.6"/><path d="M4 5.1v5.8M12 7.1c0 3-3 3.4-6.6 4.3"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.5 9.4 6.6l5.1 1.4-5.1 1.4L8 14.5 6.6 9.4 1.5 8l5.1-1.4z"/></svg>',
+  play: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6L12.8 8z"/></svg>',
+  plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+  minus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg>',
+  fit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 5.5V2.5h3M14 5.5V2.5h-3M2 10.5v3h3M14 10.5v3h-3"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg>',
+  grid: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>',
+  journey: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 11.5c2.5 0 2.5-5 5-5s2.5 4 5 4 2-6 3-7"/><circle cx="1.8" cy="11.5" r=".9" fill="currentColor"/><circle cx="14.4" cy="3.6" r=".9" fill="currentColor"/></svg>',
+};
+const JDAY = 86_400_000;
+const jd10 = (t) => (t ? new Date(t).toISOString().slice(0, 10) : "");
+const JDF = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const jdate = (t) => (t ? JDF.format(new Date(t)) : "");
+const jnum = (n) => (n == null ? "–" : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(Math.round(n * 10) / 10));
+const jhue = (p, i = 0) => `oklch(var(--pc-l) var(--pc-c) ${(hue(p || "?") + i * 34) % 360})`;
+const jdays = (a, b) => Math.max(1, Math.round((b - a) / JDAY));
+
+function openJourney(name) {
+  if (!name) return;
+  if (S.jp.name !== name) S.jp.card = null;
+  S.jp.name = name;
+  setMode("project");
+}
+function openProjects() { setMode("projects"); }
+async function loadJourney(name, opts = {}) {
+  if (!name || (S.jp.loading.has(name) && !opts.force)) return;
+  S.jp.loading.add(name);
+  try {
+    const j = await api(opts.regen ? "/api/journey/regenerate" : "/api/journey", { project: name, refresh: !!opts.refresh }, 60_000);
+    S.jp.data.set(name, j);
+    if (S.jp.name === name && S.mode === "project") renderJourney();
+    clearTimeout(loadJourney.t);
+    if (j.pending && S.jp.polls < 90) { S.jp.polls++; loadJourney.t = setTimeout(() => { if (S.mode === "project" && S.jp.name === name) loadJourney(name, { force: true }); }, 2000); }
+    else S.jp.polls = 0;
+  } catch (e) {
+    if (!S.jp.data.has(name)) S.jp.data.set(name, { error: e.message });
+    if (S.mode === "project") renderJourney();
+  } finally { S.jp.loading.delete(name); }
+}
+async function loadProjects() {
+  try { S.jp.idx = await api("/api/journeys", { wait: !S.jp.idx }, 20_000); } catch (e) { S.jp.idx = S.jp.idx ?? { error: e.message, projects: [] }; }
+  if (S.mode === "projects") renderProjects();
+  if (S.jp.idx?.building) setTimeout(() => { if (S.mode === "projects") loadProjects(); }, 2500);
+}
+
+// ── the journey graph ─────────────────────────────────────────────────────────
+/** Time → 0..1: calendar time with long empty stretches squeezed, blended with event density so busy weeks get room. */
+function jScale(j) {
+  const ts = [];
+  for (const e of j.events) { ts.push(e.t); if (e.end) ts.push(e.end); }
+  for (const q of j.quests) ts.push(q.from, q.to);
+  if (j.origin?.t) ts.push(j.origin.t);
+  const now = j.now.t;
+  const t0 = Math.min(...ts.filter(Boolean), now - 2 * 3600_000), t1 = now;
+  const uniq = [...new Set(ts.filter((t) => t >= t0 && t <= t1).concat([t0, t1]))].sort((a, b) => a - b);
+  const span = Math.max(1, t1 - t0);
+  const G = Math.max(2 * JDAY, span / 22);
+  const knots = [[t0, 0]], breaks = [];
+  let acc = 0;
+  for (let i = 1; i < uniq.length; i++) {
+    const d = uniq[i] - uniq[i - 1];
+    const dd = d > G ? G * 0.45 : d;
+    if (d > G) breaks.push({ a: uniq[i - 1], b: uniq[i] });
+    acc += dd;
+    knots.push([uniq[i], acc]);
+  }
+  // Density: every event counts (heavier ones a little more), so a busy afternoon isn't a single dot.
+  // Turns count extra, so the stretches where the project changed direction get room for their labels.
+  const ev = [...j.events.map((e) => [e.t, Math.sqrt(e.weight || 1)]), ...j.turns.map((t) => [t.t, 9])].sort((a, b) => a[0] - b[0]);
+  const W = ev.reduce((n, e) => n + e[1], 0) || 1;
+  let c = 0;
+  const cdf = [[t0, 0]];
+  for (const [t, w] of ev) { c += w; cdf.push([t, c / W]); }
+  cdf.push([t1, 1]);
+  const interp = (ks, t) => {
+    if (t <= ks[0][0]) return ks[0][1];
+    let lo = 0, hi = ks.length - 1;
+    if (t >= ks[hi][0]) return ks[hi][1];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ks[m][0] <= t) lo = m; else hi = m; }
+    const [ta, va] = ks[lo], [tb, vb] = ks[hi];
+    return tb === ta ? vb : va + ((t - ta) / (tb - ta)) * (vb - va);
+  };
+  const f = (t) => 0.5 * (interp(knots, t) / (acc || 1)) + 0.5 * interp(cdf, t);
+  return { f, t0, t1, breaks };
+}
+/** Candidate tick times (years, months, weeks, days, 6 h) between a and b, coarsest first. */
+function jTicks(a, b) {
+  const out = [];
+  const d = new Date(a); d.setHours(0, 0, 0, 0);
+  const span = b - a;
+  for (let y = new Date(a).getFullYear(); y <= new Date(b).getFullYear() + 1; y++) { const t = new Date(y, 0, 1).getTime(); if (t > a && t < b) out.push({ t, p: 0, l: String(y) }); }
+  const MF = new Intl.DateTimeFormat(undefined, { month: "short" }), DF2 = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+  for (let m = new Date(new Date(a).getFullYear(), new Date(a).getMonth() + 1, 1); m.getTime() < b; m.setMonth(m.getMonth() + 1)) out.push({ t: m.getTime(), p: 1, l: MF.format(m) });
+  if (span < 400 * JDAY) for (let t = d.getTime() + JDAY; t < b; t += JDAY) { const x = new Date(t); if (x.getDate() !== 1) out.push({ t, p: x.getDay() === 1 ? 2 : 3, l: DF2.format(x) }); }
+  if (span < 4 * JDAY) for (let t = d.getTime() + 6 * 3600_000; t < b; t += 6 * 3600_000) { const x = new Date(t); if (x.getHours()) out.push({ t, p: 4, l: `${String(x.getHours()).padStart(2, "0")}:00` }); }
+  return out.filter((x) => x.t > a && x.t < b).sort((x, y) => x.p - y.p);
+}
+const J_TRACK = { commits: 0, merge: 0, tag: 0, release: 0, deploy: 0, milestone: 0, session: 1, wiki: -1, log: -1, idea: -1, lead: -1, manual: -1 };
+const J_KIND = { commits: "Commits", merge: "Merge", tag: "Tag", release: "Release", deploy: "Deploy", milestone: "Milestone unlocked", session: "Session", wiki: "Wiki", log: "Wiki log", idea: "Plan", lead: "Leads", manual: "You logged" };
+const jEsc = (s) => esc(s).replace(/\n/g, " ");
+
+/** Lays out and draws the graph into `host` for its current zoom; cheap enough to run every animation frame. */
+function jgDraw(host) {
+  const g = host._jg;
+  if (!g) return;
+  const { j, vert } = g;
+  const W = host.clientWidth || 800;
+  const pc0 = jhue(j.project);
+  const sc = g.sc ?? (g.sc = jScale(j));
+  // Along-axis geometry: horizontal = x, vertical = y. The past gets most of it; the future a fixed stretch.
+  const futN = Math.min(4, j.milestones.filter((m) => m.state !== "unlocked").length);
+  const A0 = vert ? 46 : 56;
+  const pastLen = vert ? Math.max(620, Math.min(2600, j.events.length * 9 + 380)) : Math.max(360, W - 56 - Math.max(150, W * 0.2));
+  const futLen = vert ? 70 + futN * 58 : Math.max(150, W * 0.2) - 30;
+  const k = g.k, tx = g.tx;
+  const along = (t) => tx + A0 + (t >= j.now.t ? pastLen * k + ((t - j.now.t) / JDAY) * 0 : sc.f(t) * pastLen * k);
+  const nowA = along(j.now.t), futEnd = nowA + futLen * (vert ? 1 : Math.min(k, 1.6));
+  const H = vert ? A0 + pastLen * k + futLen + 70 : 390;
+  const X0 = vert ? 70 : 0, Y0 = vert ? 0 : 164; // the main line's across position
+  const P = (a, c) => (vert ? [X0 + c, a] : [a, Y0 + c]); // along/across → x,y
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const pt = (a, c) => P(a, c).map(r1).join(",");
+  // Turns bend the line: each one moves it to a new offset, easing in over a short window.
+  const turns = j.turns.map((t, i) => ({ ...t, a: along(t.t), off: (i % 2 ? 1 : -1) * (vert ? 10 + (i % 3) * 3 : 16 + (i % 3) * 6), i }));
+  const win = vert ? 26 : 34;
+  const offAt = (a) => { let o = 0; for (const t of turns) { const s = Math.max(0, Math.min(1, (a - (t.a - win)) / (2 * win))); o += (t.off - (t.i ? turns[t.i - 1].off : 0)) * (s * s * (3 - 2 * s)); } return o; };
+  const vis0 = vert ? -200 : -80, vis1 = vert ? H + 200 : W + 80;
+  const seen = (a) => a > vis0 && a < vis1;
+  let s = "";
+  // Era bands: each stretch between turns gets its own hue; subtle wash behind the line.
+  const bounds = [along(sc.t0), ...turns.map((t) => t.a), nowA];
+  // Time axis and squeezed gaps.
+  const axisC = vert ? -X0 + 6 : 390 - 34 - Y0;
+  const ticks = jTicks(sc.t0, j.now.t);
+  const minGap = vert ? 30 : 64;
+  const placed = sc.breaks.map((b) => (along(b.a) + along(b.b)) / 2); // ticks keep clear of the "≈ 3 d" gap marks
+  let tk = "";
+  for (const tkx of ticks) {
+    const a = along(tkx.t);
+    if (!seen(a) || a < A0 - 10 || a > nowA - 12 || placed.some((p) => Math.abs(p - a) < minGap)) continue;
+    placed.push(a);
+    const [x, y] = P(a, axisC);
+    tk += vert ? `<text class="jtk${tkx.p <= 1 ? " maj" : ""}" x="${r1(x)}" y="${r1(y + 3)}">${esc(tkx.l)}</text>` : `<line class="jgl${tkx.p <= 1 ? " maj" : ""}" x1="${r1(x)}" y1="18" x2="${r1(x)}" y2="${r1(y - 8)}"/><text class="jtk${tkx.p <= 1 ? " maj" : ""}" x="${r1(x)}" y="${r1(y + 12)}">${esc(tkx.l)}</text>`;
+  }
+  for (const b of sc.breaks) {
+    const a = (along(b.a) + along(b.b)) / 2;
+    if (!seen(a)) continue;
+    const [x, y] = P(a, vert ? -X0 + 30 : axisC);
+    const gap = b.b - b.a, label = gap > 60 * JDAY ? `${Math.round(gap / (30 * JDAY))} mo` : `${Math.round(gap / JDAY)} d`;
+    tk += vert ? `<text class="jbrk" x="${r1(x)}" y="${r1(y + 3)}">≈ ${label}</text>` : `<text class="jbrk" x="${r1(x)}" y="${r1(y + 12)}">≈ ${label}</text><path class="jgap" d="M${r1(x - 3)} ${r1(y - 14)} l3 -4 l3 4 l3 -4"/>`;
+  }
+  s += `<g class="jaxis">${tk}</g>`;
+  // The main line, one segment per era, sampled so the bends are smooth.
+  const step = 5;
+  let line = "";
+  for (let e = 0; e < bounds.length - 1; e++) {
+    const a = Math.max(bounds[e], vis0), b = Math.min(bounds[e + 1], vis1);
+    if (b <= a) continue;
+    let d = `M${pt(a, offAt(a))}`;
+    for (let x = a + step; x < b; x += step) d += `L${pt(x, offAt(x))}`;
+    d += `L${pt(b, offAt(b))}`;
+    line += `<path class="jline" pathLength="1" d="${d}" style="stroke:${jhue(j.project, e)};--d:${e * 140}"/>`;
+  }
+  // The future: dashed, from now to where it's heading.
+  const fo = offAt(nowA);
+  line += `<path class="jfut" d="M${pt(nowA, fo)} C${pt(nowA + (futEnd - nowA) * 0.4, fo)} ${pt(nowA + (futEnd - nowA) * 0.6, fo + (vert ? 0 : -18))} ${pt(futEnd, fo + (vert ? 0 : -18))}"/>`;
+  // Side quests: lanes below the line (right of it on a phone), assigned so overlapping ones don't collide.
+  const maxLanes = vert ? 4 : 5;
+  const big = j.quests.slice().sort((a, b) => (b.commits + b.sessions.length * 3) - (a.commits + a.sessions.length * 3));
+  const shown = big.slice(0, vert ? 6 : 10);
+  const laneEnd = [];
+  const qpos = new Map();
+  for (const q of shown.slice().sort((a, b) => a.from - b.from)) {
+    const a = along(q.from), b = Math.max(along(q.to), a + 26);
+    let l = laneEnd.findIndex((e) => e < a - 18);
+    if (l < 0) { if (laneEnd.length < maxLanes) l = laneEnd.length; else l = laneEnd.indexOf(Math.min(...laneEnd)); }
+    laneEnd[l] = b + 40;
+    qpos.set(q.id, { a, b, l, c: (vert ? 40 : 46) + l * (vert ? 15 : 20) });
+  }
+  let qs = "";
+  const qcol = (q) => (q.kind === "spinoff" ? "var(--jgold)" : q.status === "abandoned" ? "var(--ink-3)" : jhue(j.project, 3));
+  for (const q of shown) {
+    const p = qpos.get(q.id);
+    if (!p || (p.b < vis0 && p.a < vis0) || p.a > vis1) continue;
+    const c0 = offAt(p.a) + (vert ? 14 : 16), bend = vert ? 18 : 26;
+    let d = `M${pt(p.a, c0 - (vert ? 14 : 16))} C${pt(p.a + bend * 0.5, c0)} ${pt(p.a + bend * 0.4, p.c)} ${pt(p.a + bend, p.c)} L${pt(Math.max(p.a + bend, p.b), p.c)}`;
+    const end = Math.max(p.a + bend, p.b);
+    if (q.status === "merged") d += ` C${pt(end + bend * 0.6, p.c)} ${pt(end + bend * 0.4, offAt(end + bend))} ${pt(end + bend, offAt(end + bend))}`;
+    const fade = q.status === "abandoned";
+    qs += `<g class="jq ${q.status}" data-jq="${esc(q.id)}"><path class="jqp" d="${d}" style="stroke:${qcol(q)}${fade ? `;stroke:url(#jfade${vert ? "v" : "h"})` : ""}"/>`;
+    if (q.status === "active") { const [x, y] = P(end, p.c); qs += `<circle class="jqend" cx="${r1(x)}" cy="${r1(y)}" r="3.4" style="fill:${qcol(q)}"/>`; }
+    if (q.kind === "spinoff") { const [x, y] = P(end + 6, p.c); qs += `<path class="jqarrow" d="${vert ? `M${r1(x - 4)} ${r1(y - 4)} L${r1(x)} ${r1(y + 2)} L${r1(x + 4)} ${r1(y - 4)}` : `M${r1(x - 4)} ${r1(y - 4)} L${r1(x + 2)} ${r1(y)} L${r1(x - 4)} ${r1(y + 4)}`}" style="stroke:${qcol(q)}"/>`; }
+    const [lx, ly] = P(p.a + bend + 4, p.c);
+    const room = vert ? W - lx - 8 : Math.max(0, end - p.a - bend - 8);
+    if (room > 40) { const lbl = q.label.length * 5.6 > room ? q.label.slice(0, Math.max(3, Math.floor(room / 5.6) - 1)) + "…" : q.label; qs += vert ? "" : `<text class="jql" x="${r1(lx)}" y="${r1(ly - 5)}">${esc(lbl)}</text>`; }
+    qs += `<title>${jEsc(`${q.label} · ${q.kind === "spinoff" ? "spin-off" : q.status} · ${[q.commits ? `${q.commits} commits` : "", q.sessions.length ? `${q.sessions.length} sessions` : ""].filter(Boolean).join(", ")}`)}</title></g>`;
+  }
+  // Events: three tracks hugging the line (notes above, commits on it, sessions below); close ones merge into one dot.
+  const clusters = [];
+  const byTrack = new Map();
+  for (const [i, e] of j.events.entries()) {
+    let a = along(e.t);
+    if (!seen(a)) continue;
+    const q = e.lane && qpos.get(e.lane);
+    const tr = q ? `q:${e.lane}` : String(J_TRACK[e.kind] ?? 0);
+    if (!byTrack.has(tr)) byTrack.set(tr, []);
+    byTrack.get(tr).push({ e, i, a, q });
+  }
+  const gap = vert ? 9 : 11;
+  for (const [tr, list] of byTrack) {
+    list.sort((x, y) => x.a - y.a);
+    let cur = null;
+    for (const it of list) {
+      if (cur && it.a - cur.last < gap) { cur.items.push(it); cur.last = it.a; cur.w += it.e.weight || 1; cur.sa += it.a * (it.e.weight || 1); }
+      else { cur = { tr, items: [it], last: it.a, w: it.e.weight || 1, sa: it.a * (it.e.weight || 1), q: it.q }; clusters.push(cur); }
+    }
+  }
+  g.clusters = clusters;
+  let dots = "";
+  for (const [ci, cl] of clusters.entries()) {
+    const a = cl.sa / cl.w;
+    const tr = cl.tr.startsWith("q:") ? null : Number(cl.tr);
+    const c = cl.q ? cl.q.c : offAt(a) + (tr ? tr * (vert ? 14 : 17) : 0);
+    const [x, y] = P(a, c);
+    const n = cl.items.length;
+    const r = Math.max(tr === 0 ? 3.6 : 2.8, Math.min(vert ? 10 : 13, (tr === 0 ? 2.4 : 1.8) + Math.sqrt(cl.w) * (tr === 0 ? 1.15 : 0.9)));
+    const kinds = new Set(cl.items.map((x) => x.e.kind));
+    const top = cl.items.slice().sort((p, q) => (q.e.weight || 0) - (p.e.weight || 0))[0].e;
+    const cls = kinds.has("milestone") ? "ms" : kinds.has("release") || kinds.has("tag") || kinds.has("deploy") ? "rel" : top.kind === "merge" ? "mg" : tr === 1 || cl.q ? "se" : tr === -1 ? "nt" : "cm";
+    const live = cl.items.some((x) => x.e.kind === "session" && S.rows.get(x.e.link?.session)?.status === "working");
+    const d = Math.round(((a - A0) / Math.max(1, nowA - A0)) * 900);
+    const shape = cls === "rel" ? `<path d="M${r1(x)} ${r1(y - r - 1.5)} L${r1(x + r + 1.5)} ${r1(y)} L${r1(x)} ${r1(y + r + 1.5)} L${r1(x - r - 1.5)} ${r1(y)}Z"/>`
+      : cls === "nt" ? `<rect x="${r1(x - r)}" y="${r1(y - r)}" width="${r1(2 * r)}" height="${r1(2 * r)}" rx="1.5"/>`
+      : `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(r)}"/>`;
+    const tip = n === 1 ? `${J_KIND[top.kind] ?? top.kind} · ${jdate(top.t)} · ${top.title}` : `${n} events · ${jdate(cl.items[0].e.t)}${cl.items.at(-1).e.t - cl.items[0].e.t > JDAY ? ` – ${jdate(cl.items.at(-1).e.t)}` : ""}`;
+    dots += `<g class="jp ${cls}${live ? " live" : ""}${S.jp.card?.ci === ci && S.jp.card?.kind === "cl" ? " on" : ""}" data-jc="${ci}" style="--d:${d}${cl.q ? `;--qc:${qcol(j.quests.find((q) => q.id === cl.items[0].e.lane) ?? {})}` : ""}">${shape}${n >= 3 && r >= 7 ? `<text x="${r1(x)}" y="${r1(y + 3.2)}">${n > 99 ? "99+" : n}</text>` : ""}<title>${jEsc(tip)}</title></g>`;
+  }
+  // Milestone flags where they were unlocked; ghosts ahead for the next ones.
+  let flags = "";
+  const flag = (a, c, cls, id, tip, lbl) => {
+    const [x, y] = P(a, c);
+    const pole = vert ? 0 : 26;
+    return vert
+      ? `<g class="jflag ${cls}" data-jm="${esc(id)}"><path class="pole" d="M${r1(x)} ${r1(y)} H${r1(x - 20)}"/><path class="pen" d="M${r1(x - 20)} ${r1(y)} v-11 l-11 4 l11 4"/>${lbl ? `<text class="jfl" x="${r1(x + 26)}" y="${r1(y + 3)}">${esc(lbl)}</text>` : ""}<title>${jEsc(tip)}</title></g>`
+      : `<g class="jflag ${cls}" data-jm="${esc(id)}"><path class="pole" d="M${r1(x)} ${r1(y)} V${r1(y - pole)}"/><path class="pen" d="M${r1(x)} ${r1(y - pole)} h12 l-3 4.5 l3 4.5 h-12"/><title>${jEsc(tip)}</title></g>`;
+  };
+  for (const m of j.milestones) if (m.state === "unlocked" && m.at) { const a = along(Math.min(m.at, j.now.t)); if (seen(a)) flags += flag(a, offAt(a), "won", m.id, `Unlocked: ${m.title} · ${jdate(m.at)}`); }
+  const ahead = j.milestones.filter((m) => m.state !== "unlocked").slice(0, futN);
+  ahead.forEach((m, i) => {
+    const a = nowA + ((i + 1) / (ahead.length + 1)) * (futEnd - nowA);
+    const c = vert ? fo : fo + (-18 * (0.5 - 0.5 * Math.cos(Math.PI * ((i + 1) / (ahead.length + 1)))));
+    flags += flag(a, c, `ghost${j.next.includes(m.id) ? " next" : ""}`, m.id, `Ahead: ${m.title}${m.pct ? ` · ${Math.round(m.pct * 100)}%` : ""}`, vert ? m.title : "");
+  });
+  // Turns: bigger rings with a labelled callout; labels stack so they don't collide.
+  let tl = "";
+  const levels = vert ? [along(j.origin?.t ?? sc.t0)] : []; // on a phone the first label starts below the origin's
+  for (const t of turns) {
+    if (!seen(t.a)) continue;
+    const c = offAt(t.a);
+    const [x, y] = P(t.a, c);
+    const on = S.jp.card?.kind === "turn" && S.jp.card.id === t.event;
+    tl += `<g class="jturn${on ? " on" : ""}" data-jt="${esc(t.event)}" style="--d:${Math.round(((t.a - A0) / Math.max(1, nowA - A0)) * 900) + 300}"><circle class="halo" cx="${r1(x)}" cy="${r1(y)}" r="13"/><circle class="ring" cx="${r1(x)}" cy="${r1(y)}" r="7.5" style="stroke:${jhue(j.project, t.i + 1)}"/>`;
+    const text = t.label;
+    const w = Math.min(vert ? W - 170 : 220, text.length * 6.3 + 30);
+    if (vert) {
+      let ly = t.a;
+      const last = levels.at(-1) ?? -Infinity;
+      if (ly < last + 34) ly = last + 34;
+      levels.push(ly);
+      const lx = X0 + 96;
+      tl += `<path class="lead" d="M${r1(x + 8)} ${r1(y)} C${r1(x + 40)} ${r1(y)} ${r1(lx - 30)} ${r1(ly)} ${r1(lx)} ${r1(ly)}"/><foreignObject x="${r1(lx)}" y="${r1(ly - 13)}" width="${r1(W - lx - 6)}" height="40"><div class="jtl" xmlns="http://www.w3.org/1999/xhtml"><b>${esc(text)}</b><span>${esc(jdate(t.t))}</span></div></foreignObject>`;
+    } else {
+      let lv = 0;
+      const lx = Math.max(4, Math.min(W - w - 4, x - w / 2)); // keep the pill inside the graph
+      for (; lv < 3; lv++) if (!(levels[lv] ?? []).some(([a, b]) => !(lx + w < a || lx > b))) break;
+      if (lv < 3) {
+        (levels[lv] = levels[lv] ?? []).push([lx - 6, lx + w + 6]);
+        const ly = Y0 - 50 - lv * 30;
+        tl += `<path class="lead" d="M${r1(x)} ${r1(y - 9)} V${r1(ly + 11)}"/><foreignObject x="${r1(lx)}" y="${r1(ly - 11)}" width="${r1(w)}" height="24"><div class="jtl h" xmlns="http://www.w3.org/1999/xhtml">${J_ICON.turn}<b>${esc(text)}</b></div></foreignObject>`;
+      }
+    }
+    tl += `<title>${jEsc(`${t.label} · ${jdate(t.t)}${t.why ? ` · ${t.why}` : ""}`)}</title></g>`;
+  }
+  // Origin and now.
+  const oa = along(j.origin?.t ?? sc.t0);
+  let marks = "";
+  if (seen(oa)) {
+    const [x, y] = P(oa, offAt(oa));
+    marks += `<g class="jorigin" data-jo="1"><circle class="o2" cx="${r1(x)}" cy="${r1(y)}" r="11" style="stroke:${pc0}"/><circle class="o1" cx="${r1(x)}" cy="${r1(y)}" r="5.5" style="fill:${pc0}"/>${vert ? `<text class="jol" x="${r1(x + 18)}" y="${r1(y + 4)}">origin · ${esc(jdate(j.origin?.t))}</text>` : `<text class="jol" x="${r1(x)}" y="${r1(y + 30)}">origin</text>`}<title>${jEsc(`Origin · ${jdate(j.origin?.t)}${j.origin?.idea ? ` · ${j.origin.idea.slice(0, 160)}` : ""}`)}</title></g>`;
+  }
+  {
+    const [x, y] = P(nowA, fo);
+    const live = (j.now.live ?? []).some((l) => (S.rows.get(l.key)?.status ?? l.status) === "working");
+    marks += vert
+      ? `<g class="jnow${live ? " live" : ""}"><line x1="8" y1="${r1(y)}" x2="${r1(W - 8)}" y2="${r1(y)}"/><circle class="pulse" cx="${r1(x)}" cy="${r1(y)}" r="6"/><circle cx="${r1(x)}" cy="${r1(y)}" r="4.5"/><text x="${r1(W - 10)}" y="${r1(y - 6)}" text-anchor="end">now</text></g>`
+      : `<g class="jnow${live ? " live" : ""}"><line x1="${r1(x)}" y1="16" x2="${r1(x)}" y2="${r1(390 - 44)}"/><circle class="pulse" cx="${r1(x)}" cy="${r1(y)}" r="6"/><circle cx="${r1(x)}" cy="${r1(y)}" r="4.5"/><text x="${r1(x)}" y="12" text-anchor="middle">now</text></g>`;
+  }
+  const [hx, hy] = P(futEnd, fo + (vert ? 0 : -18));
+  marks += `<g class="jhead"><circle cx="${r1(hx)}" cy="${r1(hy)}" r="4"/></g>`;
+  host.querySelector(".jlayer").innerHTML = s + `<g class="jlines">${line}</g><g class="jqs">${qs}</g><g class="jdots">${dots}</g>` + flags + tl + marks;
+  const svg = host.querySelector("svg");
+  svg.setAttribute("height", String(Math.round(H)));
+  svg.setAttribute("viewBox", `0 0 ${Math.round(W)} ${Math.round(H)}`);
+  svg.setAttribute("width", String(Math.round(W)));
+  // Heading text sits in HTML over the future end (it wraps; SVG text doesn't).
+  const hd = host.querySelector(".jhd");
+  if (hd) {
+    if (vert) { hd.style.top = `${Math.round(hy + 14)}px`; hd.style.left = "12px"; hd.style.right = "12px"; }
+    else { const left = Math.max(nowA + 12, Math.min(W - 250, hx - 240)); hd.style.left = `${Math.round(left)}px`; hd.style.top = "20px"; hd.style.width = `${Math.round(Math.max(150, Math.min(260, W - left - 10)))}px`; hd.hidden = nowA > W - 60; }
+  }
+  g.nowA = nowA; g.A0 = A0; g.pastLen = pastLen; g.W = W;
+}
+
+/** Mounts the graph (once per page render) and wires pan, zoom, pinch and taps. */
+function jgMount(host, j) {
+  const vert = isPhone();
+  const prev = host._jg;
+  const keep = prev && prev.j.project === j.project && prev.vert === vert;
+  host._jg = { j, vert, k: keep ? prev.k : 1, tx: keep ? prev.tx : 0, sc: null };
+  const intro = !S.jp.intro.has(j.project) && !reduceMotion.matches;
+  host.innerHTML = `<svg class="jg${intro ? " intro" : ""}${vert ? " vert" : ""}" role="img" aria-label="Journey of ${esc(j.project)}"><defs>
+      <linearGradient id="jfadeh" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="var(--ink-3)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ink-3)" stop-opacity="0"/></linearGradient>
+      <linearGradient id="jfadev" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink-3)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ink-3)" stop-opacity="0"/></linearGradient>
+    </defs><g class="jlayer"></g></svg>
+    <div class="jhd">${j.heading?.direction ? `<small>Heading</small><b>${esc(j.heading.direction)}</b>` : `<small>Next</small><b>${esc(j.milestones.find((m) => m.id === j.next?.[0])?.title ?? "")}</b>`}</div>
+    ${vert ? "" : `<div class="jzoom"><button data-jz="in" title="Zoom in" aria-label="Zoom in">${J_ICON.plus}</button><button data-jz="out" title="Zoom out" aria-label="Zoom out">${J_ICON.minus}</button><button data-jz="fit" title="Fit it all" aria-label="Fit">${J_ICON.fit}</button></div>`}`;
+  if (intro) { S.jp.intro.add(j.project); setTimeout(() => host.querySelector("svg")?.classList.remove("intro"), 2400); }
+  jgDraw(host);
+  if (host._wired) return;
+  host._wired = true;
+  let raf = 0;
+  const redraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; jgDraw(host); }); };
+  const clampTx = () => {
+    const g = host._jg; const W = host.clientWidth;
+    if (g.vert) { g.tx = 0; return; }
+    const content = g.pastLen * g.k + 180;
+    g.tx = Math.min(W * 0.3, Math.max(-(content - W * 0.7), g.tx));
+  };
+  const zoomAt = (px, f) => {
+    const g = host._jg;
+    const k2 = Math.max(1, Math.min(60, g.k * f));
+    if (g.vert) { g.k = k2; redraw(); return; }
+    // Keep the point under the pointer still.
+    const a = px - g.tx - g.A0;
+    g.tx = px - g.A0 - (a * k2) / g.k;
+    g.k = k2;
+    if (k2 === 1) g.tx = 0;
+    clampTx(); redraw();
+  };
+  host._zoomAt = zoomAt;
+  host.addEventListener("wheel", (e) => {
+    const g = host._jg;
+    if (g.vert) return;
+    const r = host.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(e.clientX - r.left, Math.exp(-Math.max(-50, Math.min(50, e.deltaY)) * 0.01)); return; }
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) { e.preventDefault(); g.tx -= e.shiftKey ? e.deltaY : e.deltaX; clampTx(); redraw(); }
+  }, { passive: false });
+  const pts = new Map();
+  let drag = null, pinch = null, moved = false;
+  host.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".jzoom, .jcard")) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = false;
+    if (pts.size === 1) drag = { x: e.clientX, tx: host._jg.tx };
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: host._jg.k, tx: host._jg.tx, mid: host._jg.vert ? (a.y + b.y) / 2 : (a.x + b.x) / 2 }; drag = null; }
+  });
+  host.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = host._jg;
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const r = host.getBoundingClientRect();
+      g.k = pinch.k; g.tx = pinch.tx;
+      zoomAt(pinch.mid - (g.vert ? r.top : r.left), d / Math.max(20, pinch.d));
+      moved = true;
+      return;
+    }
+    if (drag && !g.vert && e.pointerType !== "touch" || drag && !g.vert && e.pointerType === "touch") {
+      const dx = e.clientX - drag.x;
+      if (Math.abs(dx) > 4) { moved = true; host.classList.add("dragging"); try { host.setPointerCapture(e.pointerId); } catch {} }
+      if (moved) { g.tx = drag.tx + dx; clampTx(); redraw(); }
+    }
+  });
+  const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) { drag = null; host.classList.remove("dragging"); } };
+  host.addEventListener("pointerup", up); host.addEventListener("pointercancel", up);
+  host.addEventListener("click", (e) => {
+    if (moved) { moved = false; return; }
+    const z = e.target.closest("[data-jz]")?.dataset.jz;
+    if (z) { const W = host.clientWidth; if (z === "fit") { host._jg.k = 1; host._jg.tx = 0; redraw(); } else zoomAt(W * 0.6, z === "in" ? 1.8 : 1 / 1.8); return; }
+    if (e.target.closest(".jcard")) return;
+    const r = host.getBoundingClientRect();
+    const at = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const c = e.target.closest("[data-jc]"), t = e.target.closest("[data-jt]"), q = e.target.closest("[data-jq]"), m = e.target.closest("[data-jm]"), o = e.target.closest("[data-jo]");
+    if (c) S.jp.card = { kind: "cl", ci: Number(c.dataset.jc), at };
+    else if (t) S.jp.card = { kind: "turn", id: t.dataset.jt, at };
+    else if (q) S.jp.card = { kind: "quest", id: q.dataset.jq, at };
+    else if (m) S.jp.card = { kind: "ms", id: m.dataset.jm, at };
+    else if (o) S.jp.card = { kind: "origin", at };
+    else S.jp.card = null;
+    jgCard(host); jgDraw(host);
+  });
+  new ResizeObserver(() => { const g = host._jg; if (g && Math.abs((g.W ?? 0) - host.clientWidth) > 2) redraw(); }).observe(host);
+}
+
+/** The detail card for what was tapped: a floating card on a desktop, a bottom sheet on a phone. */
+function jgCard(host) {
+  host.querySelector(".jcard")?.remove();
+  const c = S.jp.card, g = host._jg;
+  if (!c || !g) return;
+  const j = g.j;
+  let html = "";
+  const evHTML = (e) => {
+    const link = e.link ?? {};
+    const acts = [
+      link.session ? `<button class="btn primary" data-jsess="${esc(link.session)}">${J_ICON.chat}Open the session</button>` : "",
+      link.commit ? (j.now.github ? `<a class="btn" href="https://github.com/${esc(j.now.github)}/commit/${esc(link.commit)}" target="_blank" rel="noopener">${J_ICON.git}${esc(link.commit.slice(0, 7))} ↗</a>` : `<button class="btn" data-jcopy="${esc(link.commit)}">${J_ICON.git}${esc(link.commit.slice(0, 7))}</button>`) : "",
+      link.wiki ? `<a class="btn fpath" data-path="wiki:${esc(link.wiki === "log" ? "log" : link.wiki)}">${J_ICON.doc}Wiki</a>` : "",
+      link.file ? `<a class="btn fpath" data-path="${esc(link.file)}">${J_ICON.doc}Open the file</a>` : "",
+      link.url ? `<a class="btn" href="${esc(link.url)}" target="_blank" rel="noopener">Open ↗</a>` : "",
+    ].filter(Boolean).join("");
+    const lane = e.lane && j.quests.find((q) => q.id === e.lane);
+    return `<div class="jck ${esc(e.kind)}"><span>${esc(J_KIND[e.kind] ?? e.kind)}${e.n && e.kind === "session" ? ` · ${e.n} prompt${e.n === 1 ? "" : "s"}` : ""}${lane ? ` · side quest “${esc(lane.label)}”` : ""}</span><time>${esc(jdate(e.t))}${e.end && e.end - e.t > 60_000 ? ` → ${esc(e.end - e.t > JDAY ? jdate(e.end) : when(e.end))}` : ""}</time></div>
+      <h4>${esc(e.title)}</h4>${e.detail ? `<p>${esc(e.detail)}</p>` : ""}${e.items?.length > 1 ? `<ul>${e.items.slice(0, 8).map((x) => `<li>${esc(x)}</li>`).join("")}${e.items.length > 8 ? `<li class="hint">and ${e.items.length - 8} more</li>` : ""}</ul>` : ""}${acts ? `<div class="jca">${acts}</div>` : ""}`;
+  };
+  if (c.kind === "cl") {
+    const cl = g.clusters?.[c.ci];
+    if (!cl) return;
+    const items = cl.items.map((x) => x.e);
+    if (c.pick != null && items[c.pick]) html = evHTML(items[c.pick]) + (items.length > 1 ? `<button class="btn ghost jback" data-jpick="-1">← ${items.length} events here</button>` : "");
+    else if (items.length === 1) html = evHTML(items[0]);
+    else html = `<div class="jck"><span>${items.length} events</span><time>${esc(jdate(items[0].t))}${items.at(-1).t - items[0].t > JDAY ? ` – ${esc(jdate(items.at(-1).t))}` : ""}</time></div><ol class="jlist">${items.slice(0, 40).map((e, i) => `<li><button data-jpick="${i}"><i class="k ${esc(e.kind)}"></i><span>${esc(e.title)}</span><small>${esc(J_KIND[e.kind] ?? e.kind)}</small></button></li>`).join("")}</ol>${items.length > 40 ? `<p class="hint">and ${items.length - 40} more: zoom in</p>` : ""}<div class="jca"><button class="btn" data-jzoomhere="1">${J_ICON.plus}Zoom in here</button></div>`;
+  } else if (c.kind === "turn") {
+    const t = j.turns.find((x) => x.event === c.id);
+    const e = j.events.find((x) => x.id === c.id);
+    if (!t) return;
+    html = `<div class="jck turn"><span>${J_ICON.turn} A turn</span><time>${esc(jdate(t.t))}</time></div><h4>${esc(t.label)}</h4>${t.why ? `<p>${esc(t.why)}</p>` : ""}${e ? `<div class="jsub">${evHTML(e)}</div>` : ""}`;
+  } else if (c.kind === "quest") {
+    const q = j.quests.find((x) => x.id === c.id);
+    if (!q) return;
+    html = `<div class="jck quest"><span>${J_ICON.branch} ${q.kind === "spinoff" ? "Spin-off" : "Side quest"} · ${esc(q.status)}</span><time>${esc(jdate(q.from))}${q.to - q.from > JDAY ? ` – ${esc(jdate(q.to))}` : ""}</time></div><h4>${esc(q.label)}</h4>
+      <p>${[q.branch ? `branch <code>${esc(q.branch)}</code>` : "", q.commits ? `${q.commits} commit${q.commits === 1 ? "" : "s"}` : "", q.sessions.length ? `${q.sessions.length} session${q.sessions.length === 1 ? "" : "s"}` : "", q.note ? esc(q.note) : ""].filter(Boolean).join(" · ")}</p>
+      ${q.subjects?.length ? `<ul>${q.subjects.slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${q.kind === "spinoff" && q.branch ? `<div class="jca"><button class="btn" data-jopen="${esc(q.branch)}">${J_ICON.journey}Its own journey</button></div>` : ""}`;
+  } else if (c.kind === "ms") {
+    const m = j.milestones.find((x) => x.id === c.id);
+    if (!m) return;
+    html = `<div class="jck ms"><span>${m.state === "unlocked" ? `${J_ICON.trophy} Unlocked` : m.state === "progress" ? "In progress" : `${J_ICON.lock} Locked`}</span><time>${m.at ? esc(jdate(m.at)) : ""}</time></div><h4>${esc(m.title)}</h4><p>${esc(m.metric)}: ${m.value != null ? `${jnum(m.value)} / ` : ""}${jnum(m.target)} ${esc(m.unit)}</p>${m.evidence ? `<p class="ev">${esc(m.evidence)}</p>` : ""}`;
+  } else if (c.kind === "origin") {
+    const o = j.origin ?? {};
+    html = `<div class="jck origin"><span>${J_ICON.spark} Origin</span><time>${esc(jdate(o.t))}</time></div>${o.idea ? `<blockquote>${esc(o.idea.slice(0, 420))}</blockquote>` : ""}<div class="jca">${o.session?.session ? `<button class="btn primary" data-jsess="${esc(o.session.session)}">${J_ICON.chat}The first session</button>` : ""}${o.commit ? `<span class="hint">First commit: ${esc(o.commit.subject)}</span>` : ""}</div>`;
+  }
+  const el = document.createElement("div");
+  el.className = "jcard";
+  el.innerHTML = `<button class="jcx" data-jclose aria-label="Close">${ICON.x}</button>${html}`;
+  host.append(el);
+  if (!g.vert) {
+    const W = host.clientWidth;
+    const w = Math.min(360, W - 24);
+    el.style.width = `${w}px`;
+    el.style.left = `${Math.round(Math.max(12, Math.min(W - w - 12, c.at.x - w / 2)))}px`;
+    el.style.top = `${Math.round(c.at.y > 200 ? 14 : Math.min(c.at.y + 22, 200))}px`;
+  }
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (e.target.closest("[data-jclose]")) { S.jp.card = null; el.remove(); jgDraw(host); return; }
+    const pick = e.target.closest("[data-jpick]");
+    if (pick) { const i = Number(pick.dataset.jpick); S.jp.card = { ...c, pick: i < 0 ? undefined : i }; jgCard(host); return; }
+    if (e.target.closest("[data-jzoomhere]")) { const cl = g.clusters[c.ci]; const a = cl.sa / cl.w; S.jp.card = null; el.remove(); host._zoomAt(g.vert ? a : a, 3.5); return; }
+    const cp = e.target.closest("[data-jcopy]");
+    if (cp) return copy(cp.dataset.jcopy, "commit id");
+    const s = e.target.closest("[data-jsess]");
+    if (s) return jOpenSession(s.dataset.jsess);
+    const op = e.target.closest("[data-jopen]");
+    if (op) return openJourney(op.dataset.jopen);
+  });
+}
+/** A session from the page: live ones open in the deck, past ones through History (any machine). */
+function jOpenSession(key) {
+  if (!key) return;
+  if (S.rows.has(key)) { setMode(null); select(key, { open: true, scroll: true }); return; }
+  openHist(key);
+}
+
+// ── the page ────────────────────────────────────────────────────────────────
+function jSpark(series, w = 132, h = 34, color = "currentColor") {
+  const s = (series ?? []).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (s.length < 2) return `<svg class="jspark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path d="M0 ${h - 2} H${w}" stroke="var(--line-2)" stroke-dasharray="3 3"/></svg>`;
+  const t0 = s[0][0], t1 = s.at(-1)[0] || t0 + 1, v0 = Math.min(0, ...s.map((p) => p[1])), v1 = Math.max(...s.map((p) => p[1])) || 1;
+  const X = (t) => ((t - t0) / Math.max(1, t1 - t0)) * (w - 4) + 2, Y = (v) => h - 3 - ((v - v0) / Math.max(1e-9, v1 - v0)) * (h - 8);
+  const d = s.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join("");
+  return `<svg class="jspark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path class="a" d="${d}L${X(t1).toFixed(1)} ${h}L${X(t0).toFixed(1)} ${h}Z" style="fill:${color}"/><path d="${d}" style="stroke:${color}"/><circle cx="${X(s.at(-1)[0]).toFixed(1)}" cy="${Y(s.at(-1)[1]).toFixed(1)}" r="2.4" style="fill:${color}"/></svg>`;
+}
+function jWeeksSpark(weeks, commits, w = 220, h = 40, color) {
+  const n = Math.max(weeks?.length ?? 0, commits?.length ?? 0);
+  if (!n) return "";
+  const v = Array.from({ length: n }, (_, i) => (weeks?.[i] ?? 0) * 3 + (commits?.[i] ?? 0));
+  const max = Math.max(1, ...v);
+  const X = (i) => (i / (n - 1)) * (w - 4) + 2, Y = (x) => h - 3 - Math.sqrt(x / max) * (h - 8);
+  let d = `M${X(0)} ${Y(v[0])}`;
+  for (let i = 1; i < n; i++) { const xm = (X(i - 1) + X(i)) / 2; d += ` C${xm.toFixed(1)} ${Y(v[i - 1]).toFixed(1)} ${xm.toFixed(1)} ${Y(v[i]).toFixed(1)} ${X(i).toFixed(1)} ${Y(v[i]).toFixed(1)}`; }
+  return `<svg class="jspark wk" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="a" d="${d} L${X(n - 1)} ${h} L${X(0)} ${h}Z" style="fill:${color}"/><path d="${d}" style="stroke:${color}"/>${v[n - 1] ? `<circle cx="${X(n - 1)}" cy="${Y(v[n - 1]).toFixed(1)}" r="2.6" style="fill:${color}"/>` : ""}</svg>`;
+}
+function jStageRing(j) {
+  const n = j.milestones.length || 1, u = j.counts.unlocked;
+  const partial = j.milestones.filter((m) => m.state === "progress").reduce((a, m) => a + (m.pct ?? 0), 0);
+  const p = Math.min(1, (u + partial * 0.999) / n);
+  const R = 42, C = 2 * Math.PI * R;
+  return `<svg class="jring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="${R}" class="bg"/><circle cx="50" cy="50" r="${R}" class="fg" style="stroke:${jhue(j.project)};stroke-dasharray:${(C * p).toFixed(1)} ${C.toFixed(1)}"/>${j.milestones.map((m, i) => { const a = (i / n) * 2 * Math.PI - Math.PI / 2; return `<circle cx="${(50 + R * Math.cos(a)).toFixed(1)}" cy="${(50 + R * Math.sin(a)).toFixed(1)}" r="2.6" class="tick ${m.state}"/>`; }).join("")}</svg>`;
+}
+function jMilestoneCard(j, m, i) {
+  const seen = load(`jseen:${j.project}`, []);
+  const fresh = m.state === "unlocked" && !seen.includes(m.id);
+  const isNext = j.next.includes(m.id);
+  const pct = Math.round((m.pct ?? 0) * 100);
+  const src = m.source.startsWith("manual.") ? "you log it" : m.source.split(".")[0];
+  return `<article class="jm ${m.state}${isNext ? " next" : ""}${fresh ? " fresh" : ""}" data-jmid="${esc(m.id)}" style="--i:${i}">
+    <div class="jmi">${m.state === "unlocked" ? J_ICON.trophy : m.state === "progress" ? `<span class="jmp" style="--p:${pct}">${pct}%</span>` : J_ICON.lock}</div>
+    <div class="jmb"><b>${esc(m.title)}</b><span class="jmm">${m.metric === "Done" ? "A moment you mark" : `${esc(m.metric)} · ${jnum(m.target)}${m.unit && m.unit !== "$" ? ` ${esc(m.unit)}` : ""}${m.unit === "$" ? " $" : ""}`}</span>
+      <div class="jbar"><i style="width:${m.state === "unlocked" ? 100 : pct}%"></i></div>
+      <span class="jme">${m.state === "unlocked" ? `${m.at ? `Unlocked ${esc(jdate(m.at))}` : "Unlocked"}${m.manual ? " · by you" : ""}` : m.value != null ? `${jnum(m.value)} of ${jnum(m.target)}` : m.metric === "Done" ? "Not yet" : "Not measured yet"}<em>${esc(m.metric === "Done" ? "you mark it" : src)}</em></span>
+      ${m.evidence && (m.value != null || m.state === "unlocked") ? `<span class="jmev" title="${esc(m.evidence)}">${esc(m.evidence)}</span>` : ""}
+      <span class="jmacts">${m.state === "unlocked" ? (m.manual ? `<button class="link" data-jundo="${esc(m.id)}">Undo</button>` : "") : `${m.source.startsWith("manual.") && m.metric !== "Done" ? `<button class="link" data-jlog="${esc(m.source.slice(7))}">Log ${esc(m.metric.toLowerCase())}</button>` : ""}<button class="link" data-junlock="${esc(m.id)}">Mark unlocked…</button>`}</span>
+    </div>${isNext && m.state !== "unlocked" ? '<span class="jnext">next</span>' : ""}</article>`;
+}
+function jHome(j) {
+  const h = projectHome(j.project);
+  if (h) return h;
+  if (j.root) return { machine: S.self, cwd: j.root, project: j.project };
+  return null;
+}
+function jPlanPrompt(j) {
+  const m = j.milestones.find((x) => x.id === j.next[0]) ?? j.milestones.find((x) => x.state !== "unlocked");
+  const ahead = j.next.map((id) => j.milestones.find((x) => x.id === id)).filter(Boolean).map((x) => `“${x.title}”`).join(", ");
+  return m ? `Read ~/wiki/projects/${j.project}.md (if it exists) and this repo's README for context. The next milestone for ${j.project} is “${m.title}” (${m.metric}: target ${m.target}${m.unit ? ` ${m.unit}` : ""}; now ${m.value ?? "not measured"}; measured by ${m.source}).${ahead ? ` After it: ${ahead}.` : ""}${j.heading?.direction ? ` Where it seems to be heading: ${j.heading.direction}` : ""}
+
+Plan the smallest path to unlock it: what to build or do, how we'll know it happened (the evidence), risks, and the first three tasks. Write the plan to ~/.config/herdr-deck/ideas/${j.project}-${m.id}.md, then stop and wait for my go before changing anything.` : `Read ~/wiki/projects/${j.project}.md for context and propose the next milestone for ${j.project}, with a plan and the first three tasks. Don't change anything yet.`;
+}
+
+function renderJourney(fresh) {
+  const name = S.jp.name;
+  const j = S.jp.data.get(name);
+  if (!j && !S.jp.loading.has(name)) loadJourney(name);
+  if (!j || j.error) {
+    modeHTML(`<div class="jpage"><header class="jhero skel"><div class="jh-l"><p class="jcrumb"><button class="link" data-jidx>${J_ICON.grid} Projects</button></p><h2>${esc(name ?? "")}</h2><p class="jpitch">${j?.error ? esc(j.error) : '<span class="spin"></span> Reading its history: git, the wiki, every session…'}</p></div></header><div class="jgwrap skel"></div></div>`);
+    return;
+  }
+  // Re-render only when the journey itself changed; live bits (who's working) are patched in place, so the graph
+  // and the animations don't restart on every deck update.
+  const box = $("dbody");
+  const sig = [j.project, j.builtAt, j.ai?.at, j.ai?.state, !!j.pending, isPhone(), S.jp.allSessions, S.jp.allQuests].join("|");
+  if (!fresh && box._mode === "project" && box._jsig === sig && box.querySelector(".jpage")) return jPatchLive(j);
+  const calm = S.jp.shown?.has(j.project);
+  (S.jp.shown ??= new Set()).add(j.project);
+  const pcol = jhue(j.project);
+  const live = (j.now.live ?? []).map((l) => ({ ...l, status: S.rows.get(l.key)?.status ?? l.status }));
+  const working = live.filter((l) => l.status === "working").length;
+  const M = new Map(j.metrics.map((m) => [m.key, m]));
+  const nums = [
+    ["Commits", M.get("git.commits")?.value, "git.commits"], ["Sessions", j.counts.sessions, "sessions.count"], ["Agent hours", M.get("sessions.agent_hours")?.value, "sessions.agent_hours"],
+    ["Active days", M.get("git.active_days")?.value, "git.active_days"], ["Turns", j.turns.length], ["Side quests", j.quests.length],
+  ].filter(([, v]) => v != null);
+  const next = j.milestones.find((m) => m.id === j.next[0]);
+  const days = j.origin?.t ? jdays(j.origin.t, j.now.t) : 0;
+  const status = j.status ?? "active";
+  const ai = j.ai ?? {};
+  const aiLine = ai.state === "running" ? `<span class="spin"></span> Reading the journey with ${ai.source === "ollama" ? "a local model" : "Claude"}…` : ai.source ? `${ai.source === "rules" ? "Simple rules" : `${esc(ai.source === "claude" ? "Claude" : "Ollama")}${ai.model ? ` ${esc(ai.model)}` : ""}`} · ${esc(when(ai.at))}${ai.note ? ` · ${esc(ai.note)}` : ""}` : "Not read yet";
+  const sessions = j.events.filter((e) => e.kind === "session").slice().sort((a, b) => (b.end ?? b.t) - (a.end ?? a.t));
+  const liveKeys = new Set(live.map((l) => l.key));
+  const quests = j.quests.slice().sort((a, b) => b.to - a.to);
+  const metricTiles = j.metrics.filter((m) => m.value || m.series?.length > 1 || m.key.startsWith("manual.")).map((m) => `<div class="jmt"><span>${esc(m.label)}</span><b>${jnum(m.value)}${m.unit === "$" ? " $" : ""}</b>${jSpark(m.series, 132, 34, m.key.startsWith("manual.") ? "var(--jgold)" : pcol)}<small title="${esc(m.evidence)}">${esc(m.evidence)}</small></div>`).join("");
+  const showAllS = S.jp.allSessions === j.project;
+  const html = `<div class="jpage${calm ? " calm" : ""}" style="--pc:${pcol}">
+    <header class="jhero">
+      <div class="jh-l">
+        <p class="jcrumb"><button class="link" data-jidx>${J_ICON.grid} Projects</button><span>/</span><span class="jstat ${esc(status)}">${esc(status)}</span><span class="jnat">${esc(j.nature.replace("-", " "))}</span><span id="jliveChip">${jLiveChip(working, live.length)}</span></p>
+        <h2><span class="jsw"></span>${esc(j.project)}</h2>
+        <p class="jpitch">${esc(j.pitch || j.tldr || "")}</p>
+        <div class="jnums">${nums.map(([l, v]) => `<div><b>${jnum(v)}</b><span>${l}</span></div>`).join("")}${days ? `<div><b>${jnum(days)}</b><span>Days since origin</span></div>` : ""}</div>
+        <div class="jacts">
+          <button class="btn primary" data-jact="start">${J_ICON.play}Start a session here</button>
+          <button class="btn" data-jact="plan">${J_ICON.flag}Plan the next milestone</button>
+          <button class="btn" data-jact="log">${J_ICON.plus}Log a metric</button>
+          <button class="btn ghost" data-jact="regen" ${ai.state === "running" ? "disabled" : ""}>${J_ICON.refresh}Regenerate</button>
+          ${j.wikiPage ? `<a class="btn ghost fpath" data-path="wiki:${esc(j.wikiPage)}">${J_ICON.doc}Wiki</a>` : ""}
+        </div>
+      </div>
+      <div class="jh-r">
+        <div class="jstage">${jStageRing(j)}<div class="jst-t"><small>Stage</small><b>${j.stage ? esc(j.stage.title) : "Just starting"}</b><span>${j.counts.unlocked} of ${j.counts.milestones} unlocked</span></div></div>
+        ${next ? `<div class="jnextc"><small>Next milestone</small><b>${esc(next.title)}</b><div class="jbar"><i style="width:${Math.round((next.pct ?? 0) * 100)}%"></i></div><span>${next.value != null ? `${jnum(next.value)} of ${jnum(next.target)} ${esc(next.unit)}` : "not measured yet"}</span></div>` : ""}
+      </div>
+    </header>
+    <section class="jgwrap"><div class="jghead"><h3>${J_ICON.journey}The journey</h3><span class="jlegend"><i class="cm"></i>commits<i class="se"></i>sessions<i class="nt"></i>notes<i class="tn"></i>turns<i class="fl"></i>milestones<i class="qq"></i>side quests</span><span class="hint jhint">${isPhone() ? "Pinch to zoom · tap a point" : "Drag to pan · ⌘/ctrl + scroll or pinch to zoom · click a point"}</span></div><div class="jg-host" id="jgHost"></div></section>
+    <section class="jsec jms"><div class="jsh"><h3>${J_ICON.trophy}Milestones</h3><span class="hint">${j.counts.unlocked} unlocked · the ladder is written for this project by ${ai.source === "rules" || !ai.source ? "simple rules" : "AI"}, and unlocks only from evidence</span></div>
+      <div class="jladder">${j.milestones.map((m, i) => jMilestoneCard(j, m, i)).join("")}</div></section>
+    <div class="jcolz">
+      <section class="jsec"><h3>${J_ICON.spark}Original idea</h3>
+        ${j.origin?.summary ? `<p class="jidea">${esc(j.origin.summary)}</p>` : ""}
+        ${j.origin?.idea ? `<blockquote class="jq1">${esc(j.origin.idea)}</blockquote>` : '<p class="hint">No first prompt or note found.</p>'}
+        <p class="jmeta">${j.origin?.t ? `${esc(jdate(j.origin.t))} · ` : ""}${j.origin?.ideaFrom === "session" ? `your first message${j.origin.session?.session ? ` in <button class="link" data-jsess="${esc(j.origin.session.session)}">“${esc(j.origin.session.title ?? "the first session")}”</button>` : ""}` : j.origin?.ideaFrom === "wiki" ? "from the wiki page" : j.origin?.ideaFrom === "git" ? "the first commit" : ""}${j.origin?.commit ? ` · first commit “${esc(j.origin.commit.subject)}”` : ""}${j.origin?.parent ? ` · grew out of <a class="fpath" data-path="wiki:${esc(j.origin.parent)}">${esc(j.origin.parent)}</a>` : ""}</p>
+      </section>
+      <section class="jsec"><h3>${J_ICON.chat}Story so far</h3>${j.story ? `<p class="jstory">${esc(j.story)}</p>` : '<p class="hint">Not written yet.</p>'}<p class="jmeta">${aiLine}</p></section>
+      <section class="jsec"><h3>${J_ICON.turn}Where it’s heading</h3>${j.heading?.direction ? `<p class="jdir">${esc(j.heading.direction)}</p>` : ""}
+        <div class="jnext3">${j.next.map((id) => j.milestones.find((m) => m.id === id)).filter(Boolean).map((m) => `<div class="jn"><b>${esc(m.title)}</b><div class="jbar"><i style="width:${Math.round((m.pct ?? 0) * 100)}%"></i></div><small>${m.value != null ? `${jnum(m.value)} / ${jnum(m.target)} ${esc(m.unit)}` : "not measured yet"}</small></div>`).join("") || '<p class="hint">Everything on the ladder is unlocked. Regenerate for a new one.</p>'}</div>
+        ${j.turns.length ? `<ol class="jturns">${j.turns.map((t) => `<li><time>${esc(jd10(t.t))}</time><b>${esc(t.label)}</b>${t.why ? `<span>${esc(t.why)}</span>` : ""}</li>`).join("")}</ol>` : ""}
+      </section>
+      <section class="jsec"><h3>${J_ICON.branch}Side quests <span class="n">${j.quests.length}</span></h3>
+        ${quests.length ? `<ul class="jquests">${quests.slice(0, S.jp.allQuests === j.project ? 200 : 8).map((q) => `<li class="${esc(q.status)}"><i style="background:${q.kind === "spinoff" ? "var(--jgold)" : q.status === "abandoned" ? "var(--ink-3)" : jhue(j.project, 3)}"></i><div><b>${esc(q.label)}</b><small>${esc(q.kind === "spinoff" ? "spin-off" : q.status)} · ${esc(jdate(q.from))}${q.to - q.from > JDAY ? ` – ${esc(jdate(q.to))}` : ""}${q.commits ? ` · ${q.commits} commit${q.commits === 1 ? "" : "s"}` : ""}${q.sessions.length ? ` · ${q.sessions.length} session${q.sessions.length === 1 ? "" : "s"}` : ""}</small></div>${q.kind === "spinoff" && q.branch ? `<button class="link" data-jopen="${esc(q.branch)}">open</button>` : ""}</li>`).join("")}</ul>${quests.length > 8 && S.jp.allQuests !== j.project ? `<button class="link" data-jallq>Show all ${quests.length}</button>` : ""}` : '<p class="hint">No branches, worktrees or spin-offs off the main line.</p>'}
+      </section>
+    </div>
+    <section class="jsec"><div class="jsh"><h3>${J_ICON.chat}Sessions <span class="n">${sessions.length}</span></h3>${live.length ? `<span class="hint">${live.length} open now</span>` : ""}<span class="spacer"></span><button class="link" data-jhist>Search them in History</button></div>
+      <ul class="jsess">${sessions.slice(0, showAllS ? 400 : 10).map((e) => { const k = e.link?.session; const r = S.rows.get(k); const st = r?.status; const lane = e.lane && j.quests.find((q) => q.id === e.lane); return `<li><button data-jsess="${esc(k ?? "")}"><span class="dot" style="--c:${st ? statusVar(st) : "var(--line-2)"}"></span><span class="t">${esc(e.title)}</span><small>${esc(jdate(e.t))}${e.n ? ` · ${e.n} prompt${e.n === 1 ? "" : "s"}` : ""}${lane ? ` · ${esc(lane.label)}` : ""}${e.link?.machine && multiMachine() ? ` · ${esc(machineLabel(e.link.machine))}` : ""}${liveKeys.has(k) ? ` · <b>${esc(STATUS_NAME[st] ?? "open")}</b>` : ""}</small></button></li>`; }).join("")}</ul>
+      ${sessions.length > 10 && !showAllS ? `<button class="link" data-jalls>Show all ${sessions.length}</button>` : ""}
+    </section>
+    <section class="jsec"><h3>${J_ICON.grid}Metrics</h3><div class="jmetrics">${metricTiles || '<p class="hint">Nothing measured yet. Log a metric.</p>'}</div></section>
+    <footer class="jfooter">Built from ${[j.sources.git ? `git${j.now.github ? ` (${esc(j.now.github)})` : ""}${j.now.branch ? ` on <code>${esc(j.now.branch)}</code>` : ""}${j.now.dirty ? `, ${j.now.dirty} uncommitted` : ""}` : "", j.sources.wiki ? "the wiki page" : "", `${j.sources.sessions} session${j.sources.sessions === 1 ? "" : "s"}${j.sources.machines.length ? ` on ${j.sources.machines.map((m) => esc(machineLabel(m))).join(", ")}` : ""}`, j.sources.notes ? `${j.sources.notes} saved plan${j.sources.notes === 1 ? "" : "s"}/leads` : "", j.sources.github ? `GitHub: ${esc(j.sources.github)}` : "", j.sources.gumroad ? `Gumroad: ${esc(j.sources.gumroad)}` : ""].filter(Boolean).join(" · ")}. Updated ${esc(when(j.builtAt))}${j.pending ? ' · <span class="spin"></span> refreshing' : ""}.</footer>
+  </div>`;
+  modeHTML(html);
+  box._jsig = sig;
+  const host = $("dbody").querySelector("#jgHost");
+  if (host && (!host._jg || host._jg.j !== j || host._jg.vert !== isPhone())) { jgMount(host, j); if (S.jp.card) jgCard(host); }
+  // First sight of an unlock: the card plays its animation once, then it's remembered.
+  const fresh2 = j.milestones.filter((m) => m.state === "unlocked").map((m) => m.id);
+  if (fresh2.some((id) => !load(`jseen:${j.project}`, []).includes(id))) setTimeout(() => store(`jseen:${j.project}`, fresh2), 2600);
+}
+
+const jLiveChip = (working, open) => (working ? `<span class="jlive"><span class="spin"></span>${working} working now</span>` : open ? `<span class="jlive idle">${open} open session${open === 1 ? "" : "s"}</span>` : "");
+/** Who's working right now, without touching the rest of the page. */
+function jPatchLive(j) {
+  const box = $("dbody");
+  const live = (j.now.live ?? []).map((l) => S.rows.get(l.key)?.status ?? l.status);
+  const chip = box.querySelector("#jliveChip");
+  if (chip) setHTML(chip, jLiveChip(live.filter((x) => x === "working").length, live.length));
+  for (const b of box.querySelectorAll(".jsess [data-jsess]")) { const st = S.rows.get(b.dataset.jsess)?.status; b.querySelector(".dot")?.style.setProperty("--c", st ? statusVar(st) : "var(--line-2)"); }
+}
+function renderProjects() {
+  const d = S.jp.idx;
+  if (!d) { modeHTML(`<header class="vh"><h2>${J_ICON.grid}Projects</h2><p><span class="spin"></span> Gathering every project…</p></header>`); return; }
+  const q = S.jp.q.trim().toLowerCase();
+  const list = (d.projects ?? []).filter((p) => !q || `${p.project} ${p.tldr ?? ""} ${(p.tags ?? []).join(" ")} ${p.status ?? ""}`.toLowerCase().includes(q));
+  const shown = S.jp.all || q ? list : list.slice(0, 48);
+  const card = (p, i) => {
+    const col = jhue(p.project);
+    const working = S.rows.size ? [...S.rows.values()].filter((r) => r.project === p.project && r.status === "working").length : p.working;
+    return `<button class="jpc" data-jopen="${esc(p.project)}" style="--pc:${col};--i:${Math.min(i, 24)}">
+      <span class="jpc-h"><span class="jsw"></span><b>${esc(p.project)}</b>${p.status ? `<span class="jstat ${esc(p.status)}">${esc(p.status)}</span>` : ""}${working ? `<span class="jlive"><span class="spin"></span>${working}</span>` : p.live ? `<span class="jlive idle">${p.live} open</span>` : ""}</span>
+      <span class="jpc-p">${esc(p.pitch || p.tldr || (p.root ? home(p.root) : ""))}</span>
+      ${jWeeksSpark(p.weeks, p.commitWeeks, 220, 40, col)}
+      <span class="jpc-f">${p.next ? `<span class="jpc-n">${J_ICON.flag}<span>${esc(p.next.title)}</span><span class="jbar"><i style="width:${Math.round((p.next.pct ?? 0) * 100)}%"></i></span></span>` : p.stage ? `<span class="jpc-n">${J_ICON.trophy}${esc(p.stage)}</span>` : `<span class="hint">${p.sessions ? `${p.sessions} session${p.sessions === 1 ? "" : "s"}` : p.root ? "git repo" : p.wiki ? "wiki page" : p.live ? "open now" : ""}</span>`}<span class="jpc-a">${p.last ? esc(agoText(p.last)) : ""}</span></span>
+    </button>`;
+  };
+  modeHTML(`<header class="vh jvh"><h2>${J_ICON.grid}Projects</h2><p>Every project as a journey: where it started, the turns it took, and the milestones ahead. Open one to see its whole story.</p>
+    <div class="jsearch"><input class="inp" id="jpq" type="search" placeholder="Filter ${d.projects?.length ?? 0} projects" value="${esc(S.jp.q)}" autocomplete="off"></div></header>
+    <div class="jpgrid">${shown.map(card).join("") || '<p class="hint">No project matches.</p>'}</div>
+    ${list.length > shown.length ? `<p style="text-align:center"><button class="btn" data-jallp>Show all ${list.length}</button></p>` : ""}`);
+}
+
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "project" && S.mode !== "projects") return;
+  const t = e.target;
+  if (t.closest(".jg-host")) return; // the graph handles its own clicks
+  const open = t.closest("[data-jopen]");
+  if (open) return openJourney(open.dataset.jopen);
+  if (t.closest("[data-jidx]")) return openProjects();
+  if (t.closest("[data-jallp]")) { S.jp.all = true; return renderProjects(); }
+  const j = S.jp.data.get(S.jp.name);
+  if (!j || S.mode !== "project") return;
+  const sess = t.closest("[data-jsess]");
+  if (sess) return jOpenSession(sess.dataset.jsess);
+  if (t.closest("[data-jalls]")) { S.jp.allSessions = j.project; return renderJourney(); }
+  if (t.closest("[data-jallq]")) { S.jp.allQuests = j.project; return renderJourney(); }
+  if (t.closest("[data-jhist]")) { S.hq = j.project; setMode("history"); const q = $("dbody").querySelector(".view input[type=search], .view .inp"); if (q) { q.value = j.project; q.dispatchEvent(new Event("input", { bubbles: true })); } return; }
+  const log = t.closest("[data-jlog]");
+  if (log) return jLogDialog(j, log.dataset.jlog);
+  const un = t.closest("[data-junlock]");
+  if (un) {
+    const m = j.milestones.find((x) => x.id === un.dataset.junlock);
+    const note = await askDialog({ title: `Mark “${m?.title}” unlocked`, text: "What happened? Your note is the evidence shown on the milestone.", input: "", ok: "Unlock it", multiline: true });
+    if (!note || !String(note).trim()) return;
+    try { const r = await api("/api/journey/unlock", { project: j.project, id: un.dataset.junlock, note: String(note) }); S.jp.data.set(j.project, r); renderJourney(true); toast(`Unlocked “${m?.title}”`); } catch (err) { toast(err.message, true); }
+    return;
+  }
+  const undo = t.closest("[data-jundo]");
+  if (undo) { try { const r = await api("/api/journey/unlock", { project: j.project, id: undo.dataset.jundo, undo: true }); S.jp.data.set(j.project, r); renderJourney(true); } catch (err) { toast(err.message, true); } return; }
+  const act = t.closest("[data-jact]")?.dataset.jact;
+  if (!act) return;
+  if (act === "start" || act === "plan") {
+    const h = jHome(j);
+    if (!h) return toast(`${j.project}’s folder isn’t on this machine`, true);
+    const next = j.milestones.find((x) => x.id === j.next[0]);
+    return openNew(act === "start" ? { ...h, title: `New session in ${j.project}` } : { ...h, kind: "claude", prompt: jPlanPrompt(j), label: `plan ${next?.title ?? "next milestone"}`.slice(0, 40), title: `Plan the next milestone${next ? `: ${next.title}` : ""}` });
+  }
+  if (act === "log") return jLogDialog(j);
+  if (act === "regen") { toast("Reading the journey again…"); S.jp.polls = 0; return loadJourney(j.project, { regen: true, force: true }); }
+});
+$("dbody").addEventListener("input", (e) => {
+  if (S.mode === "projects" && e.target.id === "jpq") { S.jp.q = e.target.value; const pos = e.target.selectionStart; renderProjects(); const el = $("jpq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } }
+});
+function jLogDialog(j, metric = "") {
+  const names = [...new Set([...j.milestones.filter((m) => m.source.startsWith("manual.")).map((m) => m.source.slice(7)), ...j.metrics.filter((m) => m.key.startsWith("manual.")).map((m) => m.key.slice(7)), "users", "paying_customers", "mrr", "dau", "views", "downloads_month"])];
+  const d = document.createElement("dialog");
+  d.className = "dlg jlogd";
+  d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Log a metric for ${esc(j.project)}</h3><p class="hint">A reading on a date (users on that day, revenue that month…). Milestones measured by it unlock when a reading reaches their target.</p>
+    <label class="jf"><span>Metric</span><input class="inp" name="metric" list="jmlist" value="${esc(metric)}" placeholder="users" required pattern="[A-Za-z][A-Za-z0-9 _-]{1,30}"><datalist id="jmlist">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist></label>
+    <div class="jf2"><label class="jf"><span>Value</span><input class="inp" name="value" type="number" step="any" required inputmode="decimal"></label><label class="jf"><span>Date</span><input class="inp" name="at" type="date" value="${jd10(Date.now())}"></label></div>
+    <label class="jf"><span>Note (optional)</span><input class="inp" name="note" placeholder="Where the number came from"></label></div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Log it</button></div></form>`;
+  document.body.append(d);
+  d.addEventListener("close", async () => {
+    const f = d.querySelector("form");
+    const ok = d.returnValue === "ok";
+    const data = Object.fromEntries(new FormData(f));
+    d.remove();
+    if (!ok) return;
+    try {
+      const r = await api("/api/journey/metric", { project: j.project, metric: data.metric, value: Number(data.value), at: data.at ? new Date(`${data.at}T12:00:00`).getTime() : undefined, note: data.note });
+      S.jp.data.set(j.project, r); renderJourney(true); toast(`Logged ${data.metric} = ${data.value}`);
+    } catch (err) { toast(err.message, true); }
+  });
+  d.showModal();
+  (metric ? d.querySelector("[name=value]") : d.querySelector("[name=metric]")).focus();
+}
+// ──────────────────────────────────────────────────────────────────────────── </journey>
+
 // ── push notifications (Web Push through the service worker) ───────────
 // The hub sends them (Settings → Automations decides what), so they arrive with the app closed.
 // The old page-only alerts (toggleAlerts) stay as the fallback where push isn't available.
@@ -4684,6 +5907,7 @@ function focusTerminal() {
 let palItems = [], palIndex = 0;
 function openPalette(initial = "") {
   const d = $("palette");
+  if (palRoute) routeReset();
   $("palQ").value = initial;
   if (!d.open) d.showModal();
   renderPalette();
@@ -4702,6 +5926,8 @@ function fuzzy(text, q) {
 }
 function paletteItems(q) {
   const out = [];
+  // A sentence rather than a search: offer to have Jev find the session it's meant for.
+  if (routeOn() && q.split(/\s+/).filter(Boolean).length >= 3) out.push({ html: `<span>Send to the right session…</span><small>Jev suggests, you confirm</small>`, keep: true, route: true, run: () => routeAsk(q) });
   const cur = rowOf(S.sel);
   const n = targets().length;
   const sessions = [...S.rows.values()].map((r) => ({ r, s: fuzzy(`${r.title} ${r.project} ${r.launch ?? ""} ${paneName(r)} ${machineLabel(r.machine)} ${r.agent} ${r.branch ?? ""}`, q) }))
@@ -4724,6 +5950,8 @@ function paletteItems(q) {
     cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
     cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
     cur && !cur.app && !cur.hist && { t: "Rename this session…", k: "e", run: () => renameSession(cur) },
+    { t: "Projects: every project’s journey", run: openProjects },
+    cur && { t: `Project page: ${cur.project}`, run: () => openJourney(cur.project) },
     { t: "Connections: what agents can use", run: () => openConnections(cur?.key) },
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
@@ -4744,9 +5972,9 @@ function paletteItems(q) {
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },
     { t: "Idea lab: research and plan any idea", run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },
     { t: "Ideas: plans your agents wrote", run: () => { S.disc.tab = "ideas"; setMode("discover"); } },
-    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, run: () => { setMode("discover"); ideaSearch(q); } },
+    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, echo: true, run: () => { setMode("discover"); ideaSearch(q); } },
     { t: "Leads: who needs an idea, or what an audience needs", run: () => { leadsFor(""); setTimeout(() => $("dbody").querySelector("[data-lq]")?.focus(), 60); } },
-    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, run: () => leadsFor(q, "idea") },
+    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, echo: true, run: () => leadsFor(q, "idea") },
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Notifications on this device…", run: openNotifications },
     { t: "Automations: alerts, morning digest, empty sessions, proof of done", run: openAutomations },
@@ -4756,16 +5984,23 @@ function paletteItems(q) {
     !isPhone() && { t: "Keyboard shortcuts", k: "?", run: () => $("help").showModal() },
     ...(multiMachine() ? [["all", "all machines"], ...S.summary.machines.map((m) => [m.id, m.label])].map(([id, label]) => ({ t: `Show ${label}`, run: () => setMachine(id) })) : []),
   ].filter(Boolean).map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, q ? 8 : 6);
-  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, run: c.run })));
+  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, echo: c.echo, run: c.run })));
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
     if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
+    // journey: "Project: <name>" for every known project (live, indexed, or already opened)
+    const names = [...new Set([...S.rows.values()].map((r) => r.project).concat((S.jp.idx?.projects ?? []).map((x) => x.project), [...S.jp.data.keys()]))].filter(Boolean);
+    const jp = names.map((p) => ({ p, s: fuzzy(`project ${p}`, q) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 5);
+    if (jp.length) out.push({ head: "Project pages" }, ...jp.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Project: ${esc(p)}</span><small>journey & milestones</small>`, run: () => openJourney(p) })));
   }
   return out;
 }
 function renderPalette() {
   palItems = paletteItems($("palQ").value.trim());
-  palIndex = palItems.findIndex((x) => !x.head);
+  // Enter runs the top match. Routing (a Jev call) is the default only when nothing else matches; the Idea lab
+  // item echoes any long query, so it doesn't count as a match, and comes last.
+  const at = (f) => palItems.findIndex((x) => !x.head && f(x));
+  palIndex = [at((x) => !x.route && !x.echo), at((x) => x.route), at(() => true)].find((i) => i >= 0) ?? -1;
   $("palList").innerHTML = palItems.map((it, idx) => it.head ? `<div class="mh">${esc(it.head)}</div>` : `<button role="option" data-p="${idx}" class="${idx === palIndex ? "on" : ""}">${it.html}</button>`).join("") || `<div class="empty-state">Nothing found</div>`;
 }
 function palMove(d) {
@@ -4775,15 +6010,134 @@ function palMove(d) {
   for (const b of $("palList").querySelectorAll("[data-p]")) b.classList.toggle("on", Number(b.dataset.p) === palIndex);
   $("palList").querySelector(".on")?.scrollIntoView({ block: "nearest" });
 }
-function palRun(i = palIndex) { const it = palItems[i]; if (!it || it.head) return; $("palette").close(); it.run(); }
+function palRun(i = palIndex) { const it = palItems[i]; if (!it || it.head) return; if (!it.keep) $("palette").close(); it.run(); }
 $("palQ").addEventListener("input", renderPalette);
 $("palQ").addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") { e.preventDefault(); palMove(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); palMove(-1); }
-  else if (e.key === "Enter") { e.preventDefault(); palRun(); }
+  else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); palRun(); } // the route view it may open mustn't see this Enter
 });
 $("palList").addEventListener("click", (e) => { const b = e.target.closest("[data-p]"); if (b) palRun(Number(b.dataset.p)); });
 $("palette").addEventListener("click", (e) => { if (e.target === $("palette")) $("palette").close(); });
+
+// ── send by description ──────────────────────────────────────────────────
+// Jev suggests which session a message is for; nothing is sent until you press Enter or Send here.
+let palRoute = null;
+let routeDraft = null; // the message as you last edited it, kept when you go back to the list
+const PAL_FOOT = $("palette").querySelector(".pal-foot").innerHTML;
+const routeOn = () => !!S.jev?.available && S.jev?.features?.route !== false;
+const ROUTE_SURE = 0.6;
+const ROUTE_SETTLE_MS = 400; // Enter does nothing this long after the picks appear, so a held or double Enter can't send
+const ROUTE_WHY = { no_sessions: "No coding-agent session is running to send it to.", one_session: "Only one session can take it.", timeout: "Jev took too long.", deck_daily_cap: "Jev’s daily cap for the deck is used up.", unavailable: "Jev isn’t available." };
+// Without Jev's picks you still choose, from the most recent sessions that can take a message.
+const routeRecent = () => [...S.rows.values()].filter((r) => isAgent(r) && !r.empty && r.status !== "empty" && !r.app && !r.hist)
+  .sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0)).slice(0, 6).map((r) => ({ key: r.key }));
+async function routeAsk(q) {
+  const m = palRoute = { q, busy: true, list: [], sel: null };
+  $("palQ").hidden = true;
+  $("palette").querySelector(".pal-foot").innerHTML = `<span><kbd>↑</kbd> <kbd>↓</kbd> pick</span><span><kbd>↵</kbd> send</span><span><kbd>esc</kbd> back</span>`;
+  $("palList").innerHTML = `<div class="proute"><textarea id="palMsg" rows="3" aria-label="Message to send" spellcheck="true"></textarea><div class="mh" id="palWhy"></div><div id="palPicks" role="listbox" aria-label="Sessions"></div>
+    <div class="proute-f"><button type="button" class="btn" data-rback>Back</button><button type="button" class="btn primary" data-rsend>Send</button></div></div>`;
+  $("palMsg").value = routeDraft?.q === q ? routeDraft.text : q;
+  $("palMsg").focus();
+  renderRoute();
+  try {
+    const r = await api("/api/jev/route", { text: q }, 20_000);
+    if (palRoute !== m) return; // you went back or closed the palette meanwhile
+    const picks = (r.picks ?? []).filter((x) => S.rows.has(x.key));
+    if (picks.length) {
+      m.list = picks;
+      m.sel = picks[0].p >= ROUTE_SURE && !routeBlocked(picks[0].key) ? picks[0].key : null;
+      m.why = m.sel ? `Jev’s pick${r.ms != null ? ` · ${r.ms} ms` : ""}` : picks[0].p >= ROUTE_SURE ? "Jev’s pick is waiting on a prompt, so it isn’t preselected" : "Jev isn’t sure, pick one";
+    } else {
+      m.list = routeRecent();
+      // Only one session can take it: pick it for you, Enter still sends.
+      if (r.fallback === "one_session" && m.list.length === 1 && !routeBlocked(m.list[0].key)) m.sel = m.list[0].key;
+      m.why = `${ROUTE_WHY[r.fallback] ?? "Jev couldn’t pick one."}${m.list.length && !m.sel ? " Pick one." : ""}`;
+    }
+  } catch (x) {
+    if (palRoute !== m) return;
+    m.list = routeRecent();
+    m.why = `${x.message}${m.list.length ? " Pick one." : ""}`;
+  }
+  m.busy = false;
+  m.readyAt = Date.now() + ROUTE_SETTLE_MS;
+  renderRoute();
+}
+// A session waiting on a prompt could take the message as its answer ("yes, and…"): flag it, never preselect it.
+const routeBlocked = (key) => rowOf(key)?.status === "blocked";
+function renderRoute() {
+  const m = palRoute;
+  if (!m) return;
+  $("palWhy").textContent = m.busy ? "Asking Jev which session…" : m.why;
+  $("palPicks").innerHTML = m.list.map((x) => {
+    const r = rowOf(x.key);
+    if (!r) return "";
+    return `<button type="button" role="option" data-rk="${esc(x.key)}" class="${x.key === m.sel ? "on" : ""}" aria-selected="${x.key === m.sel}"><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.project)} · ${esc(r.title || r.agent)}${x.p != null ? ` — ${Math.round(x.p * 100)}%` : ""}</span><small>${multiMachine() ? esc(machineLabel(r.machine)) + " · " : ""}${r.status === "blocked" ? `<b>${pendingAsk(r)?.kind === "question" ? "waiting on your answer to a question" : "waiting on a permission prompt"}</b>` : esc(STATUS_NAME[r.status] ?? r.status)}</small></button>`;
+  }).join("");
+  $("palette").querySelector("[data-rsend]").disabled = m.busy || !m.sel;
+}
+function routeMove(d) {
+  const m = palRoute;
+  if (!m?.list.length) return;
+  const i = m.list.findIndex((x) => x.key === m.sel);
+  m.sel = m.list[i < 0 ? (d > 0 ? 0 : m.list.length - 1) : (i + d + m.list.length) % m.list.length].key;
+  renderRoute();
+  $("palPicks").querySelector(".on")?.scrollIntoView({ block: "nearest" });
+}
+function routeBack() {
+  const q = palRoute?.q ?? "";
+  if (palRoute) routeDraft = { q, text: $("palMsg").value };
+  routeReset();
+  $("palQ").value = q;
+  renderPalette();
+  $("palQ").focus();
+}
+function routeReset() {
+  palRoute = null;
+  $("palQ").hidden = false;
+  $("palette").querySelector(".pal-foot").innerHTML = PAL_FOOT;
+}
+async function routeSend() {
+  const m = palRoute;
+  if (!m || m.busy || m.sending) return;
+  const r = rowOf(m.sel), text = $("palMsg").value.trim();
+  if (!r) return toast("Pick a session first", true);
+  if (!text) return toast("Type a message first", true);
+  m.sending = true;
+  try {
+    // The same path as the message box: long text travels as a file.
+    await api("/api/send", { key: r.key, text: text.length > LONG_SEND ? await fileLongText(r, text, []) : text });
+    routeDraft = null;
+    $("palette").close();
+    toast(`Sent to ${r.project}: “${plain(text).slice(0, 50)}${text.length > 50 ? "…" : ""}”`);
+    if (S.sel === r.key) setTimeout(() => chatTick(true), 250);
+  } catch (x) { m.sending = false; toast("Send failed: " + x.message, true); }
+}
+$("palette").addEventListener("keydown", (e) => {
+  if (!palRoute) return;
+  const t = e.target;
+  if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); routeBack(); }
+  else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
+    if (t.closest?.("[data-rback], [data-rsend]")) return; // the button's own click
+    if (t.id === "palMsg" && isPhone()) return; // a new line, like the message box on a phone
+    e.preventDefault();
+    // Only a fresh press after Jev's picks have settled sends: not the Enter that opened this view, nor one held down.
+    if (palRoute.busy || e.repeat || Date.now() < (palRoute.readyAt ?? Infinity)) return;
+    if (t.dataset?.rk) { palRoute.sel = t.dataset.rk; renderRoute(); }
+    routeSend();
+  } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && !(t.id === "palMsg" && t.value.includes("\n"))) { e.preventDefault(); routeMove(e.key === "ArrowDown" ? 1 : -1); }
+});
+$("palList").addEventListener("click", (e) => {
+  if (!palRoute) return;
+  const b = e.target.closest("[data-rk]");
+  if (b) { palRoute.sel = b.dataset.rk; renderRoute(); return; }
+  if (e.target.closest("[data-rback]")) routeBack();
+  else if (e.target.closest("[data-rsend]")) routeSend();
+});
+// Esc on some browsers, and the back gesture on Android, arrive as a cancel: go back rather than close.
+$("palette").addEventListener("cancel", (e) => { if (palRoute) { e.preventDefault(); routeBack(); } });
+$("palette").addEventListener("close", () => { if (palRoute) routeReset(); });
 
 // ── new session ──────────────────────────────────────────────────────────
 const KINDS = [["claude", "Claude Code"], ["codex", "Codex"], ["opencode", "OpenCode"], ["shell", "Shell"]];
@@ -4895,6 +6249,8 @@ $("live").onclick = () => setBoard(!S.board);
 $("rows").addEventListener("click", async (e) => {
   const newin = e.target.closest('[data-secact="newin"]');
   if (newin) { e.stopPropagation(); return openNew(projectHome(newin.dataset.proj)); }
+  const jour = e.target.closest('[data-secact="journey"]');
+  if (jour) { e.stopPropagation(); return openJourney(jour.dataset.proj); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
@@ -4998,6 +6354,7 @@ $("detail").addEventListener("click", (e) => {
   if (act === "home") return goHome();
   const r = rowOf(S.sel);
   if (!r) return;
+  if (act === "journey") return openJourney(r.project);
   if (act === "tools") openToolMenu(b);
   if (act === "share") shareRow(r, Number(b.dataset.port));
   if (act === "unshare") unshareRow(r, Number(b.dataset.port));
@@ -5134,7 +6491,7 @@ new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
-  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return !$("palette").open ? openPalette() : palRoute ? routeBack() : $("palette").close(); } // in the route view: back, like Esc
   if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.mode === "inbox" && inboxKeydown(e)) return;
@@ -5303,11 +6660,17 @@ function applyFull(data) {
   S.usage = data.usage ?? {};
   S.hist = data.history ?? {};
   S.decisions = data.decisions ?? [];
+  S.radar = data.radar ?? [];
   S.jev = data.jev ?? {};
   S.canShare = !!data.canShare;
   S.publicUrl = data.publicUrl ?? "";
   S.auto = data.auto ?? S.auto;
   S.push = data.push ?? S.push;
+  if (!S.linkDone && (location.pathname === "/p" || location.pathname.startsWith("/p/"))) { // journey: a project page link
+    S.linkDone = true; S.board = true; lastOrder = ""; render();
+    const n = decodeURIComponent(location.pathname.slice(3));
+    return n ? openJourney(n) : openProjects();
+  }
   if (!S.linkDone && location.pathname.startsWith("/s/")) {
     S.linkDone = true;
     const hit = resolveLink(location.pathname);
@@ -5347,6 +6710,7 @@ function connect() {
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
   es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
+  es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
   es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
   es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
   es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });

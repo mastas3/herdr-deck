@@ -313,7 +313,7 @@ export const mixKey = (ids: string[], direction: string, engine: string) => hash
 const BIN_DIRS = [`${HOME}/.local/bin`, `${HOME}/.claude/local`, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", ...(process.env.PATH ?? "").split(":")];
 const CLAUDE = process.env.DECK_CLAUDE_BIN || BIN_DIRS.map((d) => `${d}/claude`).find((p) => existsSync(p));
 const OLLAMA_URL = process.env.OLLAMA_HOST ? (process.env.OLLAMA_HOST.startsWith("http") ? process.env.OLLAMA_HOST : `http://${process.env.OLLAMA_HOST}`) : "http://127.0.0.1:11434";
-export type RunOpts = { system: string; user: string; timeoutMs: number; signal: AbortSignal; onText: (all: string) => void; onStage?: (s: string) => void; model?: string };
+export type RunOpts = { system: string; user: string; timeoutMs: number; signal: AbortSignal; onText: (all: string) => void; onStage?: (s: string) => void; model?: string; /** Ollama: ask for JSON output (default true). */ json?: boolean };
 
 /** Headless Claude Code: print mode, no tools, no MCP, no settings or plugins, nothing saved. Streams text as it comes. */
 export async function runClaude(o: RunOpts): Promise<{ text: string; model: string }> {
@@ -383,7 +383,7 @@ export async function runOllama(o: RunOpts): Promise<{ text: string; model: stri
   o.onStage?.(`Loading ${model}…`);
   const r = await fetch(`${OLLAMA_URL}/api/chat`, {
     method: "POST", signal: o.signal, headers: { "content-type": "application/json" },
-    body: JSON.stringify({ model, stream: true, format: "json", keep_alive: "10m", options: { temperature: 0.9, num_predict: 3000 }, messages: [{ role: "system", content: o.system }, { role: "user", content: o.user }] }),
+    body: JSON.stringify({ model, stream: true, ...(o.json === false ? {} : { format: "json" }), keep_alive: "10m", options: { temperature: 0.9, num_predict: 3000 }, messages: [{ role: "system", content: o.system }, { role: "user", content: o.user }] }),
   });
   if (!r.ok || !r.body) throw new Error(`Ollama said ${r.status}`);
   let text = "", buf = "";
