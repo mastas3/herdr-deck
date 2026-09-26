@@ -427,7 +427,16 @@ function feedCodex(st: State, line: string, offset: number) {
   }
   if (p?.type === "function_call_output" || p?.type === "custom_tool_call_output") {
     const m = st.open.get(p.call_id);
-    if (m) { m.state = /"exit_code":\s*[1-9]|Exit code: [1-9]/.test(String(p.output ?? "").slice(0, 400)) ? "error" : "done"; st.open.delete(p.call_id); }
+    if (m) { m.state = /"exit_code":\s*[1-9]|Exit code: [1-9]/.test(String(typeof p.output === "string" ? p.output : "").slice(0, 400)) ? "error" : "done"; st.open.delete(p.call_id); }
+    // Screenshots and other images the agent looked at come back inside the tool output.
+    if (Array.isArray(p.output)) {
+      p.output.forEach((c: any, j: number) => {
+        if (typeof c?.image_url !== "string" || !c.image_url.startsWith("data:image")) return;
+        const id = `x:${offset}:o:${j}`;
+        st.detail.images.push({ id, at, source: "viewed" });
+        if (m) (m.images ??= []).push(id);
+      });
+    }
     return;
   }
   if (p?.type !== "message") return;
@@ -464,9 +473,41 @@ export function codexDetail(path: string): Promise<Detail> {
 }
 
 export async function codexImage(path: string, id: string) {
-  const [, off, i] = id.split(":");
-  const url: string | undefined = JSON.parse(await lineAt(path, Number(off))).payload?.content?.[Number(i)]?.image_url;
+  const parts = id.split(":");
+  const payload = JSON.parse(await lineAt(path, Number(parts[1]))).payload;
+  // x:<offset>:<i> is an image in a message; x:<offset>:o:<j> one in a tool's output
+  const url: string | undefined = parts[2] === "o" ? payload?.output?.[Number(parts[3])]?.image_url : payload?.content?.[Number(parts[2])]?.image_url;
   return dataUrl(url);
+}
+
+/**
+ * Images Codex generated for a thread are saved to ~/.codex/generated_images/<thread id>/, with no link back
+ * to the call that made them; each one is attached to the latest message written before the file was.
+ */
+export function attachGenerated(d: Detail, threadId: string) {
+  const dir = `${HOME}/.codex/generated_images/${threadId}`;
+  let names: string[];
+  try { names = readdirSync(dir).filter((n) => /\.(png|jpe?g|webp|gif)$/i.test(n)); } catch { return; }
+  const seen: Set<string> = ((d as any)._generated ??= new Set());
+  for (const n of names) {
+    if (seen.has(n)) continue;
+    let at: number;
+    try { at = statSync(`${dir}/${n}`).mtimeMs; } catch { continue; }
+    let target: Msg | undefined;
+    for (let i = d.messages.length - 1; i >= 0; i--) if ((d.messages[i].at ?? 0) <= at) { target = d.messages[i]; break; }
+    if (!target) continue; // the conversation hasn't caught up to this image yet
+    const id = `g:${n}`;
+    d.images.push({ id, at, source: "viewed", name: n });
+    (target.images ??= []).push(id);
+    seen.add(n);
+  }
+}
+
+export function codexGeneratedImage(threadId: string, id: string) {
+  const name = id.slice(2);
+  if (!/^[\w.-]+$/.test(name) || !/^[\w-]+$/.test(threadId)) return;
+  const f = Bun.file(`${HOME}/.codex/generated_images/${threadId}/${name}`);
+  return f.size ? f.arrayBuffer().then((b) => ({ type: f.type || "image/png", data: new Uint8Array(b) })) : undefined;
 }
 
 function dataUrl(url?: string) {

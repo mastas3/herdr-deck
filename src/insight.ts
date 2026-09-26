@@ -3,7 +3,7 @@
 import { findClaudeFile, findCodexFile } from "./agents";
 import { inferProject, type Project } from "./projects";
 import {
-  claudeDetail, claudeImage, claudeSubagents, claudeSubDetail, claudeSubFile, codexDetail, codexImage,
+  attachGenerated, claudeDetail, claudeImage, claudeSubagents, claudeSubDetail, claudeSubFile, codexDetail, codexGeneratedImage, codexImage,
   opencodeDetail, opencodeImage, opencodeSubagents, type Detail, type Sub,
 } from "./transcript";
 
@@ -17,7 +17,9 @@ export async function detailFor(w: Who): Promise<Detail | undefined> {
   }
   if (w.agent === "codex") {
     const f = findCodexFile(w.sessionId);
-    return f ? codexDetail(f) : undefined;
+    const d = f ? await codexDetail(f) : undefined;
+    if (d) attachGenerated(d, w.sessionId);
+    return d;
   }
   if (w.agent === "opencode") return opencodeDetail(w.sessionId);
 }
@@ -39,6 +41,7 @@ export async function imageFor(w: Who, id: string, subId?: string) {
     return path ? claudeImage(path, id) : undefined;
   }
   if (id.startsWith("x:")) { const f = findCodexFile(w.sessionId); return f ? codexImage(f, id) : undefined; }
+  if (id.startsWith("g:")) return codexGeneratedImage(w.sessionId, id);
   if (id.startsWith("o:")) return opencodeImage(id);
 }
 

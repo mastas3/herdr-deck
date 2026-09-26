@@ -16,7 +16,26 @@ const S = {
   tpos: load("tpos", "bottom"), main: load("main", "chat"),
 };
 S.notify = load("notify", false) && "Notification" in window && Notification.permission === "granted";
-const theme = load("theme", ""); if (theme) document.documentElement.dataset.theme = theme;
+const THEMES = [
+  ["", "System", "Follows your device’s light or dark setting", ["#131a22", "#f6f7f9"]],
+  ["dark", "Harbor", "The default dark", ["#131a22", "#8fbfff"]],
+  ["light", "Light", "Clean and bright", ["#f6f7f9", "#1f6fd1"]],
+  ["midnight", "Midnight", "True black, easy on OLED phones", ["#000000", "#8ab4ff"]],
+  ["nord", "Nord", "Cool arctic blues", ["#2e3440", "#88c0d0"]],
+  ["solarized", "Solarized", "The classic low-contrast dark", ["#002b36", "#b58900"]],
+  ["paper", "Paper", "Warm light, like a notebook", ["#f7f3ea", "#9a4f22"]],
+  ["contrast", "High contrast", "Maximum legibility", ["#000000", "#ffd000"]],
+];
+function applyTheme(name) {
+  const root = document.documentElement;
+  if (name) root.dataset.theme = name; else delete root.dataset.theme;
+  // The phone's status bar and the installed app's title bar follow the theme.
+  requestAnimationFrame(() => {
+    const bg = getComputedStyle(document.body).backgroundColor;
+    for (const m of document.querySelectorAll('meta[name="theme-color"]')) { m.setAttribute("content", bg); m.removeAttribute("media"); }
+  });
+}
+applyTheme(load("theme", ""));
 const app = $("app");
 app.dataset.tpos = S.tpos;
 app.dataset.main = S.main;
@@ -132,6 +151,8 @@ function inline(s) {
   const codes = [];
   let t = esc(s).replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
   t = t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    // local file links, "[name](</abs/path>)" or "[name](/abs/path)": show the name, the path on hover
+    .replace(/\[([^\]\n]+)\]\((?:&lt;)?((?:~|\/)[^\s)]*?)(?:&gt;)?\)/g, '<span class="fpath" title="$2">$1</span>')
     .replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?'"])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
     .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
     .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<i>$2</i>")
@@ -617,7 +638,7 @@ function blockHTML(b, key) {
     const long = (m.text ?? "").length > 900;
     return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
   }
-  if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS}<div class="md">${md(m.text)}</div><div class="t">${esc(when(m.at))}</div></div>`;
+  if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS}<div class="md">${md(m.text)}</div>${imgs(m.images)}<div class="t">${esc(when(m.at))}</div></div>`;
   if (b.kind === "note") return `<div class="note${/^Recap:/.test(m.text) ? " recap" : ""}">${/^Recap:/.test(m.text) ? mdLite(m.text) : esc(m.text)}</div>`;
   if (b.kind === "agent") {
     const d = S.details.get(S.sel)?.data;
@@ -1376,7 +1397,7 @@ function moreMenu(anchor) {
 }
 function settingsMenu(anchor) {
   openMenu(anchor, [
-    { html: `Theme: ${document.documentElement.dataset.theme || "system"}<small>Switch light / dark</small>`, run: toggleTheme },
+    { html: `Theme: ${esc(THEMES.find((t) => t[0] === load("theme", ""))?.[1] ?? "System")}<small>Harbor, Light, Midnight, Nord, Solarized, Paper…</small>`, run: () => setTimeout(() => themeMenu(anchor), 0) },
     { html: `Alerts: ${S.notify ? "on" : "off"}<small>When an agent finishes or needs input</small>`, run: toggleAlerts },
     { html: `Auto briefs: ${S.autoBrief ? "on" : "off"}<small>Write a brief when you open a session</small>`, run: () => { S.autoBrief = !S.autoBrief; store("autoBrief", S.autoBrief); toast(`Auto briefs ${S.autoBrief ? "on" : "off"}`); } },
     !isPhone() && { html: `Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}<small>Move it (\\)</small>`, run: () => layoutMenu(anchor) },
@@ -1385,11 +1406,17 @@ function settingsMenu(anchor) {
     !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
   ].filter(Boolean));
 }
+function setTheme(name) { applyTheme(name); store("theme", name); }
 function toggleTheme() {
   const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-  const next = cur === "light" ? "dark" : "light";
-  document.documentElement.dataset.theme = next;
-  store("theme", next);
+  setTheme(["light", "paper"].includes(cur) ? "dark" : "light");
+}
+function themeMenu(anchor) {
+  const cur = load("theme", "");
+  openMenu(anchor, THEMES.map(([id, label, hint, [a, b]]) => ({
+    html: `<span style="display:flex;gap:9px;align-items:center"><span style="width:26px;height:18px;border-radius:5px;background:linear-gradient(135deg, ${a} 55%, ${b} 55%);box-shadow:inset 0 0 0 1px rgba(127,127,127,.35);flex:none"></span><span>${esc(label)}<small style="display:block">${esc(hint)}</small></span></span>`,
+    on: cur === id, run: () => setTheme(id),
+  })), "Theme");
 }
 async function toggleAlerts() {
   if (!("Notification" in window)) return toast("This browser can’t show notifications", true);
@@ -1480,6 +1507,7 @@ function paletteItems(q) {
     { t: "Edit recipes", run: openRecipesEditor },
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Toggle light / dark", run: toggleTheme },
+    ...THEMES.map(([id, label]) => ({ t: `Theme: ${label}`, run: () => setTheme(id) })),
     !isPhone() && { t: "Keyboard shortcuts", k: "?", run: () => $("help").showModal() },
     ...(multiMachine() ? [["all", "all machines"], ...S.summary.machines.map((m) => [m.id, m.label])].map(([id, label]) => ({ t: `Show ${label}`, run: () => setMachine(id) })) : []),
   ].filter(Boolean).map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, q ? 8 : 6);
