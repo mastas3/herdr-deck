@@ -2122,6 +2122,7 @@ function setMode(m) {
   headSig = ""; bodySig = ""; chatDom.key = null;
   if (m === "history" && !S.histRes) loadHistory();
   if (m === "connections") loadConnections();
+  if (m === "inbox" && S.jevOpen) loadJevStats(true);
   if (isPhone() && m) setMView("detail", true);
   render();
   renderDetail();
@@ -2223,6 +2224,47 @@ function decisionCard(d) {
     <form class="dreply" hidden><textarea rows="2" placeholder="Reply to the agent"></textarea><button class="btn primary">Send</button></form>
   </article>`;
 }
+// Jev panel: what the suggestions cost and how often they matched what you did (from ~/.jev receipts).
+S.jevOpen = load("jevOpen", false);
+let jevLoading = 0;
+async function loadJevStats(force) {
+  if (!force && Date.now() - jevLoading < 4000) return;
+  jevLoading = Date.now();
+  try { S.jevStats = await api("/api/jev/stats", {}); S.jevErr = null; } catch (e) { S.jevErr = e.message; }
+  if (S.mode === "inbox") renderInbox();
+}
+const money = (n) => (n == null ? "–" : n === 0 ? "$0" : n < 0.01 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`);
+const ktok = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(n >= 1e4 ? 0 : 1)}k` : String(n ?? 0));
+const pctOf = (r) => (r == null ? "–" : `${Math.round(r * 100)}%`);
+function jevBar(j) {
+  const label = j.available ? `Jev · ${j.calls ?? 0}/${j.cap ?? "–"} today` : "Jev is off on this machine";
+  return `<div class="jevbar"><button class="jevtog" data-jevtog aria-expanded="${!!S.jevOpen}"><span class="jb">Jev</span>${esc(label.replace(/^Jev · /, ""))}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>${S.jevOpen ? jevPanel(S.jevStats, j) : ""}`;
+}
+function jevPanel(st, j) {
+  if (!st) return `<section class="jevp"><p class="hint">${S.jevErr ? esc(S.jevErr) : "Reading the receipts…"}</p></section>`;
+  const span = (t, x) => `<div class="jst"><span class="jl">${t}</span><b>${x.calls}</b><span>call${x.calls === 1 ? "" : "s"}</span><span class="jm">${ktok(x.inputTokens)} tok · ${money(x.cost)}</span>${x.repeats ? `<span class="jm jwarn" title="Asked again with the exact same state (before the dedupe fix)">${x.repeats} repeat${x.repeats === 1 ? "" : "s"}</span>` : ""}</div>`;
+  const KN = { prompt: "Permissions", question: "Questions", done: "Done?" };
+  const hitRow = (k) => { const h = st.hit[k]; return `<div class="jhr"><span>${KN[k]}</span><span class="jbarv"><i style="width:${h.n ? Math.round((h.hits / h.n) * 100) : 0}%"></i></span><b>${h.n ? pctOf(h.rate) : "–"}</b><span class="jm">${h.hits}/${h.n}</span></div>`; };
+  const cal = (rows, verb) => rows.map((b) => `<span class="jcal"><b>${esc(b.band)}</b> ${b.n ? `${verb} ${b.accepted ?? b.hits}/${b.n}` : "none yet"}</span>`).join("");
+  const KS = { prompt: "Permission", question: "Question", done: "Done?" };
+  const recent = st.recent.length ? st.recent.map((x) => {
+    const mark = x.followed == null ? `<span class="jno"></span>` : x.followed ? `<span class="jok" title="You did what Jev suggested">✓</span>` : `<span class="jx" title="You did something else">✗</span>`;
+    const rep = x.repeats ? ` <span class="jwarn" title="Asked ${x.repeats + 1} times with the same state (before the dedupe fix)">×${x.repeats + 1}</span>` : "";
+    return `<li><span class="jt" data-t="${x.at}">${esc(agoText(x.at))}</span><span class="jk">${KS[x.kind]}${rep}</span><span class="jq">${x.label ? esc(x.label) : `<span class="hint">–</span>`}</span><span class="js">Jev <b>${esc(x.suggestion)}</b>${x.pickTitle ? ` <span class="hint">${esc(x.pickTitle)}</span>` : ""}</span><span class="ja">${x.actual ? `You <b>${esc(x.actual)}</b>${x.actualTitle ? ` <span class="hint">${esc(x.actualTitle)}</span>` : ""}` : `<span class="hint">no answer recorded</span>`}</span>${mark}</li>`;
+  }).join("") : `<li class="hint">No deck decisions in the receipts yet.</li>`;
+  const cap = st.cap;
+  return `<section class="jevp" aria-label="Jev">
+    <div class="jgrid">${span("Today", st.today)}${span("7 days", st.week)}${span("All time", st.total)}</div>
+    <div class="jcols">
+      <div><h4>Matched what you did <span class="hint">${st.hit.all.n ? `${pctOf(st.hit.all.rate)} of ${st.hit.all.n}` : ""}</span></h4>${["prompt", "question", "done"].map(hitRow).join("")}</div>
+      <div><h4>Calibration</h4><div class="jcr"><span class="jl">“Done” said</span>${cal(st.calibration.done, "accepted")}</div><div class="jcr"><span class="jl">Pick confidence</span>${cal(st.calibration.pick, "right")}</div></div>
+    </div>
+    <h4>Last ${st.recent.length} decisions</h4>
+    <ul class="jrec">${recent}</ul>
+    <form class="jcap"><label>Daily cap <input type="number" min="0" max="100000" step="1" value="${cap.cap}" inputmode="numeric" aria-label="Jev calls per day"></label><button class="btn">Save</button><span class="hint">${cap.used} used today · at the cap ≈ ${money(cap.cap * 1200 * st.price.perMillionInput / 1e6)}/day${cap.source === "env" ? " · from DECK_JEV_DAILY until you save" : ""}</span></form>
+    <p class="hint jfoot">${st.asked} decisions asked, ${st.answered} answered in the deck. All Jev use today: ${st.allAgentsToday.calls} calls, ${money(st.allAgentsToday.cost)}. $${st.price.perMillionInput} per million input tokens, output free.</p>
+  </section>`;
+}
 // Keyboard triage: a focus ring over the cards (S.ifocus), skips that hide a card until it changes or you undo.
 const IFILTERS = [["all", "All"], ["quick", "Quick ones"], ["prompt", "Permissions"], ["question", "Questions"], ["review", "Done?"]];
 S.skipped = new Map(); // key → the decision's signature when skipped; it comes back when the decision changes
@@ -2248,7 +2290,7 @@ function renderInbox() {
   const nSkip = S.skipped.size;
   const skipped = nSkip ? ` <button class="iunskip" data-iunskip title="Show the skipped ones again">${nSkip} skipped · show</button>` : "";
   const hints = isPhone() ? "" : `<div class="khint" aria-label="Keyboard">${KEYHINTS.map(([ks, t]) => `<span>${ks.map((k) => `<kbd>${k}</kbd>`).join("")} ${t}</span>`).join("")}</div>`;
-  modeHTML(`<header class="vh"><h2>${ICON.inbox}Decisions</h2><p>${all.length ? `${all.length} waiting on you. Answer here; it goes straight to the agent.` : "Nothing is waiting on you."}${skipped}${j.available ? ` <span class="hint">· Jev suggestions: ${j.calls}/${j.cap} today</span>` : ` <span class="hint">· Jev is off on this machine</span>`}</p>${hints}<div class="chips">${chips}</div></header>
+  modeHTML(`<header class="vh"><h2>${ICON.inbox}Decisions</h2><p>${all.length ? `${all.length} waiting on you. Answer here; it goes straight to the agent.` : "Nothing is waiting on you."}${skipped}</p>${jevBar(j)}${hints}<div class="chips">${chips}</div></header>
     ${list.length ? `<div class="dlist">${list.map(decisionCard).join("")}</div>` : `<div class="empty-v"><p>${all.length ? "None in this filter." : nSkip ? "Only skipped ones left." : "All clear. When an agent asks something, needs permission, or says it’s done, it shows up here."}</p></div>`}`);
   for (const x of drafts) {
     const form = box.querySelector(`.dcard[data-dkey="${CSS.escape(x.key)}"] .dreply`);
@@ -2400,6 +2442,7 @@ $("dbody").addEventListener("click", async (e) => {
   const chip = e.target.closest("[data-ifilter]");
   if (chip) return setInboxFilter(chip.dataset.ifilter);
   if (e.target.closest("[data-iunskip]")) { S.skipped.clear(); S.skipStack = []; return renderInbox(); }
+  if (e.target.closest("[data-jevtog]")) { S.jevOpen = !S.jevOpen; store("jevOpen", S.jevOpen); renderInbox(); if (S.jevOpen) loadJevStats(true); return; }
   const card = e.target.closest(".dcard");
   if (!card) return;
   const key = card.dataset.dkey;
@@ -2422,7 +2465,14 @@ $("dbody").addEventListener("click", async (e) => {
   const act = e.target.closest("[data-dact2]")?.dataset.dact2;
   if (act) inboxAct(key, act);
 });
-$("dbody").addEventListener("submit", (e) => {
+$("dbody").addEventListener("submit", async (e) => {
+  const cap = e.target.closest(".jcap");
+  if (cap) {
+    e.preventDefault();
+    const n = Number(cap.querySelector("input").value);
+    try { const r = await api("/api/jev/cap", { cap: n }); S.jev = r.jev; toast(`Jev daily cap: ${n}`); loadJevStats(true); } catch (x) { toast(x.message, true); }
+    return;
+  }
   const form = e.target.closest(".dreply");
   if (!form) return;
   e.preventDefault();
@@ -3620,7 +3670,8 @@ function connect() {
   es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); });
-  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") renderInbox(); render(); });
+  es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
+  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
   es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });
   es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");

@@ -87,7 +87,14 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
   **Send back**, **Verify now**. Filters: quick ones, permissions, questions, done.
   - **Jev** (TypeSafe, via your `jev` CLI and its receipts) suggests which option you'd pick, whether a
     decision is low-stakes, and how likely a "done" really is. It never answers for you. What you actually did
-    is recorded with `jev outcome`. TypeSafe has no daily limit (1,200 requests/min); the deck caps its own calls at `DECK_JEV_DAILY` a day (default 1000, about $0.08).
+    is recorded with `jev outcome`, however you answered (inbox, keys, the list and board cards, or a reply
+    typed in the session). Each request is asked once: the answer is cached by a fingerprint of what's sent
+    (`~/.config/herdr-deck/jev-cache.json`), so redraws, rebuilds and restarts don't ask again. The **Jev**
+    button in the Inbox header opens a panel read from `~/.jev/receipts.jsonl`: calls, tokens and cost
+    (today, 7 days, all time; $0.042 per million input tokens), how often Jev's pick matched what you did by
+    kind, calibration, the last ten decisions, and the daily cap. TypeSafe has no daily limit (1,200
+    requests/min); the deck caps its own calls (default 1000 a day, about $0.05; set it in the panel, saved to
+    `~/.config/herdr-deck/jev-settings.json`, or `DECK_JEV_DAILY` before you do).
   - **Proof of done:** when an agent says it's done, the deck re-runs the project's own checks (detected from
     package.json, Cargo, go.mod, pytest, Makefile). You approve the command once per project, or turn it off.
     Results show on the row and in the Inbox. Stored in `~/.config/herdr-deck/checks.json`.
