@@ -15,14 +15,14 @@ bun test
 Every machine with herdr can run its own deck (a node), and one deck (the hub) shows them all as tabs.
 
 ```bash
-bin/deploy-node.sh conductor-linux      # copies the deck over SSH, runs it as a systemd --user (or launchd) service
+bin/deploy-node.sh my-linux-box      # copies the deck over SSH, runs it as a systemd --user (or launchd) service
 ```
 
 Then list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
 
 ```json
 { "self": { "id": "mac", "label": "MacBook" },
-  "remotes": [{ "id": "linux", "label": "Linux · work", "ssh": "conductor-linux" }] }
+  "remotes": [{ "id": "linux", "label": "Linux · work", "ssh": "my-linux-box" }] }
 ```
 
 The hub opens an SSH tunnel to each node's loopback port. It authenticates with the node's

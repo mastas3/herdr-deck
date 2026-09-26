@@ -25,7 +25,7 @@ describe("cleanTail", () => {
       "  ┃  Build · Abliterated Model Large V2 abliteration.ai · high",
       "  ╹▀▀▀▀▀▀▀▀▀▀▀▀▀▀",
       "   ~/wiki:main",
-      "   /Users/stas-2/wiki          92.0K (9%) · $5.30  ctrl+p commands   • OpenCode 1.18.31",
+      "   /Users/me/notes          92.0K (9%) · $5.30  ctrl+p commands   • OpenCode 1.18.31",
     ].join("\n");
     expect(cleanTail(screen)).toEqual(["  Commit bd272ee, deployed, verified on the live CSS chunk."]);
   });
