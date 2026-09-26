@@ -330,7 +330,7 @@ setInterval(() => {
 }, 15_000);
 
 // ── HTML ─────────────────────────────────────────────────────────────────────
-// app.js and the files public/assets.json names are served under content hashes (src/assets.ts).
+// The files public/assets.json names are served under content hashes (src/assets.ts).
 const assets = createAssets(new URL("../public", import.meta.url).pathname, { dev: DEV, log: (s) => console.warn(s) });
 let htmlTemplate = readFileSync(HTML_PATH, "utf8");
 function page() {

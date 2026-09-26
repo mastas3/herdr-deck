@@ -6,7 +6,7 @@ import { categorize, enrich, stateOf } from "../src/store";
 import { RECIPES, fillPrompt, rankRecipes, readiness, recipeIds, type Recipe } from "../src/recipes";
 
 // The store's pure helpers live in the browser script between <conn-store> markers; run exactly that block.
-const src = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../public/js/conn-store.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("// <conn-store>"), src.indexOf("// </conn-store>"));
 const B = new Function(`"use strict";${block};return { connState, connItems, connView, connSelectAll, connSelectNone, connAllPicked, recipesFor, connFeatured, connRecent, connMatch, connInCat, connLoginsElsewhere, connCatalogGroups };`)();
 

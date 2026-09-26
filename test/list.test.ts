@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 // The list helpers live in the browser script (no build step); evaluate just their marked block.
-const src = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../public/js/list-rows.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("/* @pure:list-begin"), src.indexOf("/* @pure:list-end */"));
 const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder };`)();
 

@@ -1,6 +1,6 @@
 // ══ Gallery: Discover → For you ══════════════════════════════════════════════════════════════════════
 // Today's top pick and Netflix-style lanes of ideas from the idea engine (server: src/gallery-server.ts,
-// src/ideagen/). Loaded after app.js and shares its globals (S, $, api, esc, toast, openPlan, startRun…).
+// src/ideagen/). Loaded after the deck's own files; shares their globals (S, $, api, esc, toast, openPlan, startRun…).
 // This file: state, loading (today's run starts when Discover opens, with progress), the lanes model, and mounting.
 // The gallery is one persistent element that For you re-attaches on every redraw, so images, scroll positions and
 // focus survive Discover's background updates. Cards: gallery-cards.js; keys and lazy rows: gallery-nav.js;
