@@ -14,6 +14,7 @@ import type { researchForServer } from "../autoresearch-server";
 import type { createJourneys } from "../journey";
 import type { gameForServer } from "../game-server";
 import type { createOpportunityService } from "../opportunity-service";
+import type { createPlugins } from "../plugins";
 import type { Graves, Self } from "./config";
 import type { Sse } from "./sse";
 import type { Machines } from "./machines";
@@ -29,7 +30,7 @@ export type Hub = {
   push: PushStore; auto: Automations | undefined; game: ReturnType<typeof gameForServer>;
   covers: ReturnType<typeof createCovers>; discover: ReturnType<typeof createDiscover>; gallery: ReturnType<typeof galleryForServer>;
   library: ReturnType<typeof createLibrary>; leads: ReturnType<typeof createLeads>; research: ReturnType<typeof researchForServer>;
-  journeys: ReturnType<typeof createJourneys>; opportunities: ReturnType<typeof createOpportunityService>;
+  journeys: ReturnType<typeof createJourneys>; opportunities: ReturnType<typeof createOpportunityService>; plugins: ReturnType<typeof createPlugins>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
   decisions: Map<string, Decision>; scheduleDecisions: () => void; broadcastGraves: () => void; refreshShared: () => Promise<void>;
   sessions: Sessions; chat: Chat; tools: ToolRuns; queue: { queues: Record<string, { id: string; text: string; at: number }[]>; saveQueues: () => void };

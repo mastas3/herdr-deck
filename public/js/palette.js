@@ -66,6 +66,7 @@ function paletteItems(q) {
     { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
     { t: "History: search every past session", k: "h", run: () => setMode("history") },
     { t: "Tools: what each one does", run: () => setMode("tools") },
+    { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
     { t: "Connections: everything this setup can reach", run: () => setMode("connections") },
     { t: "Suggest mega projects from my connections", run: suggestProjects },
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },

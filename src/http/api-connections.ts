@@ -9,7 +9,9 @@ import { json } from "./page";
 import type { Hub } from "./hub";
 
 export async function connectionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
-  const { SELF } = hub;
+  const { SELF, plugins } = hub;
+  /** Built-in and your own recipes, plus those from enabled plugins. */
+  const recipesWithPlugins = () => [...allRecipes(), ...plugins.recipes()];
   const { remotes, allRows } = hub.hosts;
   const { startSession } = hub.sessions;
   switch (path) {
@@ -35,7 +37,7 @@ export async function connectionsApi(hub: Hub, path: string, body: any): Promise
         if (body.op === "save") saveCustom(body.recipe);
         else if (body.op === "delete") deleteCustom(String(body.id ?? ""));
         else if (body.op === "prompt") {
-          const r = allRecipes().find((x) => x.id === body.id);
+          const r = recipesWithPlugins().find((x) => x.id === body.id);
           if (!r) return json({ error: "No such recipe" }, 404);
           const picked = (Array.isArray(body.picked) ? body.picked : []).map(String).slice(0, 200);
           const own = recipeIds(r, inv);
@@ -45,7 +47,7 @@ export async function connectionsApi(hub: Hub, path: string, body: any): Promise
           return json({ prompt: fillPrompt(r, { connections, machine: inv?.machine ?? m, selected }), folder: r.folder ?? "", agent: r.agent ?? "claude", machine: r.machine ?? "hub", title: r.title });
         }
       } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
-      return json({ machine: m, reachable: !!inv, recipes: rankRecipes(allRecipes(), inv) });
+      return json({ machine: m, reachable: !!inv, recipes: rankRecipes(recipesWithPlugins(), inv) });
     }
     case "/api/connections-conf": {
       if (body.machine && body.machine !== SELF.id) {

@@ -430,6 +430,11 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   tabs), friendly status words, and cheerful colors tuned for every theme.
 - **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin
   Mocha and Latte, Tokyo Night, Gruvbox, Rosé Pine, Everforest, One Dark, GitHub Light, Monokai.
+- **Plugins**: add integrations and whole working setups to the deck: a Gmail inbox, your GitHub pull requests, or (soon) a
+  business pack with its projects, agent roles and schedules. A plugin is data only (a `plugin.json` and some
+  prompts), never code. Before anything is installed you get a trust screen built from what the plugin can
+  actually do: the exact tools its agents may use, the repos it would clone and the agents it would start.
+  Install from the built-in catalog, or drop a `plugin.json` or `.zip` on Plugins → Add.
 
 ## MCP server
 

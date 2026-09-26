@@ -130,7 +130,7 @@ function stBuildAt(key) {
 async function stBuildNow(b) {
   try {
     const r = await api("/api/discover/studio/build-prompt", { build: b }, 10_000);
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
+    await openNew({ machine: S.self, ...ownFolder(r, b.title), project: "Studio", prompt: r.prompt, kind: "claude", label: r.label, title: `Build it now: ${b.title.slice(0, 40)}` });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }

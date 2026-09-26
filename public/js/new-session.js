@@ -21,6 +21,13 @@ function projectHome(p) {
   return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
 }
 /** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */
+/** Discover actions start in a folder of their own under Projects, named after the idea; it's made only when you confirm the dialog. */
+function ownFolder(r, name) {
+  if (r.folder) return { cwd: r.folder, mkdir: true };
+  if (!/(^|\/)Projects\/?$/.test(String(r.cwd ?? ""))) return { cwd: r.cwd };
+  const slug = String(name ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").slice(0, 48).replace(/^-+|-+$/g, "") || `idea-${Date.now().toString(36)}`;
+  return { cwd: `${String(r.cwd).replace(/\/+$/, "")}/${slug}`, mkdir: true };
+}
 async function openNew(pre) {
   pre = pre && pre.cwd ? pre : undefined;
   newMkdir = pre?.mkdir ? pre.cwd : null; // quests: a new run's folder is made only when you confirm

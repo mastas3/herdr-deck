@@ -164,7 +164,7 @@ async function discStart(kind, extra, title) {
   try {
     const r = await api("/api/discover/prompt", { kind, ...extra });
     S.disc.pending = r.slug ? { slug: r.slug, text: extra.text } : null;
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Discover", prompt: r.prompt, kind: "claude", label: r.label, title });
+    await openNew({ machine: S.self, ...ownFolder(r, r.slug || extra.repo?.name || extra.title || r.label), project: "Discover", prompt: r.prompt, kind: "claude", label: r.label, title });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -189,7 +189,7 @@ async function ideaResearch(text) {
   if (!r && text.length >= 4) { try { r = await api("/api/discover/prompt", { kind: "research", text }, 10_000); } catch (e) { toast(e.message, true); } }
   if (!r) return;
   S.disc.pending = { slug: r.slug, text };
-  await openNew({ machine: S.self, cwd: r.cwd, project: "Idea lab", prompt: r.prompt, kind: "claude", label: `Plan: ${text.slice(0, 28)}`, title: "Research & plan this idea" });
+  await openNew({ machine: S.self, ...ownFolder(r, r.slug || text), project: "Idea lab", prompt: r.prompt, kind: "claude", label: `Plan: ${text.slice(0, 28)}`, title: "Research & plan this idea" });
   promptTop();
 }
 // A research session that actually started gets listed under Ideas right away (as "Researching").

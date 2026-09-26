@@ -178,7 +178,7 @@ async function rsPlan(c, n) {
   try {
     const r = await api("/api/research/plan-prompt", { id: c.id, niche: n.id });
     S.disc.pending = { slug: r.slug, text: r.idea };
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Research", prompt: r.prompt, kind: "claude", label: r.label, title: `Plan the app: ${n.name.slice(0, 40)}` });
+    await openNew({ machine: S.self, ...ownFolder(r, n.name), project: "Research", prompt: r.prompt, kind: "claude", label: r.label, title: `Plan the app: ${n.name.slice(0, 40)}` });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }

@@ -47,7 +47,8 @@
     "js/gallery-detail.js",
     "js/gallery-kit.js",
     "js/gallery-play.js",
-    "js/library.js"
+    "js/library.js",
+    "js/plugins.js"
   ],
   "styles": [
     "css/tokens.css",
@@ -73,6 +74,7 @@
     "css/quests.css",
     "css/gallery.css",
     "css/gallery-sheet.css",
-    "css/library.css"
+    "css/library.css",
+    "css/plugins.css"
   ]
 }

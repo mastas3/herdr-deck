@@ -24,6 +24,7 @@ import { Automations } from "./automations";
 import { researchForServer } from "./autoresearch-server";
 import { createOpportunityService } from "./opportunity-service";
 import { runOpportunityWeb } from "./opportunity-web";
+import { createPlugins } from "./plugins";
 import { DATA_DIR, DEV, HOST, PORT, PUBLIC_URL, PUSH_DIR, TOKEN, loadApiToken, loadGraves, loadHosts, makeDataDirs } from "./http/config";
 import { createSse } from "./http/sse";
 import { createMachines } from "./http/machines";
@@ -107,6 +108,8 @@ const journeys = createJourneys(
   { dataDir: DATA_DIR, cacheDir: process.env.DECK_JOURNEY_DIR || undefined, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
   { sessions: (p) => projectSessions(p, tools.historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
 );
+// Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
+const plugins = createPlugins({ dataDir: process.env.DECK_PLUGINS_DIR || DATA_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
@@ -156,7 +159,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, covers, discover, gallery, library, leads, research, journeys, opportunities,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, covers, discover, gallery, library, leads, research, journeys, opportunities, plugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };

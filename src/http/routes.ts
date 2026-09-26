@@ -1,9 +1,10 @@
 // Every request, in order: the Host check, covers, the page and static files, the SSE stream, images and raw files,
-// then /mcp, then POSTs carrying the action token: uploads, the feature modules' own /api/* routes, a session on
-// another machine, and last the deck's API (api-hub.ts, api-connections.ts, api-sessions.ts).
+// then /mcp, then POSTs carrying the action token: uploads (files, plugins), the feature modules' own /api/* routes,
+// a session on another machine, and last the deck's API (api-hub.ts, api-connections.ts, api-sessions.ts).
 import { splitKey } from "../federation";
 import { choiceFromInput, recordOutcome } from "../decisions";
 import { handleMcp } from "../mcp";
+import { MAX_UPLOAD } from "../plugins";
 import { gzipJson, json, send, staticFile } from "./page";
 import { resolveSafe, saveUpload } from "./files";
 import { hubApi } from "./api-hub";
@@ -12,7 +13,7 @@ import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, covers, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game } = hub;
+  const { TOKEN, deck, hosts, push, covers, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game, plugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
@@ -87,6 +88,12 @@ export function createRoutes(hub: Hub) {
         return json(await saveUpload(req, name));
       } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
     }
+    if (url.pathname === "/api/plugins/upload") {
+      // Raw body, like /api/upload: a plugin.json or a .zip, staged for the trust screen. Nothing is installed yet.
+      if (Number(req.headers.get("content-length") ?? 0) > MAX_UPLOAD) return json({ error: "That file is over 5 MB." }, 413);
+      try { return json(await plugins.stageUpload(url.searchParams.get("name") ?? "plugin.json", new Uint8Array(await req.arrayBuffer()))); }
+      catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
+    }
     const body: any = await req.json().catch(() => ({}));
     try {
       // An answer typed in the reply box or pressed in the terminal answers the decision on screen too:
@@ -104,6 +111,7 @@ export function createRoutes(hub: Hub) {
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       { const g = await game.route(url.pathname, body); if (g) return json(g.data, g.status); }
+      if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       const res = (await hubApi(hub, url.pathname, body)) ?? (await connectionsApi(hub, url.pathname, body)) ?? (await sessionsApi(hub, url.pathname, body));

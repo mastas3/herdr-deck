@@ -240,7 +240,7 @@ async function leadsDeep() {
   try {
     const r = await api("/api/leads/prompt", { kind: "deep", text, dir: L.dir }, 10_000);
     L.pendingReport = { slug: r.slug, text, dir: L.dir };
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: L.dir === "audience" ? "Deep dive: what this audience needs" : "Deep dive: who needs this" });
+    await openNew({ machine: S.self, ...ownFolder(r, `leads ${text}`), project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: L.dir === "audience" ? "Deep dive: what this audience needs" : "Deep dive: who needs this" });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
@@ -248,7 +248,7 @@ async function leadsPlan(item, text, dir, places) {
   try {
     const r = await api("/api/leads/prompt", { kind: "plan", text, dir, item, places }, 10_000);
     S.disc.pending = { slug: r.slug, text: r.ideaText }; // the plan is written to Ideas; Discover lists it there once it starts
-    await openNew({ machine: S.self, cwd: r.cwd, project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: "Plan the app for them" });
+    await openNew({ machine: S.self, ...ownFolder(r, item?.idea || item?.label || text), project: "Leads", prompt: r.prompt, kind: "claude", label: r.label, title: "Plan the app for them" });
     promptTop();
   } catch (e) { toast(e.message, true); }
 }
