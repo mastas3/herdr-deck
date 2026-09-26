@@ -2163,6 +2163,7 @@ function setMode(m) {
   if (m === "connections") loadConnections();
   if (m === "discover") loadDiscover();
   if (m === "opportunities") opportunitiesLoad();
+  if (m === "plugins") loadPlugins();
   if (m === "project") loadJourney(S.jp.name, { force: true }); // journey: cached on the server, so this is instant
   if (m === "projects") loadProjects();
   if (m === "quests") loadQuests({ force: true }); // quests: the game board
@@ -2177,7 +2178,7 @@ function renderViews() {
   const el = $("views");
   if (!el) return;
   const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
-  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["discover", "Discover", ICON.compass], ["opportunities", "Opportunities", ICON.bulb], ["quests", "Quests", QI.quest]];
+  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["discover", "Discover", ICON.compass], ["opportunities", "Opportunities", ICON.bulb], ["quests", "Quests", QI.quest], ["plugins", "Plugins", ICON.puzzle]];
   setHTML(el, v.map(([id, label, icon, count]) => `<button data-view="${id}" aria-pressed="${S.mode === id}" title="${label}${id === "inbox" ? " (i)" : id === "history" ? " (h)" : id === "discover" ? " (d)" : id === "quests" ? " (q)" : ""}">${icon}<span>${label}</span>${count ? `<b>${count}</b>` : ""}</button>`).join(""));
 }
 function renderMode() {
@@ -2190,6 +2191,7 @@ function renderMode() {
   else if (S.mode === "connections") renderConnections();
   else if (S.mode === "discover") renderDiscover();
   else if (S.mode === "opportunities") renderOpportunities();
+  else if (S.mode === "plugins") renderPlugins();
   else if (S.mode === "project") renderJourney();
   else if (S.mode === "projects") renderProjects();
   else if (S.mode === "quests") renderQuests();
@@ -2926,7 +2928,7 @@ function recipeCard(r, inv, n) {
   const st = rd.state === "ready" ? `Ready on ${mname}` : rd.state === "almost" ? "Needs a sign-in" : `Missing ${rd.missing}`;
   const chip = (x, opt) => `<span class="rneed ${x.state}${opt ? " opt" : ""}" title="${esc(x.state === "missing" ? `${x.label}: not found on ${mname}` : `${x.label}: ${x.name ?? ""}${x.state === "partial" ? " (signed out / not running)" : ""}`)}">${x.state === "ready" ? ICON.check : x.state === "partial" ? "!" : "–"} ${esc(x.label)}</span>`;
   return `<article class="rcard r-${rd.state}${open ? " open" : ""}" data-rid="${esc(r.id)}" style="--i:${Math.min(n, 14)}">
-    <div class="rtop" data-ropen><span class="cti">${CICON[r.cat] ?? CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
+    <div class="rtop" data-ropen><span class="cti">${Object.hasOwn(CICON, r.cat) ? CICON[r.cat] : CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.plugin ? ` · from ${esc(r.plugin)}` : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
     <p class="rpitch" data-ropen>${esc(r.pitch)}</p>
     <div class="rneeds">${rd.needs.map((x) => chip(x)).join("")}${rd.optional.map((x) => chip(x, true)).join("")}</div>
     ${open ? `<div class="rmore"><ol class="rsteps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
@@ -3530,7 +3532,6 @@ $('dbody').addEventListener('click', async (e) => {
   }
 });
 // ── end Opportunities ──────────────────────────────────────────────────────
-
 // ══ Discover ═════════════════════════════════════════════════════════════════
 // Repos worth forking, matched to what you build; an idea lab that searches GitHub for building blocks; the
 // plans agents write for your ideas; and "what if" sparks. Server side: src/discover.ts.
@@ -7115,6 +7116,7 @@ function paletteItems(q) {
     { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
     { t: "History: search every past session", k: "h", run: () => setMode("history") },
     { t: "Tools: what each one does", run: () => setMode("tools") },
+    { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
     { t: "Connections: everything this setup can reach", run: () => setMode("connections") },
     { t: "Suggest mega projects from my connections", run: suggestProjects },
     { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },

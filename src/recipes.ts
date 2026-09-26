@@ -19,6 +19,7 @@ export type Recipe = {
   agent?: Agent;
   machine?: "hub" | "other"; // "other": the first machine that isn't the hub (the Linux box)
   custom?: boolean; from?: string;
+  plugin?: string; // the plugin it came from (its name), for the "from X" badge
 };
 
 const C = (label: string, ...any: string[]): Need => ({ label, any });

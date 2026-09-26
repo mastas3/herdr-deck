@@ -40,6 +40,7 @@ import { routeMessage } from "./route";
 import { researchForServer } from "./autoresearch-server";
 import { createOpportunityService } from "./opportunity-service";
 import { runOpportunityWeb } from "./opportunity-web";
+import { MAX_UPLOAD, createPlugins } from "./plugins";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -137,6 +138,8 @@ const journeys = createJourneys(
   { dataDir: DATA_DIR, cacheDir: process.env.DECK_JOURNEY_DIR || undefined, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
   { sessions: (p) => projectSessions(p, historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
 );
+// Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
+const plugins = createPlugins({ dataDir: process.env.DECK_PLUGINS_DIR || DATA_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
@@ -1017,6 +1020,9 @@ async function gzipJson(req: Request, res: Response): Promise<Response> {
   return new Response(Bun.gzipSync(bytes, { level: 4 }), { status: res.status, headers });
 }
 
+/** Built-in and your own recipes, plus those from enabled plugins. */
+const recipesWithPlugins = () => [...allRecipes(), ...plugins.recipes()];
+
 const serveOptions = {
   hostname: HOST,
   port: PORT,
@@ -1115,6 +1121,12 @@ async function handle(req: Request): Promise<Response> {
         return json(await saveUpload(req, name));
       } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
     }
+    if (url.pathname === "/api/plugins/upload") {
+      // Raw body, like /api/upload: a plugin.json or a .zip, staged for the trust screen. Nothing is installed yet.
+      if (Number(req.headers.get("content-length") ?? 0) > MAX_UPLOAD) return json({ error: "That file is over 5 MB." }, 413);
+      try { return json(await plugins.stageUpload(url.searchParams.get("name") ?? "plugin.json", new Uint8Array(await req.arrayBuffer()))); }
+      catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
+    }
     const body: any = await req.json().catch(() => ({}));
     try {
       // An answer typed in the reply box or pressed in the terminal answers the decision on screen too:
@@ -1132,6 +1144,7 @@ async function handle(req: Request): Promise<Response> {
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       { const g = await game.route(url.pathname, body); if (g) return json(g.data, g.status); }
+      if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
@@ -1281,7 +1294,7 @@ async function handle(req: Request): Promise<Response> {
             if (body.op === "save") saveCustom(body.recipe);
             else if (body.op === "delete") deleteCustom(String(body.id ?? ""));
             else if (body.op === "prompt") {
-              const r = allRecipes().find((x) => x.id === body.id);
+              const r = recipesWithPlugins().find((x) => x.id === body.id);
               if (!r) return json({ error: "No such recipe" }, 404);
               const picked = (Array.isArray(body.picked) ? body.picked : []).map(String).slice(0, 200);
               const own = recipeIds(r, inv);
@@ -1291,7 +1304,7 @@ async function handle(req: Request): Promise<Response> {
               return json({ prompt: fillPrompt(r, { connections, machine: inv?.machine ?? m, selected }), folder: r.folder ?? "", agent: r.agent ?? "claude", machine: r.machine ?? "hub", title: r.title });
             }
           } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
-          return json({ machine: m, reachable: !!inv, recipes: rankRecipes(allRecipes(), inv) });
+          return json({ machine: m, reachable: !!inv, recipes: rankRecipes(recipesWithPlugins(), inv) });
         }
         case "/api/connections-conf": {
           if (body.machine && body.machine !== SELF.id) {
