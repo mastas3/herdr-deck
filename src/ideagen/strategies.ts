@@ -11,7 +11,7 @@ import { seedOf } from "./sampler";
 export const STRATEGY_LABEL: Record<StrategyId, string> = {
   "A0-template": "Baseline: today's template sparks & mixes", "A1-mixer": "Baseline: today's Claude Mixer (random ingredients)", "A2-random-schema": "Control: random ingredients + new idea schema",
   "B-pain": "Pain-first", "C-audience": "Audience-first", "D-asset": "Asset leverage", "E-remix": "Market-proven remix", "F-gem": "Gem-grounded",
-  "G-constraint": "Constraint ($1k in 30 days, ≤3 ingredients)", "H-boring": "Boring-business automation", "W-hybrid": "Hybrid: pain-first × proven model",
+  "G-constraint": "Constraint ($1k in 30 days, ≤3 ingredients)", "H-boring": "Boring-business automation", "W-hybrid": "Hybrid: pain-first × proven model", "T-hot": "Trend: hot right now", "T-early": "Trend: just starting",
 };
 /** What each strategy asks of the writer, per brief. */
 const INTENT: Record<StrategyId, string> = {
@@ -32,7 +32,7 @@ const TREND_SOURCE: Record<string, string> = { hn: "HN front page", showhn: "Sho
 const SOURCE_NAME: Record<string, string> = { hn: "Hacker News", reddit: "Reddit", github: "GitHub issue", se: "Stack Exchange", appstore: "App Store review (US)" };
 
 // ── the shared prompt ───────────────────────────────────────────────────────────────────────
-export type PromptOpts = { version?: "v1" | "v2" | "v3" | "v4"; extraRules?: string[] };
+type PromptOpts = { version?: "v1" | "v2" | "v3" | "v4"; extraRules?: string[] };
 const BUILDER = "A solo developer in Israel (speaks Hebrew, Russian and English) who ships fast with coding agents (Claude Code, Codex) and already runs the projects and accounts below.";
 const CAP_LIST = CAPS.map((c) => c.id).join(", ");
 function briefText(b: Brief, i: number): string {
@@ -100,7 +100,7 @@ export function ideaPrompt(briefs: Brief[], inv: Inventory, o: PromptOpts = {}) 
 
 // ── normalizing a model's idea ───────────────────────────────────────────────────────────────────
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "");
-export function matchAsset(name: string, inv: Inventory) {
+function matchAsset(name: string, inv: Inventory) {
   const n = norm(name);
   if (n.length < 2) return undefined;
   const cands = inv.assets.filter((a) => a.kind !== "key");
@@ -163,7 +163,7 @@ function fromMix(m: Mix, strategy: StrategyId, round: number, inv: Inventory): I
     timeToFirstDollarDays: -1, difficulty: m.difficulty, evidenceIds: [], firstQuests: m.first_steps, topics: topicsOf(text), source: m.source === "template" ? "template" : "claude",
   };
 }
-export type BaselineInput = { profile: Profile; gems: Gem[]; items: { id: string; name: string; cat?: string; state?: string; detail?: string; kind?: string }[] };
+type BaselineInput = { profile: Profile; gems: Gem[]; items: { id: string; name: string; cat?: string; state?: string; detail?: string; kind?: string }[] };
 /** A0: today's deterministic sparks and template mixes, as ideas. */
 export function baselineTemplate(inp: BaselineInput, inv: Inventory, seed: number, n = 12): Idea[] {
   const ings = collectIngredients({ profile: inp.profile, gems: inp.gems, items: inp.items });

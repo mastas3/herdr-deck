@@ -13,7 +13,8 @@ import type { Gem, Profile } from "../src/discover";
 import { budgetedClaude, budgetedJev, createBudget, jevUsageFor } from "../src/ideagen/llm";
 import { briefsFor, painClusters, seedOf } from "../src/ideagen/sampler";
 import { baselineMixerPrompt, baselineTemplate, ideaPrompt, parseIdeas, parseMixerReply, STRATEGY_LABEL } from "../src/ideagen/strategies";
-import { bootMedianDiff, elo, indexPosts, jevBatch, jevGenericBatch, jevPairs, matchEvidence, mean, median, quantile, rubricBatch, scoreIdea, spearman, superiority, swissPairs, type Match } from "../src/ideagen/judge";
+import { bootMedianDiff, rubricNorm, elo, indexPosts, jevBatch, jevGenericBatch, jevPairs, matchEvidence, mean, median, quantile, rubricBatch, scoreIdea, spearman, superiority, swissPairs, type Match } from "../src/ideagen/judge";
+import { patternScore } from "../src/ideagen/success";
 import type { Brief, Idea, Inventory, PainCorpus, Rubric, Scores, StrategyId } from "../src/ideagen/types";
 
 const HOME = homedir();
@@ -27,13 +28,17 @@ const opt = (k: string, d?: string) => (args.includes(`--${k}`) ? args[args.inde
 const readJson = (p: string, d?: any) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return d; } };
 const writeJson = (p: string, v: any) => writeFileSync(p, JSON.stringify(v, null, 1));
 
-const CLAUDE_MAX_EXPERIMENT = 40, CLAUDE_MAX_KITS = 10, JEV_MAX = 300;
-const budget = createBudget({ file: `${LAB}/ledger.json`, claudeMax: CLAUDE_MAX_EXPERIMENT + CLAUDE_MAX_KITS, jevMax: JEV_MAX, cacheDir: `${LAB}/.cache` });
-const nonKitCalls = () => budget.ledger.entries.filter((e) => e.kind === "claude" && !e.cached && !e.tag.startsWith("kit")).length;
+// Separate allowances: the experiment proper, starter kits (added with the kit requirement) and pre-mortems (added with
+// the "why would it fail" requirement). Each is counted on its own in the ledger and the report.
+const CLAUDE_MAX_EXPERIMENT = 40, CLAUDE_MAX_KITS = 10, CLAUDE_MAX_PREMORTEM = 2, JEV_MAX = 300;
+const budget = createBudget({ file: `${LAB}/ledger.json`, claudeMax: CLAUDE_MAX_EXPERIMENT + CLAUDE_MAX_KITS + CLAUDE_MAX_PREMORTEM, jevMax: JEV_MAX, cacheDir: `${LAB}/.cache` });
+const pot = (tag: string) => (tag.startsWith("kit") ? "kit" : tag.startsWith("premortem") ? "premortem" : "experiment");
+const callsIn = (p: string) => budget.ledger.entries.filter((e) => e.kind === "claude" && !e.cached && pot(e.tag) === p).length;
+const nonKitCalls = () => callsIn("experiment");
 const claudeRaw = budgetedClaude(budget);
 const claude: typeof claudeRaw = async (o) => {
-  if (!o.tag.startsWith("kit") && nonKitCalls() >= CLAUDE_MAX_EXPERIMENT) throw new Error(`experiment Claude budget used (${nonKitCalls()}/${CLAUDE_MAX_EXPERIMENT})`);
-  if (o.tag.startsWith("kit") && budget.ledger.entries.filter((e) => e.kind === "claude" && !e.cached && e.tag.startsWith("kit")).length >= CLAUDE_MAX_KITS) throw new Error("kit Claude budget used");
+  const p = pot(o.tag), max = { experiment: CLAUDE_MAX_EXPERIMENT, kit: CLAUDE_MAX_KITS, premortem: CLAUDE_MAX_PREMORTEM }[p];
+  if (callsIn(p) >= max) throw new Error(`${p} Claude budget used (${callsIn(p)}/${max})`);
   return claudeRaw(o);
 };
 const jev = budgetedJev(budget);
@@ -47,7 +52,7 @@ const postsById = new Map(corpus.posts.map((p) => [p.id, p]));
 const ix = indexPosts(corpus.posts);
 
 type Store = { ideas: Idea[]; briefs: Record<string, Brief>; runs: { round: number; strategy: StrategyId; version: string; calls: number; ms: number; costUsd: number; inTok: number; outTok: number; n: number; cached: boolean }[] };
-type Judged = Record<string, { rubric?: Rubric; rubric2?: Rubric; jevP10?: number; jevShip?: number; jevSingleP10?: number; jevGeneric?: number; rubricRun?: string; rubric2Run?: string; jevRun?: string }>;
+type Judged = Record<string, { rubric?: Rubric; rubric2?: Rubric; jevP10?: number; jevShip?: number; jevSingleP10?: number; jevGeneric?: number; patterns?: Record<string, number>; rubricRun?: string; rubric2Run?: string; jevRun?: string }>;
 const STORE = `${LAB}/ideas.json`, JUDGED = `${LAB}/judgements.json`, MATCHES = `${LAB}/tournament.json`;
 const store: Store = readJson(STORE, { ideas: [], briefs: {}, runs: [] });
 const judged: Judged = readJson(JUDGED, {});
@@ -239,7 +244,7 @@ function scored(controlled = false): (Idea & { s: Scores & { jevSingleP10?: numb
     const j = judged[x.id] ?? {};
     const matches = matchEvidence(x, ix);
     const rubric = controlled ? j.rubric2 : j.rubric ?? j.rubric2;
-    return { ...x, s: { ...scoreIdea(x, { rubric, jevP10: j.jevP10, jevShip: j.jevShip, jevGeneric: j.jevGeneric, matches, posts: postsById, inv }), jevSingleP10: j.jevSingleP10 } };
+    return { ...x, s: { ...scoreIdea(x, { rubric, jevP10: j.jevP10, jevShip: j.jevShip, jevGeneric: j.jevGeneric, matches, posts: postsById, inv }), jevSingleP10: j.jevSingleP10, patterns: patternScore(j.patterns) } };
   });
 }
 
@@ -308,7 +313,7 @@ function analyze() {
     asRun: { n: both.length, rho: spearman(both.map((x) => x.s.rubricNorm!), both.map((x) => x.s.jevP10!)), llmN: llm.length, llmRho: spearman(llm.map((x) => x.s.rubricNorm!), llm.map((x) => x.s.jevP10!)), llmP10Rho: spearman(llm.map((x) => x.s.rubric!.p10), llm.map((x) => x.s.jevP10!)) },
     controlled: { n: cB.length, rho: spearman(cB.map((x) => x.s.rubricNorm!), cB.map((x) => x.s.jevP10!)), llmN: cBllm.length, llmRho: spearman(cBllm.map((x) => x.s.rubricNorm!), cBllm.map((x) => x.s.jevP10!)) },
     generic: (() => { const xs = controlled.filter((x) => x.s.rubric?.generic != null && x.s.jevGeneric != null); return { n: xs.length, rho: spearman(xs.map((x) => x.s.rubric!.generic!), xs.map((x) => x.s.jevGeneric!)) }; })(),
-    r1VsR2: (() => { const xs = all.filter((x) => judged[x.id]?.rubric && judged[x.id]?.rubric2); const { rubricNorm } = require("../src/ideagen/judge"); return { n: xs.length, rho: spearman(xs.map((x) => rubricNorm(judged[x.id].rubric!)), xs.map((x) => rubricNorm(judged[x.id].rubric2!))), meanDiff: mean(xs.map((x) => rubricNorm(judged[x.id].rubric2!) - rubricNorm(judged[x.id].rubric!))) }; })(),
+    r1VsR2: (() => { const xs = all.filter((x) => judged[x.id]?.rubric && judged[x.id]?.rubric2); return { n: xs.length, rho: spearman(xs.map((x) => rubricNorm(judged[x.id].rubric!)), xs.map((x) => rubricNorm(judged[x.id].rubric2!))), meanDiff: mean(xs.map((x) => rubricNorm(judged[x.id].rubric2!) - rubricNorm(judged[x.id].rubric!))) }; })(),
     evidenceVsRubric: spearman(both.map((x) => x.s.evidence), both.map((x) => x.s.rubricNorm!)),
     batchVsSingle: (() => { const xs = all.filter((x) => x.s.jevSingleP10 != null && x.s.jevP10 != null); return { n: xs.length, spearman: spearman(xs.map((x) => x.s.jevP10!), xs.map((x) => x.s.jevSingleP10!)), meanAbsDiff: mean(xs.map((x) => Math.abs(x.s.jevP10! - x.s.jevSingleP10!))), meanBatched: mean(xs.map((x) => x.s.jevP10!)), meanSingle: mean(xs.map((x) => x.s.jevSingleP10!)) }; })(),
     tournament: { matches: ms.length, winnerHasHigherRubric: ms.length ? ms.filter((m) => byId.get(m.winner)!.s.rubricNorm! >= byId.get(m.winner === m.a ? m.b : m.a)!.s.rubricNorm!).length / ms.length : NaN, firstPositionWins: ms.length ? ms.filter((m) => (m.swapped ? m.winner === m.b : m.winner === m.a)).length / ms.length : NaN, eloVsQuality: spearman(t.field.map((id) => rating.get(id) ?? 1500), t.field.map((id) => byId.get(id)?.s.quality ?? 0)) },
@@ -327,8 +332,8 @@ function analyze() {
   const led = budget.ledger;
   const byTag = (k: string) => { const es = led.entries.filter((e) => e.kind === "claude" && !e.cached && e.ok && e.tag.startsWith(k)); return { calls: es.length, costUsd: es.reduce((a, e) => a + (e.costUsd ?? 0), 0), inTok: es.reduce((a, e) => a + (e.inTok ?? 0), 0), outTok: es.reduce((a, e) => a + (e.outTok ?? 0), 0), ms: es.reduce((a, e) => a + e.ms, 0) }; };
   const cost = {
-    claude: { calls: nonKitCalls(), kitCalls: led.entries.filter((e) => e.kind === "claude" && !e.cached && e.tag.startsWith("kit")).length, costUsd: led.claude.costUsd, inTok: led.claude.inTok, outTok: led.claude.outTok, ms: led.claude.ms, byTag: { gen: byTag("gen"), rubric: byTag("rubric:"), rubric2: byTag("rubric2"), kit: byTag("kit") } },
-    jev: { calls: led.jev.calls, ...jevUsageFor(led.jev.ids), byKind: Object.fromEntries(["jev:", "jev-single", "generic", "pairs"].map((k) => [k, led.entries.filter((e) => e.kind === "jev" && !e.cached && e.tag.startsWith(k)).length])) },
+    claude: { calls: nonKitCalls(), kitCalls: led.entries.filter((e) => e.kind === "claude" && !e.cached && e.tag.startsWith("kit")).length, costUsd: led.claude.costUsd, inTok: led.claude.inTok, outTok: led.claude.outTok, ms: led.claude.ms, byTag: { gen: byTag("gen"), rubric: byTag("rubric:"), rubric2: byTag("rubric2"), kit: byTag("kit"), premortem: byTag("premortem") } },
+    jev: { calls: led.jev.calls, ...jevUsageFor(led.jev.ids), byKind: Object.fromEntries(["jev:", "jev-single", "generic", "pairs", "pm-", "patterns"].map((k) => [k, led.entries.filter((e) => e.kind === "jev" && !e.cached && e.tag.startsWith(k)).length])) },
     ideas: all.length, llmIdeas: all.filter((x) => x.source === "claude").length,
   };
   const ranked = all.filter((x) => x.s.slop?.pass && x.s.rubric && x.s.jevP10 != null).sort((a, b) => b.s.quality - a.s.quality);
@@ -360,7 +365,7 @@ function analyze() {
     `- Jev batched (4 per call) vs one idea per call: ρ=${f(agree.batchVsSingle.spearman, 2)}, mean |Δp|=${f(agree.batchVsSingle.meanAbsDiff, 3)}, mean p ${f(agree.batchVsSingle.meanBatched, 3)} vs ${f(agree.batchVsSingle.meanSingle, 3)} (n=${agree.batchVsSingle.n})`,
     `- Tournament: ${agree.tournament.matches} Jev pairwise matches; winner had the higher rubric score in ${f(agree.tournament.winnerHasHigherRubric * 100, 0)}%; first-listed idea won ${f(agree.tournament.firstPositionWins * 100, 0)}%; Elo vs quality ρ=${f(agree.tournament.eloVsQuality, 2)}`,
     "", "### Cost", "",
-    `- Claude: ${cost.claude.calls} experiment calls + ${cost.claude.kitCalls} kit calls, $${f(cost.claude.costUsd, 3)} total, ${cost.claude.inTok} input / ${cost.claude.outTok} output tokens`,
+    `- Claude: ${cost.claude.calls} experiment calls + ${cost.claude.kitCalls} kit calls + ${cost.claude.byTag.premortem.calls} pre-mortem calls, $${f(cost.claude.costUsd, 3)} total, ${cost.claude.inTok} input / ${cost.claude.outTok} output tokens`,
     ...Object.entries(cost.claude.byTag).map(([k, v]: any) => `  - ${k}: ${v.calls} calls, $${f(v.costUsd, 3)}, ${v.inTok}/${v.outTok} tokens, ${f(v.ms / 1000 / Math.max(1, v.calls), 0)} s per call`),
     `- Jev: ${cost.jev.calls} calls (${Object.entries(cost.jev.byKind).map(([k, v]) => `${k.replace(/:$/, "")} ${v}`).join(", ")}), ${cost.jev.inTok} input tokens ≈ $${f(cost.jev.usd, 4)}, mean latency ${f(cost.jev.latencyMs / Math.max(1, cost.jev.n), 0)} ms`,
     `- Ideas: ${cost.ideas} (${cost.llmIdeas} from Claude)`,
@@ -378,5 +383,5 @@ function analyze() {
 
 const cmds: Record<string, () => Promise<void> | void> = { gen, judge, reparse, calibrate, slopjev, rejudge, tournament, analyze };
 if (cmds[cmd]) await cmds[cmd]();
-else if (cmd === "gallery" || cmd === "kits") await (await import("./idea-experiment-out")).run(cmd, { store, judged, scored, inv, corpus, claude, jev, budget, LAB, args });
+else if (["gallery", "kits", "premortem", "archive"].includes(cmd)) await (await import("./idea-experiment-out")).run(cmd, { store, judged, scored, inv, corpus, claude, jev, budget, LAB, args, saveStore, saveJudged, postsById });
 else console.log("commands: gen | judge | calibrate | tournament | analyze | gallery | kits");

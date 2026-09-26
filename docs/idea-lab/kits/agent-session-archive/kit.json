@@ -328,19 +328,19 @@
     "have": true
    },
    {
-    "name": "Repomix",
-    "url": "",
-    "why": "LLM calls",
-    "have": true
-   },
-   {
-    "name": "LLM Wiki",
-    "url": "",
-    "why": "LLM calls",
-    "have": true
-   },
-   {
     "name": "Claude Docs",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "Ollama",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "OpenRouter",
     "url": "",
     "why": "LLM calls",
     "have": true
@@ -395,26 +395,10 @@
     "have": false
    },
    {
-    "name": "SUPABASE_ANON_KEY",
-    "purpose": "db-auth",
-    "have": false
-   },
-   {
-    "name": "DATABASE_URL",
-    "purpose": "db-auth",
-    "have": false
-   },
-   {
     "name": "NETLIFY_AUTH_TOKEN",
     "purpose": "hosting",
     "have": true,
     "where": "set in ~/.stasclaw/.env"
-   },
-   {
-    "name": "CLOUDFLARE_API_KEY",
-    "purpose": "hosting",
-    "have": true,
-    "where": "in 1 project: astra-apple"
    },
    {
     "name": "RESEND_API_KEY",
@@ -429,12 +413,6 @@
     "where": "in 2 projects: omni-claude, stasclaw"
    },
    {
-    "name": "OPENROUTER_API_KEY",
-    "purpose": "llm",
-    "have": true,
-    "where": "set in ~/.hermes/.env"
-   },
-   {
     "name": "TELEGRAM_BOT_TOKEN",
     "purpose": "telegram-bot",
     "have": true,
@@ -442,11 +420,6 @@
    },
    {
     "name": "GUMROAD_ACCESS_TOKEN",
-    "purpose": "payments",
-    "have": false
-   },
-   {
-    "name": "STRIPE_SECRET_KEY",
     "purpose": "payments",
     "have": false
    }
@@ -659,6 +632,11 @@
   "score": 0.5,
   "items": [
    {
+    "label": "Replace placeholder: placeholder",
+    "status": "needs-user",
+    "how": "fill in the real value before running that task"
+   },
+   {
     "label": "Spec, architecture and build plan",
     "status": "ready"
    },
@@ -680,24 +658,9 @@
     "how": "create it and add it to .env"
    },
    {
-    "label": "Key SUPABASE_ANON_KEY",
-    "status": "needs-user",
-    "how": "create it and add it to .env"
-   },
-   {
-    "label": "Key DATABASE_URL",
-    "status": "needs-user",
-    "how": "create it and add it to .env"
-   },
-   {
     "label": "Key NETLIFY_AUTH_TOKEN",
     "status": "ready",
     "how": "already set (set in ~/.stasclaw/.env)"
-   },
-   {
-    "label": "Key CLOUDFLARE_API_KEY",
-    "status": "ready",
-    "how": "already set (in 1 project: astra-apple)"
    },
    {
     "label": "Key RESEND_API_KEY",
@@ -710,22 +673,12 @@
     "how": "already set (in 2 projects: omni-claude, stasclaw)"
    },
    {
-    "label": "Key OPENROUTER_API_KEY",
-    "status": "ready",
-    "how": "already set (set in ~/.hermes/.env)"
-   },
-   {
     "label": "Key TELEGRAM_BOT_TOKEN",
     "status": "ready",
     "how": "already set (set in ~/.zshrc)"
    },
    {
     "label": "Key GUMROAD_ACCESS_TOKEN",
-    "status": "needs-user",
-    "how": "create it and add it to .env"
-   },
-   {
-    "label": "Key STRIPE_SECRET_KEY",
     "status": "needs-user",
     "how": "create it and add it to .env"
    },

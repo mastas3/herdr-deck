@@ -1176,7 +1176,25 @@
     "community",
     "3d"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "You're trying to ship a native iOS app (TestFlight → App Store) in 21 days. App Store review alone takes 2–5 days; TestFlight recruitment is slow (most users won't enable dev mode). This timeline is unrealistic, and… (numbers are the model's estimate, not sourced)",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "App Store price is ₪249 one-time, which means App Store takes 30%, you net ₪174. To hit ₪2k/mo, you need ~12 sales/month. But you're relying on word-of-mouth in 1 Facebook group (HumandesignIsrael = 5k members).… (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "The pain is real (app server failures), but the competition has already fragmented: some users switched to web-based apps, some to Telegram bots, some gave up on HD entirely. You're solving a problem some users have…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "appstore:as:11749955215"
+     }
+    ],
+    "fix": "Skip the App Store. Ship a web app (5 days) with offline-first PWA (works offline on phone home screen). Distribute via Gumroad for ₪149. You own distribution, 100% margin, and ship faster."
+   }
   },
   {
    "id": "B-pain:1:fbgroupscraperproarchive:dgo",
@@ -1313,7 +1331,25 @@
     "video",
     "creators"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Viral moment detection via Claude is noisy. Most podcasts don't have clean 'viral moments'—value is cumulative. Claude will flag random anecdotes as viral. Users will spend more time curating auto-selected clips than…",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "Podcasters already use existing tools: Adobe Premiere, CapCut, OpusClip, Riverside.fm (all include clip generation). Your MVP competes head-on with free/cheap video editors. You're not differentiated.",
+      "pattern": "Not hostage to a fad, platform or giant",
+      "evidence": "hn:hn:44802063"
+     },
+     {
+      "reason": "TikTok distribution channel is weak: posting 5 before/after videos won't drive customers. Podcasters don't discover tools via TikTok; they discover via Reddit, YouTube tutorials, or peer recommendation. Wrong channel. (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Pivot to selling to podcasters/coaches who embed clips in their course landing page (repeating job, weekly uploads). Competing with CapCut fails; selling to course creators who resell clip archives succeeds (see i4 revised)."
+   }
   },
   {
    "id": "B-pain:1:agentdecksessionorchestr:1co",
@@ -2828,7 +2864,26 @@
     "3d",
     "rag"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "WhatsApp bot doing live chart calculations is fragile. Each read request blocks the bot for 30–60 seconds (bodygraph-3d + Claude inference). One burst of traffic and you'll hit rate limits. No caching. Reliability is…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "appstore:as:14176611451"
+     },
+     {
+      "reason": "₪50 per read is high for a WhatsApp message. Users expect chat tips to be ₪5–₪20. At ₪50, they'd rather pay ₪150/mo for Telegram bot unlimited reads (i1) or get a free chart from HumanDesign.ai.",
+      "pattern": "Price anchored to value",
+      "evidence": "x11-2"
+     },
+     {
+      "reason": "You're selling one-time reads. No retention. To hit ₪2k/mo, you need 40 customers/month. Realistic reach in HumandesignIsrael (5k members, 1% willing to try): 50/mo. But churn is instant (they got their answer). Not a… (numbers are the model's estimate, not sourced)",
+      "pattern": "Customers keep using it"
+     }
+    ],
+    "fix": "Shift to a subscription model with a library of saved charts (not per-read pricing). Or merge with i5 (daily morning message) which has retention built in."
+   }
   },
   {
    "id": "C-audience:1:herdrconsole:kz2",
@@ -2893,7 +2948,25 @@
     "agents",
     "devtools"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Market is tiny: r/ClaudeAI + r/ChatGPTCoding = ~500k subs, but only ~50–100 people run 3+ sessions *daily* and would pay ₪19/mo. Realistic TAM: 50–100 customers = ₪950/mo. Not a sustainable business. (numbers are the model's estimate, not sourced)",
+      "pattern": "Narrow buyer you can name and reach"
+     },
+     {
+      "reason": "Stall detection (>5 min no output) is a solved problem: developers use process monitors (htop, Activity Monitor), terminal multiplexers (tmux history), or git worktree logs. You're adding a layer no one asked for.",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1w2q0bc"
+     },
+     {
+      "reason": "herdr-deck is personal/internal tooling you built for yourself. It solves *your* workflow problem, not a widespread pain point. You'd spend 80% of time on edge cases for the 20% of users who run weird setups. (numbers are the model's estimate, not sourced)",
+      "pattern": "Founder-market fit"
+     }
+    ],
+    "fix": "Abandon this idea. Your time is better spent on Human Design products (where you have proprietary data + community) or 3D games (where you have shipped projects). herdr-console is a niche tool for a niche use case."
+   }
   },
   {
    "id": "C-audience:1:groupguard:vxm",
@@ -3829,7 +3902,25 @@
     "voice",
     "community"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Video generation (Three.js + ffmpeg) is slow and expensive. At ₪19/read and 30-second turnaround, hosting costs for rendering 100 videos/month + compute = ₪2k/mo. You have negative unit economics. (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "English-speaking HD audience is saturated. HumanDesign.ai (x12-2: $8.88–$17/mo), Neutrino Design (free app + premium), YouTube coaches (free). You're competing with entrenched players on their turf. No differentiation.",
+      "pattern": "Not hostage to a fad, platform or giant",
+      "evidence": "x12-2"
+     },
+     {
+      "reason": "Channel (r/humandesign, YouTube, Instagram) is noisy. r/humandesign gets 50+ posts/day. Your comment will be buried. YouTube comments on Vikram = low conversion. Instagram #humandesign is ads-heavy, organic reach is… (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Abandon English market. Pivot to Hebrew (i6 revised, i5 revised, i11 revised). You own hd-atlas in Hebrew and bodygraph-3d; no English competitor does. Hebrew market is small but uncontested."
+   }
   },
   {
    "id": "D-asset:1:clipfactorypodcastyoutub:g9o",
@@ -5918,7 +6009,25 @@
     "creators",
     "community"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Telegram bot payments in Israel are friction-heavy. Gumroad requires email + card, breaking the impulse buy for WhatsApp-native users who expect /pay inline. Most Hebrew-speaking Telegram users won't convert.",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "HD Atlas already exists as a free corpus; you're selling access to your own data without a repeated job. Users buy once, store offline, stop paying. No retention mechanism.",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "The pain (broken apps) is real, but Telegram bot reliability still depends on Telegram's API and your server uptime. You're not meaningfully more reliable than the apps users already distrust—just smaller and unknown.",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "appstore:as:14176611451"
+     }
+    ],
+    "fix": "Move from one-time Telegram lookup bot to a daily WhatsApp subscription (like i5) with in-message Telegram payments, focusing on repeated decision-support (daily authority check) rather than reference lookups."
+   }
   },
   {
    "id": "G-constraint:1:herdrbreakdownreports:ohj",
@@ -6218,7 +6327,25 @@
     "creators",
     "community"
    ],
-   "source": "claude"
+   "source": "claude",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "yt-transcriber already exists; you're selling the same core (transcript + clips) as paid YouTube features and free extensions (reddit:rd:t3_1o1u8gd mentions homemade extensions). Creators see little reason to pay…",
+      "pattern": "Not hostage to a fad, platform or giant",
+      "evidence": "reddit:rd:t3_1o1u8gd"
+     },
+     {
+      "reason": "r/podcasting and r/NewTubers are not buyers; they're 'tire-kickers' looking for free tools. Real podcasters with budget live on private Slack groups, Discord communities, and industry forums (Pat Flynn, Tim Ferriss…",
+      "pattern": "Narrow buyer you can name and reach"
+     },
+     {
+      "reason": "30-minute turnaround breaks the workflow. Creators want clips *tonight* to post *tomorrow*. Async email delivery is a friction point. Real need is real-time or 5-minute turnaround. (numbers are the model's estimate, not sourced)",
+      "pattern": "Small first product, fast time to value"
+     }
+    ],
+    "fix": "Pivot from a standalone tool to a 'clip-ready archive' for podcasters who sell podcasts or courses: instant searchable episode library they embed in their Gumroad or Teachable (replacing manual transcript upload). Focus on *retention* (coaches keep using it weekly per student)."
+   }
   },
   {
    "id": "G-constraint:1:hdcoachtoolkitbundle:zgm",
@@ -9658,7 +9785,24 @@
     "rag"
    ],
    "source": "claude",
-   "edge": "hd-atlas is the only Hebrew-first HD knowledge base; bodygraph-3d is exact; builder is a native Hebrew speaker in Israel with direct WhatsApp group access"
+   "edge": "hd-atlas is the only Hebrew-first HD knowledge base; bodygraph-3d is exact; builder is a native Hebrew speaker in Israel with direct WhatsApp group access",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Daily habit products live or die on Day 2 retention. WhatsApp bots lose 60–80% of users by Day 2 if the message isn't hyper-personalized to the user's real birth data (which requires exact birth time). Most users will… (numbers are the model's estimate, not sourced)",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Telegram/WhatsApp payments in Israel are broken. No in-message payment option. Users have to click out to Gumroad, add a card, return to the bot. Conversion drops 70%+ in that flow. (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "You're selling a daily message competing directly with free YouTube HD astrologers and Telegram channels. The pain (wanting a quick HD tip) is real, but the frequency is saturated. Users see 10 free HD daily tips… (numbers are the model's estimate, not sourced)",
+      "pattern": "Painful problem people already spend on"
+     }
+    ],
+    "fix": "Narrow to a single decision: instead of a daily tip, become a '1:1 advisor bot' that answers a user's specific question via WhatsApp once, with a follow-up upsell to weekly coaching calls. Anchors value to a transaction, not a habit."
+   }
   },
   {
    "id": "C-audience:2:agentsessionreplay:v8t",
@@ -10815,6 +10959,23 @@
     ],
     "heat": 7.23,
     "earliness": 0.71
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Room 3D game generation is bleeding-edge and brittle. Photo-to-3D models fail 40%+ of the time (occlusions, lighting, odd furniture). User uploads a photo, gets a broken model, refund request. Customer service cost… (numbers are the model's estimate, not sourced)",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "Channel (Telegram gaming chats, TikTok #roomgame) is unproven. You have no evidence these communities exist or that they'd adopt this. TikTok discovery for niche games is hard; organic reach is near-zero without paid…",
+      "pattern": "Distribution the founder already has"
+     },
+     {
+      "reason": "Monetization is unclear. Free + ads on a casual game with <2 min playtime generates ₪0.50–₪2 per user in ad revenue. To hit ₪2k/mo, you need 10k+ users. At $4.99 APK purchase, you need 400 buyers/mo. Unrealistic for a… (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     }
+    ],
+    "fix": "Narrow to a B2B use case: sell room-to-3D scans to real estate agents (VR apartment tours) or interior designers (client visualization). Repeating job per client. Sell at ₪500–₪1000/scan. This is i14 reborn as a service, not a game."
    }
   },
   {
@@ -10965,6 +11126,23 @@
     ],
     "heat": 1.25,
     "earliness": 1
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "MakomAI (which you claim to own) is not a real, deployed product. You're reselling an internal tool you haven't validated externally. Buyer won't trust unproven 1,300 metrics. (numbers are the model's estimate, not sourced)",
+      "pattern": "Founder-market fit"
+     },
+     {
+      "reason": "One-time report has zero retention. User buys once, reads, makes decision, stops using. To hit ₪2k/mo, you need 20 buyers/month. Realistic reach: Israeli remote-work groups (50k total) with 0.04% conversion = 20/mo.… (numbers are the model's estimate, not sourced)",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Price (₪99) is low for a relocation decision. Buyers expect detailed accuracy. Your MVP is 'manual PDF generation'—i.e., you filling out a template, not automated analysis. Doesn't scale past 5 customers/month before… (numbers are the model's estimate, not sourced)",
+      "pattern": "Small first product, fast time to value"
+     }
+    ],
+    "fix": "Abandon. MakomAI is unvalidated and one-time purchases don't compound. Your time is better spent on retention-based products (daily subscriptions, per-client services)."
    }
   },
   {
@@ -11704,6 +11882,24 @@
     ],
     "heat": 3.91,
     "earliness": 0.71
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Mobile game monetization requires 100k+ downloads to hit ₪2k/mo in ad revenue. At $0.02–$0.05 CPM (mobile game standard), you need 5–10m impressions/month. Realistic: you'll get 500–2k downloads and ₪50–₪200/mo in… (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "Pokémon-style game is oversaturated. Three versions launched in the last month (i16 trend signals). You're one of 50 builders shipping the same idea. The first movers already have traction; you're entering at churn time.",
+      "pattern": "Not hostage to a fad, platform or giant",
+      "evidence": "showhn:49845172"
+     },
+     {
+      "reason": "Channel (TikTok + Telegram gaming chats) is weak for discovery. TikTok game posting requires 10–100 videos, not 1. Telegram chats are niche (hard to find, small audiences). Organic reach is near-zero without paid ads. (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Don't ship a generic Pokémon clone. Shift to a 'Falafel Rush' extended universe: leverage your existing falafel-rush traction by adding a battle mode to it (Falafel Battles). You already have an audience; extend, don't rebuild."
    }
   },
   {
@@ -11786,6 +11982,23 @@
     ],
     "heat": 1.13,
     "earliness": 0.883
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Couple compatibility reports sound intimate but are mostly static advice. Buyers read once, store, done. The only recurring use is if couples revisit the report together (rare). No retention mechanism.",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Channel (Hebrew couple groups on Facebook/Telegram) is awkward. You're a solo male builder posting in couple groups. Without credibility as a relationship expert or HD coach, your post will feel like spam. Trust is zero.",
+      "pattern": "Distribution the founder already has"
+     },
+     {
+      "reason": "Price (₪350) is anchored to coach readings (₪500–₪1000), not to the buyer's outcome. What's the outcome? Better communication? The report doesn't guarantee it. At ₪350 for a PDF, buyers see it as expensive guesswork. (numbers are the model's estimate, not sourced)",
+      "pattern": "Price anchored to value"
+     }
+    ],
+    "fix": "Reposition as a 'report generator for coaches' instead of direct-to-couple sales (see i3 revised). Coaches buy at ₪49/report, resell at ₪350. You get the margin and bypass trust issues."
    }
   },
   {
@@ -14279,7 +14492,25 @@
     "business"
    ],
    "source": "claude",
-   "edge": "gov-tender-sniper already scrapes and OCRs; builder knows Israeli business community and can DM directly; most competitors require desktop logins."
+   "edge": "gov-tender-sniper already scrapes and OCRs; builder knows Israeli business community and can DM directly; most competitors require desktop logins.",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "gov-tender-sniper scrapes mr.gov.il; official competitors (TendersGeek, GovTenders) also scrape the same source and charge ₪149–₪299/mo. You own the scraper but not a defensible edge. Buyers will try free alternatives… (numbers are the model's estimate, not sourced)",
+      "pattern": "Not hostage to a fad, platform or giant"
+     },
+     {
+      "reason": "SME decision-making on tenders is slow and manual; they evaluate 3 tenders per week, not 3 per day. Sending 2–3 daily alerts creates alert fatigue. Pain point is evaluation speed, not discovery speed.",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1sicd7c"
+     },
+     {
+      "reason": "Channel assumes you can DM 30 business owners directly; you have no proof of access to these groups or permission to post. WhatsApp DM cold outreach to SMEs has low conversion (<2%) unless you're already in their… (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Shift from alert volume to decision support: become a tender *evaluator* (not just a scraper) by pre-screening tenders using Claude against the user's historical winning bid patterns, cutting noise to 1 high-probability match per week."
+   }
   },
   {
    "id": "C-audience:4:claimslab:uot",
@@ -14517,7 +14748,24 @@
     "rag"
    ],
    "source": "claude",
-   "edge": "hd-atlas is builder's proprietary corpus; builder is Hebrew-native and knows Israeli HD community intimately; can upsell to full coaching later. Zero Hebrew-first HD reports sold at scale."
+   "edge": "hd-atlas is builder's proprietary corpus; builder is Hebrew-native and knows Israeli HD community intimately; can upsell to full coaching later. Zero Hebrew-first HD reports sold at scale.",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "One-time PDF reports have zero retention. User buys once, reads, keeps it offline, never needs you again. This is an e-book, not a business.",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Hebrew HD content is scarce, so the market is tiny (maybe 500 paying users in all of Israel). At ₪49 per report, you need 40 sales/month to hit ₪2k/mo. Realistic reach: HumandesignIsrael Facebook group (5k members,… (numbers are the model's estimate, not sourced)",
+      "pattern": "Narrow buyer you can name and reach"
+     },
+     {
+      "reason": "You're distributing via WhatsApp groups by asking admins for permission. Group admins will likely resist (no incentive to promote). Personal posts won't go viral in 5 groups. Organic reach is weak. (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Bundle one-time reports with a 'monthly update PDF' (transits, retrogrades in Hebrew, 1 action per month). Creates a repeating job: monthly refresh. Or pivot to selling reports to HD coaches who resell (pattern of i3 revised)."
+   }
   },
   {
    "id": "B-pain:4:hdatlasreader:fwr",
@@ -14779,7 +15027,24 @@
     "community"
    ],
    "source": "claude",
-   "edge": "gov-tender-sniper already crawls and extracts Israeli tenders automatically; you own the data pipeline; competitors build from public APIs that lag 3+ days"
+   "edge": "gov-tender-sniper already crawls and extracts Israeli tenders automatically; you own the data pipeline; competitors build from public APIs that lag 3+ days",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "TenderAI (i2 revised) already handles daily tender alerts with better filtering (win probability). i9 is the same idea—daily alerts—but cheaper (₪180 vs ₪249) and without the filtering. You're undercutting yourself on… (numbers are the model's estimate, not sourced)",
+      "pattern": "Not hostage to a fad, platform or giant"
+     },
+     {
+      "reason": "gov-tender-sniper data is a commodity; GovTenders and TendersGeek offer the same source at the same price. 'No server outages' isn't a competitive claim—Twilio is also subject to outages.",
+      "pattern": "Painful problem people already spend on"
+     },
+     {
+      "reason": "Channel assumes direct WhatsApp access to 5 Israeli business groups. You have no evidence you have this access or that group admins will permit promotion. Cold outreach to SMEs in WhatsApp groups has <2% conversion. (numbers are the model's estimate, not sourced)",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Ship i2 (TenderAI Score) instead. TenderBot is a worse version of a product you've already designed with better margins and a defensible edge (bid profiling)."
+   }
   },
   {
    "id": "B-pain:4:zdainupremium:lir",
@@ -15707,6 +15972,25 @@
     ],
     "heat": 3.61,
     "earliness": 0.883
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Couples buy relationship products impulsively but churn fast. No repeated job: once they read the report, they're done. Retention is near-zero unless you embed a follow-up (coaching, weekly check-ins).",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "The channel (Instagram + TikTok) targets daters and couples, but Reddit evidence (rd:t3_1q7a6vo) shows Human Design readers (not couples) are the audience. You're fishing in the wrong pond.",
+      "pattern": "Narrow buyer you can name and reach",
+      "evidence": "reddit:rd:t3_1q7a6vo"
+     },
+     {
+      "reason": "At ₪99, you're undercutting professional coaches (₪500–₪1000) but competing with AI astrology PDFs (₪18–₪40 on Etsy). Buyers in the ₪99 band expect instant delivery; 24-hour turnaround will disappoint.",
+      "pattern": "Price anchored to value",
+      "evidence": "x3-2"
+     }
+    ],
+    "fix": "Pivot to selling to HD coaches (who resell to couples) instead of couples directly. Coaches already pay ₪74–₪525 for template kits; your instant PDF generator becomes a 'client report tool' they rebrand and sell at 2–3x markup."
    }
   },
   {
@@ -15782,6 +16066,1564 @@
     ],
     "heat": 2.47,
     "earliness": 0.224
+   }
+  },
+  {
+   "id": "G-constraint:1:hdatlastelegrambot:g1y:pm",
+   "strategy": "G-constraint",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "G-constraint-1",
+   "name": "HD Atlas Daily Tip — Hebrew Morning Authority",
+   "hook": "Every morning at 7am: one Hebrew HD insight for your type + today's decision-making authority + one real choice to test it on.",
+   "buyer": "Hebrew-speaking Human Design fans in Israel (HumandesignIsrael Facebook group, Israeli HD WhatsApp groups) who want a quick, actionable morning ritual in Hebrew.",
+   "pain": "Busy Israelis know their HD type but forget to use their authority in daily decisions. Existing apps are broken or in English. They want one Hebrew sentence every morning that makes them actually *use* their strategy.",
+   "offer": "WhatsApp or Telegram message every morning at 7am: your type's strategy + today's authority tip (e.g., 'wait for clarity' for reflectors, 'respond quickly' for generators) + one real-life decision prompt to practice it on that day.",
+   "price": "₪19/month or ₪180/year",
+   "channel": "HumandesignIsrael Facebook group and Hebrew WhatsApp groups via a WhatsApp/Telegram bot link with a sample message showing 3 days of tips.",
+   "mvp": "WhatsApp bot (Twilio) that accepts birth data once via form; every morning at 7am, sends a formatted Hebrew message with type strategy, today's authority advice (based on real planetary transits), and one suggested life choice to test.",
+   "stack": [
+    {
+     "name": "hd-atlas",
+     "role": "owned; Hebrew knowledge base for strategy and authority descriptions",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; calculates exact chart and transits for personalized daily advice",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "Twilio",
+     "role": "owned; WhatsApp/Telegram delivery at scale",
+     "assetId": "svc:twilio",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; generates natural Hebrew daily messages anchored to type and transits",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Gumroad",
+     "role": "owned; billing and subscriber management",
+     "assetId": "svc:gumroad",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "llm",
+    "telegram-bot",
+    "whatsapp"
+   ],
+   "timeToFirstDollarDays": 5,
+   "difficulty": "week",
+   "evidenceIds": [
+    "appstore:as:14176611451",
+    "appstore:as:11749955215",
+    "appstore:as:14169616140"
+   ],
+   "firstQuests": [
+    "Build WhatsApp form to collect birth data and store in Supabase",
+    "Write 3 sample daily messages per type in Hebrew; run through native speaker review",
+    "Set up Twilio cron job to send at 7am; test with 3 beta users (2 days)"
+   ],
+   "topics": [
+    "hd",
+    "hebrew",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "hd-atlas is the only Hebrew-first HD corpus; bodygraph-3d calculates real transits; builder is Hebrew-native with direct WhatsApp group access. Pattern i5 (daily authority tip) already proved…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Telegram bot for Hebrew HD knowledge requires users to already know which card/gate/channel they want to look up. The pain is 'broken paid apps,' but users of broken apps were trying to *understand* their chart, not…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "appstore:as:14176611451"
+     },
+     {
+      "reason": "No repeated job after first lookup. Once a user learns their type, profile, and top channels, they rarely need to query individual cards again. A one-time lookup tool has no reason for ₪29/month recurring revenue.",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Payment friction for Israeli Telegram users. Telegram bot payments require Stripe or Stripe-like gateway; most Israeli small-spend users expect Gumroad or direct bank transfer, not bot-native payments. Conversion will…",
+      "pattern": "Price anchored to value"
+     }
+    ],
+    "fix": "Reposition as a daily authority/strategy tip (matching i5 pattern: recurring, low-friction, actionable) instead of a static card lookup, anchoring the ₪29/month to the repeating value of a *morning ritual*, not a one-time reference tool.",
+    "pivotedFrom": {
+     "name": "HD Atlas Telegram Bot",
+     "hook": "Instant Human Design card answers in Hebrew via Telegram for users frustrated with broken paid apps."
+    }
+   }
+  },
+  {
+   "id": "C-audience:4:tenderaialert:hqo:pm",
+   "strategy": "C-audience",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "C-audience-8",
+   "name": "TenderAlert Plumbing — Israeli Plumbing Supply Tenders Only",
+   "hook": "Get 2–3 plumbing supply government tenders per week on WhatsApp, filtered to match your inventory. Apply in 5 minutes, win more contracts.",
+   "buyer": "Israeli plumbing supply companies and wholesalers (10–50 employees) who bid on government tenders via mr.gov.il and currently lose bids because they miss deadlines or see irrelevant tenders.",
+   "pain": "We check mr.gov.il manually 2–3 times a week and still miss plumbing supply tenders. When we do find one, we have 48 hours to bid and often can't assemble the quote in time. Competitors who see tenders first win the contract.",
+   "offer": "WhatsApp alerts, 2–3x per week: plumbing supply government tenders only (no junk), with your company's bid-readiness checklist embedded in each message, and a direct apply link. You set your standard inventory once; we filter to matches only.",
+   "price": "₪299/month or ₪2,990/year (first 3 months free for pilot)",
+   "channel": "LinkedIn Israel + direct outreach to 20 plumbing supply companies in builder's network; offer first 5 signups free for 90 days to build proof case studies.",
+   "mvp": "gov-tender-sniper scrapes mr.gov.il nightly; Claude filters by plumbing-supply keywords (PVC pipe, pumps, fittings, etc.); Twilio sends WhatsApp with summary, deadline, and checklist. Supabase tracks which tenders each user applied to (for ROI proof).",
+   "stack": [
+    {
+     "name": "gov-tender-sniper",
+     "role": "owned; real-time tender scraper and OCR engine",
+     "assetId": "proj:gov-tender-sniper",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; category-specific filtering (plumbing supplies only)",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Twilio",
+     "role": "owned; WhatsApp delivery",
+     "assetId": "svc:twilio",
+     "owned": true
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; track user conversions and ROI per tender",
+     "assetId": "svc:supabase",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "db-auth",
+    "llm",
+    "scraping",
+    "whatsapp"
+   ],
+   "timeToFirstDollarDays": 14,
+   "difficulty": "week",
+   "evidenceIds": [
+    "reddit:rd:t3_1vmd82y",
+    "reddit:rd:t3_1sicd7c",
+    "reddit:rd:t3_1pocn46"
+   ],
+   "firstQuests": [
+    "Manually audit 20 tenders from gov-tender-sniper; label plumbing-supply tenders; train Claude filter",
+    "Reach out to 5 plumbing suppliers you know; offer 90-day free pilot in exchange for weekly 'did you apply?' check-ins",
+    "Set up Supabase tracking to measure tenders sent vs. tenders applied to (proof ROI)"
+   ],
+   "topics": [
+    "hebrew",
+    "business"
+   ],
+   "source": "claude",
+   "edge": "gov-tender-sniper already crawls and OCRs faster than competitors. Plumbing supply is a narrow, repeatable need with high contract values (₪50k–₪500k per win). Winning 1 extra tender per quarter =…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Tender alerts solve a real pain (manual checking), but the buyer—Israeli small business owners—already have free alternatives (mr.gov.il alerts, Facebook groups where tenders are shared, lawyer/accountant alerts). The…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1vmd82y"
+     },
+     {
+      "reason": "Distribution assumes DM cold-outreach to 30 business owners will convert. Israeli business owners in Facebook groups see dozens of 'try my tool' posts per week. Zero evidence that a WhatsApp bot pitch from an unknown…",
+      "pattern": "Distribution the founder already has"
+     },
+     {
+      "reason": "Price is anchored to builder's cost (Twilio + labor), not to buyer's outcome. A single missed tender = ₪5k–₪50k contract loss. Charging ₪149/month implies you only save 1–2 hours/week of manual checking, not…",
+      "pattern": "Price anchored to value",
+      "evidence": "reddit:rd:t3_1sicd7c"
+     }
+    ],
+    "fix": "Pivot to a narrower buyer (a specific trade, e.g., construction suppliers) and anchor price to actual contract value saved, not filtering convenience. Prove the filtering works on 10 real tenders first before broad rollout.",
+    "pivotedFrom": {
+     "name": "TenderAI Alert",
+     "hook": "Get a Whatsapp message each morning with 3 government tenders matching your business type. Apply in 5 minutes."
+    }
+   }
+  },
+  {
+   "id": "T-hot:4:humandesignmatchreport:q89:pm",
+   "strategy": "T-hot",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "T-hot-5",
+   "name": "HD Couples Coaching Workbook — Pre-Session Clarity Report",
+   "hook": "Before your couples therapy or coaching, both of you get a custom HD clarity report—how your types align, where you clash, and 3 practices to try. Used during sessions for deeper work.",
+   "buyer": "Couples in Israel (and Hebrew-speaking diaspora) already in therapy or coaching (via HD coaches, couples therapists, psychologists) who want to understand their partner's decision-making and conflict patterns.",
+   "pain": "My therapist/coach suggested I look at our Human Design charts, but I don't know how to use them together. I want a clear breakdown of how my type and my partner's type work together *before* our next session, so we can dig deeper in the room.",
+   "offer": "A 12-page workbook (PDF + online guide) you both fill out together: HD compatibility map (how your strategies align), 3 specific conflict patterns tied to your charts, 5 concrete practices to test this week, and session notes template. Delivered in 24 hours; includes email check-in after 2 weeks.",
+   "price": "₪449 per couple (one-time, with 14-day email follow-up included)",
+   "channel": "DM 30 HD coaches and couples therapists in Israel (via LinkedIn and WhatsApp); offer 50% referral commission per customer they send (covers cost of acquisition); post in couples therapy Facebook groups.",
+   "mvp": "Web form collects birth data for two people; bodygraph-3d generates charts; Claude writes personalized 12-page workbook in Hebrew anchored to their specific types, profiles, and strategies; Vercel + Stripe checkout; Resend auto-sends PDF + email follow-up scheduled for day 14.",
+   "stack": [
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; exact HD chart calculations",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "hd-atlas",
+     "role": "owned; Hebrew HD knowledge base for compatibility patterns",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; personalized workbook generation",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; web form and checkout",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Stripe",
+     "role": "owned; payment processing",
+     "assetId": "rec:stripe",
+     "owned": false
+    },
+    {
+     "name": "Resend",
+     "role": "owned; PDF delivery and email follow-up",
+     "assetId": "svc:resend",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "email",
+    "llm",
+    "whatsapp",
+    "pdf-report"
+   ],
+   "timeToFirstDollarDays": 10,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Build web form (birth data collection) + Stripe checkout; test end-to-end",
+    "Write Claude prompt for 12-page workbook; generate 3 sample workbooks for different type/profile combos; get feedback from 2 HD coaches",
+    "Reach out to 15 HD coaches in Israel; offer 50% commission (₪225 per sale) for referrals; start with 3 pilot referrals"
+   ],
+   "topics": [
+    "hd",
+    "hebrew",
+    "russian",
+    "geo",
+    "matching"
+   ],
+   "source": "claude",
+   "edge": "bodygraph-3d is exact HD calculation; hd-atlas is proprietary Hebrew HD knowledge. Coaches already trust your work; referral channel is warm, not cold. Anchors price to *therapy outcome* (deeper…",
+   "trend": {
+    "label": "Human Design popularity",
+    "whyNow": "No major trend signal here, but this is a high-conviction product for an audience the builder already reaches via HD Facebook groups and existing projects. Couples want quick, affordable insights before paying for a reader. The market…",
+    "signals": [
+     {
+      "id": "showhn:49844497",
+      "source": "showhn",
+      "title": "Show HN: Hacker Atlas - A map of what Hacker News talks about",
+      "url": "https://hackeratlas.com/"
+     },
+     {
+      "id": "reddit:reddit.com/r/SideProject/comments/1wozqy6/my_birdrelated_hobby_project_became_the_1_hacker/",
+      "source": "reddit",
+      "title": "My bird-related hobby project became the #1 Hacker News post this month, and now I'm being flown to China to showcase it",
+      "url": "https://www.reddit.com/r/SideProject/comments/1wozqy6/my_birdrelated_hobby_project_became_the_1_hacker/"
+     }
+    ],
+    "heat": 3.61,
+    "earliness": 0.883
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Couples compatibility reports are a one-time purchase (₪99 per couple), but the buyer—couples exploring HD—are not recurring. Once they buy a report, they do not re-buy. Pattern 8 is broken: no repeated job means no…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Price ₪99 is too low to anchor to real couples' *outcomes* (e.g., 'avoid a breakup', 'improve intimacy', 'understand conflict'). At ₪99, the buyer's expected outcome is 'curiosity satisfied', not 'relationship…",
+      "pattern": "Price anchored to value",
+      "evidence": "reddit:rd:t3_1q7a6vo"
+     },
+     {
+      "reason": "Distribution assumes Instagram and TikTok posts + referral commissions will pull couples from r/relationships. But couples in r/relationships are seeking *advice on conflict*, not 'here's our compatibility chart.'…",
+      "pattern": "Narrow buyer you can name and reach",
+      "evidence": "reddit:rd:t3_1rqg024"
+     }
+    ],
+    "fix": "Reposition as a couples-therapy pre-work tool (higher price, repeated use during actual therapy sessions or coaching), anchor to real outcomes (e.g., 'understand your partner's decision-making style to reduce fights'), and reach couples already in therapy or coaching, not cold social media.",
+    "pivotedFrom": {
+     "name": "Human Design Match Report",
+     "hook": "Get a detailed compatibility reading for you and your partner based on your Human Design charts—why you click, where you clash, how to sync your rhythms."
+    }
+   }
+  },
+  {
+   "id": "G-constraint:1:podcastclipstudiomembers:tzq:pm",
+   "strategy": "G-constraint",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "G-constraint-6",
+   "name": "Podcast Audience Archive — Make Old Episodes Discoverable",
+   "hook": "Upload 1–2 podcast episodes per month → auto-generate searchable archive your listeners can browse by topic → drive traffic back to your show.",
+   "buyer": "Solo podcasters and small podcast networks (1–3 shows, 50–5k monthly listeners) who want to build an archive so listeners can re-find old episodes by topic (e.g., 'all episodes about relationships') and drive repeat…",
+   "pain": "My podcast has 200+ episodes but no searchable archive. Listeners ask 'I heard something about X, which episode was it?' and I don't know. I want my listeners to *re-listen* to old episodes, but the archive is just a list of dates. No topic search.",
+   "offer": "Upload a podcast feed (Spotify, Apple, or RSS). We auto-transcript all episodes, extract topics and timestamps, and generate a searchable archive page you can embed on your website. Listeners search by topic ('relationships', 'mental health'), find relevant clips + timestamps, and click through to…",
+   "price": "$19/month (up to 100 episodes) or $49/month unlimited",
+   "channel": "Find 10 podcasters with 1k–5k monthly listeners on Twitter/X or Threads; DM them with a screenshot of their archive page (with sample transcript + searchable UI). Offer first 30 days free.",
+   "mvp": "Accept podcast feed URL (Spotify API or RSS); yt-transcriber + Whisper processes each episode; Claude extracts topics and timestamps; generate a simple SvelteKit archive page with full-text search. Embed code provided to podcaster.",
+   "stack": [
+    {
+     "name": "yt-transcriber",
+     "role": "owned; handles podcast transcript extraction from feed",
+     "assetId": "proj:yt-transcriber",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; topic and timestamp extraction",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; host archive pages",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; store transcripts and topic metadata",
+     "assetId": "svc:supabase",
+     "owned": true
+    },
+    {
+     "name": "Resend",
+     "role": "owned; email alerts when new episodes indexed",
+     "assetId": "svc:resend",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "hosting",
+    "db-auth",
+    "email",
+    "llm",
+    "transcription",
+    "video",
+    "payments"
+   ],
+   "timeToFirstDollarDays": 7,
+   "difficulty": "week",
+   "evidenceIds": [
+    "reddit:rd:t3_1o1u8gd",
+    "reddit:rd:t3_1pq8bph",
+    "hn:hn:47155162"
+   ],
+   "firstQuests": [
+    "Test yt-transcriber on 3 real podcast RSS feeds; extract topics and timestamps with Claude",
+    "Build searchable SvelteKit archive page with embed code; test on 2 sample podcasts",
+    "Find 15 podcasters with 1k–5k listeners; DM 10 with demo archive; aim for 2 signups for free trial"
+   ],
+   "topics": [
+    "video",
+    "rag",
+    "creators",
+    "matching"
+   ],
+   "source": "claude",
+   "edge": "yt-transcriber already handles podcast feeds. Archive is *retained* (grows every month as new episodes release), not one-off like clip generation. Drives traffic back to podcaster's website…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Podcast clip studio assumes YouTubers and podcasters are willing to upload full videos to a third-party tool and wait 30 minutes for clips. But YouTube creators' workflow is already optimized: they use CapCut (free,…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1pq8bph"
+     },
+     {
+      "reason": "Price ₪29/month for 4 credits is only valuable if creators post >4 videos per month. Most podcasters post 1–2 per month; for them, ₪29 is a waste. The tool is built for high-volume creators (10+ videos/month), but…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Distribution channel (r/podcasting, r/NewTubers) is full of 'try my tool' posts; creators see dozens per week. Zero evidence that before/after demo will outconvert free alternatives (CapCut, Opus Clip, YouTube native…",
+      "pattern": "Distribution the founder already has",
+      "evidence": "reddit:rd:t3_1o1u8gd"
+     }
+    ],
+    "fix": "Reposition as a *searchable archive* (recurring value: shared with audience, indexed for discovery, not just clips), focus on 1–2 video/month creators, and reach creators who already have an audience and want to drive traffic *back* to their site, not just make clips.",
+    "pivotedFrom": {
+     "name": "Podcast Clip Studio Membership",
+     "hook": "YouTubers and podcasters pay monthly to turn their long-form videos into ready-to-post 9:16 clips, transcripts, and searchable archives."
+    }
+   }
+  },
+  {
+   "id": "C-audience:2:yourdayhddailystrategy:iew:pm",
+   "strategy": "C-audience",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "C-audience-11",
+   "name": "HD Daily Challenge — Telegram Group + Daily Authority Test",
+   "hook": "Every morning: your type's strategy tip for today + a real-life decision to test it on. Reply at night to share what you learned. Build authority muscle with 100 Hebrew HD practitioners.",
+   "buyer": "Hebrew-speaking Human Design practitioners in Israel (HumandesignIsrael Facebook group and HD WhatsApp groups) who want daily accountability and a community to learn with, not just tips alone.",
+   "pain": "I know my type and strategy, but I forget to use it in actual decisions. I want a daily reminder + a community checking in on whether I tested my authority today. Existing apps just send tips; they don't create community or tracking.",
+   "offer": "Join a private Telegram group (100 people max). Every morning at 7am, get your type's strategy tip (e.g., 'Generators: wait for response before acting') + one real-life decision prompt. Reply at night with what happened. Weekly digest of what the group learned. Monthly 1-on-1 authority coaching…",
+   "price": "₪49/month (capped at 100 members; close when full)",
+   "channel": "Post in HumandesignIsrael Facebook group and 3 Hebrew HD WhatsApp groups; offer first week free; share weekly group digest in the same groups to drive new signups.",
+   "mvp": "Private Telegram group + daily message template (type strategy + one decision prompt). Manual replies for MVP (no bot automation). Resend sends weekly digest of replies (topline learnings). Schedule 1 monthly 20-min Zoom call with an HD coach (split fee or revenue share).",
+   "stack": [
+    {
+     "name": "hd-atlas",
+     "role": "owned; type and strategy descriptions in Hebrew",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "Telegram",
+     "role": "owned; community and daily messages",
+     "assetId": "svc:telegram",
+     "owned": true
+    },
+    {
+     "name": "Resend",
+     "role": "owned; weekly digest email",
+     "assetId": "svc:resend",
+     "owned": true
+    },
+    {
+     "name": "Gumroad",
+     "role": "owned; billing for Telegram group membership",
+     "assetId": "svc:gumroad",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "email",
+    "telegram-bot",
+    "whatsapp"
+   ],
+   "timeToFirstDollarDays": 5,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Create private Telegram group; write 7 days of daily strategy tips (one per type) in Hebrew; test drafts with 3 beta users",
+    "Set up Gumroad billing linked to Telegram group access (manual invite via Gumroad email)",
+    "Post launch announcement in HumandesignIsrael Facebook group and 2 WhatsApp groups; offer first week free"
+   ],
+   "topics": [
+    "hd",
+    "hebrew",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "hd-atlas is Hebrew-first. Community (100-person Telegram group) creates retention and word-of-mouth. Monthly coaching session (outsourced to partner coach) adds perceived value and upsell potential.…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "The offer promises 'today's authority advice based on real transits for your birth date', but transits change daily; generating truly personalized daily authority advice for each user requires custom ephemeris…",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "No repeated *decision* or *job*. Users get a daily message, but the offer does not structure them to *actually use* their authority on a real choice. Without a tracking mechanism (e.g., 'did you test this authority…",
+      "pattern": "Customers keep using it",
+      "evidence": "reddit:rd:t3_1wd9qje"
+     },
+     {
+      "reason": "Hebrew-only community is tiny: ~500–1k active HD enthusiasts in Israel, many of whom already have charts from coaches or apps. Estimating ₪19/month × 50 subscribers = ₪950/month; not enough revenue to justify product…",
+      "pattern": "Narrow buyer you can name and reach"
+     }
+    ],
+    "fix": "Simplify to type-based strategy tips (not transit-based, which requires daily calculation), add a *reply-back mechanism* to track if users actually tested their authority, and bundle with a paid community or coaching upsell to raise LTV.",
+    "pivotedFrom": {
+     "name": "היום שלך (Your Day) — HD Daily Strategy",
+     "hook": "תשובה אחת בבוקר: מה הקול שלך היום (One morning answer: what's your authority today?)"
+    }
+   }
+  },
+  {
+   "id": "C-audience:4:myhdchartinhebrew:vmv:pm",
+   "strategy": "C-audience",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "C-audience-12",
+   "name": "HD Self-Study Guide — 4-Week Hebrew Workbook Series",
+   "hook": "Get your HD chart decoded in plain Hebrew. Week 1: what your type means. Week 2: how your profile shows up. Week 3: finding your authority. Week 4: one life experiment. One chapter every Sunday.",
+   "buyer": "Hebrew-speaking HD learners in Israel (HumandesignIsrael Facebook group, HD WhatsApp groups) who want to understand their chart step-by-step before paying a coach, or as a supplement during coaching.",
+   "pain": "I got my chart calculated but the explanations are in English or too academic. I want a simple Hebrew breakdown of my type and profile so I know whether to hire a coach. Four weeks, one chapter per week, feels manageable.",
+   "offer": "Sign up with your birth data. Every Sunday for 4 weeks, get a new HD self-study chapter (plain Hebrew): Week 1 = your type + strategy, Week 2 = your profile + conditioning, Week 3 = finding your authority + decision-making, Week 4 = one personal experiment to test your type. Each chapter is 2–3…",
+   "price": "₪29/month (renews every month; can cancel anytime)",
+   "channel": "Post in HumandesignIsrael Facebook group + 3 Hebrew HD WhatsApp groups. Offer 50% commission to HD coaches who refer students (₪14.50 per new subscriber per month for life). Ask group admins to share the link (framed as 'free Hebrew…",
+   "mvp": "SvelteKit signup form (birth data). Week 1 PDF generated via Claude + Resend (one-time). Resend cron job sends Week 2, 3, 4 PDFs on Sundays. Stripe recurring charge every month. Gumroad dashboard to track subscriptions and referral payouts.",
+   "stack": [
+    {
+     "name": "hd-atlas",
+     "role": "owned; Hebrew HD knowledge base for chapter content",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; generate personalized chart visuals for each chapter",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; generate personalized Hebrew workbook chapters",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; signup form and checkout",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Stripe",
+     "role": "owned; recurring billing",
+     "assetId": "rec:stripe",
+     "owned": false
+    },
+    {
+     "name": "Resend",
+     "role": "owned; PDF generation and scheduled email delivery",
+     "assetId": "svc:resend",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "email",
+    "llm",
+    "whatsapp",
+    "pdf-report"
+   ],
+   "timeToFirstDollarDays": 5,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Write Week 1–4 chapter templates in Hebrew; generate 2 sample complete workbooks (one Reflector, one Generator) to show variety",
+    "Set up Stripe recurring billing + Resend cron job for weekly PDF delivery; test full flow end-to-end",
+    "Post in HumandesignIsrael Facebook group + 3 WhatsApp groups; reach out to 10 HD coaches with referral commission offer (₪14.50/subscriber/month)"
+   ],
+   "topics": [
+    "hd",
+    "hebrew",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "hd-atlas and bodygraph-3d generate *personalized* chapters (not templated). Recurring subscription + coach referral network (warm distribution) = sustainable unit economics. Hebrew-native voice…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "One-time purchase (₪49) for a static PDF report means zero retention. Once bought, user reads it once, bookmarks it, never returns. Builder gets one transaction per customer and no reason for repeated revenue or…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Positioning as 'DIY coaching alternative' at ₪49 invites comparison to real coaches (₪200–₪500 per session). At ₪49, buyers expect a quick insight, not a 4-page report. Messaging sets wrong expectation: if they wanted…",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "Distribution via WhatsApp groups and Facebook posts assumes admins will promote a one-time PDF tool. Admins see no recurring revenue or benefit; they have no reason to amplify. First 10 sales via friends; after that,…",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Convert to a recurring subscription with a *growing* 4-week guide (new chapter weekly based on their chart) so retention is built-in, position as coaching *supplement* (not replacement), and anchor price to coach revenue-sharing or referral commission.",
+    "pivotedFrom": {
+     "name": "My HD Chart in Hebrew",
+     "hook": "זיהוי סוגך. קרא את תרשימך בעברית בשפה פשוטה. תוצאה PDF בתוך דקה."
+    }
+   }
+  },
+  {
+   "id": "B-pain:1:hdatlaszerodowntimerelia:ylg:pm",
+   "strategy": "B-pain",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "B-pain-9",
+   "name": "HD Atlas Web — Hebrew Offline Reference (Uptime Guaranteed)",
+   "hook": "Hebrew Human Design reference that loads instantly, works offline, never crashes. No subscriptions. No server drama.",
+   "buyer": "Hebrew-speaking Human Design fans in Israel (HumandesignIsrael Facebook group, HD WhatsApp groups) who paid for broken apps and want a reliable, offline reference they can trust.",
+   "pain": "The paid HD app keeps disconnecting, support doesn't respond, and I lost access to the features I paid for. I want a reference tool that I can use anytime without internet or server issues.",
+   "offer": "A web app that loads instantly and works fully offline (cached in your browser): 2,000+ HD reference cards in Hebrew, full-text search, bodygraph visualization, gate/channel lookup. Works on any device (phone, tablet, desktop). Updates quarterly with new content. One-time purchase.",
+   "price": "₪89 one-time (capped at 500 buyers in first 6 months; then ₪129)",
+   "channel": "HumandesignIsrael Facebook group (post with screenshot) + Hebrew HD WhatsApp groups (share link with 'free offline reference' framing). Offer first 20 group admins free access in exchange for one share in their group.",
+   "mvp": "SvelteKit web app with offline-first design (Workbox service worker + SQLite WASM). Load all 2,000 HD cards on first visit; cached locally in IndexedDB. Full-text search powered by FlexSearch (offline). Deploy to Vercel (free tier for MVP). Gumroad handles one-time purchase; send license code and Vercel link via email.",
+   "stack": [
+    {
+     "name": "hd-atlas",
+     "role": "owned; all 2,000 HD reference card content in Hebrew",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; 3D bodygraph visualization",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "SvelteKit",
+     "role": "owned; web app framework with offline support",
+     "owned": false
+    },
+    {
+     "name": "Workbox",
+     "role": "owned; service worker for offline caching",
+     "owned": false
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; hosting",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Gumroad",
+     "role": "owned; one-time purchase billing",
+     "assetId": "svc:gumroad",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "db-auth",
+    "email",
+    "whatsapp"
+   ],
+   "timeToFirstDollarDays": 5,
+   "difficulty": "weekend",
+   "evidenceIds": [
+    "appstore:as:14176611451",
+    "appstore:as:11749955215",
+    "appstore:as:14169616140"
+   ],
+   "firstQuests": [
+    "Build SvelteKit web app with offline Workbox caching; test that all HD cards load and search works offline on 3 devices",
+    "Set up Gumroad one-time purchase flow; send license code via email; verify customer can access web app",
+    "Post in HumandesignIsrael Facebook group and 3 WhatsApp groups; offer first 20 admins free access"
+   ],
+   "topics": [
+    "hd",
+    "rag",
+    "hebrew",
+    "creators",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "Zero App Store friction. Offline-first web app (service worker) is nearly as good as native app, with days-to-launch instead of weeks. hd-atlas is proprietary Hebrew content. Capped initial sales…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Native iOS app with offline SQLite database requires Apple App Store review, TestFlight beta testing, and ongoing maintenance for iOS updates. Builder is solo and ships fast with web. 21 days to first dollar is too…",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "Offline app with 2,000+ HD reference cards is a *commodity* feature—once downloaded, zero ongoing reason to open the app. No recurring job means low engagement and zero LTV. User pays ₪249 once, uses it for 2 weeks,…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Price ₪249 one-time is high for a reference tool and low for a 'lifetime' product. Competitors (broken as they are) charge ₪39–₪99/year subscriptions. Jumping to ₪249 one-time invites price resistance, especially from…",
+      "pattern": "Price anchored to value",
+      "evidence": "appstore:as:14169616140"
+     }
+    ],
+    "fix": "Pivot to a lightweight *web app* (same offline-first SQLite feature, zero App Store friction, days-to-launch cut in half), anchor price to *uptime guarantee* (not just offline access), and add a *daily check-in* or *chart updates* feature to create recurring value.",
+    "pivotedFrom": {
+     "name": "HD Atlas Zero-Downtime — Reliable Hebrew Reference",
+     "hook": "The Hebrew Human Design app that never crashes. Offline, fast, trustworthy."
+    }
+   }
+  },
+  {
+   "id": "C-audience:1:herdrconsole:kz2:pm",
+   "strategy": "C-audience",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "C-audience-2",
+   "name": "herdr Console — Codebase Refactor Manager",
+   "hook": "Running a 3-day refactor across 5 Claude Code sessions? herdr shows you which session is lagging, which file had merge conflicts, and which agent needs a kick. Refactors stay on track.",
+   "buyer": "Senior software engineers and tech leads at startups who run complex multi-branch refactors using Claude Code agents across multiple machines and git worktrees.",
+   "pain": "I split my refactor across 5 Claude Code sessions (one per module). One session stalls silently for 2 hours. Another agent merges changes to the wrong branch. By the time I notice, I've lost a day of dev time. I need a single dashboard showing all sessions, merge status, and conflicts.",
+   "offer": "A web dashboard + CLI that connects to all your Claude Code sessions (via local port monitoring): shows live output for each session, flags merge conflicts and stalled agents (>5 min no output), suggests which session to prioritize next. Includes a 'refactor checklist' (phase tracking). Works…",
+   "price": "$29/month (billed only during active refactor months; pause anytime)",
+   "channel": "Post in r/ClaudeAI with a 90-second demo GIF showing 3 stalled sessions detected. Share in Claude Code Discord server (if exists) or LinkedIn via Show HN launch.",
+   "mvp": "CLI that tails Claude Code output on localhost ports, aggregates into SvelteKit web dashboard. Alerts on >5 min silence. Manual refactor checklist (user creates). No backend (local-first MVP). Deploy free version on Vercel. Gumroad for premium ($29/month).",
+   "stack": [
+    {
+     "name": "herdr-deck",
+     "role": "owned; session aggregation and alerting logic",
+     "assetId": "proj:herdr-deck",
+     "owned": true
+    },
+    {
+     "name": "node_repl",
+     "role": "owned; local port tailing and session I/O",
+     "assetId": "mcp:node-repl",
+     "owned": true
+    },
+    {
+     "name": "SvelteKit",
+     "role": "owned; web dashboard UI",
+     "owned": false
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; hosting",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Gumroad",
+     "role": "owned; subscription billing",
+     "assetId": "svc:gumroad",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "llm"
+   ],
+   "timeToFirstDollarDays": 7,
+   "difficulty": "week",
+   "evidenceIds": [
+    "reddit:rd:t3_1w2q0bc",
+    "hn:hn:48421405",
+    "reddit:rd:t3_1wni3rr"
+   ],
+   "firstQuests": [
+    "Build CLI to tail 3 Claude Code sessions on localhost; display in SvelteKit dashboard; test with 2 real refactor scenarios",
+    "Add stall detection (>5 min no output) and merge conflict flagging via git status polling",
+    "Post demo GIF to r/ClaudeAI; aim for 3–5 signups from organic HN/Reddit traffic"
+   ],
+   "topics": [
+    "agents",
+    "business"
+   ],
+   "source": "claude",
+   "edge": "herdr-deck and node_repl already exist (owned). Laser-focus on *large refactors* narrows buyer persona and improves retention (used 1–2 weeks per month, high perceived value). Outcome-based pricing…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Buyer (developers running 3+ Claude Code sessions) is real, but pain is only acute for a tiny slice: those doing *big refactors across multiple parallel sessions*. Most developers run 1–2 concurrent agents. Addressable…",
+      "pattern": "Narrow buyer you can name and reach",
+      "evidence": "reddit:rd:t3_1w2q0bc"
+     },
+     {
+      "reason": "Product solves *visibility* (see all sessions in one dashboard) but not the root pain (*stalled agents cost me 2 hours*). A 5-minute stall alert is nice, but does not unlock any new capability. No clear outcome: 'I use…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1wni3rr"
+     },
+     {
+      "reason": "Distribution via Show HN post assumes HN engineers will see the demo and convert. Show HN has high visibility but low conversion to paid SaaS (most HN readers are builders, not ready to pay for dev tools). No warm…",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Narrow to a specific use case (*multi-session refactors on large codebases*) with a narrower, warm audience (Claude Code Discord or Reddit), and anchor price to time saved per session (measurable outcome).",
+    "pivotedFrom": {
+     "name": "herdr Console",
+     "hook": "One command: see every Claude Code session across your machines in one window—stalled agents alert you."
+    }
+   }
+  },
+  {
+   "id": "B-pain:4:tenderbotwhatsapp:puv:pm",
+   "strategy": "B-pain",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "B-pain-4",
+   "name": "TenderBot Slack — Israeli Government Tenders for Teams",
+   "hook": "Israeli government tender alerts, filtered by your company's categories, posted to your #tenders Slack channel every morning. Your team sees opportunities and bids faster together.",
+   "buyer": "Israeli small-to-mid-size companies (10–100 people) with bid/tender management teams who use Slack and want alerts to reach the whole team (project managers, sales, finance) at once, not scattered across email.",
+   "pain": "Our team checks mr.gov.il separately, and often two people bid on the same tender, wasting hours. Or the right person misses the deadline because the alert went to email and they didn't see it. We need tender alerts in a shared channel where everyone sees them instantly.",
+   "offer": "A Slack bot that posts daily to your #tenders channel: 2–3 relevant government tenders filtered by your saved categories, with deadline, budget, requirements, and one-click apply link. Whole team sees it; you can comment and assign internally. No more missed deadlines or duplicate bids.",
+   "price": "₪249/month (includes 1 Slack workspace; extra workspaces ₪99 each)",
+   "channel": "LinkedIn: target procurement/bid managers at Israeli construction and supply companies (direct message 20–30 with personalized job search-based outreach). Offer 30-day free trial for first 5 signups.",
+   "mvp": "Slack bot that queries gov-tender-sniper each morning, Claude filters by saved categories (user config), posts formatted message to #tenders channel with apply link. Supabase stores category prefs and signup info. Vercel serverless for bot logic. Deploy to Slack App Directory (free tier).",
+   "stack": [
+    {
+     "name": "gov-tender-sniper",
+     "role": "owned; real-time tender scraper and OCR",
+     "assetId": "proj:gov-tender-sniper",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; category-specific filtering and Slack message formatting",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Slack",
+     "role": "owned; bot posting to channels",
+     "assetId": "svc:slack",
+     "owned": true
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; category config and workspace tracking",
+     "assetId": "svc:supabase",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; serverless bot backend",
+     "assetId": "svc:vercel",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "hosting",
+    "db-auth",
+    "email",
+    "llm",
+    "payments"
+   ],
+   "timeToFirstDollarDays": 14,
+   "difficulty": "week",
+   "evidenceIds": [
+    "reddit:rd:t3_1vmd82y",
+    "reddit:rd:t3_1sicd7c",
+    "reddit:rd:t3_1pocn46"
+   ],
+   "firstQuests": [
+    "Build Slack bot that queries gov-tender-sniper and posts to #tenders channel; test with 2 beta Slack workspaces",
+    "Set up Supabase to store user category prefs and manage Slack workspace subscriptions; Stripe integration for billing",
+    "Find 20 procurement/bid managers at Israeli companies on LinkedIn; send 10 personalized cold messages offering 30-day free trial"
+   ],
+   "topics": [
+    "hebrew",
+    "business",
+    "creators"
+   ],
+   "source": "claude",
+   "edge": "gov-tender-sniper is proprietary and fast. Slack (not WhatsApp) is the team communication standard; removes friction of personal phone notifications. Outcome-based: whole team sees alert = faster…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "This idea (TenderBot WhatsApp) is nearly identical to i2 (TenderAlert). Same pain, same offer, same channel (WhatsApp + Israeli business groups), same price range (₪180/month vs. ₪149/month). If i2 already fails on…",
+      "pattern": "Painful problem people already spend on"
+     },
+     {
+      "reason": "₪180/month is still anchored to *convenience* (no manual checking), not *outcome* (win X more contracts). Without proof that the filtering is accurate enough to increase win rate, buyers will churn after 1–2 months of…",
+      "pattern": "Price anchored to value",
+      "evidence": "reddit:rd:t3_1vmd82y"
+     },
+     {
+      "reason": "Distribution assumes posting in Israeli business WhatsApp groups will work. WhatsApp group admins delete promotional messages; posting 'try my bot' gets users blocked. Warm outreach (direct DM or LinkedIn connection)…",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Merge i2 and i9 into one revised product (remove the duplicate), or pivot i9 to focus on *workflow integration* (Slack bot for teams, not WhatsApp for individuals), which solves a different pain and targets a different buyer.",
+    "pivotedFrom": {
+     "name": "TenderBot WhatsApp",
+     "hook": "Get new Israeli government tender alerts on WhatsApp—filtered to your industry, no spam"
+    }
+   }
+  },
+  {
+   "id": "B-pain:1:storyreelpremiumhdshorts:r:pm",
+   "strategy": "B-pain",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "B-pain-11",
+   "name": "Story Reel Analytics — Turn Trending Segments into Ready Shorts",
+   "hook": "Your podcast's best moments (by listener engagement in transcript) auto-generate as 60-sec TikTok shorts with captions. Post 2 per week without thinking.",
+   "buyer": "Podcasters and YouTubers with 10k–500k followers on YouTube/Spotify who already have analytics and want to mine their *existing* top moments for shorts, not guess what goes viral.",
+   "pain": "I have 50k followers and 100+ podcast episodes, but I don't know which 60-second clips from my episodes actually drive TikTok engagement. I just guess. I want to know: 'this segment got 10k replays in the transcript player'—*that's* what I should clip.",
+   "offer": "Connect your YouTube or Spotify podcast. We analyze transcript engagement (parts listeners replayed, bookmarked, or commented on) to identify your natural 'viral moments'. Auto-generate shorts from those segments with captions. Post directly to TikTok or download. 2 shorts per week, no guessing.",
+   "price": "$19/month (up to 50 episodes) or $49/month unlimited",
+   "channel": "YouTube channel message (DM 30 podcasters with 10k–100k subs); Twitter/X: reply to 20 creator tweets about YouTube analytics and growth. Offer 2 free shorts as proof-of-concept.",
+   "mvp": "Connect YouTube/Spotify API; yt-transcriber extracts transcript. Claude analyzes for 'replayed moments' (inferred from engagement keywords in comments/captions). Generate 60-sec clip from top moment. ffmpeg adds captions. Vercel webhook. Stripe billing.",
+   "stack": [
+    {
+     "name": "yt-transcriber",
+     "role": "owned; extract transcript and detect engagement signals",
+     "assetId": "proj:yt-transcriber",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; identify viral-worthy moments from transcript engagement",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "ffmpeg",
+     "role": "owned; generate video shorts with captions",
+     "assetId": "svc:ffmpeg",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; web form and API",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Stripe",
+     "role": "owned; recurring billing",
+     "assetId": "rec:stripe",
+     "owned": false
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "llm",
+    "transcription",
+    "video"
+   ],
+   "timeToFirstDollarDays": 10,
+   "difficulty": "week",
+   "evidenceIds": [
+    "reddit:rd:t3_1v6rv5o",
+    "hn:hn:44802063",
+    "hn:hn:43791086"
+   ],
+   "firstQuests": [
+    "Build YouTube API integration to fetch transcript + comments; test on 3 podcasts with 10k+ followers",
+    "Write Claude prompt to detect 'moment scores' from transcript engagement (replays, bookmarks); validate with creator feedback",
+    "Reach out to 10 podcasters with 10k+ followers on Twitter; offer 2 free shorts from their best moments (no signup required)"
+   ],
+   "topics": [
+    "video",
+    "creators"
+   ],
+   "source": "claude",
+   "edge": "yt-transcriber detects *actual* engagement signals (replays, comments), not guesses. Creators with large audiences already have data to validate; high confidence in clip quality. $19/month is…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Product (Story Reel Premium) solves editing friction for creators, but the real bottleneck for most podcasters is *not* editing—it's *knowing which 60-second clip will go viral*. Auto-detection of 'viral moments' via…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "hn:hn:44802063"
+     },
+     {
+      "reason": "$15/month for 10 shorts or $3 per short is priced as a *convenience tool* (saves editing time), not an *outcome tool* (gets you viral). If a creator's shorts don't get engagement, they'll cancel. No pricing anchor to…",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "Distribution assumes TikTok before/after posts will drive signups. But before/after posts are low-signal in the TikTok algorithm (look like ads). Warm channel (YouTube Creator Studio, podcaster Slack community,…",
+      "pattern": "Distribution the founder already has",
+      "evidence": "reddit:rd:t3_1v6rv5o"
+     }
+    ],
+    "fix": "Reposition as a *viral-moment detector* (anchored to creator's existing analytics) instead of a generic clip generator, and focus on creators with existing audiences (10k+ followers), not new/small creators.",
+    "pivotedFrom": {
+     "name": "Story Reel Premium — HD Shorts Studio",
+     "hook": "Turn long podcasts into viral-ready vertical shorts in 5 minutes. Captions, edits, trending audio included."
+    }
+   }
+  },
+  {
+   "id": "C-audience:1:hdquickread:iy7:pm",
+   "strategy": "C-audience",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "C-audience-1",
+   "name": "HD Clarity WhatsApp — Pre-Coaching Reading (For Coaches & Clients)",
+   "hook": "Before you book a ₪500 HD coaching session, get a quick 2-min WhatsApp reading: your type, strategy, authority. Know if coaching is right for you. Or use it between sessions.",
+   "buyer": "Prospective HD coaching clients in Israel (via HumandesignIsrael Facebook group and WhatsApp groups) who want to 'test drive' coaching before committing; and active HD coaches who want to offer low-friction readings…",
+   "pain": "I'm curious about HD coaching but ₪500 is expensive and I don't know if it's for me. I want a quick preview. Or: I'm a coach and want to offer my clients a 'quick check-in' reading between sessions without a full session booking.",
+   "offer": "A WhatsApp bot (for clients) or API (for coaches): enter birth data, get a 2-minute personalized Hebrew reading (type, strategy, authority, one life advice). Clients use it to preview coaching. Coaches integrate it to offer clients affordable between-session readings.",
+   "price": "₪79 per reading (for individuals) or ₪5 per reading (for coaches, white-labeled)",
+   "channel": "HumandesignIsrael Facebook group: post as 'prep reading before coaching' offer. DM 20 HD coaches in Israel; offer white-label bot at ₪5 per reading so they can resell to their clients at ₪49–₪99 margin.",
+   "mvp": "WhatsApp bot (Twilio) + API endpoint. Bot accepts birth data, calls hd-atlas + bodygraph-3d + Claude to generate 2-min Hebrew reading, returns via WhatsApp. Stripe charges user ₪79 (or Stripe Connect charges coach ₪5 fee). Gumroad affiliate tracking for coach referrals.",
+   "stack": [
+    {
+     "name": "hd-atlas",
+     "role": "owned; Hebrew HD knowledge base",
+     "assetId": "proj:hd-atlas",
+     "owned": true
+    },
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; personalized chart calculations",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; generate personalized 2-min reading",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Twilio",
+     "role": "owned; WhatsApp delivery",
+     "assetId": "svc:twilio",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; API and bot logic",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Stripe",
+     "role": "owned; payment processing",
+     "assetId": "rec:stripe",
+     "owned": false
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "llm",
+    "whatsapp"
+   ],
+   "timeToFirstDollarDays": 7,
+   "difficulty": "week",
+   "evidenceIds": [
+    "appstore:as:14176611451",
+    "appstore:as:11749955215",
+    "appstore:as:14169616140"
+   ],
+   "firstQuests": [
+    "Build WhatsApp bot form + Stripe checkout; test full flow (birth data → reading → payment) end-to-end",
+    "Create API for coaches; test white-label integration with 2 sample coaches",
+    "Post in HumandesignIsrael Facebook group; reach out to 15 HD coaches on WhatsApp with white-label offer (₪5 per reading)"
+   ],
+   "topics": [
+    "hd",
+    "hebrew",
+    "business",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "hd-atlas and bodygraph-3d are proprietary. Coaches have warm audiences and high LTV (existing client relationships); positioning as 'coach tool' (not client tool) improves acquisition and retention.…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Offer is a one-time 2-minute WhatsApp reading (₪50 per reading). After users get one reading, they have no reason to buy another—the chart doesn't change. No repeat job means zero LTV growth or retention. Without a…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Price ₪50 per reading is too low for a personalized service and too high for a reference lookup. Buyers compare: HD coaches charge ₪200–₪500 (seem expensive, but justified for ongoing support). Automated reading at ₪50…",
+      "pattern": "Price anchored to value",
+      "evidence": "appstore:as:14169616140"
+     },
+     {
+      "reason": "Distribution via HumandesignIsrael Facebook group is known to the builder (i1, i5, i6 all use it), but posting 'get your HD chart reading on WhatsApp for ₪50' is low-differentiation. Five other projects are posting…",
+      "pattern": "Distribution the founder already has"
+     }
+    ],
+    "fix": "Reposition as a *pre-coaching consultation* (one reading to decide if you want a full session) or as an *add-on to coaching* (coaches can offer readings to clients between sessions), raising price and anchoring to coach LTV.",
+    "pivotedFrom": {
+     "name": "HDישראל Quick Read",
+     "hook": "Hebrew Human Design chart breakdowns in 2 minutes, no server drama."
+    }
+   }
+  },
+  {
+   "id": "D-asset:1:astrachartshdreadingsasa:pdv:pm",
+   "strategy": "D-asset",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "D-asset-4",
+   "name": "Astra Starter Pack — HD Onboarding Email Course",
+   "hook": "5-day HD email series + videos: understand your type, strategy, and authority. Includes worksheet. Then decide if you need coaching.",
+   "buyer": "Prospective HD coaching clients in English-speaking communities (r/humandesign, HD Instagram audiences, Vikram's YouTube community) who want to learn their chart fundamentals before committing to coaching.",
+   "pain": "I calculated my HD chart but don't understand it. I found YouTube readings (1 hour long), but they're overwhelming. I want a structured intro: 5 days, videos + worksheets, tell me if coaching is right for me.",
+   "offer": "A 5-day email onboarding series: Day 1 video (2 min): your type + strategy. Day 2 video (2 min): your authority. Day 3 worksheet: one week authority experiment. Day 4 video (2 min): reflection on experiment. Day 5: summary + book a coach or continue solo. All emails include download links to…",
+   "price": "$29 (one-time; includes lifetime email access + downloads)",
+   "channel": "Post in r/humandesign with a 30-second clip from Day 1 video. Reply to 20 YouTube comments on Vikram's 'what is your type' videos with a link. Offer HD coaches 60% commission (₪17.40 per sale) to white-label and email to their list.",
+   "mvp": "SvelteKit form (birth data). Email sequence (Resend) with 5 scheduled messages. 5 videos pre-recorded (ffmpeg + bodygraph-3d) showing sample type/strategy/authority. Stripe one-time purchase. Gumroad affiliate link for coaches.",
+   "stack": [
+    {
+     "name": "bodygraph-3d",
+     "role": "owned; generate personalized bodygraph videos",
+     "assetId": "proj:bodygraph-3d",
+     "owned": true
+    },
+    {
+     "name": "ffmpeg",
+     "role": "owned; render video with voiceover",
+     "assetId": "svc:ffmpeg",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; generate personalized worksheet content",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Resend",
+     "role": "owned; email delivery",
+     "assetId": "svc:resend",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; signup form",
+     "assetId": "svc:vercel",
+     "owned": true
+    },
+    {
+     "name": "Stripe",
+     "role": "owned; payment processing",
+     "assetId": "rec:stripe",
+     "owned": false
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "email",
+    "llm",
+    "video",
+    "pdf-report"
+   ],
+   "timeToFirstDollarDays": 12,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Record 5 sample videos (Day 1–5) with bodygraph-3d rendering + voiceover; edit with ffmpeg; test end-to-end email delivery",
+    "Create 5 worksheets (PDF templates + Claude prompts for personalization); test full Resend sequence",
+    "Post in r/humandesign and reply to Vikram YouTube comments (15–20 posts); reach out to 10 HD coaches with 60% commission offer"
+   ],
+   "topics": [
+    "hd",
+    "video",
+    "business",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "bodygraph-3d is proprietary (exact calculations). Email course (5 days) creates *retention* and *outcomes* (user actually does authority experiment). Coach referral channel (60% commission) scales…",
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Offer (2-min video reading of a bodygraph) solves 'I want fast, visual explanation' but not 'I want to *use* my chart to make decisions'. A 2-min video is entertainment; it does not teach authority, strategy, or how to…",
+      "pattern": "Customers keep using it",
+      "evidence": "reddit:rd:t3_1ttq1nq"
+     },
+     {
+      "reason": "Price $19 per video is low for custom video production and high for 'just a quick explanation'. Buyers compare to free YouTube HD readings (1 hour, free) or cheap PDF reads (₪49). At $19, buyer expects 'better than…",
+      "pattern": "Price anchored to value",
+      "evidence": "reddit:rd:t3_1oyzd74"
+     },
+     {
+      "reason": "Distribution assumes r/humandesign demo and YouTube comment replies on Vikram's channel will drive signups. r/humandesign is full of product posts; YouTube comments are spam-heavy; Instagram #humandesign ads are…",
+      "pattern": "Distribution the founder already has",
+      "evidence": "reddit:rd:t3_1ttq1nq"
+     }
+    ],
+    "fix": "Pivot to an *HD onboarding program* (email series + videos + worksheet), anchor price to 'decide if you need a coach', and reach HD coaches who can white-label or resell to their email lists.",
+    "pivotedFrom": {
+     "name": "Astra Charts—HD Readings as a Service",
+     "hook": "Instant HD chart reading in English: get a 2-min video of your bodygraph + energy blockages + life theme."
+    }
+   }
+  },
+  {
+   "id": "T-hot:3:hdcompatibilityreportfor:9tu:pm",
+   "strategy": "T-hot",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "T-hot-5",
+   "name": "DEPRECATED — Use i3 Revised (HD Couples Coaching Workbook)",
+   "hook": "DUPLICATE: This idea repeats i3 with the same buyer, offer, and channel. See i3 revised instead.",
+   "buyer": "",
+   "pain": "",
+   "offer": "",
+   "price": "",
+   "channel": "",
+   "mvp": "",
+   "stack": [],
+   "needs": [],
+   "timeToFirstDollarDays": 30,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [],
+   "topics": [
+    "hd",
+    "matching"
+   ],
+   "source": "claude",
+   "trend": {
+    "label": "AI-personalized couple reports",
+    "whyNow": "The Hacker Atlas (71 points on Show HN) shows that personalized, data-backed reports are trending. Couples want AI-written insights that feel custom, not generic—and you can deliver both accuracy (HD charts) and credibility (real…",
+    "signals": [
+     {
+      "id": "showhn:49844497",
+      "source": "showhn",
+      "title": "Show HN: Hacker Atlas - A map of what Hacker News talks about",
+      "url": "https://hackeratlas.com/"
+     }
+    ],
+    "heat": 1.13,
+    "earliness": 0.883
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "This idea is nearly identical to i3 (Human Design Match Report). Same buyer (couples), same offer (compatibility report PDF), same price range (₪350 vs. ₪99), same channel (couple groups on Facebook/Telegram). If i3…",
+      "pattern": "Painful problem people already spend on"
+     },
+     {
+      "reason": "Price ₪350 is high for a one-time PDF report. Couples compare to real couples therapists (₪300–₪500/hour for ongoing support) or HD coaches (₪200–₪500/session with follow-ups). At ₪350, a static report feels expensive…",
+      "pattern": "Price anchored to value",
+      "evidence": "se:se:webapps:181262"
+     },
+     {
+      "reason": "Offer (4–6 page PDF) is built on the assumption that couples want to understand 'how their types work together'. But the *actual* pain couples have is 'we fight about X' (specific conflict), not 'we want to understand…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "se:se:webapps:181262"
+     }
+    ],
+    "fix": "This is a duplicate of i3. Consolidate the two: use i3 revised (coaching workbook) as the single couples product. Remove i13.",
+    "pivotedFrom": {
+     "name": "HD Compatibility Report for Couples",
+     "hook": "Get a personalized Human Design compatibility report: your chart + partner's chart = tailored insights on how you work together."
+    }
+   }
+  },
+  {
+   "id": "T-early:3:roomsketchplaytests:vuh:pm",
+   "strategy": "T-early",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "T-early-3",
+   "name": "RoomSketch Arena — Explore Your Friends' Rooms",
+   "hook": "Upload a photo of your room → your friends can explore it as a 3D world → race through, find hidden objects, post your best time to the leaderboard.",
+   "buyer": "Casual mobile gamers (ages 12–35) in Hebrew/Russian-speaking communities (Telegram gaming chats, Discord servers, TikTok gaming communities) who play on phone and want social games they can play with friends.",
+   "pain": "I like exploring 3D worlds and racing against friends' times, but most games are generic. I want a game where my friends' *actual rooms* are the levels—that's unique and fun.",
+   "offer": "RoomSketch Arena: you upload a photo of your room → it becomes a playable 3D level. Your friends explore, race, and post times to the leaderboard. Earn cosmetics (skins, trails) to personalize your avatar. New rooms added weekly from community submissions. Play solo or compete.",
+   "price": "Free with ads (1 free room per day); ₪9.99/month unlimited rooms + cosmetics",
+   "channel": "Post a Telegram bot link in 15+ gaming Telegram chats (Hebrew and Russian); share in Discord gaming servers. Join viral gaming Telegram group and post weekly new room 'this week's map is from Tel Aviv' (community engagement).",
+   "mvp": "Web/mobile app (SvelteKit + Phaser 3) where users upload room photos. RoomSketch extracts floor plan → Afterlight/Home engine renders it. Leaderboard (Supabase stores times + usernames). Cosmetics store (₪9.99/month Stripe subscription). Bot (Telegram) manages submissions and limits.",
+   "stack": [
+    {
+     "name": "3d-game-from-video",
+     "role": "owned; room-to-3D conversion engine",
+     "assetId": "proj:3d-game-from-video",
+     "owned": true
+    },
+    {
+     "name": "RoomSketch",
+     "role": "owned; floor plan extraction",
+     "owned": false
+    },
+    {
+     "name": "Afterlight/Home",
+     "role": "owned; Three.js game engines",
+     "owned": false
+    },
+    {
+     "name": "Phaser 3",
+     "role": "owned; browser game framework",
+     "owned": false
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; leaderboard and player data",
+     "assetId": "svc:supabase",
+     "owned": true
+    },
+    {
+     "name": "Vercel",
+     "role": "owned; hosting",
+     "assetId": "svc:vercel",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "hosting",
+    "db-auth",
+    "video",
+    "telegram-bot"
+   ],
+   "timeToFirstDollarDays": 14,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Build SvelteKit form to upload room photo → RoomSketch extraction → Afterlight rendering; test on 3 real rooms (mobile and desktop)",
+    "Implement Supabase leaderboard (times, usernames) and Stripe subscription (cosmetics unlock); test end-to-end",
+    "Find 15 active gaming Telegram chats (Hebrew/Russian); post link + demo GIF; aim for 50+ room submissions in first week"
+   ],
+   "topics": [
+    "games",
+    "hebrew",
+    "russian",
+    "business",
+    "community",
+    "3d",
+    "video"
+   ],
+   "source": "claude",
+   "edge": "3d-game-from-video and RoomSketch are proprietary. Multiplayer leaderboard (social play) creates retention (users re-play to beat friends' times weekly). Community-submitted rooms = infinite content…",
+   "trend": {
+    "label": "AI-generated playable games from photos",
+    "whyNow": "Pokémon AI-generated gameplay trending on HN and Reddit (223 points). Players want *their* worlds made playable. Casual games dominate mobile and Telegram; Three.js room-to-game pipeline is now fast enough for public release.",
+    "signals": [
+     {
+      "id": "showhn:49845172",
+      "source": "showhn",
+      "title": "Show HN: Jev Plays Pokémon Red",
+      "url": "https://jev-pokemon.vercel.app/"
+     },
+     {
+      "id": "reddit:reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/",
+      "source": "reddit",
+      "title": "I made this playable Pokémon battle demo using Opus 5.5",
+      "url": "https://www.reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/"
+     },
+     {
+      "id": "hn:49845172",
+      "source": "hn",
+      "title": "Show HN: Jev Plays Pokémon Red",
+      "url": "https://jev-pokemon.vercel.app/"
+     }
+    ],
+    "heat": 7.23,
+    "earliness": 0.71
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Offer (scan room → playable 3D world) is cool but has zero repeated job. Users scan their room once, play for 5 minutes, share with 2 friends, then never open again. No reason to re-open the game weekly or monthly.…",
+      "pattern": "Customers keep using it",
+      "evidence": "reddit:reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/"
+     },
+     {
+      "reason": "Price ₪29 for offline APK is high for a one-time novelty game and low for a recurring gaming experience. If game is fun enough to keep, it's worth ₪1.99 per month sub (with updates, new rooms, leaderboards). At ₪29…",
+      "pattern": "Price anchored to value"
+     },
+     {
+      "reason": "Distribution assumes 'post TikTok with #roomgame' will drive installs. But TikTok algorithm favors trending sounds and formats, not one-off game promos. Posting 10 TikToks of 'here's my room as a game' will get low…",
+      "pattern": "Distribution the founder already has",
+      "evidence": "showhn:49845172"
+     }
+    ],
+    "fix": "Pivot to a *multiplayer room-exploration game* (retention via social play and leaderboards) with a subscription model (₪9.99/month for new rooms + cosmetics), and reach via a gaming community (Discord or Telegram game bot) instead of TikTok.",
+    "pivotedFrom": {
+     "name": "RoomSketch Playtests",
+     "hook": "Upload a photo of your room → playable 3D world in 2 minutes → share with friends"
+    }
+   }
+  },
+  {
+   "id": "T-early:3:makomaicitymatchreport:bem:pm",
+   "strategy": "T-early",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "T-early-5",
+   "name": "MakomAI City Match — Monthly Relocation Planning Newsletter",
+   "hook": "Every month: how your ideal Israeli city is changing (rent +5%, new tech jobs, weather trends). Stay informed. Know when it's time to move.",
+   "buyer": "Israeli remote workers and small business owners (10k–50k monthly listeners) who follow MakomAI's monthly city updates to track cost-of-living changes, job market trends, and community growth.",
+   "pain": "I moved to Raanana last year because the analysis said it was best for me. But now rent is up 20%, and there are fewer tech jobs. I wish I had monthly updates so I knew when to re-evaluate or move again.",
+   "offer": "A monthly email (MakomAI City Report): your top 3 cities ranked by current rent, job market, and community vibe. Updates on policy changes (new transit, tax breaks, subsidies). A quarterly deeper analysis: 'best cities for your lifestyle in 6 months' (forward-looking). Download updated CSV for…",
+   "price": "₪49/month or ₪490/year",
+   "channel": "Offer first month free to DM 50 remote workers in Israeli Facebook groups. Post monthly digest summary in remote-work groups; link to subscription. Affiliate partnership with Israeli co-working spaces (10% commission per subscriber).",
+   "mvp": "One-time initial analysis (unchanged from i15 MVP). Automated Resend email job: monthly fetch latest rent/job data, re-rank top 5 cities, generate summary + CSV. Gumroad for recurring billing. Segment audience by initial city interest (save for re-engagement).",
+   "stack": [
+    {
+     "name": "makom-ai",
+     "role": "owned; city scoring and metrics",
+     "assetId": "proj:makom-ai",
+     "owned": true
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; store user preferences and re-run monthly analysis",
+     "assetId": "svc:supabase",
+     "owned": true
+    },
+    {
+     "name": "Resend",
+     "role": "owned; monthly email delivery",
+     "assetId": "svc:resend",
+     "owned": true
+    },
+    {
+     "name": "Claude",
+     "role": "owned; write monthly digest + insights",
+     "assetId": "sub:claude",
+     "owned": true
+    },
+    {
+     "name": "Gumroad",
+     "role": "owned; subscription billing",
+     "assetId": "svc:gumroad",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "payments",
+    "db-auth",
+    "email",
+    "llm",
+    "pdf-report"
+   ],
+   "timeToFirstDollarDays": 7,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Set up Supabase to store user initial preferences (birth city, priorities). Build Resend job to re-score cities monthly and email summary",
+    "Draft 2 sample monthly emails (e.g., 'July report: Raanana rent up 3%, new tech hubs in Herzliya'); get feedback from 3 beta users",
+    "Post 'MakomAI City Trends' free summary in 3 Israeli remote-work Facebook groups; offer ₪49/month for full monthly reports"
+   ],
+   "topics": [
+    "astro",
+    "hebrew",
+    "geo",
+    "business",
+    "community"
+   ],
+   "source": "claude",
+   "edge": "makom-ai has 1,300+ metrics; monthly updates add *recurring job* (tracking relocation-readiness over time). Subscription model (₪49/month) is anchored to 'stay informed on relocation trends', not…",
+   "trend": {
+    "label": "Location intelligence and personalized relocation guidance",
+    "whyNow": "MakerMap just launched (living map of makers). Relocation decisions are high-stakes and data-sparse in Israel; freelancers + small biz owners now have budget to pay for certainty.",
+    "signals": [
+     {
+      "id": "producthunt:producthunt.com/products/makermap",
+      "source": "producthunt",
+      "title": "MakerMap — A living map of makers and what they’re building\n",
+      "url": "https://www.producthunt.com/products/makermap"
+     }
+    ],
+    "heat": 1.25,
+    "earliness": 1
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Offer (questionnaire → PDF with top 5 cities) is a one-time analysis tool. User gets report once, reads it, makes a decision (move or stay). No reason to re-run the tool monthly or yearly. Zero retention, zero LTV.…",
+      "pattern": "Customers keep using it",
+      "evidence": "reddit:rd:t3_1v8d2hn"
+     },
+     {
+      "reason": "Pain ('I want to leave Tel Aviv, but which city?') is niche and seasonal. Users think about moving 1–2 times per year, not monthly. A subscription product (₪99/month) makes no sense if the job is done once per year.…",
+      "pattern": "Customers keep using it"
+     },
+     {
+      "reason": "Distribution assumes posting in 'Israeli remote-work Facebook groups' will find buyers. But Israeli remote workers are often young, price-sensitive, and already know 50 cities from friends/online research. A paid ₪99…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "reddit:rd:t3_1v8d2hn"
+     }
+    ],
+    "fix": "Convert to a *recurring 'relocation readiness' service* with monthly city rankings updates (as new rent/job data arrives) or pivot to a *B2B product for HR teams* helping them place remote employees across cities.",
+    "pivotedFrom": {
+     "name": "MakomAI City Match Report",
+     "hook": "Answer 5 questions about your life → AI ranks 50 Israeli cities by livability for you → get a PDF report with rent, jobs, vibe"
+    }
+   }
+  },
+  {
+   "id": "T-hot:3:pokmonbattlegamehebrewru:tti:pm",
+   "strategy": "T-hot",
+   "promptVersion": "premortem",
+   "round": 5,
+   "briefId": "T-hot-4",
+   "name": "Falafel Rush Battles — Turn-Based Battle Mode (In-Game Event)",
+   "hook": "Falafel Rush players: earn battle credits in daily rushes → unlock turn-based 1v1 battles → climb the leaderboard → defend your rank weekly.",
+   "buyer": "Falafel Rush active players (existing 5k+ monthly users) who want a deeper gameplay loop beyond rushes and are willing to spend 5–10 min/day on battles.",
+   "pain": "I love Falafel Rush rushes, but after 2 weeks, it gets repetitive. I want something to do with my friends between rushes. I want competition and leveling.",
+   "offer": "In-game 'battle mode': every day, earn 2 free battle credits. Use them to challenge friends 1v1 or the leaderboard. Choose your character (from rush mode) and duel for 3 turns each. Win = move up rank, earn cosmetics, unlock skins. Weekly rank reset and rewards.",
+   "price": "$1.99/month battle pass (3 free battle credits/day instead of 2, weekly…",
+   "channel": "In-game notification (existing Falafel Rush app). Push notification to 5k active players: 'NEW: Battles are here.' Zero new marketing needed—use existing playerbase.",
+   "mvp": "Falafel Rush app update: add 'Battle' tab. Phaser 3 mini-game (3-turn battle system, similar to i16 core). Leaderboard (Supabase). Cosmetics earned from wins (shared with rush cosmetics shop). Simple progression (no RPG complexity). A/B test on 10% of players first.",
+   "stack": [
+    {
+     "name": "falafel-rush",
+     "role": "owned; app, existing playerbase, cosmetics shop",
+     "assetId": "proj:falafel-rush",
+     "owned": true
+    },
+    {
+     "name": "Phaser 3",
+     "role": "owned; turn-based battle mini-game",
+     "owned": false
+    },
+    {
+     "name": "Supabase",
+     "role": "owned; leaderboard and battle history",
+     "assetId": "svc:supabase",
+     "owned": true
+    }
+   ],
+   "needs": [
+    "db-auth"
+   ],
+   "timeToFirstDollarDays": 7,
+   "difficulty": "week",
+   "evidenceIds": [],
+   "firstQuests": [
+    "Design 3-turn battle mechanic and win conditions; implement Phaser 3 prototype; test on 3 players",
+    "Integrate Supabase leaderboard; track wins/losses; sync cosmetics from rush mode",
+    "Push update to Falafel Rush players; monitor adoption (target: 20% of players try battles in week 1)"
+   ],
+   "topics": [
+    "games",
+    "business"
+   ],
+   "source": "claude",
+   "edge": "falafel-rush has proven 5k+ monthly users and Hebrew/Russian community. Battles are *retention feature* (players return weekly to defend rank). Zero new customer acquisition cost (use existing app…",
+   "trend": {
+    "label": "Pokémon AI clones and battle mechanics",
+    "whyNow": "Three Pokémon battle games went viral on HN and Reddit in 2 days, proving demand for playable battles. Hebrew/Russian speakers have zero localized version—this fills a gap with a community you already reach.",
+    "signals": [
+     {
+      "id": "showhn:49845172",
+      "source": "showhn",
+      "title": "Show HN: Jev Plays Pokémon Red",
+      "url": "https://jev-pokemon.vercel.app/"
+     },
+     {
+      "id": "reddit:reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/",
+      "source": "reddit",
+      "title": "I made this playable Pokémon battle demo using Opus 5.5",
+      "url": "https://www.reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/"
+     }
+    ],
+    "heat": 3.91,
+    "earliness": 0.71
+   },
+   "premortem": {
+    "failures": [
+     {
+      "reason": "Game is described as 'Pokémon-style battle game' in Hebrew/Russian, but has zero evidence of market demand (no Reddit posts asking for this, no Telegram gaming groups asking for Hebrew Pokémon). Builder assumes demand…",
+      "pattern": "Painful problem people already spend on",
+      "evidence": "showhn:49845172"
+     },
+     {
+      "reason": "Revenue model (free + ad revenue + optional $4.99 battle pass) assumes 10k+ daily active users to generate meaningful ad revenue. Early adoption of a new game typically sees <100 DAUs; ad revenue from <100 users is…",
+      "pattern": "Small first product, fast time to value"
+     },
+     {
+      "reason": "Distribution assumes 'post TikTok + share in Telegram groups' will drive adoption. But Telegram gaming groups have low-engagement audiences (small, fragmented). TikTok algorithm favors established creators; new game…",
+      "pattern": "Distribution the founder already has",
+      "evidence": "reddit:reddit.com/r/ClaudeAI/comments/1wqb1ur/i_made_this_playable_pokémon_battle_demo_using/"
+     }
+    ],
+    "fix": "Leverage falafel-rush's *existing audience* for distribution instead of cold TikTok. Reposition as a 'battle expansion' to Falafel Rush (same playerbase, same community), not a standalone game.",
+    "pivotedFrom": {
+     "name": "Pokémon Battle Game (Hebrew + Russian)",
+     "hook": "Play a real-time Pokémon-style battle game in Hebrew or Russian on your phone—beat bosses, level up, compete on leaderboards."
+    }
    }
   }
  ],

@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import type { StarterKit } from "./types";
 
 const bullets = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
-export function renderKit(k: StarterKit, name: string): Record<string, string> {
+function renderKit(k: StarterKit, name: string): Record<string, string> {
   const c = k.connectors;
   const agent = [
     `# ${name}`, "", k.spec.problem, "",

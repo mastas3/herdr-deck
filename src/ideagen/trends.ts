@@ -14,7 +14,7 @@ import { topicsOf } from "./inventory";
 
 const HOME = homedir();
 const DAY = 86_400_000;
-export type TrendSource = "hn" | "showhn" | "github" | "producthunt" | "reddit" | "polymarket" | "report";
+type TrendSource = "hn" | "showhn" | "github" | "producthunt" | "reddit" | "polymarket" | "report";
 export type TrendSignal = {
   id: string; source: TrendSource; title: string; url: string; at: number; text: string;
   /** Raw popularity (points, stars, 24h volume) and per-day velocity; rank = 0..1 within its source. */
@@ -26,7 +26,7 @@ export type Trend = {
 };
 export type TrendSet = { at: number; day: string; signals: TrendSignal[]; trends: Trend[]; status: Record<string, { ok: boolean; n: number; ms: number; error?: string }> };
 
-export const REDDIT_SUBS = ["SideProject", "startups", "Entrepreneur", "SaaS", "indiehackers", "artificial", "LocalLLaMA", "humandesign", "ClaudeAI", "podcasting"];
+const REDDIT_SUBS = ["SideProject", "startups", "Entrepreneur", "SaaS", "indiehackers", "artificial", "LocalLLaMA", "humandesign", "ClaudeAI", "podcasting"];
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).replace(/\s+\S*$/, "")}…` : s);
 
 async function get(f: FetchLike, url: string, ms: number): Promise<{ ok: boolean; status: number; body: string; error?: string }> {
@@ -49,7 +49,7 @@ export function parseHNHits(j: any, source: "hn" | "showhn", now: number): Trend
     return { id: `${source}:${h.objectID}`, source, title: String(h.title), url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`, at, text: htmlText(h.story_text ?? "").slice(0, 300), metric: pts, velocity: pts / ageDays(at, now), rank: 0, where: `https://news.ycombinator.com/item?id=${h.objectID}` };
   });
 }
-export function parseGitHubRepos(j: any, now: number): TrendSignal[] {
+function parseGitHubRepos(j: any, now: number): TrendSignal[] {
   return (j?.items ?? []).filter((r: any) => !r.fork && !r.archived).map((r: any) => {
     const at = Date.parse(r.created_at) || now;
     const stars = Number(r.stargazers_count ?? 0);
@@ -75,7 +75,7 @@ export function parseAtom(xml: string, source: "producthunt" | "reddit", now: nu
   return out;
 }
 const TECH_MARKET = /\b(ai|openai|gpt|anthropic|claude|gemini|llm|apple|google|meta|microsoft|nvidia|tesla|spacex|app store|iphone|launch|release|model|chip|bitcoin|crypto|startup|ipo|tiktok|x\.com|twitter)\b/i;
-export function parsePolymarket(j: any, now: number): TrendSignal[] {
+function parsePolymarket(j: any, now: number): TrendSignal[] {
   return (Array.isArray(j) ? j : []).filter((m: any) => m?.question && TECH_MARKET.test(m.question)).map((m: any) => {
     const vol = Number(m.volume24hr ?? m.volume ?? 0);
     const at = Date.parse(m.startDate ?? "") || now;
@@ -83,7 +83,7 @@ export function parsePolymarket(j: any, now: number): TrendSignal[] {
   });
 }
 /** Reports other agents wrote (autoresearch, leads deep dives): their headings and bold lines as signals. */
-export function parseReport(md: string, file: string, at: number): TrendSignal[] {
+function parseReport(md: string, file: string, at: number): TrendSignal[] {
   const title = md.match(/^#\s+(.+)$/m)?.[1] ?? file.replace(/\.md$/, "");
   const lines = md.split("\n").filter((l) => /^#{2,3}\s+|^\s*[-*]\s+\*\*/.test(l)).slice(0, 12).map((l) => l.replace(/^#+\s*|^\s*[-*]\s+|\*\*/g, "").trim());
   return [{ id: `report:${file}`, source: "report", title: clip(title, 180), url: `file://${file}`, at, text: clip(lines.join("; "), 300), metric: 1, velocity: 1 / ageDays(at, Date.now()), rank: 0 }];
@@ -100,7 +100,7 @@ export function rankWithinSource(xs: TrendSignal[]): TrendSignal[] {
 const COMMON = new Set(("a about above after again against all almost also always am an and any are aren't around as at away back be because been before being below between both but by can can't cannot could did didn't do does doesn't doing don't done down during each either else enough even ever every few for from further get gets getting go goes going gone got had has hasn't have haven't having he her here hers him his how i i'm i've if in into is isn't it it's its itself just keep know last less let like likely little made make makes making many may me might mine more most much must my myself need needs never new next no nor not now of off often on once one only or other our ours out over own part per put quite rather really same see seen she should since so some something still such take than that the their them then there these they thing things think this those though through to too two under until up upon us use used using very via want wants was way ways we well went were what when where whether which while who whom whose why will with within without would yet you your yours " +
   "show hn ask launch launched launching built build building builder make made makes create created tool tools app apps application open source free new first ever best better good great cool simple easy fast faster help helps way week weekly month year years day days today yesterday tomorrow time times version release released update updates introducing announcing announced based feature features lets let's project projects product products startup startups founder founders company companies business businesses customer customers user users people team work working works real single turn turns wanted share shared because thread post posts reddit comment comments promote promotion will i'm feedback friday anyone someone everyone thing stuff lot lots question questions answer idea ideas thought thoughts guy guys hey hi help advice tips experience experiences story stories lesson lessons learned small big huge tiny finally actually really literally honestly just yet still").split(/\s+/));
 /** Title words worth grouping by: not common words, not numbers; model names like "qwen3" and acronyms stay. */
-export function trendTerms(title: string, text = ""): string[] {
+function trendTerms(title: string, text = ""): string[] {
   const words = `${title} ${text.slice(0, 160)}`.replace(/[’']/g, "").split(/[^A-Za-z0-9+.#-]+/).map((w) => w.replace(/^[.#-]+|[.#-]+$/g, "")).filter(Boolean);
   const out: string[] = [];
   for (const w of words) {
@@ -163,14 +163,9 @@ export function clusterTrends(signals: TrendSignal[], now: number, max = 36): Tr
   }
   return trends.sort((a, b) => b.heat - a.heat);
 }
-/** Which trends fit the user: shared topics with their inventory, or with their audiences. */
-export function trendFit(t: Trend, topics: string[]): number {
-  if (!t.topics.length) return 0.2;
-  return t.topics.filter((x) => topics.includes(x)).length / t.topics.length;
-}
 
 // ── fetching everything (once a day) ─────────────────────────────────────────────────────────────
-export type TrendOpts = { fetch?: FetchLike; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; now?: number; timeout?: number; redditGapMs?: number; subs?: string[]; log?: (s: string) => void; reportsDirs?: string[] };
+type TrendOpts = { fetch?: FetchLike; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; now?: number; timeout?: number; redditGapMs?: number; subs?: string[]; log?: (s: string) => void; reportsDirs?: string[] };
 export async function gatherTrends(o: TrendOpts = {}): Promise<TrendSet> {
   const f: FetchLike = o.fetch ?? ((u, i) => fetch(u, i as any) as any);
   const ghRun = o.gh ?? ghDefault;

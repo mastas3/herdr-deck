@@ -2,7 +2,7 @@
 // and pain-first briefs from the coherent sampler, plus trend and constraint lanes; one Claude call per strategy;
 // Jev + rubric judging; the slop gate) and caches the result; moreInLane refills one lane on demand.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import type { Brief, Gallery, Idea, IdeaCard, Inventory, Lane, PainCorpus, Scores, StrategyId } from "./types";
+import type { Gallery, Idea, IdeaCard, Inventory, Lane, PainCorpus, PainPost, Scores, StrategyId } from "./types";
 import type { TrendSet } from "./trends";
 import type { ClaudeRunner, JevRunner } from "./llm";
 import { briefsFor, painClusters, seedOf } from "./sampler";
@@ -10,15 +10,19 @@ import { ideaPrompt, parseIdeas } from "./strategies";
 import { indexPosts, jevBatch, jevGenericBatch, matchEvidence, rubricBatch, scoreIdea } from "./judge";
 import { mapConnectors, ownedRatio } from "./connectors";
 import { terms } from "./evidence";
+import { jevPatterns, patternScore } from "./success";
+import { keepRevised, runPremortems } from "./premortem";
+import { libraryEvidence, researchEvidence, type LibrarySearch } from "./library";
+import type { IdeaArchive } from "../idea-archive";
 
-export const GALLERY_VERSION = "g1";
+const GALLERY_VERSION = "g1";
 /** The recipe that won the experiment (docs/idea-lab/report.md): strategy → ideas per day. */
-export const RECIPE: [StrategyId, number][] = [["C-audience", 12], ["B-pain", 10], ["G-constraint", 8], ["T-hot", 6], ["T-early", 6], ["H-boring", 6], ["F-gem", 6]];
+const RECIPE: [StrategyId, number][] = [["C-audience", 12], ["B-pain", 10], ["G-constraint", 8], ["T-hot", 6], ["T-early", 6], ["H-boring", 6], ["F-gem", 6]];
 const dayOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 // ── cards ─────────────────────────────────────────────────────────────────────────────
 /** The first three quests of playing an idea, each with how it's verified. */
-export function playBrief(i: Idea) {
+function playBrief(i: Idea) {
   const channel = i.channel.split(/[;.]/)[0].trim() || "the channel above";
   return {
     quests: [
@@ -34,15 +38,17 @@ export function toCard(i: Idea, s: Scores, connectors: IdeaCard["connectors"]): 
     evidence: s.evidenceMatches.filter((m) => m.cited || m.overlap >= 0.15).slice(0, 3).map((m) => ({ url: m.url, snippet: m.snippet, source: m.source })),
     offer: i.offer, price: i.price, channel: i.channel, mvp: i.mvp, stack: i.stack, connectors, missing: connectors.filter((c) => c.missing),
     timeToFirstDollarDays: i.timeToFirstDollarDays, difficulty: i.difficulty, quality: s.quality, jevP10: s.jevP10, rubric: s.rubric, evidenceScore: s.evidence,
-    strategy: i.strategy, topics: i.topics, play: playBrief(i), trend: i.trend, ownedRatio: Math.round(ownedRatio(i) * 100) / 100,
+    strategy: i.strategy, topics: i.topics, play: playBrief(i), trend: i.trend && hasTrend(i.trend) ? i.trend : undefined, premortem: i.premortem, patterns: s.patterns, ownedRatio: Math.round(ownedRatio(i) * 100) / 100,
   };
 }
 
 // ── lanes ─────────────────────────────────────────────────────────────────────────────
 type LaneDef = { id: string; title: string; subtitle: string; pick: (c: IdeaCard) => boolean; sort: (a: IdeaCard, b: IdeaCard) => number; refill: StrategyId };
 const byQ = (a: IdeaCard, b: IdeaCard) => b.quality - a.quality;
-const realTrend = (c: IdeaCard) => !!c.trend && c.trend.signals.length > 0 && !/^no\b|no (?:major |real )?trend/i.test(c.trend.whyNow);
-export const LANES: LaneDef[] = [
+/** A trend idea whose "why now" admits there's no trend isn't one. */
+const hasTrend = (t: NonNullable<Idea["trend"]>) => t.signals.length > 0 && !/^no\b|no (?:major |real )?trend/i.test(t.whyNow);
+const realTrend = (c: IdeaCard) => !!c.trend && hasTrend(c.trend);
+const LANES: LaneDef[] = [
   { id: "top", title: "Top picks for you", subtitle: "Highest quality after judging", pick: () => true, sort: byQ, refill: "C-audience" },
   { id: "hot", title: "Hot right now", subtitle: "Riding what's trending this week, with the signals", pick: (c) => realTrend(c) && c.trend!.heat >= 1.5, sort: (a, b) => b.trend!.heat * b.quality - a.trend!.heat * a.quality, refill: "T-hot" },
   { id: "early", title: "Just starting to trend", subtitle: "Early signals: fast growth from a small base", pick: (c) => realTrend(c) && c.trend!.earliness >= 0.3, sort: (a, b) => b.trend!.earliness * b.quality - a.trend!.earliness * a.quality, refill: "T-early" },
@@ -81,20 +87,24 @@ export type GalleryDeps = {
   cacheDir: string; inv: Inventory; corpus: PainCorpus; trends?: TrendSet;
   claude: ClaudeRunner; jev: JevRunner; findRepos?: (cap: string) => Promise<any[]>;
   now?: () => number; rubric?: boolean; recipe?: [StrategyId, number][]; promptVersion?: "v4";
+  /** Every generated idea goes into the deck's idea archive (src/idea-archive.ts), with its score or as dropped. */
+  archive?: Pick<IdeaArchive, "put" | "score">;
+  /** The founder-story library's search, when the deck has one (library.ts falls back to local files, then nothing). */
+  library?: LibrarySearch;
+  /** How many of the best ideas get a pre-mortem (one Claude call for all of them; 0 turns it off). */
+  premortems?: number;
 };
 type Judged = { idea: Idea; s: Scores };
 /** Generate one strategy's ideas (one Claude call). */
-export async function generateIdeas(strategy: StrategyId, n: number, d: GalleryDeps, seed: number, exclude: Brief[] = []): Promise<Idea[]> {
-  const clusters = painClusters(d.corpus, d.inv);
-  const briefs = briefsFor(strategy, n + exclude.length, { inv: d.inv, corpus: d.corpus, seed, clusters, trends: d.trends })
-    .filter((b) => !exclude.some((x) => x.id === b.id && x.strategy === b.strategy)).slice(0, n);
+async function generateIdeas(strategy: StrategyId, n: number, d: GalleryDeps, seed: number): Promise<Idea[]> {
+  const briefs = briefsFor(strategy, n, { inv: d.inv, corpus: d.corpus, seed, clusters: painClusters(d.corpus, d.inv), trends: d.trends });
   if (!briefs.length) return [];
   const p = ideaPrompt(briefs, d.inv, { version: d.promptVersion ?? "v4" });
   const r = await d.claude({ system: p.system, user: p.user, model: "haiku", tag: `gallery:${strategy}` });
   return parseIdeas(r.text, briefs, strategy, p.version, 0, d.inv);
 }
 /** Judge ideas: Jev p10 + ship (4 per call), Jev slop check (6 per call), the rubric (15 per call) when enabled. */
-export async function judgeIdeas(ideas: Idea[], d: GalleryDeps): Promise<Judged[]> {
+async function judgeIdeas(ideas: Idea[], d: GalleryDeps): Promise<Judged[]> {
   const chunk = <T>(xs: T[], k: number) => Array.from({ length: Math.ceil(xs.length / k) }, (_, i) => xs.slice(i * k, i * k + k));
   const p10 = new Map<string, { p10?: number; ship?: number }>(), gen = new Map<string, number | undefined>(), rub = new Map<string, any>();
   await Promise.all([
@@ -102,9 +112,30 @@ export async function judgeIdeas(ideas: Idea[], d: GalleryDeps): Promise<Judged[
     ...chunk(ideas, 6).map(async (b, i) => { for (const [k, v] of await jevGenericBatch(b, d.inv, d.jev, `gallery-generic:${i}`).catch(() => new Map())) gen.set(k, v); }),
     ...(d.rubric === false ? [] : chunk(ideas, 15).map(async (b, i) => { try { for (const [k, v] of (await rubricBatch(b, d.inv, d.claude, `gallery-rubric:${i}`, "sonnet", "r2")).scores) rub.set(k, v); } catch {} })),
   ]);
+  const pat = new Map<string, Record<string, number>>();
+  await Promise.all(chunk(ideas, 3).map(async (b, i) => { for (const [k, v] of await jevPatterns(b, d.inv, d.jev, `gallery-patterns:${i}`).catch(() => new Map())) pat.set(k, v); }));
   const ix = indexPosts(d.corpus.posts);
   const posts = new Map(d.corpus.posts.map((p) => [p.id, p]));
-  return ideas.map((idea) => ({ idea, s: scoreIdea(idea, { rubric: rub.get(idea.id), jevP10: p10.get(idea.id)?.p10, jevShip: p10.get(idea.id)?.ship, jevGeneric: gen.get(idea.id), matches: matchEvidence(idea, ix), posts, inv: d.inv }) }));
+  return ideas.map((idea) => ({ idea, s: { ...scoreIdea(idea, { rubric: rub.get(idea.id), jevP10: p10.get(idea.id)?.p10, jevShip: p10.get(idea.id)?.ship, jevGeneric: gen.get(idea.id), matches: matchEvidence(idea, ix), posts, inv: d.inv }), patterns: patternScore(pat.get(idea.id)) } }));
+}
+/** Pre-mortem the best `n` survivors; judge each revision the same way and keep whichever version scores higher. */
+export async function improve(judged: Judged[], d: GalleryDeps, n = d.premortems ?? 12): Promise<Judged[]> {
+  const best = judged.filter((j) => j.s.slop?.pass).sort((a, b) => b.s.quality - a.s.quality).slice(0, n);
+  if (!best.length) return judged;
+  const posts = new Map(d.corpus.posts.map((p) => [p.id, p]));
+  const items = await Promise.all(best.map(async ({ idea, s }) => ({
+    idea, posts: s.evidenceMatches.map((m) => posts.get(m.postId)).filter((p): p is PainPost => !!p).slice(0, 3),
+    outside: [...researchEvidence(`${idea.name} ${idea.buyer} ${idea.offer}`), ...(await libraryEvidence(`${idea.name} ${idea.offer}`, { search: d.library }))],
+  })));
+  const { results } = await runPremortems(items, d.inv, d.claude, "gallery-premortem").catch(() => ({ results: new Map() }));
+  const revised = await judgeIdeas([...results.values()].map((r) => r.revised).filter((x): x is Idea => !!x), d);
+  const out = judged.map((j) => (results.has(j.idea.id) ? { ...j, idea: { ...j.idea, premortem: results.get(j.idea.id)!.premortem } } : j));
+  for (const r of revised) {
+    const i = out.findIndex((j) => `${j.idea.id}:pm` === r.idea.id);
+    if (i >= 0 && r.s.slop?.pass && keepRevised(out[i].s.quality, r.s.quality, 2)) out[i] = r;
+  }
+  // An idea the critic says to abandon (and whose rewrite didn't win) leaves the gallery; the archive keeps it as dropped.
+  return out.map((j) => (j.idea.premortem?.verdict === "abandon" && !j.idea.premortem.pivotedFrom ? { ...j, s: { ...j.s, quality: 0, slop: { pass: false, reasons: [...(j.s.slop?.reasons ?? []), `pre-mortem: ${j.idea.premortem.fix}`] } } } : j));
 }
 /** Cards + lanes from judged ideas (no model calls). */
 export async function buildGallery(judged: Judged[], inv: Inventory, o: { day: string; at: number; findRepos?: GalleryDeps["findRepos"]; stats?: Partial<Gallery["stats"]> }): Promise<Gallery> {
@@ -125,22 +156,33 @@ export async function generateGallery(d: GalleryDeps, o: { force?: boolean } = {
   const t0 = Date.now();
   const seed = seedOf(day);
   const made = await Promise.all((d.recipe ?? RECIPE).map(([s, n]) => generateIdeas(s, n, d, seed).catch(() => [] as Idea[])));
-  const judged = await judgeIdeas(made.flat(), d);
+  const first = await judgeIdeas(made.flat(), d);
+  const judged = d.premortems === 0 ? first : await improve(first, d);
+  archive(judged, d);
   const g = await buildGallery(judged, d.inv, { day, at: now, findRepos: d.findRepos, stats: { ms: Date.now() - t0, claudeCalls: (d.recipe ?? RECIPE).length } });
   save(d.cacheDir, g);
   return g;
+}
+/** Keep every idea: passing ones with their quality, gated ones as dropped (with the reasons in their data). */
+function archive(judged: Judged[], d: GalleryDeps) {
+  if (!d.archive) return;
+  for (const { idea, s } of judged) {
+    d.archive.put({ ...idea, title: idea.name, source: "gallery", row: idea.strategy, slop: s.slop } as any);
+    d.archive.score(idea.id, s.quality, !s.slop?.pass);
+  }
 }
 /** "More in this lane": generate a few more with the lane's strategy, judge, and append what passes. */
 export async function moreInLane(laneId: string, d: GalleryDeps, n = 6): Promise<Gallery> {
   const g = await generateGallery(d);
   const def = LANES.find((l) => l.id === laneId);
   if (!def) throw new Error(`No lane "${laneId}"`);
-  const round = (g.stats.note?.match(/more:(\d+)/)?.[1] ?? "0");
-  const ideas = await generateIdeas(def.refill, n, d, seedOf(`${g.day}:${laneId}:${round}`));
+  const refills = { ...g.stats.refills, [laneId]: (g.stats.refills?.[laneId] ?? 0) + 1 };
+  const ideas = await generateIdeas(def.refill, n, d, seedOf(`${g.day}:${laneId}:${refills[laneId]}`));
   const judged = await judgeIdeas(ideas, d);
+  archive(judged, d);
   for (const { idea, s } of judged) if (s.slop?.pass && !g.ideas[idea.id]) g.ideas[idea.id] = toCard(idea, s, await mapConnectors(idea, d.inv, d.findRepos));
   const lanes = laneize(Object.values(g.ideas));
-  const next: Gallery = { ...g, lanes: g.lanes.map((l) => lanes.find((x) => x.id === l.id) ?? l).concat(lanes.filter((x) => !g.lanes.some((l) => l.id === x.id))), stats: { ...g.stats, ideas: Object.keys(g.ideas).length, note: `more:${Number(round) + 1}` } };
+  const next: Gallery = { ...g, lanes: g.lanes.map((l) => lanes.find((x) => x.id === l.id) ?? l).concat(lanes.filter((x) => !g.lanes.some((l) => l.id === x.id))), stats: { ...g.stats, ideas: Object.keys(g.ideas).length, refills } };
   save(d.cacheDir, next);
   return next;
 }

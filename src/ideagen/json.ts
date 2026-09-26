@@ -23,7 +23,7 @@ export function closeTruncated(t: string): string {
   return `${t}${inStr ? '"' : ""}${stack.reverse().join("")}`;
 }
 /** Parse, then retry without trailing commas, with key typos fixed and with bare newlines inside strings escaped. */
-export function tryParse(t: string): any {
+function tryParse(t: string): any {
   for (const f of [(x: string) => x, noTrailing, (x: string) => noTrailing(fixTypos(x)), (x: string) => noTrailing(fixTypos(escapeNewlinesInStrings(x)))]) {
     try { return JSON.parse(f(t)); } catch {}
   }
@@ -44,7 +44,7 @@ function escapeNewlinesInStrings(t: string) {
   return out;
 }
 /** Complete, balanced {...} spans (string-aware), in order of their start. */
-export function objectSpans(text: string): { s: number; e: number; depth: number }[] {
+function objectSpans(text: string): { s: number; e: number; depth: number }[] {
   const found: { s: number; e: number; depth: number }[] = [];
   const stack: number[] = [];
   let inStr = false, esc = false;

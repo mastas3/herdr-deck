@@ -1,0 +1,509 @@
+{
+ "ideaId": "G-constraint:1:hdatlastelegrambot:g1y:pm",
+ "slug": "hd-atlas-daily-tip-hebrew-morning-author",
+ "at": 1790436443793,
+ "version": "k1",
+ "spec": {
+  "problem": "People know their Human Design type but say 'On the days I actually am able to follow my Strategy and Authority... I feel more aligned and notice way less bitterness. The problem is I keep forgetting.' They can name their Authority but don't run it against real daily decisions, and the apps they've tried are broken or only in English.",
+  "buyer": "Hebrew-speaking Human Design fans in Israel, mostly in HumandesignIsrael Facebook group and Israeli HD WhatsApp groups, who know their type but don't apply Strategy and Authority day to day.",
+  "jobs": [
+   "Get one Hebrew reminder each morning that names today's Authority action in plain words",
+   "Get one real decision to test the Authority on that day",
+   "Not have to open an app or re-learn HD theory every morning"
+  ],
+  "scopeIn": [
+   "One-time WhatsApp intake form for birth date, time, place",
+   "Daily 7am WhatsApp message: type + Strategy line + today's Authority tip + one decision prompt",
+   "Manual Gumroad checkout, manual WhatsApp group add (v1 not self-serve automated billing gate)",
+   "Hebrew only"
+  ],
+  "scopeOut": [
+   "Telegram bot (mentioned in offer but v1 ships WhatsApp only, Telegram is fallback if Twilio WhatsApp approval is slow)",
+   "In-app chat/back-and-forth with the bot",
+   "Compatibility/relationship readings",
+   "English version"
+  ],
+  "metrics": [
+   {
+    "metric": "landing page live with sample 3-day message",
+    "target": "1 page on Netlify with real Hebrew sample text",
+    "milestone": "landing live"
+   },
+   {
+    "metric": "DMs sent to HD group members with sample",
+    "target": "10 conversations started, replies tracked in a sheet",
+    "milestone": "10 conversations"
+   },
+   {
+    "metric": "paid subscribers",
+    "target": "1 person paid ₪19 or ₪180 via Gumroad",
+    "milestone": "first paying customer"
+   }
+  ]
+ },
+ "architecture": {
+  "summary": "A Netlify site collects birth data via a form, computes the chart with bodygraph-3d's engine, stores it in Supabase, and a scheduled Netlify Function runs daily to pull today's transit, generate a Hebrew message via Claude grounded in hd-atlas text, and send it over Twilio WhatsApp.",
+  "components": [
+   {
+    "name": "hd-atlas",
+    "does": "Supplies Hebrew canon text for each type's Strategy and each Authority's decision-making description, used as grounding context for Claude",
+    "uses": "local repo, packages/atlas cards read at build or function runtime via a small export script"
+   },
+   {
+    "name": "bodygraph-3d",
+    "does": "Computes the user's exact chart (type, Authority) from birth data and computes today's planetary transit line for the daily tip",
+    "uses": "astronomy-engine, exposed as a small server function called from the intake and daily-send flow"
+   },
+   {
+    "name": "Netlify",
+    "does": "Hosts landing page, intake form, and two functions: intake-submit and daily-send (triggered by Netlify scheduled functions)",
+    "uses": "Netlify Functions, Netlify Blobs for lightweight caching of today's transit"
+   },
+   {
+    "name": "Supabase",
+    "does": "Stores subscribers table (birth data, chart result, phone number, subscription status) since Netlify Functions are stateless",
+    "uses": "Postgres"
+   },
+   {
+    "name": "Twilio",
+    "does": "Sends the daily WhatsApp message to each subscriber's number",
+    "uses": "WhatsApp Business API via Twilio"
+   },
+   {
+    "name": "Claude",
+    "does": "Writes the final Hebrew daily message from a template: Strategy line + Authority tip + decision prompt, given hd-atlas text and today's transit as context",
+    "uses": "Anthropic API called from daily-send function"
+   },
+   {
+    "name": "Gumroad",
+    "does": "Takes payment and captures buyer email; builder manually cross-checks paid emails against Supabase subscribers",
+    "uses": "Gumroad product page, manual reconciliation for v1"
+   }
+  ],
+  "dataModel": [
+   {
+    "entity": "subscriber",
+    "fields": [
+     "id",
+     "phone_e164",
+     "email",
+     "birth_date",
+     "birth_time",
+     "birth_place",
+     "hd_type",
+     "hd_authority",
+     "status(trial/active/cancelled)",
+     "created_at"
+    ]
+   },
+   {
+    "entity": "daily_message_log",
+    "fields": [
+     "id",
+     "subscriber_id",
+     "date",
+     "transit_summary",
+     "message_text",
+     "sent_at",
+     "twilio_sid"
+    ]
+   }
+  ],
+  "flows": [
+   {
+    "name": "Onboarding",
+    "steps": [
+     "User clicks WhatsApp link from landing page sample",
+     "User sends birth date, time, place as free text to the bot number",
+     "intake-submit function parses the message, calls bodygraph-3d chart function to get type + Authority",
+     "Result saved to Supabase subscribers table",
+     "Bot replies in Hebrew confirming type and Authority, links to Gumroad for payment"
+    ]
+   },
+   {
+    "name": "Daily send",
+    "steps": [
+     "Netlify scheduled function daily-send fires at 7am Israel time",
+     "For each active subscriber, function reads hd_type and hd_authority",
+     "bodygraph-3d computes today's transit summary",
+     "Claude generates the Hebrew message using hd-atlas Strategy/Authority text + transit + a decision-prompt instruction",
+     "Message sent via Twilio WhatsApp API",
+     "Row written to daily_message_log"
+    ]
+   },
+   {
+    "name": "Payment reconciliation",
+    "steps": [
+     "Gumroad sends payment notification email to rpsm90@gmail.com",
+     "Builder manually matches Gumroad buyer email to a pending subscriber phone number in Supabase",
+     "Builder updates subscriber.status to active in Supabase table editor"
+    ]
+   }
+  ]
+ },
+ "buildPlan": [
+  {
+   "id": "T1",
+   "title": "Landing page with sample 3-day Hebrew message",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author create a single static landing page (index.html, style.css) in Hebrew, RTL, with: headline, subhead, 3 benefits, a sample of 3 consecutive days of the daily WhatsApp message (write realistic Hebrew text for a Generator with Sacral Authority: Strategy line + today's Authority tip + one decision prompt, for 3 different days), and a CTA button linking to a WhatsApp click-to-chat link https://wa.me/972500000000?text=%D7%A8%D7%95%D7%A6%D7%94%20%D7%9C%D7%94%D7%AA%D7%97%D7%99%D7%9C (placeholder number to be replaced once Twilio WhatsApp number is provisioned). Deploy with: cd ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author && npx netlify-cli deploy --prod. Print the resulting URL.",
+   "accept": [
+    "netlify deploy --prod succeeds and prints a live https URL",
+    "Page renders RTL Hebrew text correctly with no broken layout on mobile width 375px",
+    "Sample messages read naturally in Hebrew and mention Strategy, Authority, and a concrete decision"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T2",
+   "title": "Export hd-atlas Strategy/Authority text for the 5 types and 7 authorities",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/hd-atlas, inspect the existing atlas card structure first: run ls packages/atlas and cat one sample card file to see its fields. Then write a script scripts/export-strategy-authority.ts that reads all cards tagged type or authority and writes a single JSON file to ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author/data/strategy-authority-he.json with shape {type: string, strategy_text_he: string}[] and {authority: string, tip_text_he: string}[]. Run it with: npx tsx scripts/export-strategy-authority.ts and confirm the output file has entries for all 5 types (Generator, Manifesting Generator, Projector, Manifestor, Reflector) and at least 6 authorities.",
+   "accept": [
+    "data/strategy-authority-he.json exists and is valid JSON",
+    "Contains exactly 5 type entries and at least 6 authority entries, all with non-empty Hebrew text",
+    "Running the script twice produces the same output (idempotent)"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T3",
+   "title": "Supabase subscribers table and Netlify env wiring",
+   "size": "S",
+   "prompt": "Create a Supabase project (or use an existing one) and run this SQL in the SQL editor: create table subscribers (id uuid primary key default gen_random_uuid(), phone_e164 text unique not null, email text, birth_date date, birth_time time, birth_place text, hd_type text, hd_authority text, status text default 'trial', created_at timestamptz default now()); create table daily_message_log (id uuid primary key default gen_random_uuid(), subscriber_id uuid references subscribers(id), date date, transit_summary text, message_text text, sent_at timestamptz, twilio_sid text). In ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author add netlify/functions/lib/supabase.ts exporting a configured Supabase client reading SUPABASE_URL and SUPABASE_SERVICE_KEY from process.env. Set these with: npx netlify-cli env:set SUPABASE_URL <value> and npx netlify-cli env:set SUPABASE_SERVICE_KEY <value>.",
+   "accept": [
+    "Both tables exist in Supabase, confirmed by running select * from subscribers limit 1 in SQL editor with no error",
+    "netlify env:list shows SUPABASE_URL and SUPABASE_SERVICE_KEY set",
+    "A local test insert via the supabase.ts client succeeds and shows up in the table"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T4",
+   "title": "Chart calculation function using bodygraph-3d engine",
+   "size": "M",
+   "prompt": "Inspect ~/Documents/Projects/bodygraph-3d/src to find the exported function that computes type and authority from birth date/time/place (look in src for a file exporting something like calculateBodygraph or deriveChart; run grep -r 'export function' src | grep -i chart to find it). Copy or import the minimal calculation logic into ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author/netlify/functions/lib/chart.ts as a function computeChart(birthDate, birthTime, birthPlace): {type: string, authority: string}. Write a small test in netlify/functions/lib/chart.test.ts using a known birth date/time and assert it returns a plausible type and authority (not 'undefined').",
+   "accept": [
+    "grep command output is inspected and referenced function is correctly identified before copying",
+    "chart.test.ts passes with npx vitest run netlify/functions/lib/chart.test.ts",
+    "computeChart returns one of the 5 valid types and one of the 7 valid authorities for a test date"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T5",
+   "title": "Intake function: WhatsApp message parses birth data and saves subscriber",
+   "size": "M",
+   "prompt": "In ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author create netlify/functions/intake-submit.ts as a Twilio WhatsApp webhook handler. First inspect a real Twilio incoming WhatsApp webhook payload by checking Twilio docs sample or the Twilio console log format (print the raw request body to console.log on first real test message before writing the parser). Parse free-text Hebrew birth data (expect a loose format like '15/03/1990 14:30 תל אביב'), call computeChart from lib/chart.ts, upsert into Supabase subscribers by phone_e164, and reply with a Hebrew TwiML message confirming the detected type and Authority. Deploy with npx netlify-cli deploy --prod and set the function URL as the Twilio WhatsApp webhook.",
+   "accept": [
+    "Sending a test WhatsApp message with sample birth text triggers a Supabase row with correct hd_type and hd_authority",
+    "Function replies in Hebrew with the detected type and Authority within the Twilio 15-second timeout",
+    "Malformed input (missing time) returns a Hebrew error message asking to resend, not a crash"
+   ],
+   "dependsOn": [
+    "T3",
+    "T4"
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "Daily-send scheduled function generating Claude-written Hebrew messages",
+   "size": "M",
+   "prompt": "In ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author create netlify/functions/daily-send.ts as a Netlify scheduled function (cron '0 4 * * *' for 7am Israel time UTC+3). It should: load all subscribers with status='active' from Supabase, load data/strategy-authority-he.json, call computeChart's transit helper (or a simple daily transit lookup from bodygraph-3d) to get today's transit_summary, call the Anthropic API with a Hebrew prompt template combining strategy_text_he, tip_text_he, and transit_summary asking for a short daily message with one decision prompt, send the result via Twilio WhatsApp API using TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN/TWILIO_WHATSAPP_NUMBER env vars, and log to daily_message_log. Set env vars with npx netlify-cli env:set for each. Test locally with npx netlify-cli functions:invoke daily-send.",
+   "accept": [
+    "functions:invoke daily-send runs without error against at least one test subscriber in Supabase",
+    "A real WhatsApp message arrives in Hebrew with Strategy, Authority tip, and a distinct decision prompt",
+    "daily_message_log gets a new row with sent_at populated and matching twilio_sid"
+   ],
+   "dependsOn": [
+    "T2",
+    "T3",
+    "T4"
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "Gumroad product and manual reconciliation checklist",
+   "size": "S",
+   "prompt": "Create a Gumroad product 'HD Atlas יומי בעברית' with two prices: ₪19/month subscription and ₪180/year subscription. In ~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author add a file docs/reconciliation.md describing the manual steps: when a Gumroad sale notification arrives at rpsm90@gmail.com, find the matching phone number in the Supabase subscribers table by email or by asking the buyer via WhatsApp, then run an UPDATE subscribers SET status='active' WHERE phone_e164 = '...' in the Supabase SQL editor. Link the Gumroad product URL in landing page CTA from T1.",
+   "accept": [
+    "Gumroad product page is live with both ₪19/month and ₪180/year options visible",
+    "docs/reconciliation.md exists with the exact SQL update command written out",
+    "Landing page CTA links to the live Gumroad product URL"
+   ],
+   "dependsOn": [
+    "T1"
+   ]
+  }
+ ],
+ "connectors": {
+  "repos": [],
+  "services": [
+   {
+    "name": "Gumroad",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Shopify",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Claude Docs",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "Ollama",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "Telegram",
+    "url": "",
+    "why": "Telegram bot",
+    "have": true
+   },
+   {
+    "name": "Twilio",
+    "url": "",
+    "why": "WhatsApp messages",
+    "have": true
+   },
+   {
+    "name": "WhatsApp",
+    "url": "",
+    "why": "WhatsApp messages",
+    "have": true
+   }
+  ],
+  "keys": [
+   {
+    "name": "GUMROAD_ACCESS_TOKEN",
+    "purpose": "payments",
+    "have": false
+   },
+   {
+    "name": "ANTHROPIC_API_KEY",
+    "purpose": "llm",
+    "have": true,
+    "where": "in 2 projects: omni-claude, stasclaw"
+   },
+   {
+    "name": "TELEGRAM_BOT_TOKEN",
+    "purpose": "telegram-bot",
+    "have": true,
+    "where": "set in ~/.zshrc"
+   }
+  ],
+  "mcpAndSkills": [
+   {
+    "name": "gumroad (MCP)",
+    "use": "create the product and read sales"
+   },
+   {
+    "name": "context7 (MCP)",
+    "use": "current SDK docs while coding"
+   }
+  ],
+  "missing": []
+ },
+ "scaffold": {
+  "folder": "~/Documents/Projects/hd-atlas-daily-tip-hebrew-morning-author",
+  "base": "copy the patterns (not the code wholesale) from ~/Documents/Projects/hd-atlas",
+  "deploy": "Netlify (npx netlify-cli deploy; the CLI is signed in)",
+  "files": [
+   {
+    "path": "README.md",
+    "purpose": "what it is, who it's for, how to run it"
+   },
+   {
+    "path": "CLAUDE.md",
+    "purpose": "agent instructions: stack, commands, rules, where the owned projects live"
+   },
+   {
+    "path": "AGENTS.md",
+    "purpose": "same instructions for Codex and other agents"
+   },
+   {
+    "path": ".env.example",
+    "purpose": "the key names the project needs (no values)"
+   },
+   {
+    "path": "TASKS.md",
+    "purpose": "the build plan with paste-ready agent prompts and acceptance checks"
+   },
+   {
+    "path": "SPEC.md",
+    "purpose": "the PRD"
+   },
+   {
+    "path": "ARCHITECTURE.md",
+    "purpose": "components, data model, flows"
+   },
+   {
+    "path": "CONNECTORS.md",
+    "purpose": "repos, services, keys, MCP/skills, what's missing"
+   },
+   {
+    "path": "GTM.md",
+    "purpose": "landing copy, pricing, launch posts, outreach"
+   },
+   {
+    "path": "QUESTS.md",
+    "purpose": "the play loop and how each quest is verified"
+   },
+   {
+    "path": "graphics/PROMPTS.md",
+    "purpose": "codex-image prompts for logo, OG image and icon"
+   }
+  ]
+ },
+ "gtm": {
+  "landing": {
+   "headline": "כל בוקר ב-7: משפט אחד שיזכיר לך להשתמש באוטוריטי שלך",
+   "subhead": "אתה כבר יודע שאתה Generator, Projector או כל טיפוס אחר. הבעיה היא שביום-יום שוכחים להשתמש בזה. הודעת וואטסאפ אחת בעברית, כל בוקר, עם החלטה אמיתית לתרגל עליה.",
+   "benefits": [
+    "הודעה קצרה בעברית, לא עוד אפליקציה שצריך לפתוח",
+    "מבוסס על הצ'ארט המדויק שלך ועל תנועת השמיים של היום, לא טקסט גנרי",
+    "החלטה אחת אמיתית ליום, כדי שהתאוריה תהפוך להרגל"
+   ],
+   "cta": "שלח הודעת 'רוצה להתחיל' בוואטסאפ (בדוק שהמספר בעמוד פעיל)"
+  },
+  "pricing": [
+   {
+    "tier": "חודשי",
+    "price": "₪19 לחודש",
+    "includes": [
+     "הודעת וואטסאפ יומית ב-7 בבוקר",
+     "טיפ אוטוריטי מותאם אישית לפי הצ'ארט שלך",
+     "החלטה אחת ליום לתרגול"
+    ]
+   },
+   {
+    "tier": "שנתי",
+    "price": "₪180 לשנה",
+    "includes": [
+     "כל מה שיש במסלול החודשי",
+     "חיסכון של כ-2 חודשים לעומת תשלום חודשי",
+     "עדיפות בתמיכה אישית בוואטסאפ"
+    ]
+   }
+  ],
+  "launchPosts": [
+   {
+    "channel": "Facebook (HumandesignIsrael group)",
+    "text": "מישהו כאן מרגיש שהוא יודע את הטיפוס וה-Authority שלו אבל ביום-יום פשוט שוכח להשתמש בזה? בניתי בוט וואטסאפ קטן שכל בוקר ב-7 שולח הודעה אחת בעברית: מה האסטרטגיה שלך, מה האוטוריטי אומר להיום, ועוד החלטה אמיתית לתרגל עליה. זה לא עוד אפליקציה, פשוט הודעה שנכנסת לוואטסאפ ומזכירה. אם מישהו רוצה לנסות 3 ימים בחינם, תכתבו לי בפרטי ואני אשלח לינק."
+   },
+   {
+    "channel": "WhatsApp group (Israeli HD group)",
+    "text": "היי לכולם, מי שמכיר את הטיפוס וה-Authority שלו אבל מתקשה ליישם יום-יום — בניתי משהו פשוט: הודעת וואטסאפ אחת כל בוקר ב-7, בעברית, עם תזכורת לאסטרטגיה שלך + טיפ על האוטוריטי + החלטה אחת אמיתית ליום. מבוסס על הצ'ארט המדויק ועל השמיים של אותו יום, לא טקסט כללי. מי שרוצה לנסות, תגיבו כאן ואני שולח לינק להרשמה."
+   },
+   {
+    "channel": "Landing page share (Twilio-delivered sample link)",
+    "text": "דוגמה אמיתית להודעה שתקבלו: 'בוקר טוב! היום, כ-Generator עם Sacral Authority, האנרגיה שלך מגיבה - לא יוזמת. חכה שמישהו יפנה אליך במקום לרדוף אחרי הזדמנות. נסה היום: כשמישהו יציע לך פגישה או פרויקט, שים לב אם הגוף אומר כן ברור או שקט. זו ההחלטה לתרגל.' זה בדיוק מה שנשלח כל בוקר. הלינק לניסיון בעמוד."
+   }
+  ],
+  "outreach": "היי, ראיתי שאת/ה כותב/ת בקבוצת HumandesignIsrael ומכיר/ה את הטיפוס וה-Authority שלך. בניתי בוט וואטסאפ קטן שכל בוקר ב-7 שולח הודעה אחת בעברית עם תזכורת לאסטרטגיה שלך, טיפ על האוטוריטי להיום, והחלטה אמיתית לתרגל עליה - מבוסס על הצ'ארט המדויק שלך. רוצה לנסות 3 ימים בחינם? אם כן תכתוב לי את תאריך, שעה ומקום הלידה שלך ואני מפעיל לך את זה עוד היום.",
+  "graphics": [
+   {
+    "asset": "logo",
+    "prompt": "Flat vector logo mark for \"HD Atlas Daily Tip — Hebrew Morning Authority\": one simple symbol tied to hd, two colours, no text, readable at 32 px, on white"
+   },
+   {
+    "asset": "og-image",
+    "prompt": "1200×630 social preview for \"HD Atlas Daily Tip — Hebrew Morning Authority\": the headline \"כל בוקר ב-7: משפט אחד שיזכיר לך להשתמש באוטוריטי שלך\" in large clean type on a plain background, one small product screenshot, no stock people"
+   },
+   {
+    "asset": "app-icon",
+    "prompt": "512×512 app icon for \"HD Atlas Daily Tip — Hebrew Morning Authority\": the logo mark centred on a solid colour square, rounded corners, no text"
+   }
+  ]
+ },
+ "quests": [
+  {
+   "title": "Landing page live with a ₪19/month or ₪180/year checkout",
+   "verify": "the page returns 200 and a test purchase (or a published Gumroad product) goes through",
+   "done": false
+  },
+  {
+   "title": "10 conversations with buyers via HumandesignIsrael Facebook group and Hebrew WhatsApp groups via a WhatsApp/Telegram bot link with a sample message showing 3 days of tips",
+   "verify": "10 replies logged in QUESTS.md with each person's words about the pain",
+   "done": false
+  },
+  {
+   "title": "First paying customer",
+   "verify": "a real payment in Gumroad/Stripe from someone you don't know",
+   "done": false
+  }
+ ],
+ "readiness": {
+  "score": 0.33,
+  "items": [
+   {
+    "label": "Replace placeholder: 972500000000",
+    "status": "needs-user",
+    "how": "fill in the real value before running that task"
+   },
+   {
+    "label": "Replace placeholder: placeholder number to be replaced once Twilio WhatsApp number",
+    "status": "needs-user",
+    "how": "fill in the real value before running that task"
+   },
+   {
+    "label": "Replace placeholder: <value>",
+    "status": "needs-user",
+    "how": "fill in the real value before running that task"
+   },
+   {
+    "label": "Spec, architecture and build plan",
+    "status": "ready"
+   },
+   {
+    "label": "Key GUMROAD_ACCESS_TOKEN",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key ANTHROPIC_API_KEY",
+    "status": "ready",
+    "how": "already set (in 2 projects: omni-claude, stasclaw)"
+   },
+   {
+    "label": "Key TELEGRAM_BOT_TOKEN",
+    "status": "ready",
+    "how": "already set (set in ~/.zshrc)"
+   },
+   {
+    "label": "Graphics (logo, OG image, icon)",
+    "status": "needs-user",
+    "how": "run the prompts in graphics/PROMPTS.md with the codex-image skill"
+   },
+   {
+    "label": "Checkout product",
+    "status": "needs-user",
+    "how": "create the product at the price in GTM.md (the Gumroad MCP can do it on request)"
+   }
+  ]
+ },
+ "cost": {
+  "claudeCalls": 1,
+  "ms": 82800
+ },
+ "judge": {
+  "ready": 2,
+  "questions": [
+   "What Twilio WhatsApp number/sender should be used, and has Twilio WhatsApp Business API access been approved yet (v1 depends on this; Telegram fallback isn't built)?",
+   "Does bodygraph-3d actually expose a callable function for computing type/Authority and a daily transit summary, or does T4 require reverse-engineering it from scratch?",
+   "What are GUMROAD_ACCESS_TOKEN and STRIPE_SECRET_KEY needed for if payment reconciliation is manual — is Gumroad MCP automation actually required for T7?",
+   "Who manually handles reconciliation and ongoing subscriber support daily — is that the user's committed workflow going forward?",
+   "What free-text birth-data parsing format/library should intake-submit.ts use given real users will type inconsistent formats (date/time/place in Hebrew)?"
+  ],
+  "notes": "The plan is well structured but has real unresolved blockers: unverified Twilio WhatsApp provisioning, unverified bodygraph-3d API surface, and missing payment keys despite a 'manual' reconciliation flow that still lists Gumroad/Stripe keys as needed. An agent would hit unknowns mid-build on T4-T6."
+ }
+}

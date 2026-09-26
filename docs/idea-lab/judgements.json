@@ -348,7 +348,17 @@
    "flaw": "One-time purchase caps revenue; small addressable Hebrew HD niche"
   },
   "rubricRun": "r1:4",
-  "jevGeneric": 0.15
+  "jevGeneric": 0.15,
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.7,
+   "distribution": 0.35,
+   "fit": 0.78,
+   "small": 0.81,
+   "price": 0.66,
+   "durable": 0.54,
+   "repeat": 0.19
+  }
  },
  "A1-mixer:1:workflowautopilotcoach:9cr": {
   "jevP10": 0.1,
@@ -504,7 +514,17 @@
    "flaw": "Niche audience of multi-session Claude Code power users may be too small",
    "generic": 2
   },
-  "rubric2Run": "4"
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.65,
+   "distribution": 0.25,
+   "fit": 0.72,
+   "small": 0.77,
+   "price": 0.62,
+   "durable": 0.44,
+   "repeat": 0.51
+  }
  },
  "C-audience:1:groupguard:vxm": {
   "jevP10": 0.33,
@@ -804,7 +824,17 @@
    "flaw": "One-off ₪50 purchase, hard to build recurring revenue base"
   },
   "rubricRun": "r1:7",
-  "jevGeneric": 0.21
+  "jevGeneric": 0.21,
+  "patterns": {
+   "spend": 0.77,
+   "narrow": 0.72,
+   "distribution": 0.31,
+   "fit": 0.76,
+   "small": 0.87,
+   "price": 0.66,
+   "durable": 0.45,
+   "repeat": 0.33
+  }
  },
  "D-asset:1:forecastlabproosintpredi:fbq": {
   "jevP10": 0.21,
@@ -1078,7 +1108,17 @@
    "flaw": "Tiny addressable market of Hebrew HD Telegram users limits revenue ceiling"
   },
   "rubricRun": "r1:0",
-  "jevGeneric": 0.19
+  "jevGeneric": 0.19,
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.72,
+   "distribution": 0.57,
+   "fit": 0.79,
+   "small": 0.88,
+   "price": 0.53,
+   "durable": 0.44,
+   "repeat": 0.44
+  }
  },
  "C-audience:1:datesync:bq7": {
   "jevP10": 0.47,
@@ -1170,7 +1210,17 @@
    "flaw": "Competes with free 1-hour YouTube HD readings already serving this audience",
    "generic": 3
   },
-  "rubric2Run": "1"
+  "rubric2Run": "1",
+  "patterns": {
+   "spend": 0.72,
+   "narrow": 0.63,
+   "distribution": 0.27,
+   "fit": 0.68,
+   "small": 0.77,
+   "price": 0.72,
+   "durable": 0.37,
+   "repeat": 0.3
+  }
  },
  "H-boring:1:menusync:g46": {
   "jevP10": 0.35,
@@ -1348,7 +1398,17 @@
    "flaw": "Directly competes with well-funded incumbents like Opus Clip"
   },
   "rubricRun": "r1:4",
-  "jevGeneric": 0.31
+  "jevGeneric": 0.31,
+  "patterns": {
+   "spend": 0.84,
+   "narrow": 0.66,
+   "distribution": 0.18,
+   "fit": 0.67,
+   "small": 0.79,
+   "price": 0.62,
+   "durable": 0.27,
+   "repeat": 0.71
+  }
  },
  "A2-random-schema:1:shrinegameshub:4v": {
   "jevP10": 0.32,
@@ -1607,7 +1667,17 @@
    "flaw": "Nearly identical to i7 and i11; commodity clip-tool market, hard to stand out",
    "generic": 3
   },
-  "rubric2Run": "4"
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.66,
+   "distribution": 0.13,
+   "fit": 0.64,
+   "small": 0.83,
+   "price": 0.66,
+   "durable": 0.33,
+   "repeat": 0.79
+  }
  },
  "B-pain:1:agentcostmonitorrealtime:kia": {
   "jevP10": 0.41,
@@ -2471,7 +2541,17 @@
    "flaw": "Very small addressable Hebrew HD market limits ceiling well under target"
   },
   "rubricRun": "r2:2",
-  "jevGeneric": 0.17
+  "jevGeneric": 0.17,
+  "patterns": {
+   "spend": 0.54,
+   "narrow": 0.72,
+   "distribution": 0.42,
+   "fit": 0.8,
+   "small": 0.8,
+   "price": 0.55,
+   "durable": 0.4,
+   "repeat": 0.9
+  }
  },
  "C-audience:2:shortclipstudio:1ly": {
   "jevP10": 0.47,
@@ -3424,7 +3504,17 @@
    "flaw": "No clear paying buyer; ₪29 download unlikely to convert casual TikTok viewers",
    "generic": 3
   },
-  "rubric2Run": "4"
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.4,
+   "narrow": 0.64,
+   "distribution": 0.45,
+   "fit": 0.73,
+   "small": 0.79,
+   "price": 0.43,
+   "durable": 0.36,
+   "repeat": 0.25
+  }
  },
  "T-hot:3:decisionapifortarotreadi:xfd": {
   "jevP10": 0.41,
@@ -3550,7 +3640,17 @@
    "flaw": "Same HD-compatibility niche as i6; unclear if market supports two competing offers",
    "generic": 2
   },
-  "rubric2Run": "4"
+  "rubric2Run": "4",
+  "patterns": {
+   "spend": 0.53,
+   "narrow": 0.72,
+   "distribution": 0.38,
+   "fit": 0.74,
+   "small": 0.87,
+   "price": 0.76,
+   "durable": 0.5,
+   "repeat": 0.2
+  }
  },
  "T-early:3:storyreelopusshorts:ofc": {
   "jevP10": 0.43,
@@ -3856,7 +3956,17 @@
    "flaw": "Free ad-supported game, no clear path to paying customers",
    "generic": 3
   },
-  "rubric2Run": "0"
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.64,
+   "narrow": 0.51,
+   "distribution": 0.42,
+   "fit": 0.64,
+   "small": 0.57,
+   "price": 0.24,
+   "durable": 0.32,
+   "repeat": 0.5
+  }
  },
  "B-pain:3:hdatlaspro:nmb": {
   "jevP10": 0.47,
@@ -3910,7 +4020,17 @@
    "flaw": "Relocation decisions rarely justified by one cheap AI report",
    "generic": 3
   },
-  "rubric2Run": "0"
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.58,
+   "narrow": 0.68,
+   "distribution": 0.55,
+   "fit": 0.67,
+   "small": 0.85,
+   "price": 0.62,
+   "durable": 0.45,
+   "repeat": 0.19
+  }
  },
  "C-audience:3:synccheckcompatibilityre:va0": {
   "jevP10": 0.48,
@@ -4216,7 +4336,17 @@
    "flaw": "Requires trust/DM outreach conversion in a skeptical B2B niche",
    "generic": 2
   },
-  "rubric2Run": "0"
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.59,
+   "distribution": 0.24,
+   "fit": 0.62,
+   "small": 0.76,
+   "price": 0.64,
+   "durable": 0.42,
+   "repeat": 0.84
+  }
  },
  "C-audience:4:tarotdailydeck:83r": {
   "jevP10": 0.44,
@@ -4252,7 +4382,17 @@
    "flaw": "Small underserved niche, uncertain how many will pay ₪49",
    "generic": 1
   },
-  "rubric2Run": "1"
+  "rubric2Run": "1",
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.68,
+   "distribution": 0.39,
+   "fit": 0.8,
+   "small": 0.89,
+   "price": 0.6,
+   "durable": 0.46,
+   "repeat": 0.18
+  }
  },
  "B-pain:4:sideprojectlaunchpad:gdq": {
   "jevP10": 0.37,
@@ -4504,7 +4644,17 @@
    "flaw": "Same core idea as i4; success hinges on WhatsApp group access and trust",
    "generic": 2
   },
-  "rubric2Run": "0"
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.81,
+   "narrow": 0.59,
+   "distribution": 0.16,
+   "fit": 0.6,
+   "small": 0.72,
+   "price": 0.61,
+   "durable": 0.35,
+   "repeat": 0.81
+  }
  },
  "B-pain:4:grouparchivebuilder:u57": {
   "jevP10": 0.43,
@@ -4666,6 +4816,256 @@
    "flaw": "Low price point means needing many buyers; HD compatibility market size uncertain",
    "generic": 2
   },
-  "rubric2Run": "0"
+  "rubric2Run": "0",
+  "patterns": {
+   "spend": 0.79,
+   "narrow": 0.61,
+   "distribution": 0.44,
+   "fit": 0.73,
+   "small": 0.83,
+   "price": 0.57,
+   "durable": 0.43,
+   "repeat": 0.21
+  }
+ },
+ "T-early:3:makomaicitymatchreport:bem:pm": {
+  "patterns": {
+   "spend": 0.6,
+   "narrow": 0.57,
+   "distribution": 0.43,
+   "fit": 0.69,
+   "small": 0.71,
+   "price": 0.67,
+   "durable": 0.46,
+   "repeat": 0.87
+  },
+  "jevP10": 0.41,
+  "jevShip": 0.8,
+  "jevGeneric": 0.29
+ },
+ "T-hot:3:pokmonbattlegamehebrewru:tti:pm": {
+  "patterns": {
+   "spend": 0.59,
+   "narrow": 0.76,
+   "distribution": 0.89,
+   "fit": 0.77,
+   "small": 0.7,
+   "price": 0.48,
+   "durable": 0.5,
+   "repeat": 0.79
+  },
+  "jevP10": 0.37,
+  "jevShip": 0.68,
+  "jevGeneric": 0.18
+ },
+ "G-constraint:1:hdatlastelegrambot:g1y:pm": {
+  "patterns": {
+   "spend": 0.55,
+   "narrow": 0.74,
+   "distribution": 0.62,
+   "fit": 0.81,
+   "small": 0.84,
+   "price": 0.63,
+   "durable": 0.48,
+   "repeat": 0.87
+  },
+  "jevP10": 0.54,
+  "jevShip": 0.82,
+  "jevGeneric": 0.18
+ },
+ "C-audience:4:tenderaialert:hqo:pm": {
+  "patterns": {
+   "spend": 0.83,
+   "narrow": 0.6,
+   "distribution": 0.18,
+   "fit": 0.66,
+   "small": 0.76,
+   "price": 0.78,
+   "durable": 0.49,
+   "repeat": 0.86
+  },
+  "jevP10": 0.2,
+  "jevShip": 0.63,
+  "jevGeneric": 0.27
+ },
+ "C-audience:4:myhdchartinhebrew:vmv:pm": {
+  "patterns": {
+   "spend": 0.7,
+   "narrow": 0.73,
+   "distribution": 0.37,
+   "fit": 0.8,
+   "small": 0.69,
+   "price": 0.55,
+   "durable": 0.55,
+   "repeat": 0.89
+  },
+  "jevP10": 0.52,
+  "jevShip": 0.82,
+  "jevGeneric": 0.21
+ },
+ "B-pain:1:hdatlaszerodowntimerelia:ylg:pm": {
+  "patterns": {
+   "spend": 0.78,
+   "narrow": 0.74,
+   "distribution": 0.42,
+   "fit": 0.76,
+   "small": 0.85,
+   "price": 0.57,
+   "durable": 0.58,
+   "repeat": 0.14
+  },
+  "jevGeneric": 0.14,
+  "jevP10": 0.54,
+  "jevShip": 0.78
+ },
+ "C-audience:1:herdrconsole:kz2:pm": {
+  "patterns": {
+   "spend": 0.77,
+   "narrow": 0.52,
+   "distribution": 0.18,
+   "fit": 0.7,
+   "small": 0.76,
+   "price": 0.78,
+   "durable": 0.46,
+   "repeat": 0.39
+  },
+  "jevGeneric": 0.23,
+  "jevP10": 0.23,
+  "jevShip": 0.74
+ },
+ "B-pain:4:tenderbotwhatsapp:puv:pm": {
+  "jevGeneric": 0.23,
+  "patterns": {
+   "spend": 0.82,
+   "narrow": 0.61,
+   "distribution": 0.13,
+   "fit": 0.71,
+   "small": 0.75,
+   "price": 0.67,
+   "durable": 0.42,
+   "repeat": 0.85
+  },
+  "jevP10": 0.26,
+  "jevShip": 0.68
+ },
+ "B-pain:1:storyreelpremiumhdshorts:r:pm": {
+  "jevGeneric": 0.35,
+  "patterns": {
+   "spend": 0.73,
+   "narrow": 0.62,
+   "distribution": 0.17,
+   "fit": 0.65,
+   "small": 0.76,
+   "price": 0.62,
+   "durable": 0.31,
+   "repeat": 0.81
+  },
+  "jevP10": 0.36,
+  "jevShip": 0.7
+ },
+ "C-audience:1:hdquickread:iy7:pm": {
+  "jevGeneric": 0.24,
+  "patterns": {
+   "spend": 0.68,
+   "narrow": 0.68,
+   "distribution": 0.31,
+   "fit": 0.78,
+   "small": 0.85,
+   "price": 0.63,
+   "durable": 0.38,
+   "repeat": 0.64
+  },
+  "jevP10": 0.54,
+  "jevShip": 0.79
+ },
+ "D-asset:1:astrachartshdreadingsasa:pdv:pm": {
+  "jevGeneric": 0.28,
+  "patterns": {
+   "spend": 0.78,
+   "narrow": 0.69,
+   "distribution": 0.25,
+   "fit": 0.78,
+   "small": 0.86,
+   "price": 0.66,
+   "durable": 0.55,
+   "repeat": 0.21
+  },
+  "jevP10": 0.52,
+  "jevShip": 0.8
+ },
+ "C-audience:2:yourdayhddailystrategy:iew:pm": {
+  "jevP10": 0.58,
+  "jevShip": 0.83,
+  "jevGeneric": 0.23,
+  "patterns": {
+   "spend": 0.56,
+   "narrow": 0.75,
+   "distribution": 0.62,
+   "fit": 0.71,
+   "small": 0.81,
+   "price": 0.52,
+   "durable": 0.42,
+   "repeat": 0.86
+  }
+ },
+ "T-hot:4:humandesignmatchreport:q89:pm": {
+  "jevP10": 0.51,
+  "jevShip": 0.83,
+  "jevGeneric": 0.2,
+  "patterns": {
+   "spend": 0.76,
+   "narrow": 0.65,
+   "distribution": 0.52,
+   "fit": 0.77,
+   "small": 0.86,
+   "price": 0.8,
+   "durable": 0.64,
+   "repeat": 0.16
+  }
+ },
+ "G-constraint:1:podcastclipstudiomembers:tzq:pm": {
+  "jevP10": 0.3,
+  "jevShip": 0.77,
+  "jevGeneric": 0.33,
+  "patterns": {
+   "spend": 0.61,
+   "narrow": 0.54,
+   "distribution": 0.14,
+   "fit": 0.52,
+   "small": 0.71,
+   "price": 0.52,
+   "durable": 0.4,
+   "repeat": 0.79
+  }
+ },
+ "T-hot:3:hdcompatibilityreportfor:9tu:pm": {
+  "jevP10": 0.17,
+  "jevShip": 0.34,
+  "patterns": {
+   "spend": 0.31,
+   "narrow": 0.12,
+   "distribution": 0.22,
+   "fit": 0.31,
+   "small": 0.46,
+   "price": 0.24,
+   "durable": 0.33,
+   "repeat": 0.2
+  },
+  "jevGeneric": 0.84
+ },
+ "T-early:3:roomsketchplaytests:vuh:pm": {
+  "jevP10": 0.23,
+  "jevShip": 0.55,
+  "patterns": {
+   "spend": 0.53,
+   "narrow": 0.57,
+   "distribution": 0.21,
+   "fit": 0.77,
+   "small": 0.54,
+   "price": 0.42,
+   "durable": 0.34,
+   "repeat": 0.7
+  },
+  "jevGeneric": 0.28
  }
 }

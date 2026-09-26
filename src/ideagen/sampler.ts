@@ -2,7 +2,7 @@
 // fit together (an audience, a real pain, an engine that can solve it, a channel that reaches them), scores them for
 // compatibility × demand × strength, then picks a diverse set (no engine, audience or pain used over and over).
 import type { Asset, Audience, Brief, Inventory, PainCorpus, PainPost, PainTheme, ProvenModel, StrategyId } from "./types";
-import { terms, themesFor } from "./evidence";
+import { terms } from "./evidence";
 import { topicsOf } from "./inventory";
 import type { Trend, TrendSet } from "./trends";
 
@@ -16,7 +16,7 @@ const GENERIC_TOPICS = new Set(["community", "business", "rag"]);
 const LANGUAGE_TOPICS = new Set(["hebrew", "russian"]);
 const topicW = (t: string) => (LANGUAGE_TOPICS.has(t) ? 0.25 : GENERIC_TOPICS.has(t) ? 0.5 : 1);
 /** Topic overlap between two parts, 0..1. Generic topics count half, languages a quarter. */
-export function topicFit(a: string[], b: string[]): number {
+function topicFit(a: string[], b: string[]): number {
   if (!a.length || !b.length) return 0;
   const B = new Set(b);
   let hit = 0, tot = 0;
@@ -57,7 +57,7 @@ export function coherence(p: { audience?: Audience; pain?: PainTheme; engine?: A
   return Math.round((parts.reduce((a, b) => a + b, 0) / parts.length) * ready * 1000) / 1000;
 }
 /** 0..1: how much demand backs the brief (pain theme heat and volume; the audience's post volume and access). */
-export function demandOf(p: { pain?: PainTheme; audience?: Audience }, corpus?: PainCorpus): number {
+function demandOf(p: { pain?: PainTheme; audience?: Audience }, corpus?: PainCorpus): number {
   let d = 0.2;
   if (p.pain) d = Math.min(1, 0.35 + Math.log10(1 + p.pain.score) / 3 + p.pain.heat / 20 + Math.min(0.15, p.pain.n / 40));
   else if (p.audience && corpus) { const n = corpus.posts.filter((x) => x.audience === p.audience!.id).length; d = Math.min(1, 0.2 + Math.log10(1 + n) / 3); }
@@ -129,7 +129,7 @@ export function pickDiverse(cands: Cand[], n: number, seed = 1): Cand[] {
 }
 
 // ── proven models and boring niches (for E and H) ───────────────────────────────────────────────
-export const PROVEN: ProvenModel[] = [
+const PROVEN: ProvenModel[] = [
   { id: "pdf-report", name: "Personalized report sold per unit", pattern: "Customer enters data → gets a beautiful personalized PDF/web report instantly; one-time price", examples: "astrology report shops on Etsy, Gumroad chart readings", price: "$15–49 one-time", fits: ["hd", "astro", "esoteric", "matching"] },
   { id: "daily-app", name: "Daily personalized content subscription", pattern: "A short personalized daily message/push based on the user's data; freemium with a monthly plan", examples: "Co–Star, The Pattern", price: "$5–10/month", fits: ["hd", "astro", "esoteric", "matching"] },
   { id: "clip-service", name: "AI repurposing tool for creators", pattern: "Upload long content → get clips, captions, posts; credits per month", examples: "Opus Clip, Descript", price: "$19–49/month", fits: ["video", "creators", "voice"] },
@@ -145,7 +145,7 @@ export const PROVEN: ProvenModel[] = [
   { id: "game-iap", name: "Casual web game with sponsors/IAP", pattern: "Free viral browser game; revenue from portal rev-share, sponsors or cosmetic purchases", examples: "CrazyGames/Poki titles, branded advergames", price: "sponsorship $500+ or rev-share", fits: ["games", "hebrew", "russian"] },
   { id: "compat-quiz", name: "Viral compatibility quiz with paid deep-dive", pattern: "Free shareable quiz for two people; paid detailed report", examples: "couples quizzes, 16Personalities premium", price: "$9–29 per report", fits: ["matching", "hd", "astro"] },
 ];
-export const BORING: { id: string; who: string; job: string; topics: string[]; caps?: string[] }[] = [
+const BORING: { id: string; who: string; job: string; topics: string[]; caps?: string[] }[] = [
   { id: "tenders", who: "small Israeli companies bidding on government tenders", job: "find relevant tenders and prepare bid documents without reading hundreds of PDFs", topics: ["business", "hebrew"], caps: ["tenders", "llm", "pdf-report"] },
   { id: "realestate", who: "real-estate agents who post listings in Facebook groups", job: "post listings and answer the same questions again and again", topics: ["business", "community", "hebrew"], caps: ["fb-archive", "social-post", "llm"] },
   { id: "clinics", who: "private clinics and therapists", job: "cut no-shows with reminders and rebooking on WhatsApp", topics: ["business", "hebrew"], caps: ["whatsapp", "llm", "booking"] },
@@ -159,7 +159,7 @@ export const BORING: { id: string; who: string; job: string; topics: string[]; c
 ];
 
 // ── building briefs per strategy ───────────────────────────────────────────────────────────────
-export type SampleCtx = { inv: Inventory; corpus: PainCorpus; seed: number; clusters?: PainTheme[]; trends?: TrendSet };
+type SampleCtx = { inv: Inventory; corpus: PainCorpus; seed: number; clusters?: PainTheme[]; trends?: TrendSet };
 const ownedEngines = (inv: Inventory) => inv.assets.filter((a) => a.owned && a.ready && a.kind === "project" && a.roles.some((r) => r === "engine" || r === "data") && a.strength >= 0.4);
 const gems = (inv: Inventory) => inv.assets.filter((a) => a.kind === "repo" && a.caps.length > 0);
 const channelsFor = (inv: Inventory, au: Audience) => inv.assets.filter((a) => au.reach.includes(a.id) && a.kind !== "project");

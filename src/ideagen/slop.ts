@@ -4,7 +4,7 @@
 // "would a sharp indie founder dismiss this as generic?" are the model checks on top.
 import type { EvidenceMatch, Idea, Inventory } from "./types";
 
-export const HYPE = /\b(ai[- ]powered|revolutioni[sz]e|seamless(?:ly)?|leverag(?:e|es|ing) (?:ai|the power)|one[- ]stop|for everyone|game[- ]chang(?:er|ing)|cutting[- ]edge|unlock (?:your|the) (?:full )?potential|supercharge|next[- ]gen(?:eration)?|all[- ]in[- ]one|effortless(?:ly)?|empower(?:s|ing)?|harness the power|transform (?:the way|how)|disrupt(?:s|ing|ive)?|synerg\w*|world[- ]class|best[- ]in[- ]class|state[- ]of[- ]the[- ]art|10x your|elevate your|unleash)\b/i;
+const HYPE = /\b(ai[- ]powered|revolutioni[sz]e|seamless(?:ly)?|leverag(?:e|es|ing) (?:ai|the power)|one[- ]stop|for everyone|game[- ]chang(?:er|ing)|cutting[- ]edge|unlock (?:your|the) (?:full )?potential|supercharge|next[- ]gen(?:eration)?|all[- ]in[- ]one|effortless(?:ly)?|empower(?:s|ing)?|harness the power|transform (?:the way|how)|disrupt(?:s|ing|ive)?|synerg\w*|world[- ]class|best[- ]in[- ]class|state[- ]of[- ]the[- ]art|10x your|elevate your|unleash)\b/i;
 const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 /** A buyer is reachable when we're told where they are: a named community, platform, group or place. */
 const PLACE = /\br\/\w+|\bsubreddit|\bgroups?\b|\bdiscord\b|\btelegram\b|\bwhatsapp\b|\bfacebook\b|\binstagram\b|\btiktok\b|\byoutube\b|\blinkedin\b|\bx \(twitter\)|\btwitter\b|\bhacker news\b|\bshow hn\b|\bindie hackers\b|\bproduct hunt\b|\bgithub\b|\betsy\b|\bapp store\b|\bforum\b|\bslack\b|\bmeetups?\b|\bcommunit(?:y|ies)\b|\bassociation\b|\bchannel\b|\bnewsletter\b|\bin israel\b|\bmr\.gov\.il\b/i;
@@ -13,12 +13,15 @@ const PRICE = /(?:[$€£₪]\s?\d|\d+(?:[.,]\d+)?\s?(?:usd|eur|ils|nis|₪|\$|s
 /** Market-size or statistic claims ("a $4B market", "70% of creators") need a source; ours never have one. */
 const STAT = /\b\d+(?:\.\d+)?\s?%|\$\s?\d+(?:\.\d+)?\s?(?:b|bn|m|billion|million)\b|\b\d+(?:\.\d+)?\s?(?:million|billion)\s+(?:users|people|creators|businesses|market)|\b\d+(?:[.,]\d+)?\s?[km]?\+?\s(?:members|subscribers|followers|monthly users|downloads)\b/i;
 
-/** The first statistic that is claimed rather than sourced. "YouTubers with 10k–1M subscribers" defines a segment; it isn't a claim. */
-export function unsourcedStat(text: string, evidence: EvidenceMatch[] = []): string | undefined {
+/**
+ * The first statistic that is claimed rather than sourced. In the buyer line a size qualifier defines the segment
+ * ("YouTubers with 10k–1M subscribers", "groups under 5k members"); anywhere else a count is a claim ("r/x (200k members)").
+ */
+export function unsourcedStat(text: string, evidence: EvidenceMatch[] = [], segment = false): string | undefined {
   const re = new RegExp(STAT.source, "gi");
   for (let m; (m = re.exec(text)); ) {
     const before = text.slice(Math.max(0, m.index - 24), m.index);
-    if (/(?:with|under|over|between|than|up to|from|to|–|-)\s*[\d.,kmKM$€₪\s]*$/i.test(before)) continue;
+    if (segment && /(?:with|who have|under|over|at least|between|from)\s*[\d.,kmKM$€₪\s–-]*$/i.test(before)) continue;
     // Offer terms aren't claims: "30% revenue share", "50% off", "you keep 100%", "99.9% uptime SLA".
     const after = text.slice(m.index + m[0].length, m.index + m[0].length + 22);
     if (/%$/.test(m[0].trim()) && (/^\s*(?:off|discount|revenue|referral|commission|of (?:the )?revenue|cut\b|split|uptime|sla|refund|of each sale)/i.test(after) || /(?:keep|split:?|save|get|earn)\s*$/i.test(before))) continue;
@@ -28,7 +31,7 @@ export function unsourcedStat(text: string, evidence: EvidenceMatch[] = []): str
   return undefined;
 }
 
-export type SlopVerdict = { pass: boolean; reasons: string[] };
+type SlopVerdict = { pass: boolean; reasons: string[] };
 /** Deterministic checks. `evidence` = the idea's matches to real pain posts; trend ideas count their cited signals. */
 export function slopCheck(i: Idea, evidence: EvidenceMatch[], inv: Inventory): SlopVerdict {
   const reasons: string[] = [];
@@ -42,7 +45,7 @@ export function slopCheck(i: Idea, evidence: EvidenceMatch[], inv: Inventory): S
   if (!i.channel || VAGUE_CHANNEL.test(i.channel.trim()) || !PLACE.test(i.channel)) reasons.push("no specific first-customer channel");
   const onTopic = evidence.some((m) => m.cited || m.overlap >= 0.15);
   if (!onTopic && !(i.trend && i.trend.signals.length)) reasons.push("no linked evidence (pain post or trend signal)");
-  const stat = unsourcedStat(`${i.hook} ${i.pain} ${i.offer} ${i.buyer} ${i.channel}`, evidence);
+  const stat = unsourcedStat(`${i.hook} ${i.pain} ${i.offer} ${i.channel}`, evidence) ?? unsourcedStat(i.buyer, evidence, true);
   if (stat) reasons.push(`unsourced statistic "${stat}"`);
   // A moat: at least one of the user's own projects (their data, archive, engine or audience) does real work in it.
   const ownedProject = i.stack.some((s) => s.owned && inv.assets.find((a) => a.id === s.assetId)?.kind === "project");

@@ -5,7 +5,7 @@
 import type { Asset, AssetKind, Audience, Inventory, Role } from "./types";
 
 // ── capabilities ─────────────────────────────────────────────────────────────────────────────
-export type CapDef = {
+type CapDef = {
   id: string; label: string; role: Role; re: RegExp;
   /** Env var names a project using this capability usually needs (names only, never values). */
   keys?: string[];
@@ -23,7 +23,7 @@ export const CAPS: CapDef[] = [
   { id: "db-auth", label: "Accounts & database", role: "build", re: /supabase|postgres|\bneon\b|firebase|auth0|sqlite|redis|upstash|database/, keys: ["SUPABASE_URL", "SUPABASE_ANON_KEY", "DATABASE_URL"], recs: ["supabase", "neon", "upstash"] },
   { id: "email", label: "Send email", role: "channel", re: /resend|gmail|sendgrid|mailchimp|\bemails?\b|\bmail\b/, keys: ["RESEND_API_KEY"], recs: ["resend"], lib: "resend/resend-node" },
   { id: "newsletter", label: "Newsletter", role: "channel", re: /beehiiv|buttondown|mailchimp|newsletter|substack/, recs: ["beehiiv", "buttondown"] },
-  { id: "llm", label: "LLM calls", role: "engine", re: /\bclaude\b|openai|openrouter|anthropic|ollama|gemini|deepseek|\bllms?\b|\bgpt|nanogpt|hermes/, keys: ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"], recs: ["groq"] },
+  { id: "llm", label: "LLM calls", role: "engine", re: /\bclaude\b|openai|openrouter|anthropic|ollama|gemini|deepseek|nanogpt|\bgroq\b/, keys: ["ANTHROPIC_API_KEY", "OPENROUTER_API_KEY"], recs: ["groq"] },
   { id: "rag", label: "Search a corpus with sources", role: "engine", re: /\brag\b|chroma|vector|embedding|knowledge base|corpus|semantic (?:search|index)|pgvector|retrieval/, recs: ["turbopuffer", "pinecone"], topics: ["rag"], lib: "run-llama/llama_index" },
   { id: "transcription", label: "Transcribe audio/video", role: "engine", re: /transcri|whisper|deepgram|speech[- ]to[- ]text|subtitle|\bsrt\b/, keys: ["DEEPGRAM_API_KEY"], recs: ["deepgram", "modal"], topics: ["video"], lib: "SYSTRAN/faster-whisper" },
   { id: "tts", label: "Voice & narration", role: "engine", re: /elevenlabs|\bvoices?\b|\btts\b|text[- ]to[- ]speech|narrat|voiceover/, keys: ["ELEVENLABS_API_KEY"], recs: ["elevenlabs"], topics: ["voice"] },
@@ -84,15 +84,15 @@ export function topicsOf(text: string, caps: string[] = []): string[] {
   for (const c of caps) for (const x of CAP[c]?.topics ?? []) out.add(x);
   return [...out];
 }
-export const rolesOf = (caps: string[]) => [...new Set(caps.map((c) => CAP[c]?.role).filter(Boolean))] as Role[];
+const rolesOf = (caps: string[]) => [...new Set(caps.map((c) => CAP[c]?.role).filter(Boolean))] as Role[];
 
 // ── building the inventory ─────────────────────────────────────────────────────────────────
 export type ConnItem = { id: string; name: string; state?: string; cat?: string; kind?: string; detail?: string; hidden?: boolean };
-export type ConnSection = { id: string; items: ConnItem[] };
-export type ProfileProject = { name: string; status: string; tags: string[]; tldr: string; weight: number };
-export type GemRepo = { full: string; url: string; desc: string; stars: number; lang?: string; topics?: string[]; created?: string; pushed?: string };
-export type RecLite = { id: string; name: string; url: string; free: string; what: string; cat: string };
-export type InventoryInput = { sections?: ConnSection[]; projects?: ProfileProject[]; gems?: GemRepo[]; recs?: RecLite[]; now?: number };
+type ConnSection = { id: string; items: ConnItem[] };
+type ProfileProject = { name: string; status: string; tags: string[]; tldr: string; weight: number };
+type GemRepo = { full: string; url: string; desc: string; stars: number; lang?: string; topics?: string[]; created?: string; pushed?: string };
+type RecLite = { id: string; name: string; url: string; free: string; what: string; cat: string };
+type InventoryInput = { sections?: ConnSection[]; projects?: ProfileProject[]; gems?: GemRepo[]; recs?: RecLite[]; now?: number };
 
 const SECTION_KIND: Record<string, AssetKind> = { services: "service", accounts: "account", ai: "ai", mcp: "mcp", skills: "skill", projects: "project", keys: "key", recommended: "rec" };
 const clip = (s: unknown, n: number) => { const t = String(s ?? "").replace(/\s+/g, " ").replace(/(?:\/Users|\/home)\/[\w.-]+/g, "~").trim(); return t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, "")}…` : t; };

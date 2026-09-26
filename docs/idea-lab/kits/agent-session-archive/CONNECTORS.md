@@ -19,9 +19,9 @@
 - have: Resend — Send email
 - have: Gmail — Send email
 - have: Mail — Send email
-- have: Repomix — LLM calls
-- have: LLM Wiki — LLM calls
 - have: Claude Docs — LLM calls
+- have: Ollama — LLM calls
+- have: OpenRouter — LLM calls
 - have: Telegram — Telegram bot
 - have: Adobe — PDF / document reports
 - have: Pandoc — PDF / document reports
@@ -33,16 +33,11 @@
 ## Keys (names only)
 
 - SUPABASE_URL: missing
-- SUPABASE_ANON_KEY: missing
-- DATABASE_URL: missing
 - NETLIFY_AUTH_TOKEN: have (set in ~/.stasclaw/.env)
-- CLOUDFLARE_API_KEY: have (in 1 project: astra-apple)
 - RESEND_API_KEY: have (in 1 project: xxx-quiz)
 - ANTHROPIC_API_KEY: have (in 2 projects: omni-claude, stasclaw)
-- OPENROUTER_API_KEY: have (set in ~/.hermes/.env)
 - TELEGRAM_BOT_TOKEN: have (set in ~/.zshrc)
 - GUMROAD_ACCESS_TOKEN: missing
-- STRIPE_SECRET_KEY: missing
 
 ## MCP servers & skills
 

@@ -52,7 +52,7 @@ const PROMPTS: Record<string, string> = {
   divination: "A reading template: the spread, each card's meaning in context, one practical takeaway, no fear language",
   "lead-data": "An outreach template in the buyer's language that names their exact problem from the linked posts",
 };
-export type GhSearch = (args: string[], timeoutMs?: number) => Promise<GhRes>;
+type GhSearch = (args: string[], timeoutMs?: number) => Promise<GhRes>;
 /**
  * Libraries per capability: the canonical one (checked with one core-API call) or, when there is none, one GitHub
  * search whose results must mention the searched words. At most `maxSearches` calls per run, cached per capability.

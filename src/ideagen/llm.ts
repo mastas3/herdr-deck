@@ -10,12 +10,11 @@ import { jevAsk, type JevAnswer } from "../jev";
 const HOME = homedir();
 const BIN_DIRS = [`${HOME}/.local/bin`, `${HOME}/.claude/local`, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", ...(process.env.PATH ?? "").split(":")];
 const CLAUDE = process.env.DECK_CLAUDE_BIN || BIN_DIRS.map((d) => `${d}/claude`).find((p) => existsSync(p));
-export const claudeAvailable = () => !!CLAUDE && process.env.NODE_ENV !== "test";
 export const hashOf = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 24);
 
-export type LedgerEntry = { at: number; kind: "claude" | "jev"; tag: string; model?: string; ms: number; costUsd?: number; inTok?: number; outTok?: number; ok: boolean; cached?: boolean; id?: string; error?: string };
-export type Ledger = { claude: { calls: number; max: number; costUsd: number; inTok: number; outTok: number; ms: number }; jev: { calls: number; max: number; ms: number; ids: string[] }; entries: LedgerEntry[] };
-export class BudgetError extends Error {}
+type LedgerEntry = { at: number; kind: "claude" | "jev"; tag: string; model?: string; ms: number; costUsd?: number; inTok?: number; outTok?: number; ok: boolean; cached?: boolean; id?: string; error?: string };
+type Ledger = { claude: { calls: number; max: number; costUsd: number; inTok: number; outTok: number; ms: number }; jev: { calls: number; max: number; ms: number; ids: string[] }; entries: LedgerEntry[] };
+class BudgetError extends Error {}
 
 /** A spending guard + ledger, optionally persisted (so separate runs of an experiment share one budget). */
 export function createBudget(o: { file?: string; claudeMax: number; jevMax: number; cacheDir?: string }) {
@@ -43,13 +42,13 @@ export function createBudget(o: { file?: string; claudeMax: number; jevMax: numb
     },
   };
 }
-export type Budget = ReturnType<typeof createBudget>;
+type Budget = ReturnType<typeof createBudget>;
 
-export type ClaudeResult = { text: string; model: string; ms: number; costUsd: number; inTok: number; outTok: number; cached: boolean };
+type ClaudeResult = { text: string; model: string; ms: number; costUsd: number; inTok: number; outTok: number; cached: boolean };
 export type ClaudeRunner = (o: { system: string; user: string; model?: string; timeoutMs?: number; tag: string }) => Promise<ClaudeResult>;
 
 /** One headless Claude call → the reply text plus usage. Throws on errors (the caller decides what to fall back to). */
-export async function claudeOnce(o: { system: string; user: string; model?: string; timeoutMs?: number }): Promise<Omit<ClaudeResult, "cached">> {
+async function claudeOnce(o: { system: string; user: string; model?: string; timeoutMs?: number }): Promise<Omit<ClaudeResult, "cached">> {
   if (!CLAUDE) throw new Error("Claude Code (claude) isn't installed here");
   const model = o.model ?? "haiku";
   const env: Record<string, string | undefined> = { ...process.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", MAX_THINKING_TOKENS: "0", NO_COLOR: "1" };

@@ -7,7 +7,7 @@ import type { Audience, EvidenceMatch, Idea, PainCorpus, PainPost, PainTheme } f
 import { topicsOf } from "./inventory";
 
 // ── gathering ─────────────────────────────────────────────────────────────────────────────
-export type GatherOpts = {
+type GatherOpts = {
   fetch?: SourceCtx["fetch"]; gh?: SourceCtx["gh"]; timeout?: number; now?: number;
   sources?: SourceId[]; log?: (s: string) => void;
   /** Leads results already on disk (the deck's leads-cache.json entries), reused instead of searching again. */
@@ -108,8 +108,4 @@ export function evidenceScore(ms: EvidenceMatch[], posts: Map<string, PainPost>)
   }
   const sources = new Set(ms.filter((m) => m.overlap >= 0.15).map((m) => m.source)).size;
   return Math.round(Math.min(1, 1 - miss + (sources >= 2 ? 0.05 : 0)) * 1000) / 1000;
-}
-/** The strongest themes for an audience (or all), for the samplers. */
-export function themesFor(corpus: PainCorpus, audience?: string): PainTheme[] {
-  return corpus.themes.filter((t) => !audience || t.audience === audience).sort((a, b) => b.score * (0.6 + b.heat / 7) - a.score * (0.6 + a.heat / 7));
 }

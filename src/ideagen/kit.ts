@@ -1,7 +1,7 @@
 // Starter kits: everything an idea needs to start building, generated lazily when a card is opened or played, cached
 // per idea. The spec, architecture, build plan and go-to-market copy come from one Claude call; connectors, keys,
 // scaffold, quests and the readiness meter are computed here from the user's real inventory (repos are checked with gh).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import type { GhRes } from "../discover";
 import type { IdeaCard, Inventory, KitReadiness, KitTask, StarterKit } from "./types";
@@ -10,7 +10,7 @@ import { CAP } from "./inventory";
 import { builderSummary } from "./judge";
 import { parseLoose, list, str } from "./json";
 
-export const KIT_VERSION = "k1";
+const KIT_VERSION = "k1";
 const HOME = homedir();
 export const slugOf = (name: string) => name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "idea";
 
@@ -32,9 +32,15 @@ function mcpAndSkills(caps: string[], inv: Inventory) {
   }
   return out;
 }
+/** One key per capability: one the user already has when there is one (Gumroad over Stripe), else the first option. */
 function keysFor(caps: string[], inv: Inventory) {
-  const names = [...new Set(caps.flatMap((c) => CAP[c]?.keys ?? []))];
-  return names.map((name) => { const k = inv.keys.find((x) => x.name === name); return { name, purpose: caps.find((c) => CAP[c]?.keys?.includes(name))!, have: !!k, where: k?.where }; });
+  return caps.flatMap((cap) => {
+    const opts = CAP[cap]?.keys ?? [];
+    const name = opts.find((n) => inv.keys.some((k) => k.name === n)) ?? opts[0];
+    if (!name) return [];
+    const k = inv.keys.find((x) => x.name === name);
+    return [{ name, purpose: cap, have: !!k, where: k?.where }];
+  });
 }
 function deployTarget(inv: Inventory) {
   const has = (re: RegExp) => inv.assets.some((a) => a.owned && a.ready && re.test(a.name));
@@ -43,14 +49,20 @@ function deployTarget(inv: Inventory) {
   return "Cloudflare Pages (npx wrangler pages deploy)";
 }
 /** Does a GitHub repo exist? One core-API call per repo (not the search budget). */
-export async function repoExists(url: string, gh: (args: string[], t?: number) => Promise<GhRes>): Promise<boolean> {
+async function repoExists(url: string, gh: (args: string[], t?: number) => Promise<GhRes>): Promise<boolean> {
   const m = url.match(/github\.com\/([\w.-]+)\/([\w.-]+)/);
   if (!m) return false;
   const r = await gh([`repos/${m[1]}/${m[2].replace(/\.git$/, "")}`], 10_000);
   return r.ok && !!r.data?.full_name;
 }
+/** Placeholders a model slipped in despite the rules ("<bot_name>", "placeholder number"): each one is a to-do. */
+export function placeholders(k: Pick<StarterKit, "buildPlan" | "gtm" | "spec">): string[] {
+  const text = JSON.stringify([k.buildPlan, k.gtm, k.spec]);
+  return [...new Set([...text.matchAll(/placeholder[^"\\.;)]{0,50}|\bTBD\b|lorem ipsum|<[a-z_\u0590-\u05FF]+>|\b(?:9725|0)0{6,}\d*|your (?:product|company|name)\b/gi)].map((m) => m[0].trim()))].slice(0, 6);
+}
 export function readiness(k: Omit<StarterKit, "readiness" | "judge" | "cost">): StarterKit["readiness"] {
   const items: KitReadiness[] = [
+    ...placeholders(k).map((p): KitReadiness => ({ label: `Replace placeholder: ${p}`, status: "needs-user", how: "fill in the real value before running that task" })),
     { label: "Spec, architecture and build plan", status: k.buildPlan.length >= 3 ? "ready" : "missing" },
     ...k.connectors.repos.map((r): KitReadiness => ({ label: `Repo ${r.name}`, status: r.verified ? "ready" : "missing", how: r.verified ? undefined : "couldn't verify it exists; pick another" })),
     ...k.connectors.keys.map((x): KitReadiness => ({ label: `Key ${x.name}`, status: x.have ? "ready" : "needs-user", how: x.have ? `already set (${x.where})` : `create it and add it to .env` })),
@@ -63,14 +75,39 @@ export function readiness(k: Omit<StarterKit, "readiness" | "judge" | "cost">): 
   return { score, items };
 }
 
+/**
+ * What an agent would otherwise ask about the user's own projects: does the folder exist, what's in it, how it runs.
+ * Names only (files, scripts, dependencies); no file contents, no env values.
+ */
+function localFacts(names: string[], root = `${HOME}/Documents/Projects`): string[] {
+  return names.map((n) => {
+    const dir = `${root}/${n}`;
+    if (!existsSync(dir)) return `${n}: no folder at ~/Documents/Projects/${n}`;
+    const entries = readdirSync(dir).filter((f) => !f.startsWith(".") && f !== "node_modules").slice(0, 18);
+    let pkg = "";
+    try { const j = JSON.parse(readFileSync(`${dir}/package.json`, "utf8")); pkg = `; scripts: ${Object.keys(j.scripts ?? {}).slice(0, 8).join(", ")}; deps: ${Object.keys({ ...j.dependencies }).slice(0, 12).join(", ")}`; } catch {}
+    // The functions an agent can call without reverse-engineering the project (exported names from src/, first dozen).
+    const exported = existsSync(`${dir}/src`) ? readdirSync(`${dir}/src`).filter((f) => /\.(ts|js)$/.test(f)).slice(0, 20)
+      .flatMap((f) => [...readFileSync(`${dir}/src/${f}`, "utf8").matchAll(/^export (?:async )?function (\w+)/gm)].map((m) => `${f}:${m[1]}`)).slice(0, 12) : [];
+    return `${n}: ~/Documents/Projects/${n} has ${entries.join(", ")}${pkg}${exported.length ? `; exports ${exported.join(", ")}` : ""}`;
+  });
+}
+/** Hosting facts that change the architecture (the first kit's judge caught a bot writing to a Netlify Function's disk). */
+const DEPLOY_NOTES: [RegExp, string][] = [
+  [/netlify/i, "Netlify Functions are stateless and time-limited: keep state in Netlify Blobs or Supabase; long-running bots/workers need another home (the builder's Mac via launchd, or Fly/Railway)."],
+  [/vercel/i, "Vercel functions are stateless: keep state in a database (Supabase/Neon/Upstash); no long-running processes."],
+  [/cloudflare/i, "Workers are stateless: use KV/D1/R2 for state; long jobs need Queues or another host."],
+];
+
 // ── the model half ───────────────────────────────────────────────────────────────────────────
-export function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string) {
+function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string, facts: string[] = []) {
   const system = "You are a senior engineer and a plain-spoken founder writing a starter kit a coding agent will build from. Everything must be specific to this product and this builder: real file names, real commands, real numbers. No placeholders (no TBD, Lorem, 'your product'), no hype words, no invented statistics. Strict JSON only: no prose, no Markdown fences.";
   const card = { name: c.name, hook: c.hook, buyer: c.buyer, pain: c.pain, evidence: c.evidence.map((e) => e.snippet), offer: c.offer, price: c.price, channel: c.channel, mvp: c.mvp,
     stack: c.stack.map((s) => ({ name: s.name, role: s.role, owned: s.owned, path: s.owned && inv.assets.find((a) => a.id === s.assetId)?.kind === "project" ? `~/Documents/Projects/${s.name}` : undefined })),
     have: c.connectors.filter((x) => !x.missing).map((x) => `${x.label}: ${x.have.map((h) => h.name).join(", ")}`), missing: c.missing.map((x) => x.label), trend: c.trend ? { name: c.trend.label, why_now: c.trend.whyNow } : undefined };
   const user = [
-    "THE BUILDER", builderSummary(inv), `Deploy target: ${deploy}. Project folder: ~/Documents/Projects/${slugOf(c.name)}.`, "",
+    "THE BUILDER", builderSummary(inv), `Deploy target: ${deploy}. ${DEPLOY_NOTES.find(([re]) => re.test(deploy))?.[1] ?? ""} Project folder: ~/Documents/Projects/${slugOf(c.name)}.`,
+    ...(facts.length ? ["Facts about the builder's own projects in the stack (checked on disk):", ...facts.map((f) => `- ${f}`)] : []), "",
     "THE IDEA", JSON.stringify(card), "",
     "Write the kit. Rules:",
     "- spec: the problem in the buyer's words (use the evidence), jobs, what is in and out of v1, metrics tied to milestones (landing live, 10 conversations, first paying customer).",
@@ -108,7 +145,7 @@ export function parseKitReply(text: string) {
 }
 
 // ── building, caching, judging ───────────────────────────────────────────────────────────────
-export type KitDeps = { inv: Inventory; claude: ClaudeRunner; gh: (args: string[], t?: number) => Promise<GhRes>; cacheDir: string; card: (id: string) => IdeaCard | undefined };
+type KitDeps = { inv: Inventory; claude: ClaudeRunner; gh: (args: string[], t?: number) => Promise<GhRes>; cacheDir: string; card: (id: string) => IdeaCard | undefined };
 const kitFile = (d: KitDeps, id: string) => `${d.cacheDir}/kits/${id.replace(/[^\w.-]+/g, "_")}.json`;
 /** The kit for an idea: cached, or built now (one Claude call plus a gh check per repo). */
 export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<StarterKit> {
@@ -117,22 +154,19 @@ export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<Start
   if (!c) throw new Error(`No idea ${ideaId} in the gallery`);
   const t0 = Date.now();
   const deploy = deployTarget(d.inv);
-  const p = kitPrompt(c, d.inv, deploy);
+  const ownedNames = c.stack.filter((s) => s.owned && d.inv.assets.find((a) => a.id === s.assetId)?.kind === "project").map((s) => s.name);
+  const p = kitPrompt(c, d.inv, deploy, localFacts(ownedNames));
   const r = await d.claude({ system: p.system, user: p.user, model: "sonnet", tag: `kit:${c.id}` });
   const m = parseKitReply(r.text);
-  const caps = c.connectors.map((x) => x.cap);
   const repoSugs = c.connectors.flatMap((x) => x.suggestions).filter((s) => s.type === "repo" && s.url);
   const repos = await Promise.all(repoSugs.slice(0, 4).map(async (s) => ({ name: s.name, url: s.url!, why: s.why, verified: await repoExists(s.url!, d.gh) })));
-  const ownedProjects = c.stack.filter((s) => s.owned && d.inv.assets.find((a) => a.id === s.assetId)?.kind === "project");
   const slug = slugOf(c.name);
-  const base = ownedProjects[0] ? `copy the patterns (not the code wholesale) from ~/Documents/Projects/${ownedProjects[0].name}` : repos.find((x) => x.verified)?.url ?? "npm create astro@latest (Astro, as in the builder's hd2027-blog)";
+  const base = ownedNames[0] ? `copy the patterns (not the code wholesale) from ~/Documents/Projects/${ownedNames[0]}` : repos.find((x) => x.verified)?.url ?? "npm create astro@latest (Astro, as in the builder's hd2027-blog)";
   const kit: Omit<StarterKit, "readiness" | "judge" | "cost"> = {
     ideaId, slug, at: Date.now(), version: KIT_VERSION, spec: m.spec, architecture: m.architecture, buildPlan: m.buildPlan,
     connectors: {
       repos,
-      services: c.connectors.flatMap((x) => [...x.have.filter((h) => h.id.startsWith("svc:") || h.id.startsWith("acct:")).map((h) => ({ name: h.name, url: "", why: x.label, have: true })), ...x.suggestions.filter((s) => s.type === "service").map((s) => ({ name: s.name, url: s.url ?? "", why: s.why, free: s.free, have: false }))])
-        .filter((s, i, a) => a.findIndex((y) => y.name === s.name) === i),
-      keys: keysFor(caps, d.inv), mcpAndSkills: mcpAndSkills(caps, d.inv), missing: c.missing,
+      services: [], keys: [], mcpAndSkills: [], missing: [],
     },
     scaffold: {
       folder: `~/Documents/Projects/${slug}`, base, deploy,
@@ -155,10 +189,18 @@ export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<Start
     },
     quests: c.play.quests.map((q) => ({ ...q, done: false })),
   };
-  const full: StarterKit = { ...kit, readiness: readiness(kit), cost: { claudeCalls: 1, ms: Date.now() - t0 } };
+  const full = refreshKit({ ...kit, readiness: { score: 0, items: [] }, cost: { claudeCalls: 1, ms: Date.now() - t0 } }, c, d.inv);
   mkdirSync(`${d.cacheDir}/kits`, { recursive: true });
   writeFileSync(kitFile(d, ideaId), JSON.stringify(full, null, 1));
   return full;
+}
+/** Recompute the parts that come from the inventory (keys, tools, services, readiness): cheap, no model call. */
+export function refreshKit(k: StarterKit, c: IdeaCard, inv: Inventory): StarterKit {
+  const caps = c.connectors.map((x) => x.cap);
+  const services = c.connectors.flatMap((x) => [...x.have.filter((h) => h.id.startsWith("svc:") || h.id.startsWith("acct:")).map((h) => ({ name: h.name, url: "", why: x.label, have: true })), ...x.suggestions.filter((s) => s.type === "service").map((s) => ({ name: s.name, url: s.url ?? "", why: s.why, free: s.free, have: false }))])
+    .filter((s, i, a) => a.findIndex((y) => y.name === s.name) === i);
+  const next = { ...k, connectors: { ...k.connectors, keys: keysFor(caps, inv), mcpAndSkills: mcpAndSkills(caps, inv), services, missing: c.missing } };
+  return { ...next, readiness: readiness(next) };
 }
 /** One Claude call: could a coding agent start from this kit without asking questions? */
 export async function judgeKit(k: StarterKit, claude: ClaudeRunner): Promise<NonNullable<StarterKit["judge"]>> {
@@ -168,4 +210,3 @@ export async function judgeKit(k: StarterKit, claude: ClaudeRunner): Promise<Non
   const j = parseLoose(r.text) ?? {};
   return { ready: Math.max(1, Math.min(5, Number(j.ready) || 1)), questions: list(j.questions, 10, 240), notes: str(j.notes, 400) };
 }
-export const kitsHome = `${HOME}/.config/herdr-deck/ideas`;

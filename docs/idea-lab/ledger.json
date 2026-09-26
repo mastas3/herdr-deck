@@ -1,16 +1,16 @@
 {
  "claude": {
-  "calls": 48,
-  "max": 50,
-  "costUsd": 2.2685120000000003,
-  "inTok": 328939,
-  "outTok": 192654,
-  "ms": 2159098
+  "calls": 52,
+  "max": 52,
+  "costUsd": 2.5935930000000003,
+  "inTok": 366684,
+  "outTok": 230580,
+  "ms": 2617344
  },
  "jev": {
-  "calls": 125,
+  "calls": 148,
   "max": 300,
-  "ms": 54963,
+  "ms": 63995,
   "ids": [
    "f992865c-55e7-447e-b1e4-73972eee1636",
    "d7fb9924-1cc5-4787-b1bd-ce9286b71d73",
@@ -136,7 +136,30 @@
    "c30c992e-b7d6-4e78-bc8b-31d91c8c31cd",
    "bd77d739-2b1a-49c6-94fd-227f1f5ac5fd",
    "45cff455-264c-40d2-8f2f-8806a2287e37",
-   "90555167-95e0-41f1-ac6d-c10686a869d4"
+   "90555167-95e0-41f1-ac6d-c10686a869d4",
+   "87ced25a-8361-4268-b83a-311fdca96525",
+   "3fb67832-26c1-4232-acdf-bce8ec198e1a",
+   "0775cc89-5967-4606-a9f9-563804ab8967",
+   "46db2710-35ed-4847-a9a1-f1b8b879cc72",
+   "0eecb788-47e1-48e8-8334-cbc1eb55325d",
+   "a76c00d4-a23c-4327-b034-8660b6f8cda6",
+   "02b9fd78-5f75-4ad3-bffd-75eada3ab69d",
+   "6e52b9c0-ec21-47f8-a249-08e9db780e77",
+   "33c8fa36-a602-4c3b-acf8-e700dbebc0b6",
+   "29ed7c98-b587-454d-9fd7-09c0f1eb8602",
+   "29ba9ce0-17e0-48b1-891c-f3fb534b66a8",
+   "dc201ad7-76f3-4a2e-815e-b91e716445ce",
+   "13f84b37-f1e5-40cb-aac7-558d102e21bd",
+   "69394fd7-d1dc-4765-a65a-dcd7e3436c55",
+   "47b5088f-2fed-45c7-8bda-2e5e9138bcba",
+   "5e69532e-6ca5-4957-9b19-c0aa180c3325",
+   "14041074-a425-43e6-8a99-c73abd333c4d",
+   "962365ff-0212-4052-9da7-5ce2855b2ebe",
+   "11278182-4d90-4b06-b36a-becb60fca15f",
+   "d0c700db-6403-4dd5-880e-c616d23c2697",
+   "304db7ee-61da-4b46-810f-95fe12018d84",
+   "b3684ce5-4412-4c40-a5ea-e8cbdaa9013b",
+   "a04d1455-33ba-4fd3-92f6-ecf93501a89c"
   ]
  },
  "entries": [
@@ -1666,6 +1689,234 @@
    "costUsd": 0.044022,
    "inTok": 9929,
    "outTok": 431,
+   "ok": true
+  },
+  {
+   "at": 1790436123281,
+   "kind": "claude",
+   "tag": "premortem:1",
+   "model": "haiku",
+   "ms": 230228,
+   "costUsd": 0.11635599999999999,
+   "inTok": 10552,
+   "outTok": 19051,
+   "ok": true
+  },
+  {
+   "at": 1790436123691,
+   "kind": "jev",
+   "tag": "patterns:10",
+   "ms": 374,
+   "ok": true,
+   "id": "87ced25a-8361-4268-b83a-311fdca96525"
+  },
+  {
+   "at": 1790436123691,
+   "kind": "jev",
+   "tag": "patterns:5",
+   "ms": 376,
+   "ok": true,
+   "id": "3fb67832-26c1-4232-acdf-bce8ec198e1a"
+  },
+  {
+   "at": 1790436123692,
+   "kind": "jev",
+   "tag": "patterns:1",
+   "ms": 377,
+   "ok": true,
+   "id": "0775cc89-5967-4606-a9f9-563804ab8967"
+  },
+  {
+   "at": 1790436123693,
+   "kind": "jev",
+   "tag": "patterns:7",
+   "ms": 376,
+   "ok": true,
+   "id": "46db2710-35ed-4847-a9a1-f1b8b879cc72"
+  },
+  {
+   "at": 1790436123693,
+   "kind": "jev",
+   "tag": "patterns:2",
+   "ms": 379,
+   "ok": true,
+   "id": "0eecb788-47e1-48e8-8334-cbc1eb55325d"
+  },
+  {
+   "at": 1790436123694,
+   "kind": "jev",
+   "tag": "patterns:3",
+   "ms": 379,
+   "ok": true,
+   "id": "a76c00d4-a23c-4327-b034-8660b6f8cda6"
+  },
+  {
+   "at": 1790436123709,
+   "kind": "jev",
+   "tag": "pm-generic:1",
+   "ms": 395,
+   "ok": true,
+   "id": "02b9fd78-5f75-4ad3-bffd-75eada3ab69d"
+  },
+  {
+   "at": 1790436123713,
+   "kind": "jev",
+   "tag": "pm-p10:1",
+   "ms": 401,
+   "ok": true,
+   "id": "6e52b9c0-ec21-47f8-a249-08e9db780e77"
+  },
+  {
+   "at": 1790436123714,
+   "kind": "jev",
+   "tag": "pm-p10:0",
+   "ms": 403,
+   "ok": true,
+   "id": "33c8fa36-a602-4c3b-acf8-e700dbebc0b6"
+  },
+  {
+   "at": 1790436123715,
+   "kind": "jev",
+   "tag": "pm-p10:3",
+   "ms": 403,
+   "ok": true,
+   "id": "29ed7c98-b587-454d-9fd7-09c0f1eb8602"
+  },
+  {
+   "at": 1790436123729,
+   "kind": "jev",
+   "tag": "patterns:8",
+   "ms": 413,
+   "ok": true,
+   "id": "29ba9ce0-17e0-48b1-891c-f3fb534b66a8"
+  },
+  {
+   "at": 1790436123730,
+   "kind": "jev",
+   "tag": "patterns:9",
+   "ms": 414,
+   "ok": true,
+   "id": "dc201ad7-76f3-4a2e-815e-b91e716445ce"
+  },
+  {
+   "at": 1790436123730,
+   "kind": "jev",
+   "tag": "patterns:0",
+   "ms": 416,
+   "ok": true,
+   "id": "13f84b37-f1e5-40cb-aac7-558d102e21bd"
+  },
+  {
+   "at": 1790436123730,
+   "kind": "jev",
+   "tag": "pm-generic:0",
+   "ms": 417,
+   "ok": true,
+   "id": "69394fd7-d1dc-4765-a65a-dcd7e3436c55"
+  },
+  {
+   "at": 1790436123731,
+   "kind": "jev",
+   "tag": "pm-generic:2",
+   "ms": 417,
+   "ok": true,
+   "id": "47b5088f-2fed-45c7-8bda-2e5e9138bcba"
+  },
+  {
+   "at": 1790436123732,
+   "kind": "jev",
+   "tag": "patterns:6",
+   "ms": 416,
+   "ok": true,
+   "id": "5e69532e-6ca5-4957-9b19-c0aa180c3325"
+  },
+  {
+   "at": 1790436123742,
+   "kind": "jev",
+   "tag": "pm-p10:2",
+   "ms": 430,
+   "ok": true,
+   "id": "14041074-a425-43e6-8a99-c73abd333c4d"
+  },
+  {
+   "at": 1790436123759,
+   "kind": "jev",
+   "tag": "patterns:4",
+   "ms": 444,
+   "ok": true,
+   "id": "962365ff-0212-4052-9da7-5ce2855b2ebe"
+  },
+  {
+   "at": 1790436273278,
+   "kind": "claude",
+   "tag": "premortem:1",
+   "model": "haiku",
+   "ms": 137323,
+   "costUsd": 0.088783,
+   "inTok": 14508,
+   "outTok": 11954,
+   "ok": true
+  },
+  {
+   "at": 1790436273639,
+   "kind": "jev",
+   "tag": "pm-p10:2",
+   "ms": 345,
+   "ok": true,
+   "id": "11278182-4d90-4b06-b36a-becb60fca15f"
+  },
+  {
+   "at": 1790436273648,
+   "kind": "jev",
+   "tag": "pm-p10:0",
+   "ms": 356,
+   "ok": true,
+   "id": "d0c700db-6403-4dd5-880e-c616d23c2697"
+  },
+  {
+   "at": 1790436273654,
+   "kind": "jev",
+   "tag": "pm-generic:0",
+   "ms": 359,
+   "ok": true,
+   "id": "304db7ee-61da-4b46-810f-95fe12018d84"
+  },
+  {
+   "at": 1790436273657,
+   "kind": "jev",
+   "tag": "pm-p10:1",
+   "ms": 363,
+   "ok": true,
+   "id": "b3684ce5-4412-4c40-a5ea-e8cbdaa9013b"
+  },
+  {
+   "at": 1790436273674,
+   "kind": "jev",
+   "tag": "pm-generic:1",
+   "ms": 379,
+   "ok": true,
+   "id": "a04d1455-33ba-4fd3-92f6-ecf93501a89c"
+  },
+  {
+   "at": 1790436443792,
+   "kind": "claude",
+   "tag": "kit:G-constraint:1:hdatlastelegrambot:g1y:pm",
+   "model": "sonnet",
+   "ms": 82795,
+   "costUsd": 0.079222,
+   "inTok": 3534,
+   "outTok": 6509,
+   "ok": true
+  },
+  {
+   "at": 1790436451695,
+   "kind": "claude",
+   "tag": "kit-judge:G-constraint:1:hdatlastelegrambot:g1y:pm",
+   "model": "sonnet",
+   "ms": 7900,
+   "costUsd": 0.04071999999999999,
+   "inTok": 9151,
+   "outTok": 412,
    "ok": true
   }
  ]

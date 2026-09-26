@@ -73,6 +73,8 @@ export type Idea = {
   edge?: string;
   /** Trend ideas: the trend they ride, the signals cited, why now; heat/earliness come from the cited signals. */
   trend?: { label: string; whyNow: string; signals: { id: string; source: string; title: string; url: string }[]; heat: number; earliness: number };
+  /** Why it could fail and what the kept version fixes (premortem.ts); pivotedFrom is set when the revision won. */
+  premortem?: { failures: { reason: string; pattern?: string; evidence?: string }[]; fix: string; verdict: "improve" | "abandon"; pivotedFrom?: { name: string; hook: string } };
   raw?: any;
 };
 
@@ -85,7 +87,7 @@ export type Scores = {
   evidence: number; evidenceMatches: EvidenceMatch[];
   elo?: number; wins?: number; games?: number;
   /** The slop gate: a failing idea gets quality 0 and is never shown; qualityRaw keeps what the judges said. */
-  slop?: { pass: boolean; reasons: string[] }; jevGeneric?: number;
+  slop?: { pass: boolean; reasons: string[] }; jevGeneric?: number; patterns?: number;
   quality: number; qualityNoEvidence: number; qualityRaw: number;
 };
 export type ConnectorType = "repo" | "service" | "business" | "prompt" | "graphics" | "project" | "mcp";
@@ -102,14 +104,16 @@ export type IdeaCard = {
   timeToFirstDollarDays: number; difficulty: Difficulty;
   quality: number; jevP10?: number; rubric?: Rubric; evidenceScore: number;
   strategy: StrategyId; topics: string[]; play: PlayBrief;
-  trend?: Idea["trend"];
+  trend?: Idea["trend"]; premortem?: Idea["premortem"];
+  /** 0..1: how many of the success patterns (success.ts) Jev says it has. */
+  patterns?: number;
   ownedRatio: number;
 };
 export type Lane = { id: string; title: string; subtitle: string; ideas: string[]; more: boolean };
 export type Gallery = {
   day: string; at: number; version: string;
   lanes: Lane[]; ideas: Record<string, IdeaCard>;
-  stats: { ideas: number; claudeCalls: number; jevCalls: number; ms: number; note?: string };
+  stats: { ideas: number; claudeCalls: number; jevCalls: number; ms: number; note?: string; refills?: Record<string, number> };
 };
 
 // ── starter kits ───────────────────────────────────────────────────────────────────────
