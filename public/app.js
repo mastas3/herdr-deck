@@ -832,6 +832,20 @@ function select(key, opts = {}) {
   prefetchNeighbours(key);
   if (opts.scroll) requestAnimationFrame(() => rowCache.get(key)?.el.scrollIntoView({ block: "nearest" }));
   if (opts.open && isPhone()) setMView("detail", true);
+  // Opening a session puts you straight in its message box (desktop; on a phone it would pop the keyboard).
+  // The pane renders a frame or two later, so try for up to half a second.
+  if (opts.open && !isPhone()) {
+    let tries = 0;
+    const go = () => {
+      const t = $("cText");
+      if (S.sel !== key || S.mode || document.querySelector("dialog[open]") || !t || t.disabled) return;
+      if (!t.offsetParent) { if (++tries < 12) setTimeout(go, 40); return; }
+      if (document.activeElement === t) return;
+      t.focus({ preventScroll: true });
+      t.setSelectionRange?.(t.value.length, t.value.length);
+    };
+    requestAnimationFrame(go);
+  }
   syncUrl();
 }
 S.drafts = new Map();
