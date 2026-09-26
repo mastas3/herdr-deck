@@ -2000,6 +2000,7 @@ function askDialog({ title, text = "", input, ok = "OK", danger = false, multili
 
 // ── views: inbox, history, tools, connections ────────────────────────────
 function setMode(m) {
+  if (m === "inbox" && S.mode !== "inbox") { S.ifocus = null; S.ifocusIdx = 0; } // the first card has the focus ring on open
   S.mode = m;
   S.board = false;
   headSig = ""; bodySig = ""; chatDom.key = null;
@@ -2053,21 +2054,50 @@ function jevLine(d) {
   if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}</div>`;
   return "";
 }
+// <inbox-keys> Pure: what a triage key means on a decision. No DOM, no globals (test/inbox-keys.test.ts runs this block).
+const YES_RE = /^\W*(yes|y|allow|approve|accept|ok|okay|confirm|proceed|continue|go ahead|trust|sure)\b/i;
+const NO_RE = /^\W*(no|n|deny|reject|decline|cancel|don['’]?t|do not|exit|abort|stop)\b/i;
+/** The option `y` (want "yes") or `n` (want "no") answers with: the first yes-/no-worded option; for yes, else the recommended one. */
+function yesNoOption(d, want) {
+  const opts = d?.options ?? [];
+  const re = want === "yes" ? YES_RE : NO_RE;
+  return opts.find((o) => re.test(String(o.title ?? ""))) ?? (want === "yes" ? opts.find((o) => o.rec) : undefined);
+}
+/** { opt } answers with an option, { act } runs a card action, { miss } explains why the key does nothing here, null: not a card key. */
+function inboxKey(d, k) {
+  if (!d) return null;
+  const n = d.options?.length ?? 0;
+  if (/^[1-9]$/.test(k)) { const o = d.options?.[Number(k) - 1]; return o ? { opt: o } : { miss: n ? `This one has ${n} option${n === 1 ? "" : "s"}` : "No options here: y, n, v or r" }; }
+  if (k === "y" || k === "n") {
+    if (d.kind === "review") return { act: k === "y" ? "accept" : "sendback" };
+    const o = yesNoOption(d, k === "y" ? "yes" : "no");
+    return o ? { opt: o } : { miss: `No clear ${k === "y" ? "yes" : "no"} option here: pick with 1–${Math.min(n, 9)}` };
+  }
+  if (k === "v") return d.kind === "review" ? { act: "verify" } : { miss: "Verify is for finished work" };
+  if (k === "r") return { act: "reply" };
+  if (k === "o" || k === "Enter") return { act: "open" };
+  if (k === "s" || k === "x") return { act: "skip" };
+  return null;
+}
+// </inbox-keys>
+const kh = (k) => `<kbd class="kh" aria-hidden="true">${k}</kbd>`;
 function decisionCard(d) {
   const r = rowOf(d.key);
   if (!r) return "";
   const [kindLabel, kindVar] = d.kind === "review" && !d.claim ? ["Finished", "idle"] : KIND[d.kind];
   const pick = d.jev?.pick;
-  const opts = d.options.map((o) => `<button class="dopt${o.rec ? " rec" : ""}${pick === o.id ? " jevpick" : ""}" data-dopt="${esc(o.id)}"><span class="ol">${esc(String(o.id).toUpperCase())}</span><span class="ob"><span class="ot">${inline(o.title)}${o.rec ? '<span class="rp">Recommended</span>' : ""}${pick === o.id ? '<span class="rp jevp">Jev</span>' : ""}</span>${o.detail ? `<span class="od">${inline(o.detail)}</span>` : ""}</span></button>`).join("");
+  const yes = yesNoOption(d, "yes"), no = yesNoOption(d, "no");
+  // The badge is the key that picks it (1–9); an agent's own letter stays visible beside the title.
+  const opts = d.options.map((o, i) => `<button class="dopt${o.rec ? " rec" : ""}${o === yes ? " isyes" : ""}${pick === o.id ? " jevpick" : ""}" data-dopt="${esc(o.id)}"><span class="ol">${i < 9 ? i + 1 : esc(String(o.id).toUpperCase())}</span><span class="ob"><span class="ot">${/^[a-h]$/i.test(o.id) ? `<span class="oid">${esc(o.id.toUpperCase())}</span>` : ""}${inline(o.title)}${o.rec ? '<span class="rp">Recommended</span>' : ""}${pick === o.id ? '<span class="rp jevp">Jev</span>' : ""}</span>${o.detail ? `<span class="od">${inline(o.detail)}</span>` : ""}</span>${o === yes ? kh("y") : o === no ? kh("n") : ""}</button>`).join("");
   const c = r.check;
   const check = d.kind === "review" ? (c?.state === "needs-approval"
     ? `<div class="dcheck ask">The deck can re-run this project’s checks to prove it: <code>${esc(c.cmd)}</code><span class="spacer"></span><button class="btn primary" data-dcheck="allow">Allow for ${esc(r.project)}</button><button class="btn" data-dcheck="edit">Edit…</button><button class="btn ghost" data-dcheck="never">Never</button></div>`
     : c && c.state !== "skipped" ? `<div class="dcheck ${c.state}">${c.state === "pass" ? "✓" : c.state === "fail" ? "✗" : '<span class="spin"></span>'} <code>${esc(c.cmd ?? "")}</code> ${c.state === "pass" ? `passed${c.ms ? ` in ${Math.round(c.ms / 1000)}s` : ""}` : c.state === "fail" ? `failed (exit ${c.exit})` : c.state}${c.at && (c.state === "pass" || c.state === "fail") ? ` · ${esc(agoText(c.at))}` : ""}${c.tail?.length && c.state === "fail" ? `<details><summary>Output</summary><pre>${esc(c.tail.slice(-25).join("\n"))}</pre></details>` : ""}</div>` : "") : "";
   const acts = d.kind === "review"
-    ? `<button class="btn primary" data-dact2="accept">${ICON.check}Looks good</button><button class="btn" data-dact2="sendback">Send back…</button><button class="btn" data-dact2="verify">Verify now</button><button class="btn ghost" data-dact2="reply">Reply…</button>`
-    : `<button class="btn ghost" data-dact2="reply">Something else…</button>${d.kind === "prompt" ? `<button class="btn ghost" data-dact2="term">Show terminal</button>` : ""}`;
+    ? `<button class="btn primary" data-dact2="accept">${ICON.check}Looks good${kh("y")}</button><button class="btn" data-dact2="sendback">Send back…${kh("n")}</button><button class="btn" data-dact2="verify">Verify now${kh("v")}</button><button class="btn ghost" data-dact2="reply">Reply…${kh("r")}</button>`
+    : `<button class="btn ghost" data-dact2="reply">Something else…${kh("r")}</button>${d.kind === "prompt" ? `<button class="btn ghost" data-dact2="term">Show terminal</button>` : ""}`;
   return `<article class="dcard" data-dkey="${esc(d.key)}" data-kind="${d.kind}" style="--pc:${pc(r.project)};--kc:var(--${kindVar})">
-    <header><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span><span class="dk">${kindLabel}</span>${multiMachine() ? `<span class="hint">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint" data-t="${d.at}">${esc(agoText(d.at))}</span><button class="ib" data-dact2="open" title="Open the session">${ICON.jump}</button></header>
+    <header><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span><span class="dk">${kindLabel}</span>${multiMachine() ? `<span class="hint">${esc(machineLabel(r.machine))}</span>` : ""}<span class="dhr"><span class="hint" data-t="${d.at}">${esc(agoText(d.at))}</span><button class="dskip" data-dact2="skip" title="Hide it for now without answering (s)">Skip${kh("s")}</button><button class="ib" data-dact2="open" title="Open the session (o)">${ICON.jump}</button></span></header>
     <div class="dtitle">${esc(r.title)} <span class="hint">${paneTag(r)}</span></div>
     <div class="dq">${inline(d.question)}</div>
     ${d.context && d.kind !== "prompt" ? `<details class="dctx"><summary>Context</summary><div class="md">${md(d.context)}</div></details>` : d.kind === "prompt" ? `<pre class="dterm">${ansi((r.tail ?? []).slice(-6).join("\n"))}</pre>` : ""}
@@ -2078,46 +2108,194 @@ function decisionCard(d) {
     <form class="dreply" hidden><textarea rows="2" placeholder="Reply to the agent"></textarea><button class="btn primary">Send</button></form>
   </article>`;
 }
+// Keyboard triage: a focus ring over the cards (S.ifocus), skips that hide a card until it changes or you undo.
+const IFILTERS = [["all", "All"], ["quick", "Quick ones"], ["prompt", "Permissions"], ["question", "Questions"], ["review", "Done?"]];
+S.skipped = new Map(); // key → the decision's signature when skipped; it comes back when the decision changes
+S.skipStack = [];
+S.ifocus = null; S.ifocusIdx = 0;
+const dsig = (d) => `${d.kind}|${d.at}|${d.question}`;
+const isSkipped = (d) => S.skipped.get(d.key) === dsig(d);
+const KEYHINTS = [[["j", "k"], "move"], [["1–9"], "pick"], [["y", "n"], "yes / no"], [["v"], "verify"], [["r"], "reply"], [["o"], "open"], [["s"], "skip"], [["u"], "undo skip"], [["f"], "filter"], [["Esc"], "back"]];
 function renderInbox() {
-  const all = (S.decisions ?? []).filter((d) => rowOf(d.key) && !S.done.has(d.key)).sort((a, b) => ({ prompt: 0, question: 1, review: 2 })[a.kind] - ({ prompt: 0, question: 1, review: 2 })[b.kind] || b.at - a.at);
+  const box = $("dbody");
+  // A reply being written survives the re-render that any decision change triggers.
+  const drafts = box._mode === "inbox" ? [...box.querySelectorAll(".dcard .dreply:not([hidden])")].map((f) => { const ta = f.querySelector("textarea"); return { key: f.closest(".dcard").dataset.dkey, text: ta.value, action: f.dataset.action, focus: document.activeElement === ta, a: ta.selectionStart, b: ta.selectionEnd }; }) : [];
+  const waiting = (S.decisions ?? []).filter((d) => rowOf(d.key) && !S.done.has(d.key));
+  for (const k of [...S.skipped.keys()]) if (!waiting.some((d) => d.key === k && isSkipped(d))) S.skipped.delete(k);
+  const all = waiting.filter((d) => !isSkipped(d)).sort((a, b) => ({ prompt: 0, question: 1, review: 2 })[a.kind] - ({ prompt: 0, question: 1, review: 2 })[b.kind] || b.at - a.at);
   const quick = (d) => d.jev?.low >= 0.7 || (d.kind === "review" && (d.jev?.done ?? 0) >= 0.7);
   const f = S.inboxFilter;
   const list = all.filter((d) => f === "all" || (f === "quick" ? quick(d) : d.kind === f));
   const count = (k) => all.filter((d) => (k === "quick" ? quick(d) : d.kind === k)).length;
-  const chips = [["all", "All", all.length], ["quick", "Quick ones", count("quick")], ["prompt", "Permissions", count("prompt")], ["question", "Questions", count("question")], ["review", "Done?", count("review")]]
-    .map(([k, l, n]) => `<button class="chip" data-ifilter="${k}" aria-pressed="${f === k}">${l}${n ? ` <b>${n}</b>` : ""}</button>`).join("");
+  const chips = IFILTERS.map(([k, l]) => [k, l, k === "all" ? all.length : count(k)])
+    .map(([k, l, n]) => `<button class="chip" data-ifilter="${k}" aria-pressed="${f === k}">${l}${n ? ` <b>${n}</b>` : ""}</button>`).join("") + (isPhone() ? "" : `<span class="chipkey">${kh("f")} cycles</span>`);
   const j = S.jev ?? {};
-  modeHTML(`<header class="vh"><h2>${ICON.inbox}Decisions</h2><p>${all.length ? `${all.length} waiting on you. Answer here; it goes straight to the agent.` : "Nothing is waiting on you."}${j.available ? ` <span class="hint">· Jev suggestions: ${j.calls}/${j.cap} today</span>` : ` <span class="hint">· Jev is off on this machine</span>`}</p><div class="chips">${chips}</div></header>
-    ${list.length ? `<div class="dlist">${list.map(decisionCard).join("")}</div>` : `<div class="empty-v"><p>${all.length ? "None in this filter." : "All clear. When an agent asks something, needs permission, or says it’s done, it shows up here."}</p></div>`}`);
+  const nSkip = S.skipped.size;
+  const skipped = nSkip ? ` <button class="iunskip" data-iunskip title="Show the skipped ones again">${nSkip} skipped · show</button>` : "";
+  const hints = isPhone() ? "" : `<div class="khint" aria-label="Keyboard">${KEYHINTS.map(([ks, t]) => `<span>${ks.map((k) => `<kbd>${k}</kbd>`).join("")} ${t}</span>`).join("")}</div>`;
+  modeHTML(`<header class="vh"><h2>${ICON.inbox}Decisions</h2><p>${all.length ? `${all.length} waiting on you. Answer here; it goes straight to the agent.` : "Nothing is waiting on you."}${skipped}${j.available ? ` <span class="hint">· Jev suggestions: ${j.calls}/${j.cap} today</span>` : ` <span class="hint">· Jev is off on this machine</span>`}</p>${hints}<div class="chips">${chips}</div></header>
+    ${list.length ? `<div class="dlist">${list.map(decisionCard).join("")}</div>` : `<div class="empty-v"><p>${all.length ? "None in this filter." : nSkip ? "Only skipped ones left." : "All clear. When an agent asks something, needs permission, or says it’s done, it shows up here."}</p></div>`}`);
+  for (const x of drafts) {
+    const form = box.querySelector(`.dcard[data-dkey="${CSS.escape(x.key)}"] .dreply`);
+    if (!form || !form.hidden) continue;
+    const ta = form.querySelector("textarea");
+    form.hidden = false; form.dataset.action = x.action ?? ""; ta.value = x.text; autosize(ta);
+    if (x.focus) { ta.focus(); ta.setSelectionRange(x.a, x.b); }
+  }
+  applyInboxFocus(false);
 }
-async function decide(key, action, fn, choice) {
-  const card = document.querySelector(`.dcard[data-dkey="${CSS.escape(key)}"]`);
+const inboxCards = () => [...$("dbody").querySelectorAll(".dcard:not(.leaving)")];
+const cardOf = (key) => document.querySelector(`#dbody .dcard[data-dkey="${CSS.escape(key)}"]`);
+/** Put the focus ring on S.ifocus, or on the card now at its old place (the next one) when it's gone. */
+function applyInboxFocus(scroll) {
+  const cards = inboxCards();
+  const el = cards.find((c) => c.dataset.dkey === S.ifocus) ?? cards[Math.min(S.ifocusIdx, cards.length - 1)];
+  for (const c of $("dbody").querySelectorAll(".dcard.kfocus")) if (c !== el) c.classList.remove("kfocus");
+  if (!el) { S.ifocus = null; return; }
+  S.ifocus = el.dataset.dkey; S.ifocusIdx = cards.indexOf(el);
+  if (!isPhone()) el.classList.add("kfocus");
+  if (scroll) el.scrollIntoView({ block: el.offsetHeight > $("dbody").clientHeight - 24 ? "start" : "nearest", behavior: "smooth" });
+}
+function moveInboxFocus(delta) {
+  const cards = inboxCards();
+  if (!cards.length) return;
+  const i = cards.findIndex((c) => c.dataset.dkey === S.ifocus);
+  S.ifocus = cards[i < 0 ? 0 : Math.max(0, Math.min(cards.length - 1, i + delta))].dataset.dkey;
+  applyInboxFocus(true);
+}
+/** The answered or skipped card is leaving: the ring goes to the one after it (or before, at the end). */
+function focusPast(key) {
+  const cards = inboxCards(), i = cards.findIndex((c) => c.dataset.dkey === key);
+  if (i < 0 || S.ifocus !== key) return;
+  S.ifocus = (cards[i + 1] ?? cards[i - 1])?.dataset.dkey ?? null;
+  S.ifocusIdx = i;
+}
+function nextHint() {
+  const d = S.ifocus && (S.decisions ?? []).find((x) => x.key === S.ifocus);
+  if (!d) return "All clear · Esc to go back";
+  if (d.kind === "review") return "Next: y looks good · n send back · v verify · s skip";
+  const n = Math.min(d.options.length, 9);
+  return `Next: ${yesNoOption(d, "yes") ? "y / n · " : ""}${n ? `1–${n} pick · ` : ""}r reply · s skip`;
+}
+function triageToast(msg) {
+  toast(msg);
+  const t = document.querySelector(".toast");
+  if (t && !isPhone()) { const h = document.createElement("span"); h.className = "tnext"; h.textContent = nextHint(); t.append(h); }
+}
+async function decide(key, action, fn, choice, sent) {
+  const card = cardOf(key);
+  if (card?.classList.contains("leaving")) return;
+  focusPast(key);
   card?.classList.add("leaving");
+  applyInboxFocus(true);
   try {
     await fn();
     S.done.set(key, Date.now());
     api("/api/decide", { key, action, choice }).catch(() => {});
     if (action !== "verify") api("/api/seen", { key }).catch(() => {});
-    setTimeout(() => { renderInbox(); renderViews(); }, 180);
-  } catch (e) { card?.classList.remove("leaving"); toast(e.message, true); }
+    if (sent) triageToast(sent);
+    setTimeout(() => { renderInbox(); renderViews(); if (S.mode === "inbox") applyInboxFocus(true); }, 180); // the answered card is gone: keep the next one in view
+  } catch (e) { card?.classList.remove("leaving"); S.ifocus = key; applyInboxFocus(true); toast(e.message, true); }
 }
 setInterval(() => { for (const [k, t] of S.done) if (Date.now() - t > 20_000) S.done.delete(k); }, 5000);
+/** Answer with one of the card's options: the digit or cursor keys for a terminal prompt, the option's text for a question. */
+function inboxPick(key, o) {
+  const d = (S.decisions ?? []).find((x) => x.key === key), r = rowOf(key);
+  if (!d || !r) return;
+  const sent = `Sent “${plain(o.title).slice(0, 60)}” to ${r.project}`;
+  if (d.kind === "prompt") return decide(key, "answer", () => api("/api/keys", { key, keys: o.keys ?? [String(o.id)] }), String(o.id), sent);
+  return decide(key, "answer", () => api("/api/send", { key, text: o.send ?? o.title }), String(o.id), sent);
+}
+function inboxAct(key, act) {
+  const card = cardOf(key), r = rowOf(key);
+  if (!card || !r) return;
+  if (act === "open") return select(key, { scroll: true, open: true });
+  if (act === "term") { select(key, { open: true }); return showTerminal(); }
+  if (act === "skip") return skipDecision(key);
+  if (act === "accept") return decide(key, "accept", async () => {}, undefined, `Looks good: ${r.project} accepted`);
+  if (act === "verify") return verifyRow(r, true);
+  if (act === "sendback" || act === "reply") {
+    const form = card.querySelector(".dreply");
+    form.hidden = false;
+    const ta = form.querySelector("textarea");
+    if (act === "sendback" && !ta.value) ta.value = r.check?.state === "fail" ? `The checks fail (\`${r.check.cmd}\`, exit ${r.check.exit}). Fix it, re-run them, and show me the output.` : "Not done yet: run the tests and type checks, show me the output, and fix anything that fails.";
+    form.dataset.action = act;
+    ta.focus();
+    autosize(ta);
+    form.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+function closeReply(form) {
+  form.hidden = true;
+  if (form.contains(document.activeElement)) document.activeElement.blur();
+  applyInboxFocus(false);
+}
+function skipDecision(key) {
+  const d = (S.decisions ?? []).find((x) => x.key === key);
+  if (!d) return;
+  focusPast(key);
+  S.skipped.set(key, dsig(d));
+  S.skipStack.push(key);
+  renderInbox();
+  applyInboxFocus(true);
+  triageToast(`Skipped ${rowOf(key)?.project ?? "it"} for now · u brings it back`);
+}
+function undoSkip() {
+  while (S.skipStack.length) {
+    const k = S.skipStack.pop();
+    if (!S.skipped.has(k)) continue;
+    S.skipped.delete(k);
+    S.ifocus = k;
+    renderInbox();
+    applyInboxFocus(true);
+    return toast(`Back: ${rowOf(k)?.project ?? "the decision"}`);
+  }
+  toast("Nothing skipped to bring back");
+}
+function setInboxFilter(f) { S.inboxFilter = f; store("inboxFilter", f); S.ifocus = null; S.ifocusIdx = 0; renderInbox(); }
+/** Inbox keys, called by the global handler (which already skips inputs, dialogs and menus). True when handled. */
+function inboxKeydown(e) {
+  const k = e.key;
+  if (k === "Escape") { const form = $("dbody").querySelector(".dreply:not([hidden])"); if (form) { closeReply(form); return true; } return false; }
+  if (k === "j" || k === "ArrowDown") { e.preventDefault(); moveInboxFocus(1); return true; }
+  if (k === "k" || k === "ArrowUp") { e.preventDefault(); moveInboxFocus(-1); return true; }
+  if (k === "f" || k === "F") {
+    const i = IFILTERS.findIndex(([id]) => id === S.inboxFilter);
+    const [id, label] = IFILTERS[(i + (k === "F" ? IFILTERS.length - 1 : 1)) % IFILTERS.length];
+    setInboxFilter(id);
+    toast(`Showing: ${label}`);
+    return true;
+  }
+  if (k === "u") { undoSkip(); return true; }
+  if (k === "Enter" && e.target.closest?.("button, a, summary")) return false; // Enter on a focused button presses it
+  const isCardKey = /^([1-9ynvrosx]|Enter)$/.test(k);
+  const card = S.ifocus && cardOf(S.ifocus);
+  const d = card && !card.classList.contains("leaving") && (S.decisions ?? []).find((x) => x.key === S.ifocus);
+  if (!d) return isCardKey; // an empty inbox swallows card keys instead of running their global meanings
+  const a = inboxKey(d, k);
+  if (!a) return false;
+  e.preventDefault();
+  if (a.miss) toast(a.miss);
+  else if (a.opt) inboxPick(d.key, a.opt);
+  else inboxAct(d.key, a.act);
+  return true;
+}
 $("dbody").addEventListener("click", async (e) => {
   if (S.mode !== "inbox") return;
   const chip = e.target.closest("[data-ifilter]");
-  if (chip) { S.inboxFilter = chip.dataset.ifilter; store("inboxFilter", S.inboxFilter); return renderInbox(); }
+  if (chip) return setInboxFilter(chip.dataset.ifilter);
+  if (e.target.closest("[data-iunskip]")) { S.skipped.clear(); S.skipStack = []; return renderInbox(); }
   const card = e.target.closest(".dcard");
   if (!card) return;
   const key = card.dataset.dkey;
   const d = S.decisions.find((x) => x.key === key);
   const r = rowOf(key);
   if (!d || !r) return;
+  if (S.ifocus !== key && !card.classList.contains("leaving")) { S.ifocus = key; applyInboxFocus(false); }
   const opt = e.target.closest("[data-dopt]");
   if (opt) {
     const o = d.options.find((x) => String(x.id) === opt.dataset.dopt);
-    if (!o) return;
-    if (d.kind === "prompt") return decide(key, "answer", () => api("/api/keys", { key, keys: o.keys ?? [String(o.id)] }), String(o.id));
-    return decide(key, "answer", () => api("/api/send", { key, text: o.send ?? o.title }), String(o.id));
+    return o && inboxPick(key, o);
   }
   const chk = e.target.closest("[data-dcheck]")?.dataset.dcheck;
   if (chk) {
@@ -2127,20 +2305,7 @@ $("dbody").addEventListener("click", async (e) => {
     return api("/api/verify", { key, approve: true, cmd }).then(() => toast(`Checking ${r.project}…`)).catch((x) => toast(x.message, true));
   }
   const act = e.target.closest("[data-dact2]")?.dataset.dact2;
-  if (!act) return;
-  const form = card.querySelector(".dreply");
-  if (act === "open") return select(key, { scroll: true, open: true });
-  if (act === "term") { select(key, { open: true }); return showTerminal(); }
-  if (act === "accept") return decide(key, "accept", async () => {});
-  if (act === "verify") return verifyRow(r, true);
-  if (act === "sendback" || act === "reply") {
-    form.hidden = false;
-    const ta = form.querySelector("textarea");
-    if (act === "sendback" && !ta.value) ta.value = r.check?.state === "fail" ? `The checks fail (\`${r.check.cmd}\`, exit ${r.check.exit}). Fix it, re-run them, and show me the output.` : "Not done yet: run the tests and type checks, show me the output, and fix anything that fails.";
-    form.dataset.action = act;
-    ta.focus();
-    autosize(ta);
-  }
+  if (act) inboxAct(key, act);
 });
 $("dbody").addEventListener("submit", (e) => {
   const form = e.target.closest(".dreply");
@@ -2149,10 +2314,12 @@ $("dbody").addEventListener("submit", (e) => {
   const key = form.closest(".dcard").dataset.dkey;
   const text = form.querySelector("textarea").value.trim();
   if (!text) return;
-  decide(key, form.dataset.action === "sendback" ? "sendback" : "reply", () => api("/api/send", { key, text }));
+  const back = form.dataset.action === "sendback";
+  decide(key, back ? "sendback" : "reply", () => api("/api/send", { key, text }), undefined, `${back ? "Sent back to" : "Sent to"} ${rowOf(key)?.project ?? "the agent"}: “${plain(text).slice(0, 50)}${text.length > 50 ? "…" : ""}”`);
 });
 $("dbody").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey && e.target.matches(".dreply textarea")) { e.preventDefault(); e.target.form.requestSubmit(); }
+  if (e.key === "Escape" && e.target.matches(".dreply textarea")) { e.preventDefault(); e.stopPropagation(); closeReply(e.target.form); }
 });
 
 // History ──────────────────────────────────────────────────────────────────
@@ -3134,6 +3301,7 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
   if (e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (S.mode === "inbox" && inboxKeydown(e)) return;
   const k = e.key, cur = S.sel && S.rows.has(S.sel) ? S.sel : null;
   if (k === "/") { e.preventDefault(); if (app.classList.contains("list-off")) $("listToggle").click(); $("q").focus(); $("q").select(); }
   else if (k === "j" || k === "ArrowDown") { e.preventDefault(); moveSel(1); }

@@ -577,6 +577,31 @@ body.moving { cursor: grabbing; user-select: none; }
 .dacts .btn svg { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
 .dreply { display: flex; gap: 8px; margin-top: 10px; align-items: flex-end; }
 .dreply textarea { flex: 1; resize: none; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; font: 15px/1.45 var(--read); color: var(--ink); }
+/* keyboard triage: focus ring, key badges, hint strip */
+.dcard.kfocus { outline: 2px solid var(--accent); outline-offset: 2px; background: color-mix(in oklch, var(--accent) 5%, var(--side)); }
+.dcard.kfocus .dopt.isyes .ol { background: var(--accent); color: var(--accent-ink); }
+.dopt .ob { flex: 1; min-width: 0; }
+.dopt .ol { font-family: var(--mono); }
+.dopt .oid { display: inline-block; margin-right: 7px; padding: 0 5px; border-radius: 4px; background: var(--hover); color: var(--ink-2); font: 600 11.5px/1.6 var(--mono); vertical-align: 1px; }
+.dopt .rp { margin-left: 8px; font: 600 11px var(--sans, system-ui); color: var(--accent); border: 1px solid color-mix(in oklch, var(--accent) 45%, transparent); border-radius: 99px; padding: 1px 7px; vertical-align: 1px; }
+.dcard .kh { display: none; margin-left: 8px; align-self: center; flex: none; }
+.dcard.kfocus .kh { display: inline-block; }
+.dcard header { flex-wrap: wrap; row-gap: 2px; } .dcard header > * { white-space: nowrap; }
+.dcard .dhr { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.dcard { scroll-margin: 14px 0; min-width: 0; } /* a wide terminal line scrolls inside .dterm instead of widening the card */
+.btn.primary .kh { color: inherit; border-color: currentColor; opacity: .75; }
+.dskip { border: 0; background: transparent; color: var(--ink-3); font-size: 12.5px; padding: 4px 8px; border-radius: 7px; cursor: pointer; display: inline-flex; align-items: center; }
+.dskip:hover { background: var(--hover); color: var(--ink); }
+.dskip .kh { margin-left: 5px; }
+.khint { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 2px 0 6px; font-size: 12px; color: var(--ink-3); }
+.khint span { white-space: nowrap; }
+.khint kbd + kbd { margin-left: 2px; }
+.chipkey { font-size: 12px; color: var(--ink-3); margin-left: 4px; }
+.chipkey .kh { display: inline-block; margin: 0 3px 0 0; }
+.iunskip { border: 0; background: transparent; color: var(--accent); font: inherit; padding: 0 2px; cursor: pointer; }
+.iunskip:hover { text-decoration: underline; }
+.toast .tnext { display: block; margin-top: 3px; font-size: 12.5px; color: var(--ink-3); }
+@media (max-width: 760px) { .khint, .chipkey, .dcard .kh, .dcard.kfocus .kh { display: none; } .dcard.kfocus { outline: 0; } }
 .chk { border: 1px solid var(--line-2); background: transparent; border-radius: 99px; padding: 1px 8px; font-size: 12px; cursor: pointer; color: var(--ink-2); }
 .chk.ok { color: var(--working); border-color: color-mix(in oklch, var(--working) 45%, transparent); }
 .chk.bad { color: var(--blocked); border-color: color-mix(in oklch, var(--blocked) 45%, transparent); }
@@ -1297,6 +1322,20 @@ dialog[open]::backdrop { animation: fade .18s ease; }
       <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Collapse the list / the terminal</td></tr>
       <tr><td><kbd>c</kbd></td><td>Closed sessions</td></tr>
       <tr><td><kbd>Esc</kbd></td><td>Clear the filter, then the selection</td></tr>
+    </table>
+    <h3>Decisions (<kbd>i</kbd>)</h3>
+    <table>
+      <tr><td><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></td><td>Next / previous decision</td></tr>
+      <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Pick that option on the focused card</td></tr>
+      <tr><td><kbd>y</kbd></td><td>Yes: the allow / yes / recommended option; on finished work, Looks good</td></tr>
+      <tr><td><kbd>n</kbd></td><td>No: the deny / no option; on finished work, Send back (opens the reply, prefilled)</td></tr>
+      <tr><td><kbd>v</kbd></td><td>Verify now (finished work)</td></tr>
+      <tr><td><kbd>r</kbd></td><td>Reply in your own words (<kbd>Enter</kbd> sends, <kbd>Esc</kbd> closes)</td></tr>
+      <tr><td><kbd>o</kbd> or <kbd>Enter</kbd></td><td>Open the session</td></tr>
+      <tr><td><kbd>s</kbd> or <kbd>x</kbd></td><td>Skip it for now without answering</td></tr>
+      <tr><td><kbd>u</kbd></td><td>Bring back the last skipped one</td></tr>
+      <tr><td><kbd>f</kbd> / <kbd>⇧F</kbd></td><td>Next / previous filter (All, Quick ones, Permissions, Questions, Done?)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close the reply box, then leave Decisions</td></tr>
     </table>
     <p class="hint">Filter words must all match; <span class="mono">-word</span> excludes. <span class="mono">is:stale</span>, <span class="mono">is:dup</span>, <span class="mono">is:working</span>, <span class="mono">agent:codex</span> also work.</p></div>
   <form method="dialog" class="dlg-f"><button class="btn">Done</button></form>
