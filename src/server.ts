@@ -26,6 +26,7 @@ import { createDiscover } from "./discover";
 import { PushStore, endpointOk, type Message } from "./push";
 import { Automations, linkPath } from "./automations";
 import { Radar } from "./radar";
+import { routeMessage } from "./route";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -1363,6 +1364,11 @@ async function handle(req: Request): Promise<Response> {
           try { setJevFeature(String(body.name), body.on); } catch (e: any) { return json({ error: e.message }, 400); }
           broadcast("jev", jevUsage());
           return json({ ok: true, jev: jevUsage() });
+        }
+        case "/api/jev/route": {
+          // Jev suggests which session a message is for; the palette asks you before anything is sent.
+          const r = await routeMessage(body.text, allRows());
+          return json(r.body, r.status);
         }
         case "/api/mcp-info":
           return json({ url: `http://127.0.0.1:${PORT}/mcp`, token: MCP_TOKEN, audit: readAudit(30), claude: `claude mcp add --scope user --transport http herdr-deck http://127.0.0.1:${PORT}/mcp --header "Authorization: Bearer ${MCP_TOKEN}"` });
