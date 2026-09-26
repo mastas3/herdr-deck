@@ -215,7 +215,7 @@ class Check {
       if (v.type !== "object" || !isObj(v.properties)) this.bad(at(path, "properties"), "only an object schema has properties");
       else for (const [k, s] of Object.entries(v.properties).slice(0, 40)) this.schema(s, `${at(path, "properties")}.${k}`, depth + 1);
     }
-    if (v.required !== undefined && (!Array.isArray(v.required) || v.required.some((r: unknown) => typeof r !== "string" || !isObj(v.properties) || !v.properties[r as string])))
+    if (v.required !== undefined && (!Array.isArray(v.required) || v.required.some((r: unknown) => typeof r !== "string" || !isObj(v.properties) || !Object.hasOwn(v.properties, r as string))))
       this.bad(at(path, "required"), "must list names from properties");
     if (v.items !== undefined) { if (v.type !== "array") this.bad(at(path, "items"), "only an array schema has items"); else this.schema(v.items, at(path, "items"), depth + 1); }
     if (v.maxItems !== undefined && !(Number.isInteger(v.maxItems) && v.maxItems >= 1 && v.maxItems <= 500)) this.bad(at(path, "maxItems"), "must be a whole number from 1 to 500");
@@ -250,7 +250,7 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
   }
 
   // Grants: the only tools any agent run from this plugin may get.
-  const grants: Record<string, GrantDef> = {};
+  const grants = new Map<string, GrantDef>();
   if (m.grants !== undefined) {
     if (!isObj(m.grants)) c.bad("grants", "must be an object of named grants");
     else {
@@ -258,18 +258,19 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
       if (entries.length > 20) c.bad("grants", "has more than 20 grants");
       for (const [gid, g] of entries.slice(0, 20)) {
         const gp = `grants.${gid}`;
-        if (!LOCAL_ID.test(gid)) c.bad(gp, `grant names ${ID_HINT.replace("must be ", "are ")}`);
+        if (gid === "constructor") { c.bad(gp, "is a reserved name"); continue; }
+        if (!LOCAL_ID.test(gid)) { c.bad(gp, `grant names ${ID_HINT.replace("must be ", "are ")}`); continue; }
         if (!c.shape(g, gp, ["tools"], ["writes"])) continue;
         c.bool(g.writes, at(gp, "writes"));
         if (Array.isArray(g.tools) && !g.tools.length) c.bad(at(gp, "tools"), "must name at least one tool");
         c.list(g.tools, at(gp, "tools"), 20, (t, p) => { if (!toolClass(t).ok) c.bad(p, `isn't a tool plugins may use: ${String(t).slice(0, 80)}`); });
-        if (Array.isArray(g.tools)) grants[gid] = { tools: g.tools.filter((t: unknown): t is string => typeof t === "string"), writes: g.writes === true };
+        if (Array.isArray(g.tools)) grants.set(gid, { tools: g.tools.filter((t: unknown): t is string => typeof t === "string"), writes: g.writes === true });
       }
     }
   }
   const grantRefs = (v: unknown, path: string, want: "read" | "write") => c.list(v, path, 10, (gid, p) => {
-    if (typeof gid !== "string" || !grants[gid]) return c.bad(p, `there's no grant named ${String(gid).slice(0, 40)}`);
-    const w = grantClass(grants[gid]).writes;
+    if (typeof gid !== "string" || !grants.has(gid)) return c.bad(p, `there's no grant named ${String(gid).slice(0, 40)}`);
+    const w = grantClass(grants.get(gid)!).writes;
     if (want === "read" && w) c.bad(p, `${gid} can change things, and sources may only read`);
     if (want === "write" && !w) c.bad(p, `${gid} only reads; a draft action's grants are what Send uses to change things`);
   });
@@ -289,7 +290,7 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
     c.prompt(s.prompt, at(sp, "prompt"), files);
     grantRefs(s.grants, at(sp, "grants"), "read");
     // A run that can read your accounts or files and also reach the web could be talked into leaking them.
-    const tools = (Array.isArray(s.grants) ? s.grants : []).flatMap((g: unknown) => (typeof g === "string" ? grants[g]?.tools ?? [] : []));
+    const tools = (Array.isArray(s.grants) ? s.grants : []).flatMap((g: unknown) => (typeof g === "string" ? grants.get(g)?.tools ?? [] : []));
     const web = tools.filter((t: string) => toolClass(t).web).length;
     if (web && web < tools.length) c.bad(at(sp, "grants"), "a source can't both read your accounts or files and reach the web: that could leak them");
     if (c.schema(s.schema, at(sp, "schema"))) {
@@ -307,7 +308,7 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
     c.str(v.title, at(vp, "title"), { max: 40 });
     c.oneOf(v.template, at(vp, "template"), Object.keys(TEMPLATES));
     if (!sourceIds.has(v.source)) c.bad(at(vp, "source"), `there's no source named ${String(v.source).slice(0, 40)}`);
-    const fields = TEMPLATES[v.template as Template];
+    const fields = Object.hasOwn(TEMPLATES, v.template) ? TEMPLATES[v.template as Template] : undefined;
     const props = itemProps.get(v.source);
     const ip = at(vp, "item");
     if (!isObj(v.item)) c.bad(ip, 'must map template fields to paths, like { "title": "$.subject" }');
@@ -318,7 +319,7 @@ export function validate(raw: unknown, files: Record<string, string>): Problem[]
         if (fields && !fields.includes(f)) c.bad(fp, `isn't a field of the ${v.template} template (it has ${fields.join(", ")})`);
         if (typeof path !== "string" || !JSON_PATH.test(path)) { c.bad(fp, "must be a path into the item, like $.subject"); continue; }
         const first = /^\$\.([A-Za-z_]\w*)/.exec(path)?.[1];
-        if (first && props && !props[first]) c.bad(fp, `points at ${first}, which the source's schema doesn't have`);
+        if (first && props && !Object.hasOwn(props, first)) c.bad(fp, `points at ${first}, which the source's schema doesn't have`);
       }
     }
     c.list(v.actions, at(vp, "actions"), 10, (a, p) => { if (!actionIds.has(a)) c.bad(p, `there's no action named ${String(a).slice(0, 40)}`); });

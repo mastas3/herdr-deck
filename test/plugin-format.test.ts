@@ -247,4 +247,42 @@ describe("bundles", () => {
     expect(promptText({ "p.md": "from file" }, "p.md")).toBe("from file");
     expect(promptText({}, "inline text")).toBe("inline text");
   });
+  test("hostile keys never crash the validator and are reported", () => {
+    // __proto__ as grant name: JSON.parse makes it an own key, not prototype
+    const raw1 = JSON.parse('{"deck":1,"id":"test","name":"Test","version":"1.0.0","kind":"integration","grants":{"__proto__":{"tools":["mcp__x__y"],"writes":true}},"sources":[{"id":"s1","prompt":"x","grants":["tools"],"schema":{"type":"array","items":{"type":"object"}}}]}');
+    expect(() => validate(raw1, {})).not.toThrow();
+    const ps1 = validate(raw1, {});
+    has(ps1, "grants.__proto__", "grant names are");
+    has(ps1, "sources[0].grants[0]", "no grant named tools");
+
+    // grant "constructor" is reserved
+    const { raw, files } = mail();
+    raw.grants.constructor = { tools: ["mcp__claude_ai_Gmail__search_threads"] };
+    const ps2 = validate(raw, files);
+    has(ps2, "grants.constructor", "reserved");
+
+    // source referencing undefined grant "constructor"
+    raw.grants.constructor = undefined;
+    raw.sources[0].grants = ["constructor"];
+    const ps3 = validate(raw, files);
+    has(ps3, "sources[0].grants[0]", "no grant named constructor");
+
+    // view with template "__proto__"
+    const { raw: raw4, files: files4 } = mail();
+    raw4.views[0].template = "__proto__" as any;
+    const ps4 = validate(raw4, files4);
+    has(ps4, "views[0].template", "must be");
+
+    // view item path $.constructor against schema lacking it
+    const { raw: raw5, files: files5 } = mail();
+    raw5.views[0].item.title = "$.constructor";
+    const ps5 = validate(raw5, files5);
+    has(ps5, "views[0].item.title", "doesn't have");
+
+    // schema with required: ["constructor"] and properties lacking it
+    const { raw: raw6, files: files6 } = mail();
+    raw6.sources[0].schema = { type: "array", items: { type: "object", properties: { id: { type: "string" } }, required: ["constructor"] } };
+    const ps6 = validate(raw6, files6);
+    has(ps6, "sources[0].schema.items.required", "must list names");
+  });
 });
