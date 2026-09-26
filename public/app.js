@@ -694,8 +694,9 @@ function renderList() {
       const dots = g.proj ? `<span class="dots">${nb ? `<span class="dot" style="--c:var(--blocked)" title="${nb} need you"></span>` : ""}${nw ? `<span class="dot" style="--c:var(--working)" title="${nw} working"></span>` : ""}</span>` : "";
       const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>`
         : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
+      const jour = g.proj ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${J_ICON.journey}</span>` : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
-      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${extra}</button><div class="sec-b"></div>`;
+      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
       for (const r of g.rows) body.append(rowCache.get(r.key).el);
       frag.append(sec);
@@ -802,7 +803,7 @@ function resolveLink(path) {
 }
 function syncUrl() {
   const r = rowOf(S.sel);
-  const path = S.board || !r ? "/" : linkPath(r);
+  const path = S.mode === "project" && S.jp?.name ? `/p/${encodeURIComponent(S.jp.name)}` : S.mode === "projects" ? "/p" : S.board || !r ? "/" : linkPath(r);
   if (location.pathname !== path) history.replaceState(history.state, "", path);
 }
 
@@ -1282,7 +1283,7 @@ function renderHead(r, d, tab) {
   const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
-    `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
+    `<button class="pj" data-dact="journey" style="--pc:${pc(r.project)}" title="${esc(where)} · open the project page">${esc(r.project)}</button>`,
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
     r.duplicate ? `<span class="wchip" title="Two panes are attached to this one conversation">${ICON.warn}duplicate</span>` : "",
@@ -2144,11 +2145,14 @@ function setMode(m) {
   if (m === "history" && !S.histRes) loadHistory();
   if (m === "connections") loadConnections();
   if (m === "discover") loadDiscover();
+  if (m === "project") loadJourney(S.jp.name, { force: true }); // journey: cached on the server, so this is instant
+  if (m === "projects") loadProjects();
   if (m === "inbox" && S.jevOpen) loadJevStats(true);
   if (isPhone() && m) setMView("detail", true);
   render();
   renderDetail();
   renderViews();
+  if (m === "project" || m === "projects" || location.pathname.startsWith("/p")) syncUrl(); // journey: /p/<project>
 }
 function renderViews() {
   const el = $("views");
@@ -2166,6 +2170,8 @@ function renderMode() {
   else if (S.mode === "tools") renderTools();
   else if (S.mode === "connections") renderConnections();
   else if (S.mode === "discover") renderDiscover();
+  else if (S.mode === "project") renderJourney();
+  else if (S.mode === "projects") renderProjects();
 }
 function modeHTML(html) {
   const box = $("dbody");
@@ -3892,6 +3898,744 @@ async function toggleAlerts() {
   S.notify = !S.notify; store("notify", S.notify); toast(`Alerts ${S.notify ? "on" : "off"}`);
 }
 
+// ── Project page (journeys) ─────────────────────────────────────────────────── <journey>
+// Every project as a journey: origin → turns → now → where it's heading, with side quests branching off, milestone
+// flags on the line and a ladder of milestones that unlock from evidence. Data comes from /api/journey (src/journey.ts),
+// cached on the server; the graph is one inline SVG drawn from that data (no libraries), re-laid out on pan/zoom.
+S.jp = { name: null, data: new Map(), idx: null, q: "", all: false, loading: new Set(), polls: 0, intro: new Set(), card: null };
+const J_ICON = {
+  flag: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 14.5V2"/><path d="M3.5 2.5h8l-1.8 3 1.8 3h-8"/></svg>',
+  lock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  trophy: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M5 2.5h6v3.5a3 3 0 0 1-6 0z"/><path d="M5 3.5H2.8v1a2.3 2.3 0 0 0 2.3 2.3M11 3.5h2.2v1a2.3 2.3 0 0 1-2.3 2.3M8 9v2.5M5.5 14h5M6.5 11.5h3V14h-3z"/></svg>',
+  git: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="2.4"/><path d="M1.5 8h4.1M10.4 8h4.1"/></svg>',
+  chat: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5z"/></svg>',
+  doc: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M4 1.8h5.5L12.5 5v9.2H4z"/><path d="M6.3 8.3h4M6.3 10.8h4"/></svg>',
+  turn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 13.5c4 0 5-2 5.5-5.5S10 3 13.5 3"/><path d="M10.8 1.8 13.5 3l-1.3 2.6"/></svg>',
+  branch: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="4" cy="3.5" r="1.6"/><circle cx="4" cy="12.5" r="1.6"/><circle cx="12" cy="5.5" r="1.6"/><path d="M4 5.1v5.8M12 7.1c0 3-3 3.4-6.6 4.3"/></svg>',
+  spark: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8 1.5 9.4 6.6l5.1 1.4-5.1 1.4L8 14.5 6.6 9.4 1.5 8l5.1-1.4z"/></svg>',
+  play: '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.2v9.6L12.8 8z"/></svg>',
+  plus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3v10M3 8h10"/></svg>',
+  minus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10"/></svg>',
+  fit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 5.5V2.5h3M14 5.5V2.5h-3M2 10.5v3h3M14 10.5v3h-3"/></svg>',
+  refresh: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M13 8a5 5 0 1 1-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg>',
+  grid: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>',
+  journey: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 11.5c2.5 0 2.5-5 5-5s2.5 4 5 4 2-6 3-7"/><circle cx="1.8" cy="11.5" r=".9" fill="currentColor"/><circle cx="14.4" cy="3.6" r=".9" fill="currentColor"/></svg>',
+};
+const JDAY = 86_400_000;
+const jd10 = (t) => (t ? new Date(t).toISOString().slice(0, 10) : "");
+const JDF = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
+const jdate = (t) => (t ? JDF.format(new Date(t)) : "");
+const jnum = (n) => (n == null ? "–" : n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1).replace(/\.0$/, "")}k` : String(Math.round(n * 10) / 10));
+const jhue = (p, i = 0) => `oklch(var(--pc-l) var(--pc-c) ${(hue(p || "?") + i * 34) % 360})`;
+const jdays = (a, b) => Math.max(1, Math.round((b - a) / JDAY));
+
+function openJourney(name) {
+  if (!name) return;
+  if (S.jp.name !== name) S.jp.card = null;
+  S.jp.name = name;
+  setMode("project");
+}
+function openProjects() { setMode("projects"); }
+async function loadJourney(name, opts = {}) {
+  if (!name || (S.jp.loading.has(name) && !opts.force)) return;
+  S.jp.loading.add(name);
+  try {
+    const j = await api(opts.regen ? "/api/journey/regenerate" : "/api/journey", { project: name, refresh: !!opts.refresh }, 60_000);
+    S.jp.data.set(name, j);
+    if (S.jp.name === name && S.mode === "project") renderJourney();
+    clearTimeout(loadJourney.t);
+    if (j.pending && S.jp.polls < 90) { S.jp.polls++; loadJourney.t = setTimeout(() => { if (S.mode === "project" && S.jp.name === name) loadJourney(name, { force: true }); }, 2000); }
+    else S.jp.polls = 0;
+  } catch (e) {
+    if (!S.jp.data.has(name)) S.jp.data.set(name, { error: e.message });
+    if (S.mode === "project") renderJourney();
+  } finally { S.jp.loading.delete(name); }
+}
+async function loadProjects() {
+  try { S.jp.idx = await api("/api/journeys", { wait: !S.jp.idx }, 20_000); } catch (e) { S.jp.idx = S.jp.idx ?? { error: e.message, projects: [] }; }
+  if (S.mode === "projects") renderProjects();
+  if (S.jp.idx?.building) setTimeout(() => { if (S.mode === "projects") loadProjects(); }, 2500);
+}
+
+// ── the journey graph ─────────────────────────────────────────────────────────
+/** Time → 0..1: calendar time with long empty stretches squeezed, blended with event density so busy weeks get room. */
+function jScale(j) {
+  const ts = [];
+  for (const e of j.events) { ts.push(e.t); if (e.end) ts.push(e.end); }
+  for (const q of j.quests) ts.push(q.from, q.to);
+  if (j.origin?.t) ts.push(j.origin.t);
+  const now = j.now.t;
+  const t0 = Math.min(...ts.filter(Boolean), now - 2 * 3600_000), t1 = now;
+  const uniq = [...new Set(ts.filter((t) => t >= t0 && t <= t1).concat([t0, t1]))].sort((a, b) => a - b);
+  const span = Math.max(1, t1 - t0);
+  const G = Math.max(2 * JDAY, span / 22);
+  const knots = [[t0, 0]], breaks = [];
+  let acc = 0;
+  for (let i = 1; i < uniq.length; i++) {
+    const d = uniq[i] - uniq[i - 1];
+    const dd = d > G ? G * 0.45 : d;
+    if (d > G) breaks.push({ a: uniq[i - 1], b: uniq[i] });
+    acc += dd;
+    knots.push([uniq[i], acc]);
+  }
+  // Density: every event counts (heavier ones a little more), so a busy afternoon isn't a single dot.
+  // Turns count extra, so the stretches where the project changed direction get room for their labels.
+  const ev = [...j.events.map((e) => [e.t, Math.sqrt(e.weight || 1)]), ...j.turns.map((t) => [t.t, 9])].sort((a, b) => a[0] - b[0]);
+  const W = ev.reduce((n, e) => n + e[1], 0) || 1;
+  let c = 0;
+  const cdf = [[t0, 0]];
+  for (const [t, w] of ev) { c += w; cdf.push([t, c / W]); }
+  cdf.push([t1, 1]);
+  const interp = (ks, t) => {
+    if (t <= ks[0][0]) return ks[0][1];
+    let lo = 0, hi = ks.length - 1;
+    if (t >= ks[hi][0]) return ks[hi][1];
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (ks[m][0] <= t) lo = m; else hi = m; }
+    const [ta, va] = ks[lo], [tb, vb] = ks[hi];
+    return tb === ta ? vb : va + ((t - ta) / (tb - ta)) * (vb - va);
+  };
+  const f = (t) => 0.5 * (interp(knots, t) / (acc || 1)) + 0.5 * interp(cdf, t);
+  return { f, t0, t1, breaks };
+}
+/** Candidate tick times (years, months, weeks, days, 6 h) between a and b, coarsest first. */
+function jTicks(a, b) {
+  const out = [];
+  const d = new Date(a); d.setHours(0, 0, 0, 0);
+  const span = b - a;
+  for (let y = new Date(a).getFullYear(); y <= new Date(b).getFullYear() + 1; y++) { const t = new Date(y, 0, 1).getTime(); if (t > a && t < b) out.push({ t, p: 0, l: String(y) }); }
+  const MF = new Intl.DateTimeFormat(undefined, { month: "short" }), DF2 = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" });
+  for (let m = new Date(new Date(a).getFullYear(), new Date(a).getMonth() + 1, 1); m.getTime() < b; m.setMonth(m.getMonth() + 1)) out.push({ t: m.getTime(), p: 1, l: MF.format(m) });
+  if (span < 400 * JDAY) for (let t = d.getTime() + JDAY; t < b; t += JDAY) { const x = new Date(t); if (x.getDate() !== 1) out.push({ t, p: x.getDay() === 1 ? 2 : 3, l: DF2.format(x) }); }
+  if (span < 4 * JDAY) for (let t = d.getTime() + 6 * 3600_000; t < b; t += 6 * 3600_000) { const x = new Date(t); if (x.getHours()) out.push({ t, p: 4, l: `${String(x.getHours()).padStart(2, "0")}:00` }); }
+  return out.filter((x) => x.t > a && x.t < b).sort((x, y) => x.p - y.p);
+}
+const J_TRACK = { commits: 0, merge: 0, tag: 0, release: 0, deploy: 0, milestone: 0, session: 1, wiki: -1, log: -1, idea: -1, lead: -1, manual: -1 };
+const J_KIND = { commits: "Commits", merge: "Merge", tag: "Tag", release: "Release", deploy: "Deploy", milestone: "Milestone unlocked", session: "Session", wiki: "Wiki", log: "Wiki log", idea: "Plan", lead: "Leads", manual: "You logged" };
+const jEsc = (s) => esc(s).replace(/\n/g, " ");
+
+/** Lays out and draws the graph into `host` for its current zoom; cheap enough to run every animation frame. */
+function jgDraw(host) {
+  const g = host._jg;
+  if (!g) return;
+  const { j, vert } = g;
+  const W = host.clientWidth || 800;
+  const pc0 = jhue(j.project);
+  const sc = g.sc ?? (g.sc = jScale(j));
+  // Along-axis geometry: horizontal = x, vertical = y. The past gets most of it; the future a fixed stretch.
+  const futN = Math.min(4, j.milestones.filter((m) => m.state !== "unlocked").length);
+  const A0 = vert ? 46 : 56;
+  const pastLen = vert ? Math.max(620, Math.min(2600, j.events.length * 9 + 380)) : Math.max(360, W - 56 - Math.max(150, W * 0.2));
+  const futLen = vert ? 70 + futN * 58 : Math.max(150, W * 0.2) - 30;
+  const k = g.k, tx = g.tx;
+  const along = (t) => tx + A0 + (t >= j.now.t ? pastLen * k + ((t - j.now.t) / JDAY) * 0 : sc.f(t) * pastLen * k);
+  const nowA = along(j.now.t), futEnd = nowA + futLen * (vert ? 1 : Math.min(k, 1.6));
+  const H = vert ? A0 + pastLen * k + futLen + 70 : 390;
+  const X0 = vert ? 70 : 0, Y0 = vert ? 0 : 164; // the main line's across position
+  const P = (a, c) => (vert ? [X0 + c, a] : [a, Y0 + c]); // along/across → x,y
+  const r1 = (n) => Math.round(n * 10) / 10;
+  const pt = (a, c) => P(a, c).map(r1).join(",");
+  // Turns bend the line: each one moves it to a new offset, easing in over a short window.
+  const turns = j.turns.map((t, i) => ({ ...t, a: along(t.t), off: (i % 2 ? 1 : -1) * (vert ? 10 + (i % 3) * 3 : 16 + (i % 3) * 6), i }));
+  const win = vert ? 26 : 34;
+  const offAt = (a) => { let o = 0; for (const t of turns) { const s = Math.max(0, Math.min(1, (a - (t.a - win)) / (2 * win))); o += (t.off - (t.i ? turns[t.i - 1].off : 0)) * (s * s * (3 - 2 * s)); } return o; };
+  const vis0 = vert ? -200 : -80, vis1 = vert ? H + 200 : W + 80;
+  const seen = (a) => a > vis0 && a < vis1;
+  let s = "";
+  // Era bands: each stretch between turns gets its own hue; subtle wash behind the line.
+  const bounds = [along(sc.t0), ...turns.map((t) => t.a), nowA];
+  // Time axis and squeezed gaps.
+  const axisC = vert ? -X0 + 6 : 390 - 34 - Y0;
+  const ticks = jTicks(sc.t0, j.now.t);
+  const minGap = vert ? 30 : 64;
+  const placed = sc.breaks.map((b) => (along(b.a) + along(b.b)) / 2); // ticks keep clear of the "≈ 3 d" gap marks
+  let tk = "";
+  for (const tkx of ticks) {
+    const a = along(tkx.t);
+    if (!seen(a) || a < A0 - 10 || a > nowA - 12 || placed.some((p) => Math.abs(p - a) < minGap)) continue;
+    placed.push(a);
+    const [x, y] = P(a, axisC);
+    tk += vert ? `<text class="jtk${tkx.p <= 1 ? " maj" : ""}" x="${r1(x)}" y="${r1(y + 3)}">${esc(tkx.l)}</text>` : `<line class="jgl${tkx.p <= 1 ? " maj" : ""}" x1="${r1(x)}" y1="18" x2="${r1(x)}" y2="${r1(y - 8)}"/><text class="jtk${tkx.p <= 1 ? " maj" : ""}" x="${r1(x)}" y="${r1(y + 12)}">${esc(tkx.l)}</text>`;
+  }
+  for (const b of sc.breaks) {
+    const a = (along(b.a) + along(b.b)) / 2;
+    if (!seen(a)) continue;
+    const [x, y] = P(a, vert ? -X0 + 30 : axisC);
+    const gap = b.b - b.a, label = gap > 60 * JDAY ? `${Math.round(gap / (30 * JDAY))} mo` : `${Math.round(gap / JDAY)} d`;
+    tk += vert ? `<text class="jbrk" x="${r1(x)}" y="${r1(y + 3)}">≈ ${label}</text>` : `<text class="jbrk" x="${r1(x)}" y="${r1(y + 12)}">≈ ${label}</text><path class="jgap" d="M${r1(x - 3)} ${r1(y - 14)} l3 -4 l3 4 l3 -4"/>`;
+  }
+  s += `<g class="jaxis">${tk}</g>`;
+  // The main line, one segment per era, sampled so the bends are smooth.
+  const step = 5;
+  let line = "";
+  for (let e = 0; e < bounds.length - 1; e++) {
+    const a = Math.max(bounds[e], vis0), b = Math.min(bounds[e + 1], vis1);
+    if (b <= a) continue;
+    let d = `M${pt(a, offAt(a))}`;
+    for (let x = a + step; x < b; x += step) d += `L${pt(x, offAt(x))}`;
+    d += `L${pt(b, offAt(b))}`;
+    line += `<path class="jline" pathLength="1" d="${d}" style="stroke:${jhue(j.project, e)};--d:${e * 140}"/>`;
+  }
+  // The future: dashed, from now to where it's heading.
+  const fo = offAt(nowA);
+  line += `<path class="jfut" d="M${pt(nowA, fo)} C${pt(nowA + (futEnd - nowA) * 0.4, fo)} ${pt(nowA + (futEnd - nowA) * 0.6, fo + (vert ? 0 : -18))} ${pt(futEnd, fo + (vert ? 0 : -18))}"/>`;
+  // Side quests: lanes below the line (right of it on a phone), assigned so overlapping ones don't collide.
+  const maxLanes = vert ? 4 : 5;
+  const big = j.quests.slice().sort((a, b) => (b.commits + b.sessions.length * 3) - (a.commits + a.sessions.length * 3));
+  const shown = big.slice(0, vert ? 6 : 10);
+  const laneEnd = [];
+  const qpos = new Map();
+  for (const q of shown.slice().sort((a, b) => a.from - b.from)) {
+    const a = along(q.from), b = Math.max(along(q.to), a + 26);
+    let l = laneEnd.findIndex((e) => e < a - 18);
+    if (l < 0) { if (laneEnd.length < maxLanes) l = laneEnd.length; else l = laneEnd.indexOf(Math.min(...laneEnd)); }
+    laneEnd[l] = b + 40;
+    qpos.set(q.id, { a, b, l, c: (vert ? 40 : 46) + l * (vert ? 15 : 20) });
+  }
+  let qs = "";
+  const qcol = (q) => (q.kind === "spinoff" ? "var(--jgold)" : q.status === "abandoned" ? "var(--ink-3)" : jhue(j.project, 3));
+  for (const q of shown) {
+    const p = qpos.get(q.id);
+    if (!p || (p.b < vis0 && p.a < vis0) || p.a > vis1) continue;
+    const c0 = offAt(p.a) + (vert ? 14 : 16), bend = vert ? 18 : 26;
+    let d = `M${pt(p.a, c0 - (vert ? 14 : 16))} C${pt(p.a + bend * 0.5, c0)} ${pt(p.a + bend * 0.4, p.c)} ${pt(p.a + bend, p.c)} L${pt(Math.max(p.a + bend, p.b), p.c)}`;
+    const end = Math.max(p.a + bend, p.b);
+    if (q.status === "merged") d += ` C${pt(end + bend * 0.6, p.c)} ${pt(end + bend * 0.4, offAt(end + bend))} ${pt(end + bend, offAt(end + bend))}`;
+    const fade = q.status === "abandoned";
+    qs += `<g class="jq ${q.status}" data-jq="${esc(q.id)}"><path class="jqp" d="${d}" style="stroke:${qcol(q)}${fade ? `;stroke:url(#jfade${vert ? "v" : "h"})` : ""}"/>`;
+    if (q.status === "active") { const [x, y] = P(end, p.c); qs += `<circle class="jqend" cx="${r1(x)}" cy="${r1(y)}" r="3.4" style="fill:${qcol(q)}"/>`; }
+    if (q.kind === "spinoff") { const [x, y] = P(end + 6, p.c); qs += `<path class="jqarrow" d="${vert ? `M${r1(x - 4)} ${r1(y - 4)} L${r1(x)} ${r1(y + 2)} L${r1(x + 4)} ${r1(y - 4)}` : `M${r1(x - 4)} ${r1(y - 4)} L${r1(x + 2)} ${r1(y)} L${r1(x - 4)} ${r1(y + 4)}`}" style="stroke:${qcol(q)}"/>`; }
+    const [lx, ly] = P(p.a + bend + 4, p.c);
+    const room = vert ? W - lx - 8 : Math.max(0, end - p.a - bend - 8);
+    if (room > 40) { const lbl = q.label.length * 5.6 > room ? q.label.slice(0, Math.max(3, Math.floor(room / 5.6) - 1)) + "…" : q.label; qs += vert ? "" : `<text class="jql" x="${r1(lx)}" y="${r1(ly - 5)}">${esc(lbl)}</text>`; }
+    qs += `<title>${jEsc(`${q.label} · ${q.kind === "spinoff" ? "spin-off" : q.status} · ${[q.commits ? `${q.commits} commits` : "", q.sessions.length ? `${q.sessions.length} sessions` : ""].filter(Boolean).join(", ")}`)}</title></g>`;
+  }
+  // Events: three tracks hugging the line (notes above, commits on it, sessions below); close ones merge into one dot.
+  const clusters = [];
+  const byTrack = new Map();
+  for (const [i, e] of j.events.entries()) {
+    let a = along(e.t);
+    if (!seen(a)) continue;
+    const q = e.lane && qpos.get(e.lane);
+    const tr = q ? `q:${e.lane}` : String(J_TRACK[e.kind] ?? 0);
+    if (!byTrack.has(tr)) byTrack.set(tr, []);
+    byTrack.get(tr).push({ e, i, a, q });
+  }
+  const gap = vert ? 9 : 11;
+  for (const [tr, list] of byTrack) {
+    list.sort((x, y) => x.a - y.a);
+    let cur = null;
+    for (const it of list) {
+      if (cur && it.a - cur.last < gap) { cur.items.push(it); cur.last = it.a; cur.w += it.e.weight || 1; cur.sa += it.a * (it.e.weight || 1); }
+      else { cur = { tr, items: [it], last: it.a, w: it.e.weight || 1, sa: it.a * (it.e.weight || 1), q: it.q }; clusters.push(cur); }
+    }
+  }
+  g.clusters = clusters;
+  let dots = "";
+  for (const [ci, cl] of clusters.entries()) {
+    const a = cl.sa / cl.w;
+    const tr = cl.tr.startsWith("q:") ? null : Number(cl.tr);
+    const c = cl.q ? cl.q.c : offAt(a) + (tr ? tr * (vert ? 14 : 17) : 0);
+    const [x, y] = P(a, c);
+    const n = cl.items.length;
+    const r = Math.max(tr === 0 ? 3.6 : 2.8, Math.min(vert ? 10 : 13, (tr === 0 ? 2.4 : 1.8) + Math.sqrt(cl.w) * (tr === 0 ? 1.15 : 0.9)));
+    const kinds = new Set(cl.items.map((x) => x.e.kind));
+    const top = cl.items.slice().sort((p, q) => (q.e.weight || 0) - (p.e.weight || 0))[0].e;
+    const cls = kinds.has("milestone") ? "ms" : kinds.has("release") || kinds.has("tag") || kinds.has("deploy") ? "rel" : top.kind === "merge" ? "mg" : tr === 1 || cl.q ? "se" : tr === -1 ? "nt" : "cm";
+    const live = cl.items.some((x) => x.e.kind === "session" && S.rows.get(x.e.link?.session)?.status === "working");
+    const d = Math.round(((a - A0) / Math.max(1, nowA - A0)) * 900);
+    const shape = cls === "rel" ? `<path d="M${r1(x)} ${r1(y - r - 1.5)} L${r1(x + r + 1.5)} ${r1(y)} L${r1(x)} ${r1(y + r + 1.5)} L${r1(x - r - 1.5)} ${r1(y)}Z"/>`
+      : cls === "nt" ? `<rect x="${r1(x - r)}" y="${r1(y - r)}" width="${r1(2 * r)}" height="${r1(2 * r)}" rx="1.5"/>`
+      : `<circle cx="${r1(x)}" cy="${r1(y)}" r="${r1(r)}"/>`;
+    const tip = n === 1 ? `${J_KIND[top.kind] ?? top.kind} · ${jdate(top.t)} · ${top.title}` : `${n} events · ${jdate(cl.items[0].e.t)}${cl.items.at(-1).e.t - cl.items[0].e.t > JDAY ? ` – ${jdate(cl.items.at(-1).e.t)}` : ""}`;
+    dots += `<g class="jp ${cls}${live ? " live" : ""}${S.jp.card?.ci === ci && S.jp.card?.kind === "cl" ? " on" : ""}" data-jc="${ci}" style="--d:${d}${cl.q ? `;--qc:${qcol(j.quests.find((q) => q.id === cl.items[0].e.lane) ?? {})}` : ""}">${shape}${n >= 3 && r >= 7 ? `<text x="${r1(x)}" y="${r1(y + 3.2)}">${n > 99 ? "99+" : n}</text>` : ""}<title>${jEsc(tip)}</title></g>`;
+  }
+  // Milestone flags where they were unlocked; ghosts ahead for the next ones.
+  let flags = "";
+  const flag = (a, c, cls, id, tip, lbl) => {
+    const [x, y] = P(a, c);
+    const pole = vert ? 0 : 26;
+    return vert
+      ? `<g class="jflag ${cls}" data-jm="${esc(id)}"><path class="pole" d="M${r1(x)} ${r1(y)} H${r1(x - 20)}"/><path class="pen" d="M${r1(x - 20)} ${r1(y)} v-11 l-11 4 l11 4"/>${lbl ? `<text class="jfl" x="${r1(x + 26)}" y="${r1(y + 3)}">${esc(lbl)}</text>` : ""}<title>${jEsc(tip)}</title></g>`
+      : `<g class="jflag ${cls}" data-jm="${esc(id)}"><path class="pole" d="M${r1(x)} ${r1(y)} V${r1(y - pole)}"/><path class="pen" d="M${r1(x)} ${r1(y - pole)} h12 l-3 4.5 l3 4.5 h-12"/><title>${jEsc(tip)}</title></g>`;
+  };
+  for (const m of j.milestones) if (m.state === "unlocked" && m.at) { const a = along(Math.min(m.at, j.now.t)); if (seen(a)) flags += flag(a, offAt(a), "won", m.id, `Unlocked: ${m.title} · ${jdate(m.at)}`); }
+  const ahead = j.milestones.filter((m) => m.state !== "unlocked").slice(0, futN);
+  ahead.forEach((m, i) => {
+    const a = nowA + ((i + 1) / (ahead.length + 1)) * (futEnd - nowA);
+    const c = vert ? fo : fo + (-18 * (0.5 - 0.5 * Math.cos(Math.PI * ((i + 1) / (ahead.length + 1)))));
+    flags += flag(a, c, `ghost${j.next.includes(m.id) ? " next" : ""}`, m.id, `Ahead: ${m.title}${m.pct ? ` · ${Math.round(m.pct * 100)}%` : ""}`, vert ? m.title : "");
+  });
+  // Turns: bigger rings with a labelled callout; labels stack so they don't collide.
+  let tl = "";
+  const levels = vert ? [along(j.origin?.t ?? sc.t0)] : []; // on a phone the first label starts below the origin's
+  for (const t of turns) {
+    if (!seen(t.a)) continue;
+    const c = offAt(t.a);
+    const [x, y] = P(t.a, c);
+    const on = S.jp.card?.kind === "turn" && S.jp.card.id === t.event;
+    tl += `<g class="jturn${on ? " on" : ""}" data-jt="${esc(t.event)}" style="--d:${Math.round(((t.a - A0) / Math.max(1, nowA - A0)) * 900) + 300}"><circle class="halo" cx="${r1(x)}" cy="${r1(y)}" r="13"/><circle class="ring" cx="${r1(x)}" cy="${r1(y)}" r="7.5" style="stroke:${jhue(j.project, t.i + 1)}"/>`;
+    const text = t.label;
+    const w = Math.min(vert ? W - 170 : 220, text.length * 6.3 + 30);
+    if (vert) {
+      let ly = t.a;
+      const last = levels.at(-1) ?? -Infinity;
+      if (ly < last + 34) ly = last + 34;
+      levels.push(ly);
+      const lx = X0 + 96;
+      tl += `<path class="lead" d="M${r1(x + 8)} ${r1(y)} C${r1(x + 40)} ${r1(y)} ${r1(lx - 30)} ${r1(ly)} ${r1(lx)} ${r1(ly)}"/><foreignObject x="${r1(lx)}" y="${r1(ly - 13)}" width="${r1(W - lx - 6)}" height="40"><div class="jtl" xmlns="http://www.w3.org/1999/xhtml"><b>${esc(text)}</b><span>${esc(jdate(t.t))}</span></div></foreignObject>`;
+    } else {
+      let lv = 0;
+      const lx = Math.max(4, Math.min(W - w - 4, x - w / 2)); // keep the pill inside the graph
+      for (; lv < 3; lv++) if (!(levels[lv] ?? []).some(([a, b]) => !(lx + w < a || lx > b))) break;
+      if (lv < 3) {
+        (levels[lv] = levels[lv] ?? []).push([lx - 6, lx + w + 6]);
+        const ly = Y0 - 50 - lv * 30;
+        tl += `<path class="lead" d="M${r1(x)} ${r1(y - 9)} V${r1(ly + 11)}"/><foreignObject x="${r1(lx)}" y="${r1(ly - 11)}" width="${r1(w)}" height="24"><div class="jtl h" xmlns="http://www.w3.org/1999/xhtml">${J_ICON.turn}<b>${esc(text)}</b></div></foreignObject>`;
+      }
+    }
+    tl += `<title>${jEsc(`${t.label} · ${jdate(t.t)}${t.why ? ` · ${t.why}` : ""}`)}</title></g>`;
+  }
+  // Origin and now.
+  const oa = along(j.origin?.t ?? sc.t0);
+  let marks = "";
+  if (seen(oa)) {
+    const [x, y] = P(oa, offAt(oa));
+    marks += `<g class="jorigin" data-jo="1"><circle class="o2" cx="${r1(x)}" cy="${r1(y)}" r="11" style="stroke:${pc0}"/><circle class="o1" cx="${r1(x)}" cy="${r1(y)}" r="5.5" style="fill:${pc0}"/>${vert ? `<text class="jol" x="${r1(x + 18)}" y="${r1(y + 4)}">origin · ${esc(jdate(j.origin?.t))}</text>` : `<text class="jol" x="${r1(x)}" y="${r1(y + 30)}">origin</text>`}<title>${jEsc(`Origin · ${jdate(j.origin?.t)}${j.origin?.idea ? ` · ${j.origin.idea.slice(0, 160)}` : ""}`)}</title></g>`;
+  }
+  {
+    const [x, y] = P(nowA, fo);
+    const live = (j.now.live ?? []).some((l) => (S.rows.get(l.key)?.status ?? l.status) === "working");
+    marks += vert
+      ? `<g class="jnow${live ? " live" : ""}"><line x1="8" y1="${r1(y)}" x2="${r1(W - 8)}" y2="${r1(y)}"/><circle class="pulse" cx="${r1(x)}" cy="${r1(y)}" r="6"/><circle cx="${r1(x)}" cy="${r1(y)}" r="4.5"/><text x="${r1(W - 10)}" y="${r1(y - 6)}" text-anchor="end">now</text></g>`
+      : `<g class="jnow${live ? " live" : ""}"><line x1="${r1(x)}" y1="16" x2="${r1(x)}" y2="${r1(390 - 44)}"/><circle class="pulse" cx="${r1(x)}" cy="${r1(y)}" r="6"/><circle cx="${r1(x)}" cy="${r1(y)}" r="4.5"/><text x="${r1(x)}" y="12" text-anchor="middle">now</text></g>`;
+  }
+  const [hx, hy] = P(futEnd, fo + (vert ? 0 : -18));
+  marks += `<g class="jhead"><circle cx="${r1(hx)}" cy="${r1(hy)}" r="4"/></g>`;
+  host.querySelector(".jlayer").innerHTML = s + `<g class="jlines">${line}</g><g class="jqs">${qs}</g><g class="jdots">${dots}</g>` + flags + tl + marks;
+  const svg = host.querySelector("svg");
+  svg.setAttribute("height", String(Math.round(H)));
+  svg.setAttribute("viewBox", `0 0 ${Math.round(W)} ${Math.round(H)}`);
+  svg.setAttribute("width", String(Math.round(W)));
+  // Heading text sits in HTML over the future end (it wraps; SVG text doesn't).
+  const hd = host.querySelector(".jhd");
+  if (hd) {
+    if (vert) { hd.style.top = `${Math.round(hy + 14)}px`; hd.style.left = "12px"; hd.style.right = "12px"; }
+    else { const left = Math.max(nowA + 12, Math.min(W - 250, hx - 240)); hd.style.left = `${Math.round(left)}px`; hd.style.top = "20px"; hd.style.width = `${Math.round(Math.max(150, Math.min(260, W - left - 10)))}px`; hd.hidden = nowA > W - 60; }
+  }
+  g.nowA = nowA; g.A0 = A0; g.pastLen = pastLen; g.W = W;
+}
+
+/** Mounts the graph (once per page render) and wires pan, zoom, pinch and taps. */
+function jgMount(host, j) {
+  const vert = isPhone();
+  const prev = host._jg;
+  const keep = prev && prev.j.project === j.project && prev.vert === vert;
+  host._jg = { j, vert, k: keep ? prev.k : 1, tx: keep ? prev.tx : 0, sc: null };
+  const intro = !S.jp.intro.has(j.project) && !reduceMotion.matches;
+  host.innerHTML = `<svg class="jg${intro ? " intro" : ""}${vert ? " vert" : ""}" role="img" aria-label="Journey of ${esc(j.project)}"><defs>
+      <linearGradient id="jfadeh" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="var(--ink-3)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ink-3)" stop-opacity="0"/></linearGradient>
+      <linearGradient id="jfadev" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="var(--ink-3)" stop-opacity=".9"/><stop offset="1" stop-color="var(--ink-3)" stop-opacity="0"/></linearGradient>
+    </defs><g class="jlayer"></g></svg>
+    <div class="jhd">${j.heading?.direction ? `<small>Heading</small><b>${esc(j.heading.direction)}</b>` : `<small>Next</small><b>${esc(j.milestones.find((m) => m.id === j.next?.[0])?.title ?? "")}</b>`}</div>
+    ${vert ? "" : `<div class="jzoom"><button data-jz="in" title="Zoom in" aria-label="Zoom in">${J_ICON.plus}</button><button data-jz="out" title="Zoom out" aria-label="Zoom out">${J_ICON.minus}</button><button data-jz="fit" title="Fit it all" aria-label="Fit">${J_ICON.fit}</button></div>`}`;
+  if (intro) { S.jp.intro.add(j.project); setTimeout(() => host.querySelector("svg")?.classList.remove("intro"), 2400); }
+  jgDraw(host);
+  if (host._wired) return;
+  host._wired = true;
+  let raf = 0;
+  const redraw = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; jgDraw(host); }); };
+  const clampTx = () => {
+    const g = host._jg; const W = host.clientWidth;
+    if (g.vert) { g.tx = 0; return; }
+    const content = g.pastLen * g.k + 180;
+    g.tx = Math.min(W * 0.3, Math.max(-(content - W * 0.7), g.tx));
+  };
+  const zoomAt = (px, f) => {
+    const g = host._jg;
+    const k2 = Math.max(1, Math.min(60, g.k * f));
+    if (g.vert) { g.k = k2; redraw(); return; }
+    // Keep the point under the pointer still.
+    const a = px - g.tx - g.A0;
+    g.tx = px - g.A0 - (a * k2) / g.k;
+    g.k = k2;
+    if (k2 === 1) g.tx = 0;
+    clampTx(); redraw();
+  };
+  host._zoomAt = zoomAt;
+  host.addEventListener("wheel", (e) => {
+    const g = host._jg;
+    if (g.vert) return;
+    const r = host.getBoundingClientRect();
+    if (e.ctrlKey || e.metaKey) { e.preventDefault(); zoomAt(e.clientX - r.left, Math.exp(-Math.max(-50, Math.min(50, e.deltaY)) * 0.01)); return; }
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) { e.preventDefault(); g.tx -= e.shiftKey ? e.deltaY : e.deltaX; clampTx(); redraw(); }
+  }, { passive: false });
+  const pts = new Map();
+  let drag = null, pinch = null, moved = false;
+  host.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".jzoom, .jcard")) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = false;
+    if (pts.size === 1) drag = { x: e.clientX, tx: host._jg.tx };
+    if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: host._jg.k, tx: host._jg.tx, mid: host._jg.vert ? (a.y + b.y) / 2 : (a.x + b.x) / 2 }; drag = null; }
+  });
+  host.addEventListener("pointermove", (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const g = host._jg;
+    if (pinch && pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      const r = host.getBoundingClientRect();
+      g.k = pinch.k; g.tx = pinch.tx;
+      zoomAt(pinch.mid - (g.vert ? r.top : r.left), d / Math.max(20, pinch.d));
+      moved = true;
+      return;
+    }
+    if (drag && !g.vert && e.pointerType !== "touch" || drag && !g.vert && e.pointerType === "touch") {
+      const dx = e.clientX - drag.x;
+      if (Math.abs(dx) > 4) { moved = true; host.classList.add("dragging"); try { host.setPointerCapture(e.pointerId); } catch {} }
+      if (moved) { g.tx = drag.tx + dx; clampTx(); redraw(); }
+    }
+  });
+  const up = (e) => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!pts.size) { drag = null; host.classList.remove("dragging"); } };
+  host.addEventListener("pointerup", up); host.addEventListener("pointercancel", up);
+  host.addEventListener("click", (e) => {
+    if (moved) { moved = false; return; }
+    const z = e.target.closest("[data-jz]")?.dataset.jz;
+    if (z) { const W = host.clientWidth; if (z === "fit") { host._jg.k = 1; host._jg.tx = 0; redraw(); } else zoomAt(W * 0.6, z === "in" ? 1.8 : 1 / 1.8); return; }
+    if (e.target.closest(".jcard")) return;
+    const r = host.getBoundingClientRect();
+    const at = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const c = e.target.closest("[data-jc]"), t = e.target.closest("[data-jt]"), q = e.target.closest("[data-jq]"), m = e.target.closest("[data-jm]"), o = e.target.closest("[data-jo]");
+    if (c) S.jp.card = { kind: "cl", ci: Number(c.dataset.jc), at };
+    else if (t) S.jp.card = { kind: "turn", id: t.dataset.jt, at };
+    else if (q) S.jp.card = { kind: "quest", id: q.dataset.jq, at };
+    else if (m) S.jp.card = { kind: "ms", id: m.dataset.jm, at };
+    else if (o) S.jp.card = { kind: "origin", at };
+    else S.jp.card = null;
+    jgCard(host); jgDraw(host);
+  });
+  new ResizeObserver(() => { const g = host._jg; if (g && Math.abs((g.W ?? 0) - host.clientWidth) > 2) redraw(); }).observe(host);
+}
+
+/** The detail card for what was tapped: a floating card on a desktop, a bottom sheet on a phone. */
+function jgCard(host) {
+  host.querySelector(".jcard")?.remove();
+  const c = S.jp.card, g = host._jg;
+  if (!c || !g) return;
+  const j = g.j;
+  let html = "";
+  const evHTML = (e) => {
+    const link = e.link ?? {};
+    const acts = [
+      link.session ? `<button class="btn primary" data-jsess="${esc(link.session)}">${J_ICON.chat}Open the session</button>` : "",
+      link.commit ? (j.now.github ? `<a class="btn" href="https://github.com/${esc(j.now.github)}/commit/${esc(link.commit)}" target="_blank" rel="noopener">${J_ICON.git}${esc(link.commit.slice(0, 7))} ↗</a>` : `<button class="btn" data-jcopy="${esc(link.commit)}">${J_ICON.git}${esc(link.commit.slice(0, 7))}</button>`) : "",
+      link.wiki ? `<a class="btn fpath" data-path="wiki:${esc(link.wiki === "log" ? "log" : link.wiki)}">${J_ICON.doc}Wiki</a>` : "",
+      link.file ? `<a class="btn fpath" data-path="${esc(link.file)}">${J_ICON.doc}Open the file</a>` : "",
+      link.url ? `<a class="btn" href="${esc(link.url)}" target="_blank" rel="noopener">Open ↗</a>` : "",
+    ].filter(Boolean).join("");
+    const lane = e.lane && j.quests.find((q) => q.id === e.lane);
+    return `<div class="jck ${esc(e.kind)}"><span>${esc(J_KIND[e.kind] ?? e.kind)}${e.n && e.kind === "session" ? ` · ${e.n} prompt${e.n === 1 ? "" : "s"}` : ""}${lane ? ` · side quest “${esc(lane.label)}”` : ""}</span><time>${esc(jdate(e.t))}${e.end && e.end - e.t > 60_000 ? ` → ${esc(e.end - e.t > JDAY ? jdate(e.end) : when(e.end))}` : ""}</time></div>
+      <h4>${esc(e.title)}</h4>${e.detail ? `<p>${esc(e.detail)}</p>` : ""}${e.items?.length > 1 ? `<ul>${e.items.slice(0, 8).map((x) => `<li>${esc(x)}</li>`).join("")}${e.items.length > 8 ? `<li class="hint">and ${e.items.length - 8} more</li>` : ""}</ul>` : ""}${acts ? `<div class="jca">${acts}</div>` : ""}`;
+  };
+  if (c.kind === "cl") {
+    const cl = g.clusters?.[c.ci];
+    if (!cl) return;
+    const items = cl.items.map((x) => x.e);
+    if (c.pick != null && items[c.pick]) html = evHTML(items[c.pick]) + (items.length > 1 ? `<button class="btn ghost jback" data-jpick="-1">← ${items.length} events here</button>` : "");
+    else if (items.length === 1) html = evHTML(items[0]);
+    else html = `<div class="jck"><span>${items.length} events</span><time>${esc(jdate(items[0].t))}${items.at(-1).t - items[0].t > JDAY ? ` – ${esc(jdate(items.at(-1).t))}` : ""}</time></div><ol class="jlist">${items.slice(0, 40).map((e, i) => `<li><button data-jpick="${i}"><i class="k ${esc(e.kind)}"></i><span>${esc(e.title)}</span><small>${esc(J_KIND[e.kind] ?? e.kind)}</small></button></li>`).join("")}</ol>${items.length > 40 ? `<p class="hint">and ${items.length - 40} more: zoom in</p>` : ""}<div class="jca"><button class="btn" data-jzoomhere="1">${J_ICON.plus}Zoom in here</button></div>`;
+  } else if (c.kind === "turn") {
+    const t = j.turns.find((x) => x.event === c.id);
+    const e = j.events.find((x) => x.id === c.id);
+    if (!t) return;
+    html = `<div class="jck turn"><span>${J_ICON.turn} A turn</span><time>${esc(jdate(t.t))}</time></div><h4>${esc(t.label)}</h4>${t.why ? `<p>${esc(t.why)}</p>` : ""}${e ? `<div class="jsub">${evHTML(e)}</div>` : ""}`;
+  } else if (c.kind === "quest") {
+    const q = j.quests.find((x) => x.id === c.id);
+    if (!q) return;
+    html = `<div class="jck quest"><span>${J_ICON.branch} ${q.kind === "spinoff" ? "Spin-off" : "Side quest"} · ${esc(q.status)}</span><time>${esc(jdate(q.from))}${q.to - q.from > JDAY ? ` – ${esc(jdate(q.to))}` : ""}</time></div><h4>${esc(q.label)}</h4>
+      <p>${[q.branch ? `branch <code>${esc(q.branch)}</code>` : "", q.commits ? `${q.commits} commit${q.commits === 1 ? "" : "s"}` : "", q.sessions.length ? `${q.sessions.length} session${q.sessions.length === 1 ? "" : "s"}` : "", q.note ? esc(q.note) : ""].filter(Boolean).join(" · ")}</p>
+      ${q.subjects?.length ? `<ul>${q.subjects.slice(0, 6).map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}${q.kind === "spinoff" && q.branch ? `<div class="jca"><button class="btn" data-jopen="${esc(q.branch)}">${J_ICON.journey}Its own journey</button></div>` : ""}`;
+  } else if (c.kind === "ms") {
+    const m = j.milestones.find((x) => x.id === c.id);
+    if (!m) return;
+    html = `<div class="jck ms"><span>${m.state === "unlocked" ? `${J_ICON.trophy} Unlocked` : m.state === "progress" ? "In progress" : `${J_ICON.lock} Locked`}</span><time>${m.at ? esc(jdate(m.at)) : ""}</time></div><h4>${esc(m.title)}</h4><p>${esc(m.metric)}: ${m.value != null ? `${jnum(m.value)} / ` : ""}${jnum(m.target)} ${esc(m.unit)}</p>${m.evidence ? `<p class="ev">${esc(m.evidence)}</p>` : ""}`;
+  } else if (c.kind === "origin") {
+    const o = j.origin ?? {};
+    html = `<div class="jck origin"><span>${J_ICON.spark} Origin</span><time>${esc(jdate(o.t))}</time></div>${o.idea ? `<blockquote>${esc(o.idea.slice(0, 420))}</blockquote>` : ""}<div class="jca">${o.session?.session ? `<button class="btn primary" data-jsess="${esc(o.session.session)}">${J_ICON.chat}The first session</button>` : ""}${o.commit ? `<span class="hint">First commit: ${esc(o.commit.subject)}</span>` : ""}</div>`;
+  }
+  const el = document.createElement("div");
+  el.className = "jcard";
+  el.innerHTML = `<button class="jcx" data-jclose aria-label="Close">${ICON.x}</button>${html}`;
+  host.append(el);
+  if (!g.vert) {
+    const W = host.clientWidth;
+    const w = Math.min(360, W - 24);
+    el.style.width = `${w}px`;
+    el.style.left = `${Math.round(Math.max(12, Math.min(W - w - 12, c.at.x - w / 2)))}px`;
+    el.style.top = `${Math.round(c.at.y > 200 ? 14 : Math.min(c.at.y + 22, 200))}px`;
+  }
+  el.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (e.target.closest("[data-jclose]")) { S.jp.card = null; el.remove(); jgDraw(host); return; }
+    const pick = e.target.closest("[data-jpick]");
+    if (pick) { const i = Number(pick.dataset.jpick); S.jp.card = { ...c, pick: i < 0 ? undefined : i }; jgCard(host); return; }
+    if (e.target.closest("[data-jzoomhere]")) { const cl = g.clusters[c.ci]; const a = cl.sa / cl.w; S.jp.card = null; el.remove(); host._zoomAt(g.vert ? a : a, 3.5); return; }
+    const cp = e.target.closest("[data-jcopy]");
+    if (cp) return copy(cp.dataset.jcopy, "commit id");
+    const s = e.target.closest("[data-jsess]");
+    if (s) return jOpenSession(s.dataset.jsess);
+    const op = e.target.closest("[data-jopen]");
+    if (op) return openJourney(op.dataset.jopen);
+  });
+}
+/** A session from the page: live ones open in the deck, past ones through History (any machine). */
+function jOpenSession(key) {
+  if (!key) return;
+  if (S.rows.has(key)) { setMode(null); select(key, { open: true, scroll: true }); return; }
+  openHist(key);
+}
+
+// ── the page ────────────────────────────────────────────────────────────────
+function jSpark(series, w = 132, h = 34, color = "currentColor") {
+  const s = (series ?? []).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (s.length < 2) return `<svg class="jspark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path d="M0 ${h - 2} H${w}" stroke="var(--line-2)" stroke-dasharray="3 3"/></svg>`;
+  const t0 = s[0][0], t1 = s.at(-1)[0] || t0 + 1, v0 = Math.min(0, ...s.map((p) => p[1])), v1 = Math.max(...s.map((p) => p[1])) || 1;
+  const X = (t) => ((t - t0) / Math.max(1, t1 - t0)) * (w - 4) + 2, Y = (v) => h - 3 - ((v - v0) / Math.max(1e-9, v1 - v0)) * (h - 8);
+  const d = s.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)} ${Y(p[1]).toFixed(1)}`).join("");
+  return `<svg class="jspark" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}"><path class="a" d="${d}L${X(t1).toFixed(1)} ${h}L${X(t0).toFixed(1)} ${h}Z" style="fill:${color}"/><path d="${d}" style="stroke:${color}"/><circle cx="${X(s.at(-1)[0]).toFixed(1)}" cy="${Y(s.at(-1)[1]).toFixed(1)}" r="2.4" style="fill:${color}"/></svg>`;
+}
+function jWeeksSpark(weeks, commits, w = 220, h = 40, color) {
+  const n = Math.max(weeks?.length ?? 0, commits?.length ?? 0);
+  if (!n) return "";
+  const v = Array.from({ length: n }, (_, i) => (weeks?.[i] ?? 0) * 3 + (commits?.[i] ?? 0));
+  const max = Math.max(1, ...v);
+  const X = (i) => (i / (n - 1)) * (w - 4) + 2, Y = (x) => h - 3 - Math.sqrt(x / max) * (h - 8);
+  let d = `M${X(0)} ${Y(v[0])}`;
+  for (let i = 1; i < n; i++) { const xm = (X(i - 1) + X(i)) / 2; d += ` C${xm.toFixed(1)} ${Y(v[i - 1]).toFixed(1)} ${xm.toFixed(1)} ${Y(v[i]).toFixed(1)} ${X(i).toFixed(1)} ${Y(v[i]).toFixed(1)}`; }
+  return `<svg class="jspark wk" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><path class="a" d="${d} L${X(n - 1)} ${h} L${X(0)} ${h}Z" style="fill:${color}"/><path d="${d}" style="stroke:${color}"/>${v[n - 1] ? `<circle cx="${X(n - 1)}" cy="${Y(v[n - 1]).toFixed(1)}" r="2.6" style="fill:${color}"/>` : ""}</svg>`;
+}
+function jStageRing(j) {
+  const n = j.milestones.length || 1, u = j.counts.unlocked;
+  const partial = j.milestones.filter((m) => m.state === "progress").reduce((a, m) => a + (m.pct ?? 0), 0);
+  const p = Math.min(1, (u + partial * 0.999) / n);
+  const R = 42, C = 2 * Math.PI * R;
+  return `<svg class="jring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="${R}" class="bg"/><circle cx="50" cy="50" r="${R}" class="fg" style="stroke:${jhue(j.project)};stroke-dasharray:${(C * p).toFixed(1)} ${C.toFixed(1)}"/>${j.milestones.map((m, i) => { const a = (i / n) * 2 * Math.PI - Math.PI / 2; return `<circle cx="${(50 + R * Math.cos(a)).toFixed(1)}" cy="${(50 + R * Math.sin(a)).toFixed(1)}" r="2.6" class="tick ${m.state}"/>`; }).join("")}</svg>`;
+}
+function jMilestoneCard(j, m, i) {
+  const seen = load(`jseen:${j.project}`, []);
+  const fresh = m.state === "unlocked" && !seen.includes(m.id);
+  const isNext = j.next.includes(m.id);
+  const pct = Math.round((m.pct ?? 0) * 100);
+  const src = m.source.startsWith("manual.") ? "you log it" : m.source.split(".")[0];
+  return `<article class="jm ${m.state}${isNext ? " next" : ""}${fresh ? " fresh" : ""}" data-jmid="${esc(m.id)}" style="--i:${i}">
+    <div class="jmi">${m.state === "unlocked" ? J_ICON.trophy : m.state === "progress" ? `<span class="jmp" style="--p:${pct}">${pct}%</span>` : J_ICON.lock}</div>
+    <div class="jmb"><b>${esc(m.title)}</b><span class="jmm">${m.metric === "Done" ? "A moment you mark" : `${esc(m.metric)} · ${jnum(m.target)}${m.unit && m.unit !== "$" ? ` ${esc(m.unit)}` : ""}${m.unit === "$" ? " $" : ""}`}</span>
+      <div class="jbar"><i style="width:${m.state === "unlocked" ? 100 : pct}%"></i></div>
+      <span class="jme">${m.state === "unlocked" ? `${m.at ? `Unlocked ${esc(jdate(m.at))}` : "Unlocked"}${m.manual ? " · by you" : ""}` : m.value != null ? `${jnum(m.value)} of ${jnum(m.target)}` : m.metric === "Done" ? "Not yet" : "Not measured yet"}<em>${esc(m.metric === "Done" ? "you mark it" : src)}</em></span>
+      ${m.evidence && (m.value != null || m.state === "unlocked") ? `<span class="jmev" title="${esc(m.evidence)}">${esc(m.evidence)}</span>` : ""}
+      <span class="jmacts">${m.state === "unlocked" ? (m.manual ? `<button class="link" data-jundo="${esc(m.id)}">Undo</button>` : "") : `${m.source.startsWith("manual.") && m.metric !== "Done" ? `<button class="link" data-jlog="${esc(m.source.slice(7))}">Log ${esc(m.metric.toLowerCase())}</button>` : ""}<button class="link" data-junlock="${esc(m.id)}">Mark unlocked…</button>`}</span>
+    </div>${isNext && m.state !== "unlocked" ? '<span class="jnext">next</span>' : ""}</article>`;
+}
+function jHome(j) {
+  const h = projectHome(j.project);
+  if (h) return h;
+  if (j.root) return { machine: S.self, cwd: j.root, project: j.project };
+  return null;
+}
+function jPlanPrompt(j) {
+  const m = j.milestones.find((x) => x.id === j.next[0]) ?? j.milestones.find((x) => x.state !== "unlocked");
+  const ahead = j.next.map((id) => j.milestones.find((x) => x.id === id)).filter(Boolean).map((x) => `“${x.title}”`).join(", ");
+  return m ? `Read ~/wiki/projects/${j.project}.md (if it exists) and this repo's README for context. The next milestone for ${j.project} is “${m.title}” (${m.metric}: target ${m.target}${m.unit ? ` ${m.unit}` : ""}; now ${m.value ?? "not measured"}; measured by ${m.source}).${ahead ? ` After it: ${ahead}.` : ""}${j.heading?.direction ? ` Where it seems to be heading: ${j.heading.direction}` : ""}
+
+Plan the smallest path to unlock it: what to build or do, how we'll know it happened (the evidence), risks, and the first three tasks. Write the plan to ~/.config/herdr-deck/ideas/${j.project}-${m.id}.md, then stop and wait for my go before changing anything.` : `Read ~/wiki/projects/${j.project}.md for context and propose the next milestone for ${j.project}, with a plan and the first three tasks. Don't change anything yet.`;
+}
+
+function renderJourney(fresh) {
+  const name = S.jp.name;
+  const j = S.jp.data.get(name);
+  if (!j && !S.jp.loading.has(name)) loadJourney(name);
+  if (!j || j.error) {
+    modeHTML(`<div class="jpage"><header class="jhero skel"><div class="jh-l"><p class="jcrumb"><button class="link" data-jidx>${J_ICON.grid} Projects</button></p><h2>${esc(name ?? "")}</h2><p class="jpitch">${j?.error ? esc(j.error) : '<span class="spin"></span> Reading its history: git, the wiki, every session…'}</p></div></header><div class="jgwrap skel"></div></div>`);
+    return;
+  }
+  // Re-render only when the journey itself changed; live bits (who's working) are patched in place, so the graph
+  // and the animations don't restart on every deck update.
+  const box = $("dbody");
+  const sig = [j.project, j.builtAt, j.ai?.at, j.ai?.state, !!j.pending, isPhone(), S.jp.allSessions, S.jp.allQuests].join("|");
+  if (!fresh && box._mode === "project" && box._jsig === sig && box.querySelector(".jpage")) return jPatchLive(j);
+  const calm = S.jp.shown?.has(j.project);
+  (S.jp.shown ??= new Set()).add(j.project);
+  const pcol = jhue(j.project);
+  const live = (j.now.live ?? []).map((l) => ({ ...l, status: S.rows.get(l.key)?.status ?? l.status }));
+  const working = live.filter((l) => l.status === "working").length;
+  const M = new Map(j.metrics.map((m) => [m.key, m]));
+  const nums = [
+    ["Commits", M.get("git.commits")?.value, "git.commits"], ["Sessions", j.counts.sessions, "sessions.count"], ["Agent hours", M.get("sessions.agent_hours")?.value, "sessions.agent_hours"],
+    ["Active days", M.get("git.active_days")?.value, "git.active_days"], ["Turns", j.turns.length], ["Side quests", j.quests.length],
+  ].filter(([, v]) => v != null);
+  const next = j.milestones.find((m) => m.id === j.next[0]);
+  const days = j.origin?.t ? jdays(j.origin.t, j.now.t) : 0;
+  const status = j.status ?? "active";
+  const ai = j.ai ?? {};
+  const aiLine = ai.state === "running" ? `<span class="spin"></span> Reading the journey with ${ai.source === "ollama" ? "a local model" : "Claude"}…` : ai.source ? `${ai.source === "rules" ? "Simple rules" : `${esc(ai.source === "claude" ? "Claude" : "Ollama")}${ai.model ? ` ${esc(ai.model)}` : ""}`} · ${esc(when(ai.at))}${ai.note ? ` · ${esc(ai.note)}` : ""}` : "Not read yet";
+  const sessions = j.events.filter((e) => e.kind === "session").slice().sort((a, b) => (b.end ?? b.t) - (a.end ?? a.t));
+  const liveKeys = new Set(live.map((l) => l.key));
+  const quests = j.quests.slice().sort((a, b) => b.to - a.to);
+  const metricTiles = j.metrics.filter((m) => m.value || m.series?.length > 1 || m.key.startsWith("manual.")).map((m) => `<div class="jmt"><span>${esc(m.label)}</span><b>${jnum(m.value)}${m.unit === "$" ? " $" : ""}</b>${jSpark(m.series, 132, 34, m.key.startsWith("manual.") ? "var(--jgold)" : pcol)}<small title="${esc(m.evidence)}">${esc(m.evidence)}</small></div>`).join("");
+  const showAllS = S.jp.allSessions === j.project;
+  const html = `<div class="jpage${calm ? " calm" : ""}" style="--pc:${pcol}">
+    <header class="jhero">
+      <div class="jh-l">
+        <p class="jcrumb"><button class="link" data-jidx>${J_ICON.grid} Projects</button><span>/</span><span class="jstat ${esc(status)}">${esc(status)}</span><span class="jnat">${esc(j.nature.replace("-", " "))}</span><span id="jliveChip">${jLiveChip(working, live.length)}</span></p>
+        <h2><span class="jsw"></span>${esc(j.project)}</h2>
+        <p class="jpitch">${esc(j.pitch || j.tldr || "")}</p>
+        <div class="jnums">${nums.map(([l, v]) => `<div><b>${jnum(v)}</b><span>${l}</span></div>`).join("")}${days ? `<div><b>${jnum(days)}</b><span>Days since origin</span></div>` : ""}</div>
+        <div class="jacts">
+          <button class="btn primary" data-jact="start">${J_ICON.play}Start a session here</button>
+          <button class="btn" data-jact="plan">${J_ICON.flag}Plan the next milestone</button>
+          <button class="btn" data-jact="log">${J_ICON.plus}Log a metric</button>
+          <button class="btn ghost" data-jact="regen" ${ai.state === "running" ? "disabled" : ""}>${J_ICON.refresh}Regenerate</button>
+          ${j.wikiPage ? `<a class="btn ghost fpath" data-path="wiki:${esc(j.wikiPage)}">${J_ICON.doc}Wiki</a>` : ""}
+        </div>
+      </div>
+      <div class="jh-r">
+        <div class="jstage">${jStageRing(j)}<div class="jst-t"><small>Stage</small><b>${j.stage ? esc(j.stage.title) : "Just starting"}</b><span>${j.counts.unlocked} of ${j.counts.milestones} unlocked</span></div></div>
+        ${next ? `<div class="jnextc"><small>Next milestone</small><b>${esc(next.title)}</b><div class="jbar"><i style="width:${Math.round((next.pct ?? 0) * 100)}%"></i></div><span>${next.value != null ? `${jnum(next.value)} of ${jnum(next.target)} ${esc(next.unit)}` : "not measured yet"}</span></div>` : ""}
+      </div>
+    </header>
+    <section class="jgwrap"><div class="jghead"><h3>${J_ICON.journey}The journey</h3><span class="jlegend"><i class="cm"></i>commits<i class="se"></i>sessions<i class="nt"></i>notes<i class="tn"></i>turns<i class="fl"></i>milestones<i class="qq"></i>side quests</span><span class="hint jhint">${isPhone() ? "Pinch to zoom · tap a point" : "Drag to pan · ⌘/ctrl + scroll or pinch to zoom · click a point"}</span></div><div class="jg-host" id="jgHost"></div></section>
+    <section class="jsec jms"><div class="jsh"><h3>${J_ICON.trophy}Milestones</h3><span class="hint">${j.counts.unlocked} unlocked · the ladder is written for this project by ${ai.source === "rules" || !ai.source ? "simple rules" : "AI"}, and unlocks only from evidence</span></div>
+      <div class="jladder">${j.milestones.map((m, i) => jMilestoneCard(j, m, i)).join("")}</div></section>
+    <div class="jcolz">
+      <section class="jsec"><h3>${J_ICON.spark}Original idea</h3>
+        ${j.origin?.summary ? `<p class="jidea">${esc(j.origin.summary)}</p>` : ""}
+        ${j.origin?.idea ? `<blockquote class="jq1">${esc(j.origin.idea)}</blockquote>` : '<p class="hint">No first prompt or note found.</p>'}
+        <p class="jmeta">${j.origin?.t ? `${esc(jdate(j.origin.t))} · ` : ""}${j.origin?.ideaFrom === "session" ? `your first message${j.origin.session?.session ? ` in <button class="link" data-jsess="${esc(j.origin.session.session)}">“${esc(j.origin.session.title ?? "the first session")}”</button>` : ""}` : j.origin?.ideaFrom === "wiki" ? "from the wiki page" : j.origin?.ideaFrom === "git" ? "the first commit" : ""}${j.origin?.commit ? ` · first commit “${esc(j.origin.commit.subject)}”` : ""}${j.origin?.parent ? ` · grew out of <a class="fpath" data-path="wiki:${esc(j.origin.parent)}">${esc(j.origin.parent)}</a>` : ""}</p>
+      </section>
+      <section class="jsec"><h3>${J_ICON.chat}Story so far</h3>${j.story ? `<p class="jstory">${esc(j.story)}</p>` : '<p class="hint">Not written yet.</p>'}<p class="jmeta">${aiLine}</p></section>
+      <section class="jsec"><h3>${J_ICON.turn}Where it’s heading</h3>${j.heading?.direction ? `<p class="jdir">${esc(j.heading.direction)}</p>` : ""}
+        <div class="jnext3">${j.next.map((id) => j.milestones.find((m) => m.id === id)).filter(Boolean).map((m) => `<div class="jn"><b>${esc(m.title)}</b><div class="jbar"><i style="width:${Math.round((m.pct ?? 0) * 100)}%"></i></div><small>${m.value != null ? `${jnum(m.value)} / ${jnum(m.target)} ${esc(m.unit)}` : "not measured yet"}</small></div>`).join("") || '<p class="hint">Everything on the ladder is unlocked. Regenerate for a new one.</p>'}</div>
+        ${j.turns.length ? `<ol class="jturns">${j.turns.map((t) => `<li><time>${esc(jd10(t.t))}</time><b>${esc(t.label)}</b>${t.why ? `<span>${esc(t.why)}</span>` : ""}</li>`).join("")}</ol>` : ""}
+      </section>
+      <section class="jsec"><h3>${J_ICON.branch}Side quests <span class="n">${j.quests.length}</span></h3>
+        ${quests.length ? `<ul class="jquests">${quests.slice(0, S.jp.allQuests === j.project ? 200 : 8).map((q) => `<li class="${esc(q.status)}"><i style="background:${q.kind === "spinoff" ? "var(--jgold)" : q.status === "abandoned" ? "var(--ink-3)" : jhue(j.project, 3)}"></i><div><b>${esc(q.label)}</b><small>${esc(q.kind === "spinoff" ? "spin-off" : q.status)} · ${esc(jdate(q.from))}${q.to - q.from > JDAY ? ` – ${esc(jdate(q.to))}` : ""}${q.commits ? ` · ${q.commits} commit${q.commits === 1 ? "" : "s"}` : ""}${q.sessions.length ? ` · ${q.sessions.length} session${q.sessions.length === 1 ? "" : "s"}` : ""}</small></div>${q.kind === "spinoff" && q.branch ? `<button class="link" data-jopen="${esc(q.branch)}">open</button>` : ""}</li>`).join("")}</ul>${quests.length > 8 && S.jp.allQuests !== j.project ? `<button class="link" data-jallq>Show all ${quests.length}</button>` : ""}` : '<p class="hint">No branches, worktrees or spin-offs off the main line.</p>'}
+      </section>
+    </div>
+    <section class="jsec"><div class="jsh"><h3>${J_ICON.chat}Sessions <span class="n">${sessions.length}</span></h3>${live.length ? `<span class="hint">${live.length} open now</span>` : ""}<span class="spacer"></span><button class="link" data-jhist>Search them in History</button></div>
+      <ul class="jsess">${sessions.slice(0, showAllS ? 400 : 10).map((e) => { const k = e.link?.session; const r = S.rows.get(k); const st = r?.status; const lane = e.lane && j.quests.find((q) => q.id === e.lane); return `<li><button data-jsess="${esc(k ?? "")}"><span class="dot" style="--c:${st ? statusVar(st) : "var(--line-2)"}"></span><span class="t">${esc(e.title)}</span><small>${esc(jdate(e.t))}${e.n ? ` · ${e.n} prompt${e.n === 1 ? "" : "s"}` : ""}${lane ? ` · ${esc(lane.label)}` : ""}${e.link?.machine && multiMachine() ? ` · ${esc(machineLabel(e.link.machine))}` : ""}${liveKeys.has(k) ? ` · <b>${esc(STATUS_NAME[st] ?? "open")}</b>` : ""}</small></button></li>`; }).join("")}</ul>
+      ${sessions.length > 10 && !showAllS ? `<button class="link" data-jalls>Show all ${sessions.length}</button>` : ""}
+    </section>
+    <section class="jsec"><h3>${J_ICON.grid}Metrics</h3><div class="jmetrics">${metricTiles || '<p class="hint">Nothing measured yet. Log a metric.</p>'}</div></section>
+    <footer class="jfooter">Built from ${[j.sources.git ? `git${j.now.github ? ` (${esc(j.now.github)})` : ""}${j.now.branch ? ` on <code>${esc(j.now.branch)}</code>` : ""}${j.now.dirty ? `, ${j.now.dirty} uncommitted` : ""}` : "", j.sources.wiki ? "the wiki page" : "", `${j.sources.sessions} session${j.sources.sessions === 1 ? "" : "s"}${j.sources.machines.length ? ` on ${j.sources.machines.map((m) => esc(machineLabel(m))).join(", ")}` : ""}`, j.sources.notes ? `${j.sources.notes} saved plan${j.sources.notes === 1 ? "" : "s"}/leads` : "", j.sources.github ? `GitHub: ${esc(j.sources.github)}` : "", j.sources.gumroad ? `Gumroad: ${esc(j.sources.gumroad)}` : ""].filter(Boolean).join(" · ")}. Updated ${esc(when(j.builtAt))}${j.pending ? ' · <span class="spin"></span> refreshing' : ""}.</footer>
+  </div>`;
+  modeHTML(html);
+  box._jsig = sig;
+  const host = $("dbody").querySelector("#jgHost");
+  if (host && (!host._jg || host._jg.j !== j || host._jg.vert !== isPhone())) { jgMount(host, j); if (S.jp.card) jgCard(host); }
+  // First sight of an unlock: the card plays its animation once, then it's remembered.
+  const fresh2 = j.milestones.filter((m) => m.state === "unlocked").map((m) => m.id);
+  if (fresh2.some((id) => !load(`jseen:${j.project}`, []).includes(id))) setTimeout(() => store(`jseen:${j.project}`, fresh2), 2600);
+}
+
+const jLiveChip = (working, open) => (working ? `<span class="jlive"><span class="spin"></span>${working} working now</span>` : open ? `<span class="jlive idle">${open} open session${open === 1 ? "" : "s"}</span>` : "");
+/** Who's working right now, without touching the rest of the page. */
+function jPatchLive(j) {
+  const box = $("dbody");
+  const live = (j.now.live ?? []).map((l) => S.rows.get(l.key)?.status ?? l.status);
+  const chip = box.querySelector("#jliveChip");
+  if (chip) setHTML(chip, jLiveChip(live.filter((x) => x === "working").length, live.length));
+  for (const b of box.querySelectorAll(".jsess [data-jsess]")) { const st = S.rows.get(b.dataset.jsess)?.status; b.querySelector(".dot")?.style.setProperty("--c", st ? statusVar(st) : "var(--line-2)"); }
+}
+function renderProjects() {
+  const d = S.jp.idx;
+  if (!d) { modeHTML(`<header class="vh"><h2>${J_ICON.grid}Projects</h2><p><span class="spin"></span> Gathering every project…</p></header>`); return; }
+  const q = S.jp.q.trim().toLowerCase();
+  const list = (d.projects ?? []).filter((p) => !q || `${p.project} ${p.tldr ?? ""} ${(p.tags ?? []).join(" ")} ${p.status ?? ""}`.toLowerCase().includes(q));
+  const shown = S.jp.all || q ? list : list.slice(0, 48);
+  const card = (p, i) => {
+    const col = jhue(p.project);
+    const working = S.rows.size ? [...S.rows.values()].filter((r) => r.project === p.project && r.status === "working").length : p.working;
+    return `<button class="jpc" data-jopen="${esc(p.project)}" style="--pc:${col};--i:${Math.min(i, 24)}">
+      <span class="jpc-h"><span class="jsw"></span><b>${esc(p.project)}</b>${p.status ? `<span class="jstat ${esc(p.status)}">${esc(p.status)}</span>` : ""}${working ? `<span class="jlive"><span class="spin"></span>${working}</span>` : p.live ? `<span class="jlive idle">${p.live} open</span>` : ""}</span>
+      <span class="jpc-p">${esc(p.pitch || p.tldr || (p.root ? home(p.root) : ""))}</span>
+      ${jWeeksSpark(p.weeks, p.commitWeeks, 220, 40, col)}
+      <span class="jpc-f">${p.next ? `<span class="jpc-n">${J_ICON.flag}<span>${esc(p.next.title)}</span><span class="jbar"><i style="width:${Math.round((p.next.pct ?? 0) * 100)}%"></i></span></span>` : p.stage ? `<span class="jpc-n">${J_ICON.trophy}${esc(p.stage)}</span>` : `<span class="hint">${p.sessions ? `${p.sessions} session${p.sessions === 1 ? "" : "s"}` : p.root ? "git repo" : p.wiki ? "wiki page" : p.live ? "open now" : ""}</span>`}<span class="jpc-a">${p.last ? esc(agoText(p.last)) : ""}</span></span>
+    </button>`;
+  };
+  modeHTML(`<header class="vh jvh"><h2>${J_ICON.grid}Projects</h2><p>Every project as a journey: where it started, the turns it took, and the milestones ahead. Open one to see its whole story.</p>
+    <div class="jsearch"><input class="inp" id="jpq" type="search" placeholder="Filter ${d.projects?.length ?? 0} projects" value="${esc(S.jp.q)}" autocomplete="off"></div></header>
+    <div class="jpgrid">${shown.map(card).join("") || '<p class="hint">No project matches.</p>'}</div>
+    ${list.length > shown.length ? `<p style="text-align:center"><button class="btn" data-jallp>Show all ${list.length}</button></p>` : ""}`);
+}
+
+$("dbody").addEventListener("click", async (e) => {
+  if (S.mode !== "project" && S.mode !== "projects") return;
+  const t = e.target;
+  if (t.closest(".jg-host")) return; // the graph handles its own clicks
+  const open = t.closest("[data-jopen]");
+  if (open) return openJourney(open.dataset.jopen);
+  if (t.closest("[data-jidx]")) return openProjects();
+  if (t.closest("[data-jallp]")) { S.jp.all = true; return renderProjects(); }
+  const j = S.jp.data.get(S.jp.name);
+  if (!j || S.mode !== "project") return;
+  const sess = t.closest("[data-jsess]");
+  if (sess) return jOpenSession(sess.dataset.jsess);
+  if (t.closest("[data-jalls]")) { S.jp.allSessions = j.project; return renderJourney(); }
+  if (t.closest("[data-jallq]")) { S.jp.allQuests = j.project; return renderJourney(); }
+  if (t.closest("[data-jhist]")) { S.hq = j.project; setMode("history"); const q = $("dbody").querySelector(".view input[type=search], .view .inp"); if (q) { q.value = j.project; q.dispatchEvent(new Event("input", { bubbles: true })); } return; }
+  const log = t.closest("[data-jlog]");
+  if (log) return jLogDialog(j, log.dataset.jlog);
+  const un = t.closest("[data-junlock]");
+  if (un) {
+    const m = j.milestones.find((x) => x.id === un.dataset.junlock);
+    const note = await askDialog({ title: `Mark “${m?.title}” unlocked`, text: "What happened? Your note is the evidence shown on the milestone.", input: "", ok: "Unlock it", multiline: true });
+    if (!note || !String(note).trim()) return;
+    try { const r = await api("/api/journey/unlock", { project: j.project, id: un.dataset.junlock, note: String(note) }); S.jp.data.set(j.project, r); renderJourney(true); toast(`Unlocked “${m?.title}”`); } catch (err) { toast(err.message, true); }
+    return;
+  }
+  const undo = t.closest("[data-jundo]");
+  if (undo) { try { const r = await api("/api/journey/unlock", { project: j.project, id: undo.dataset.jundo, undo: true }); S.jp.data.set(j.project, r); renderJourney(true); } catch (err) { toast(err.message, true); } return; }
+  const act = t.closest("[data-jact]")?.dataset.jact;
+  if (!act) return;
+  if (act === "start" || act === "plan") {
+    const h = jHome(j);
+    if (!h) return toast(`${j.project}’s folder isn’t on this machine`, true);
+    const next = j.milestones.find((x) => x.id === j.next[0]);
+    return openNew(act === "start" ? { ...h, title: `New session in ${j.project}` } : { ...h, kind: "claude", prompt: jPlanPrompt(j), label: `plan ${next?.title ?? "next milestone"}`.slice(0, 40), title: `Plan the next milestone${next ? `: ${next.title}` : ""}` });
+  }
+  if (act === "log") return jLogDialog(j);
+  if (act === "regen") { toast("Reading the journey again…"); S.jp.polls = 0; return loadJourney(j.project, { regen: true, force: true }); }
+});
+$("dbody").addEventListener("input", (e) => {
+  if (S.mode === "projects" && e.target.id === "jpq") { S.jp.q = e.target.value; const pos = e.target.selectionStart; renderProjects(); const el = $("jpq"); if (el) { el.focus(); el.setSelectionRange(pos, pos); } }
+});
+function jLogDialog(j, metric = "") {
+  const names = [...new Set([...j.milestones.filter((m) => m.source.startsWith("manual.")).map((m) => m.source.slice(7)), ...j.metrics.filter((m) => m.key.startsWith("manual.")).map((m) => m.key.slice(7)), "users", "paying_customers", "mrr", "dau", "views", "downloads_month"])];
+  const d = document.createElement("dialog");
+  d.className = "dlg jlogd";
+  d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Log a metric for ${esc(j.project)}</h3><p class="hint">A reading on a date (users on that day, revenue that month…). Milestones measured by it unlock when a reading reaches their target.</p>
+    <label class="jf"><span>Metric</span><input class="inp" name="metric" list="jmlist" value="${esc(metric)}" placeholder="users" required pattern="[A-Za-z][A-Za-z0-9 _-]{1,30}"><datalist id="jmlist">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist></label>
+    <div class="jf2"><label class="jf"><span>Value</span><input class="inp" name="value" type="number" step="any" required inputmode="decimal"></label><label class="jf"><span>Date</span><input class="inp" name="at" type="date" value="${jd10(Date.now())}"></label></div>
+    <label class="jf"><span>Note (optional)</span><input class="inp" name="note" placeholder="Where the number came from"></label></div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Log it</button></div></form>`;
+  document.body.append(d);
+  d.addEventListener("close", async () => {
+    const f = d.querySelector("form");
+    const ok = d.returnValue === "ok";
+    const data = Object.fromEntries(new FormData(f));
+    d.remove();
+    if (!ok) return;
+    try {
+      const r = await api("/api/journey/metric", { project: j.project, metric: data.metric, value: Number(data.value), at: data.at ? new Date(`${data.at}T12:00:00`).getTime() : undefined, note: data.note });
+      S.jp.data.set(j.project, r); renderJourney(true); toast(`Logged ${data.metric} = ${data.value}`);
+    } catch (err) { toast(err.message, true); }
+  });
+  d.showModal();
+  (metric ? d.querySelector("[name=value]") : d.querySelector("[name=metric]")).focus();
+}
+// ──────────────────────────────────────────────────────────────────────────── </journey>
+
 // ── push notifications (Web Push through the service worker) ───────────
 // The hub sends them (Settings → Automations decides what), so they arrive with the app closed.
 // The old page-only alerts (toggleAlerts) stay as the fallback where push isn't available.
@@ -4251,6 +4995,8 @@ function paletteItems(q) {
     cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
     cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
     cur && !cur.app && !cur.hist && { t: "Rename this session…", k: "e", run: () => renameSession(cur) },
+    { t: "Projects: every project’s journey", run: openProjects },
+    cur && { t: `Project page: ${cur.project}`, run: () => openJourney(cur.project) },
     { t: "Connections: what agents can use", run: () => openConnections(cur?.key) },
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
@@ -4285,6 +5031,10 @@ function paletteItems(q) {
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
     if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
+    // journey: "Project: <name>" for every known project (live, indexed, or already opened)
+    const names = [...new Set([...S.rows.values()].map((r) => r.project).concat((S.jp.idx?.projects ?? []).map((x) => x.project), [...S.jp.data.keys()]))].filter(Boolean);
+    const jp = names.map((p) => ({ p, s: fuzzy(`project ${p}`, q) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 5);
+    if (jp.length) out.push({ head: "Project pages" }, ...jp.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Project: ${esc(p)}</span><small>journey & milestones</small>`, run: () => openJourney(p) })));
   }
   return out;
 }
@@ -4420,6 +5170,8 @@ $("live").onclick = () => setBoard(!S.board);
 $("rows").addEventListener("click", async (e) => {
   const newin = e.target.closest('[data-secact="newin"]');
   if (newin) { e.stopPropagation(); return openNew(projectHome(newin.dataset.proj)); }
+  const jour = e.target.closest('[data-secact="journey"]');
+  if (jour) { e.stopPropagation(); return openJourney(jour.dataset.proj); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
@@ -4523,6 +5275,7 @@ $("detail").addEventListener("click", (e) => {
   if (act === "home") return goHome();
   const r = rowOf(S.sel);
   if (!r) return;
+  if (act === "journey") return openJourney(r.project);
   if (act === "tools") openToolMenu(b);
   if (act === "share") shareRow(r, Number(b.dataset.port));
   if (act === "unshare") unshareRow(r, Number(b.dataset.port));
@@ -4833,6 +5586,11 @@ function applyFull(data) {
   S.publicUrl = data.publicUrl ?? "";
   S.auto = data.auto ?? S.auto;
   S.push = data.push ?? S.push;
+  if (!S.linkDone && (location.pathname === "/p" || location.pathname.startsWith("/p/"))) { // journey: a project page link
+    S.linkDone = true; S.board = true; lastOrder = ""; render();
+    const n = decodeURIComponent(location.pathname.slice(3));
+    return n ? openJourney(n) : openProjects();
+  }
   if (!S.linkDone && location.pathname.startsWith("/s/")) {
     S.linkDone = true;
     const hit = resolveLink(location.pathname);

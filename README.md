@@ -255,6 +255,22 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   - **Ideas:** the plans, rendered, with the session that wrote them and **Start building**.
   - Only interest keywords and the words of your idea go to GitHub. Nothing starts until you confirm the
     dialog. Your chips, saves (repos and mixes) and dismissals live in `~/.config/herdr-deck/discover.json`.
+- **Projects** (⌘K "Projects" or "Project: <name>", the journey icon on a Projects group header, the project name in a
+  session's header, or a link `/p/<project>`): a page for every project. A journey graph runs from the origin (your
+  first prompt, the first commit, the wiki's words) through every sitting of commits, session, wiki entry, tag and
+  deploy to now and a dashed "heading" into the future; turns where it changed direction bend the line, side quests
+  (merged or abandoned branches, worktrees, spin-off projects named after it) fork off as lanes, and milestone flags
+  sit where they were unlocked. Drag, ⌘/ctrl-scroll or pinch to zoom; tap any point for what happened and a link to the
+  session, commit or wiki page. On a phone it runs top to bottom. Below it: a milestone ladder written for the project
+  (users, revenue, releases, stars, views… by kind of project) that unlocks only from evidence (git, deploy config,
+  wiki entries that say it shipped, GitHub via `gh`, Gumroad sales for a matching product when your Gumroad MCP server
+  has a token, the deck's session history) or from what you log (**Log a metric**, **Mark unlocked…** with a note);
+  the original idea, the story so far, where it's heading, side quests, every session and metric sparklines.
+  **Start a session here** and **Plan the next milestone** open the New session dialog prefilled. The AI read (turns,
+  side-quest names, the ladder, the story) is one headless Claude Code call (Haiku, low effort, no tools) on the first
+  open, at most daily after that, or on **Regenerate**; only titles, dates, commit subjects and counts are sent, and
+  simple rules fill in without a model. `DECK_JOURNEY_AI=0` turns the model off; `DECK_JOURNEY_ENGINE=ollama` uses a
+  local model. Cached in `~/.config/herdr-deck/journeys/` (your entries in `journeys/manual.json`). Code: `src/journey*.ts`.
 - **Simple mode** (Settings, or ⌘K): big type, only the essentials (no terminal, tool calls, meters or
   tabs), friendly status words, and cheerful colors tuned for every theme.
 - **Themes:** System, Harbor, Light, Midnight, Nord, Solarized, Paper, High contrast, Dracula, Catppuccin
