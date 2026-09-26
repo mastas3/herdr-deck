@@ -9,6 +9,9 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - `src/server.ts` is the HTTP server, SSE and API routes. `src/deck.ts` builds the session rows from herdr's socket
   (`src/herdr.ts`). Transcripts come from `src/agents.ts` / `src/transcript.ts` (Claude Code JSONL, Codex rollouts,
   OpenCode SQLite). `src/federation.ts` is the hub-to-node tunnel. `src/mcp.ts` is the MCP endpoint.
+- `src/plugin-format.ts` (manifest validator), `src/plugin-trust.ts` (trust screen, update diff) and `src/plugins.ts`
+  (staging, install, catalog) are plugins: data-only packages, never code. Built-in ones live in `plugins-catalog/`.
+  The design is `docs/superpowers/specs/2026-09-26-plugins-design.md`.
 - `public/` is the page: vanilla JS (`app.js`) and CSS in `index.html`, a service worker and a manifest.
 - `bin/` holds the install scripts: `bootstrap.sh` (one-line install), `install.sh` (the launchd or systemd
   service), `deploy-node.sh` (another machine over SSH) and `uninstall.sh`.
