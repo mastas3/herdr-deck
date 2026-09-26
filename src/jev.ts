@@ -116,15 +116,21 @@ type Kit = {
   resolveKey(): { key: string | null };
 };
 let kitP: Promise<Kit | null> | undefined;
+let kitWarned = false;
 /** The kit module, imported once; null (use the CLI) when BIN isn't a JS module or lacks what's needed. */
 function loadKit(): Promise<Kit | null> {
   return (kitP ??= (async () => {
+    let kit: Kit | null = null;
     try {
       const real = realpathSync(BIN!); // ~/.local/bin/jev is a symlink to the .mjs
-      if (!/\.m?js$/.test(real)) return null;
-      const m = await import(pathToFileURL(real).href);
-      return ["validateQuestions", "validateAnswers", "deepRedact", "resolveKey"].every((f) => typeof m[f] === "function") ? (m as Kit) : null;
-    } catch { return null; }
+      if (/\.m?js$/.test(real)) {
+        const m = await import(pathToFileURL(real).href);
+        if (["validateQuestions", "validateAnswers", "deepRedact", "resolveKey"].every((f) => typeof m[f] === "function")) kit = m as Kit;
+      }
+    } catch {}
+    // Asks still work through the CLI, only slower: say so once, so a slow deck has an explanation.
+    if (!kit && !kitWarned) { kitWarned = true; console.warn("Jev: using the CLI (kit not importable)"); }
+    return kit;
   })());
 }
 let fetchImpl: typeof fetch = (...a) => fetch(...a);
@@ -258,7 +264,7 @@ loadState();
 export function _configure(o: { dir?: string; bin?: string; receipts?: string; timeoutMs?: number }) {
   if (o.dir) DIR = o.dir;
   if (o.timeoutMs) TIMEOUT_MS = o.timeoutMs;
-  if (o.bin) { BIN = o.bin; kitP = undefined; }
+  if (o.bin) { BIN = o.bin; kitP = undefined; kitWarned = false; }
   if (o.receipts) RECEIPTS_FILE = o.receipts;
   apiKey = null; inflight.clear(); loadState();
 }

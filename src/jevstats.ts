@@ -5,11 +5,14 @@ import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { PRICE_PER_M_INPUT, localDay, type CacheEntry } from "./jev";
 
 export type Kind = "prompt" | "question" | "done";
-const KINDS: Record<string, Kind> = { "deck-prompt": "prompt", "deck-choice": "question", "deck-done": "done" };
+// The radar and routing spend calls too, but have no outcome to score: they count in the totals only.
+type AnyKind = Kind | "radar" | "route";
+const KINDS: Record<string, AnyKind> = { "deck-prompt": "prompt", "deck-choice": "question", "deck-done": "done", "deck-radar": "radar", "deck-route": "route" };
+const JUDGED = new Set<AnyKind>(["prompt", "question", "done"]);
 
 type Dec = {
-  id: string; t: number; kind: Kind; group: string; calls: number; inTok: number; outTok: number; fallback: string | null; repeat: boolean;
-  pick?: string; pickP?: number; done?: number; next?: string; low?: number;
+  id: string; t: number; kind: AnyKind; group: string; calls: number; inTok: number; outTok: number; fallback: string | null; repeat: boolean;
+  pick?: string; pickP?: number; done?: number; next?: string; low?: number; risk?: boolean;
 };
 type Out = { followed: boolean | null; note: string; result: string; t: number };
 
@@ -70,6 +73,7 @@ export class Receipts {
       id: r.decision_id, t, kind, group, calls, inTok, outTok, fallback: r.fallback ?? null, repeat,
       pick: pick != null ? String(pick).replace(/^o(?=\d$)/, "") : undefined, pickP: pick != null ? a.pick?.probabilities?.[pick] : undefined,
       done: typeof a.done?.noul === "number" ? a.done.noul : undefined, next: a.next?.choice, low: typeof a.low?.noul === "number" ? a.low.noul : undefined,
+      risk: a.risk?.choice != null || undefined,
     });
   }
 }
@@ -102,8 +106,10 @@ export function summarize(rc: Receipts, opts: { now?: number; cap: number; used:
     const inTok = ds.reduce((s, d) => s + d.inTok, 0);
     return { calls: ds.reduce((s, d) => s + d.calls, 0), inputTokens: inTok, outputTokens: ds.reduce((s, d) => s + d.outTok, 0), cost: cost(inTok), repeats: ds.filter((d) => d.repeat).length };
   };
-  const decs = rc.decs;
+  const every = rc.decs; // every deck call, for the totals
+  const decs = every.filter((d) => JUDGED.has(d.kind)) as (Dec & { kind: Kind })[]; // the ones with an outcome to score
   const allToday = rc.all.filter((x) => localDay(x.t) === today);
+  const todays = every.filter((d) => localDay(d.t) === today);
 
   // Hit rate: of the decisions you answered, how often Jev's suggestion was what you did.
   const hit = { prompt: { n: 0, hits: 0 }, question: { n: 0, hits: 0 }, done: { n: 0, hits: 0 } } as Record<Kind, { n: number; hits: number; rate?: number | null }>;
@@ -153,10 +159,12 @@ export function summarize(rc: Receipts, opts: { now?: number; cap: number; used:
 
   return {
     receipts: { file: rc.file, rows: rc.rows },
-    since: decs[0]?.t ?? null,
-    today: span(decs.filter((d) => localDay(d.t) === today)),
-    week: span(decs.filter((d) => d.t >= weekAgo)),
-    total: span(decs),
+    since: every[0]?.t ?? null,
+    today: span(todays),
+    week: span(every.filter((d) => d.t >= weekAgo)),
+    total: span(every),
+    // Calls today per Jev panel switch; a risk read rides along on a permission check, so it counts answers.
+    features: { risk: todays.filter((d) => d.risk).length, radar: span(todays.filter((d) => d.kind === "radar")).calls, route: span(todays.filter((d) => d.kind === "route")).calls },
     allAgentsToday: { calls: allToday.reduce((s, x) => s + x.calls, 0), inputTokens: allToday.reduce((s, x) => s + x.inTok, 0), cost: cost(allToday.reduce((s, x) => s + x.inTok, 0)) },
     asked: groups.size, answered,
     hit: { ...hit, all: { ...tot, rate: rate(tot.hits, tot.n) } },

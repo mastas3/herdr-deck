@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { PushRule, Radar, radarEntry, radarRequest, radarTrigger, stuckMessage, type RadarEntry } from "../src/radar";
+import { PushRule, Radar, radarEntry, radarHasRoom, radarRequest, radarTrigger, stuckMessage, type RadarEntry } from "../src/radar";
 import type { Msg } from "../src/transcript";
 
 // No Jev calls here: the radar's ask is always a stand-in.
@@ -144,6 +144,7 @@ describe("PushRule: two confident answers in a row, once per 30 minutes", () => 
 describe("Radar: state, events and pushes", () => {
   const setup = (answers: (n: number) => any = () => ({ stuck: { noul: 0.9 }, off_task: { noul: 0.1 }, phase: { choice: "debugging", probabilities: {} } }), gate?: () => Promise<void>) => {
     let t = NOW, n = 0, on = true, reads = 0;
+    let usage = { calls: 0, cap: 1000 }; // never the real counter: that lives in ~/.config/herdr-deck
     let fail: "none" | "undefined" | "throw" = "none";
     const chats = new Map<string, Msg[]>();
     const events: RadarEntry[][] = [], pushes: any[] = [], asked: any[] = [];
@@ -157,9 +158,10 @@ describe("Radar: state, events and pushes", () => {
       push: (m) => pushes.push(m),
       ask: async (state, questions, kind) => { asked.push({ state, questions, kind }); n++; if (gate) await gate(); return { id: `d-${n}`, fallback: null, answers: answers(n) }; },
       enabled: () => on,
+      usage: () => usage,
       now: () => t,
     });
-    return { radar, chats, events, pushes, asked, tick: (ms: number) => (t += ms), off: () => (on = false), fail: (f: typeof fail) => (fail = f), reads: () => reads };
+    return { radar, chats, events, pushes, asked, tick: (ms: number) => (t += ms), off: () => (on = false), fail: (f: typeof fail) => (fail = f), reads: () => reads, use: (calls: number, cap = 1000) => (usage = { calls, cap }) };
   };
   const looping = (k: number) => [user("Fix the login bug"), tool("Bash", "bun test", "error"), tool("Bash", "bun test", "error"), tool("Bash", "bun test", "error"), said(`attempt ${k}`)];
 
@@ -305,5 +307,75 @@ describe("Radar: state, events and pushes", () => {
     await s.radar.pass([row({ key: "a" })]); // answers: undefined → no entry, no push
     expect(s.radar.list()).toEqual([]);
     expect(s.pushes.length).toBe(0);
+  });
+  test("the radar leaves the last 25% of the daily cap to inbox checks and routing", async () => {
+    expect(radarHasRoom({ calls: 749, cap: 1000 })).toBe(true);
+    expect(radarHasRoom({ calls: 750, cap: 1000 })).toBe(false);
+    expect(radarHasRoom({ calls: 0, cap: 0 })).toBe(false); // a cap of 0: no radar asks at all
+    const s = setup();
+    s.chats.set("a", looping(1));
+    s.use(750);
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(0);
+    s.use(0, 0);
+    s.tick(15_000);
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(0);
+    s.use(10);
+    s.tick(15_000);
+    await s.radar.pass([row({ key: "a" })]); // room again: the same request is asked, nothing was held back
+    expect(s.asked.length).toBe(1);
+  });
+
+  test("after a calm answer, no new ask for 10 minutes unless the trigger kind changes", async () => {
+    const s = setup(() => ({ stuck: { noul: 0.2 }, off_task: { noul: 0.1 } }));
+    const failing = (k: number) => [user("Fix it"), tool("Bash", `a${k}`, "error"), tool("Read", "x"), tool("Bash", `b${k}`, "error"), tool("Grep", "y"), tool("Bash", `c${k}`, "error")];
+    s.chats.set("a", looping(1));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(1);
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", looping(2)); // a new request, same trigger (repeat): held back
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(1);
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", failing(1)); // a different trigger (errors): asked
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(2);
+    expect(s.radar.list()[0]?.trigger).toBe("errors");
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", failing(2)); // errors again, inside its own 10 minutes: held back
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(2);
+    s.tick(10 * 60_000);
+    await s.radar.pass([row({ key: "a" })]); // 10 minutes on: asked again
+    expect(s.asked.length).toBe(3);
+  });
+
+  test("a worried answer doesn't back off", async () => {
+    const s = setup((n) => ({ stuck: { noul: n === 1 ? 0.2 : 0.6 }, off_task: { noul: 0.1 } }));
+    s.chats.set("a", looping(1));
+    await s.radar.pass([row({ key: "a" })]); // calm
+    s.tick(10 * 60_000);
+    s.chats.set("a", looping(2));
+    await s.radar.pass([row({ key: "a" })]); // 0.6: not calm
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", looping(3));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.asked.length).toBe(3);
+  });
+
+  test("a read older than 15 minutes is dropped when later asks fall back", async () => {
+    const s = setup((n) => (n === 1 ? { stuck: { noul: 0.9 } } : undefined));
+    s.chats.set("a", looping(1));
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.radar.list().length).toBe(1);
+    s.tick(2 * 60_000 + 1);
+    s.chats.set("a", looping(2));
+    await s.radar.pass([row({ key: "a" })]); // falls back: the old read stays for now
+    expect(s.radar.list().length).toBe(1);
+    s.tick(13 * 60_000);
+    await s.radar.pass([row({ key: "a" })]);
+    expect(s.radar.list()).toEqual([]);
+    expect(s.events.at(-1)).toEqual([]);
   });
 });

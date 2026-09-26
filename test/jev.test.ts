@@ -267,19 +267,21 @@ describe("risk level on permission prompts", () => {
   });
 });
 
-// The real kit, imported in-process, against a fake fetch: never the network, never ~/.jev.
+// In-process asks against a fake fetch: never the network, never ~/.jev. They always run against a stub
+// of the kit (so CI covers them), and against the real kit as well where it's installed.
 const KIT = `${homedir()}/.local/share/jev-kit/bin/jev.mjs`;
-describe.skipIf(!existsSync(KIT))("in-process transport", () => {
-  const receipts = join(dir, "deck-receipts.jsonl");
+const KITS = [["stub kit", join(import.meta.dir, "jev-kit-stub.mjs")], ...(existsSync(KIT) ? [["real kit", KIT]] : [])];
+const receipts = join(dir, "deck-receipts.jsonl");
+for (const [kitName, kitFile] of KITS) describe(`in-process transport (${kitName})`, () => {
   const MODEL = process.env.JEV_MODEL ?? "jev-1.13.0";
   const Q = { stuck: noul("Is it stuck?"), phase: choice("Which phase?", { a: "A", b: "B" }) };
   const good = { model: MODEL, answers: { stuck: { type: "noul", noul: 0.3 }, phase: { type: "choice", choice: "a", probabilities: { a: 0.7, b: 0.3 }, confidence: 0.6 } }, usage: { input_tokens: 120, output_tokens: 4 } };
   let sent: { url: string; init: any }[] = [];
   let reply: (init: any) => Response | Promise<Response> = () => Response.json(good);
   // Per test, not beforeAll: bun runs every describe's beforeAll up front, before the tests above.
-  const link = join(dir, "jev-link");
+  const link = join(dir, `jev-link-${kitName.replace(" ", "-")}`);
   const withKit = (fn: () => Promise<void>) => async () => {
-    if (!existsSync(link)) symlinkSync(KIT, link); // ~/.local/bin/jev is a symlink too
+    if (!existsSync(link)) symlinkSync(kitFile, link); // ~/.local/bin/jev is a symlink too
     const prevRunner = _setRunner(null);
     _configure({ bin: link, receipts });
     _setFetch((async (url: any, init: any) => { sent.push({ url: String(url), init }); return reply(init); }) as any);
@@ -385,31 +387,41 @@ describe.skipIf(!existsSync(KIT))("in-process transport", () => {
     expect(sent.length).toBe(0);
   }));
 
-  // A stand-in CLI that answers when run, and can't be used as the kit when imported.
-  const cli = (name: string, importable: boolean) => {
-    const f = join(dir, name);
-    writeFileSync(f, `${importable ? "export const ask = 1;" : 'if (!import.meta.main) throw new Error("not a module");'}
-if (import.meta.main) { const req = JSON.parse(await Bun.stdin.text()); console.log(JSON.stringify({ decision_id: "spawned-" + req.kind, answers: { stuck: { type: "noul", noul: 0.5 } }, fallback: null, latency_ms: 12 })); }\n`);
-    return f;
-  };
-  test("falls back to the CLI when the kit can't be imported, or lacks what's needed", withKit(async () => {
-    try {
-      for (const [f, kind] of [[cli("broken-kit.mjs", false), "deck-a"], [cli("old-kit.mjs", true), "deck-b"]]) {
-        sent = [];
-        _configure({ bin: f });
-        const r = await jevAsk({}, Q, kind);
-        expect(r).toMatchObject({ id: `spawned-${kind}`, fallback: null, ms: 12 });
-        expect(sent.length).toBe(0);
-      }
-    } finally { _configure({ bin: link }); }
-  }));
-
   test("a runner set by a test still answers instead of the kit", withKit(async () => {
     sent = [];
     const prev = _setRunner(async () => ({ decision_id: "from-runner", answers: {}, fallback: null }));
     try { expect((await jevAsk({ r: 1 }, Q, "deck-test")).id).toBe("from-runner"); } finally { _setRunner(prev); }
     expect(sent.length).toBe(0);
   }));
+});
+
+// The CLI fallback needs no kit at all: stand-in CLIs that answer when run.
+describe("CLI fallback", () => {
+  const cli = (name: string, importable: boolean) => {
+    const f = join(dir, name);
+    writeFileSync(f, `${importable ? "export const ask = 1;" : 'if (!import.meta.main) throw new Error("not a module");'}
+if (import.meta.main) { const req = JSON.parse(await Bun.stdin.text()); console.log(JSON.stringify({ decision_id: "spawned-" + req.kind, answers: { stuck: { type: "noul", noul: 0.5 } }, fallback: null, latency_ms: 12 })); }\n`);
+    return f;
+  };
+  test("falls back to the CLI when the kit can't be imported, or lacks what's needed, and says so once", async () => {
+    const sent: unknown[] = [];
+    const prevRunner = _setRunner(null);
+    _setFetch((async (url: any) => { sent.push(url); return Response.json({}); }) as any);
+    const warn = console.warn, warned: string[] = [];
+    console.warn = (...a: unknown[]) => { warned.push(a.join(" ")); };
+    try {
+      for (const [f, kind] of [[cli("broken-kit.mjs", false), "deck-a"], [cli("old-kit.mjs", true), "deck-b"]]) {
+        _configure({ bin: f, receipts });
+        for (const n of [1, 2]) {
+          const r = await jevAsk({ n }, { stuck: noul("Is it stuck?") }, kind);
+          expect(r).toMatchObject({ id: `spawned-${kind}`, fallback: null, ms: 12 });
+        }
+      }
+      expect(sent.length).toBe(0);
+      // One line per kit that failed to load, however many asks followed.
+      expect(warned).toEqual(["Jev: using the CLI (kit not importable)", "Jev: using the CLI (kit not importable)"]);
+    } finally { console.warn = warn; _setFetch(null); _setRunner(prevRunner); _configure({ bin: join(dir, "fake-jev") }); }
+  });
 });
 
 // ── aggregation over a fake receipts log ─────────────────────────────────────
@@ -482,6 +494,32 @@ describe("stats from receipts", () => {
     expect(q).toMatchObject({ label: "demo: Which db?", suggestion: "B (56%)", pickTitle: "SQLite", actual: "B", actualTitle: "SQLite", followed: true, repeats: 1 });
     expect(s.recent.find((x) => x.suggestion.startsWith("30%"))).toMatchObject({ actual: "accepted", followed: false });
     expect(s.cap).toMatchObject({ cap: 1000, used: 6 });
+  });
+
+  test("radar and route calls count in the totals and per switch, never in the accuracy numbers", () => {
+    const risky = { ...pick("1", 0.9), risk: { type: "choice", choice: "reversible", probabilities: { read_only: 0.1, reversible: 0.8, irreversible: 0.1 } } };
+    const extra = [
+      dec("r1", 1, "deck-radar", "r-a", { stuck: { type: "noul", noul: 0.9 } }, 800),
+      dec("r2", 0.8, "deck-radar", "r-b", null, 0, { calls_used: 1, fallback: "timeout", usage: null }),
+      dec("r0", 30, "deck-radar", "r-c", { stuck: { type: "noul", noul: 0.2 } }, 800), // this week, not today
+      dec("o1", 0.7, "deck-route", "o-a", { to: { type: "choice", choice: "s1", probabilities: { s1: 0.9, s2: 0.1 }, confidence: 0.8 } }, 600),
+      out("o1", 0.6, true, "sent"), // not something the deck writes, but even so it isn't scored
+      dec("k1", 0.4, "deck-prompt", "k-a", risky, 400),
+    ];
+    writeFileSync(file, [...rows, ...extra].map((r) => JSON.stringify(r)).join("\n") + "\n");
+    const rc = new Receipts(file);
+    rc.refresh();
+    const s = summarize(rc, { now: NOW, cap: 1000, used: 6 });
+    expect(s.today).toEqual({ calls: 6 + 2 + 1 + 1, inputTokens: 6900 + 800 + 600 + 400, outputTokens: 300 + 50 * 3, cost: 0.000365, repeats: 1 });
+    expect(s.week.calls).toBe(7 + 5);
+    expect(s.total.calls).toBe(8 + 5);
+    expect(s.features).toEqual({ risk: 1, radar: 2, route: 1 });
+    // The accuracy side only gains the new permission check (asked, no outcome yet).
+    expect(s.hit.all).toEqual({ n: 6, hits: 3, rate: 0.5 });
+    expect(s.answered).toBe(6);
+    expect(s.asked).toBe(8);
+    expect(s.recent.map((x) => x.kind)).not.toContain("radar");
+    expect(s.recent.map((x) => x.kind)).not.toContain("route");
   });
 
   test("reads only what's appended, and starts over when the log is replaced", () => {

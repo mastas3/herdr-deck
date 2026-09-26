@@ -5,7 +5,7 @@
 import type { Row } from "./deck";
 import type { Message } from "./push";
 import { EDIT_TOOLS, type Msg } from "./transcript";
-import { choice, fingerprint, jevAskOnce, jevAvailable, jevFeature, noul, scrub, type JevAnswer, type JevAnswers } from "./jev";
+import { choice, fingerprint, jevAskOnce, jevAvailable, jevFeature, jevUsage, noul, scrub, type JevAnswer, type JevAnswers } from "./jev";
 
 export type Trigger = "repeat" | "errors" | "stall";
 export type Phase = "exploring" | "editing" | "testing" | "debugging" | "wrapping_up";
@@ -19,6 +19,11 @@ const TODO_TOOLS = /^todowrite$/i;
 export const ASK_EVERY_MS = 2 * 60_000; // at most one ask per session this often
 export const PUSH_EVERY_MS = 30 * 60_000; // at most one "looks stuck" push per session this often
 const READ_EVERY_MS = 10_000; // how often a running session's chat is re-read for the cheap check
+export const CALM_MS = 10 * 60_000; // after a "not stuck, on task" answer, leave the session alone this long
+export const ENTRY_MAX_MS = 15 * 60_000; // an older read is dropped: it no longer says much about the session
+// The radar only spends the first 75% of the deck's daily Jev calls: inbox checks and routing keep the rest.
+export const RADAR_SHARE = 0.75;
+export const radarHasRoom = (u: { calls: number; cap: number }) => u.calls < u.cap * RADAR_SHARE;
 
 /** Why the deck looked, in plain words (tooltips and the push body). */
 export const TRIGGER_WORDS: Record<Trigger, string> = {
@@ -125,6 +130,8 @@ export type RadarDeps = {
   ask?: (state: unknown, questions: typeof RADAR_QUESTIONS, kind: string, meta: { label?: string }) => Promise<JevAnswer<RadarAnswers>>;
   /** The radar feature is on and Jev can be asked. */
   enabled?: () => boolean;
+  /** Today's deck Jev calls and the cap (jevUsage). */
+  usage?: () => { calls: number; cap: number };
   now?: () => number;
 };
 
@@ -137,12 +144,13 @@ export class Radar {
   private busy = new Set<string>();
   private live = new Set<string>();
   private seen = new Map<string, { lastActiveAt: number; msgs: Msg[] }>(); // the last chat read, reused while the row hasn't moved
+  private calm = new Map<string, { until: number; trigger: Trigger }>(); // Jev said fine: no new ask until then, for the same trigger
   private gen = new Map<string, number>(); // bumped when a session's state is dropped: answers from before are void
   constructor(private d: RadarDeps) {}
   private now() { return this.d.now?.() ?? Date.now(); }
   list() { return [...this.entries.values()]; }
   private drop(key: string) {
-    this.readAt.delete(key); this.asked.delete(key); this.seen.delete(key); this.rule.forget(key, this.now());
+    this.readAt.delete(key); this.asked.delete(key); this.seen.delete(key); this.calm.delete(key); this.rule.forget(key, this.now());
     this.gen.set(key, (this.gen.get(key) ?? 0) + 1);
     return this.entries.delete(key);
   }
@@ -152,7 +160,10 @@ export class Radar {
     const working = new Map(rows.filter((r) => r.status === "working" && CODING_AGENTS.has(r.agent)).map((r) => [r.key, r]));
     this.live = new Set(on ? working.keys() : []);
     let dirty = false;
-    for (const k of new Set([...this.entries.keys(), ...this.readAt.keys(), ...this.asked.keys(), ...this.seen.keys()])) if (!this.live.has(k)) dirty = this.drop(k) || dirty;
+    for (const k of new Set([...this.entries.keys(), ...this.readAt.keys(), ...this.asked.keys(), ...this.seen.keys(), ...this.calm.keys()])) if (!this.live.has(k)) dirty = this.drop(k) || dirty;
+    // A read nobody refreshed (later asks fell back, or the request hasn't changed) goes stale: drop its chip.
+    const now = this.now();
+    for (const [k, e] of this.entries) if (now - e.at >= ENTRY_MAX_MS) { this.entries.delete(k); dirty = true; }
     if (dirty) this.d.changed(this.list());
     if (!on) return;
     await Promise.all([...working.values()].map((r) => this.check(r).catch(() => {})));
@@ -182,14 +193,19 @@ export class Radar {
         if (this.entries.delete(r.key)) this.d.changed(this.list());
         return;
       }
+      const calm = this.calm.get(r.key);
+      if (calm && now < calm.until && calm.trigger === trigger) return; // Jev just said it's fine; a new kind of trouble asks again
       const req = radarRequest(r, msgs, trigger);
       const fp = fingerprint(req.kind, req.state, req.questions);
       if (asked?.fp === fp) return; // same request as last time: its answer is already on screen
+      if (!radarHasRoom((this.d.usage ?? jevUsage)())) return;
       this.asked.set(r.key, { at: now, fp });
       const res = await (this.d.ask ?? jevAskOnce)(req.state, req.questions, req.kind, req.meta);
       if (stale()) return; // it stopped working while Jev was thinking
       const e = radarEntry(r.key, trigger, res, this.now());
       if (!e) return;
+      if ((e.stuck ?? 0) < 0.5 && (e.offTask ?? 0) < 0.5) this.calm.set(r.key, { until: e.at + CALM_MS, trigger });
+      else this.calm.delete(r.key);
       this.entries.set(r.key, e);
       this.d.changed(this.list());
       if (this.rule.answer(r.key, fp, e.stuck, this.now())) this.d.push(stuckMessage(r, trigger), r);
