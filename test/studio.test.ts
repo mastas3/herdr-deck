@@ -314,7 +314,8 @@ describe("the studio: conversations, jobs, fallbacks", () => {
     const run = async (o: RunOpts) => {
       calls.push(o);
       if (opts.fail) throw new Error(opts.fail);
-      const parts = reply.match(/[\s\S]{1,40}/g) ?? [];
+      // A hanging model delivers its text at once, then stalls: what matters is what's kept at the time limit.
+      const parts = opts.hang ? [reply] : reply.match(/[\s\S]{1,40}/g) ?? [];
       let all = "";
       for (const p of parts) {
         if (o.signal.aborted) throw new Error("cancelled");

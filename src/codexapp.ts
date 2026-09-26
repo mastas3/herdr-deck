@@ -34,14 +34,28 @@ function open() {
   return db;
 }
 
-let running = { at: 0, value: false };
-/** The app's backend runs as "Codex (Service)"; without it nothing in the app can be working. */
+const pgrepService = async () => {
+  const p = Bun.spawn(["pgrep", "-f", "Codex \\(Service\\)"], { stdout: "pipe", stderr: "ignore" });
+  const [code, out] = await Promise.all([p.exited, new Response(p.stdout).text()]);
+  return code === 0 && out.trim().length > 0;
+};
+let probe: () => Promise<boolean> = pgrepService;
+let running = { at: 0, value: false, busy: false };
+/** The app's backend runs as "Codex (Service)"; without it nothing in the app can be working.
+ *  Read on every patch, so it answers from cache and rechecks in the background: a sync pgrep on a
+ *  loaded machine froze the whole deck for seconds. */
 export function codexAppRunning(): boolean {
-  if (Date.now() - running.at < 5_000) return running.value;
-  const p = Bun.spawnSync(["pgrep", "-f", "Codex \\(Service\\)"], { stdout: "pipe", stderr: "ignore" });
-  running = { at: Date.now(), value: p.exitCode === 0 && p.stdout.toString().trim().length > 0 };
+  if (!running.busy && Date.now() - running.at >= 5_000) {
+    running.busy = true;
+    probe()
+      .then((up) => { running.value = up; })
+      .catch(() => {})
+      .finally(() => { running.at = Date.now(); running.busy = false; });
+  }
   return running.value;
 }
+/** Test seam: swap the process check and forget the cached answer. */
+export function _setRunningProbe(fn: () => Promise<boolean>) { probe = fn; running = { at: 0, value: false, busy: false }; }
 
 type TurnState = { size: number; mtime: number; ino: number; open: boolean; startedAt?: number; endedAt?: number };
 const turnCache = new Map<string, TurnState>();
