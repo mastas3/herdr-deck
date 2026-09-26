@@ -44,7 +44,7 @@ export function seedCombos(all: Ingredient[], row: string, n: number, seed: numb
 
 export type FeedIdea = Build & { at: number; score?: number };
 type Batch = { id: string; rows: string[]; perRow: number; started: number; finished?: number; status: "running" | "done" | "error"; kept: number; dropped: number; error?: string; abort: AbortController };
-type Store = { day?: string; at?: number; ideas: FeedIdea[]; model?: string; cursor: number; dropped: number; generated?: boolean; judged?: number };
+type Store = { day?: string; at?: number; ideas: FeedIdea[]; model?: string; cursor: number; dropped: number; generated?: boolean; judged?: number; settled?: string };
 export type FeedDeps = {
   file: string;
   ingredients: (wait?: number) => Promise<Ingredient[]>;
@@ -114,7 +114,7 @@ export function createFeed(deps: FeedDeps) {
     store.generated = store.generated || b.kept > 0;
     // Last resort: nothing from any model at all, so quick template ideas stand in (clearly marked).
     if (!running().length && !store.ideas.length) fillTemplates(all);
-    if (!running().length) judge().catch(() => {});
+    if (!running().length) { store.settled = dayOf(now()); judge().catch(() => {}); }
     save();
     for (const [k, x] of batches) if (x.status !== "running" && now() - (x.finished ?? x.started) > 30 * 60_000) batches.delete(k);
   }
@@ -157,8 +157,9 @@ export function createFeed(deps: FeedDeps) {
     /** The first view of the day: the six batches (about 72 ideas before the critic), in parallel. Only when Discover opens. */
     ensure() {
       const today = dayOf(now());
-      if (store.day === today || running().length) return;
-      store = { day: today, at: now(), ideas: store.ideas.filter((x) => x.source !== "template").slice(-60), cursor: 0, dropped: 0, model: store.model };
+      if (running().length || (store.day === today && store.settled === today)) return;
+      // A new day starts fresh; a run a restart cut short (same day, never settled) just goes again.
+      if (store.day !== today) store = { day: today, at: now(), ideas: store.ideas.filter((x) => x.source !== "template").slice(-60), cursor: 0, dropped: 0, model: store.model };
       // Yesterday's best stay visible until today's arrive; new ones go first.
       for (const rows of FEED_BATCHES) start(rows, 6);
       store.cursor = FEED_BATCHES.length;

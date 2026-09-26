@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createFeed, isDuplicate, seedCombos } from "../src/feed";
 import type { Ingredient, RunOpts } from "../src/mix";
@@ -76,6 +76,16 @@ describe("the feed", () => {
     });
     return { f, calls, judged, next: () => { day += 86_400_000; } };
   };
+  test("a run a restart cut short (same day, never settled) starts again; a settled day doesn't", async () => {
+    writeFileSync(`${root}/cut-short.json`, JSON.stringify({ day: "2026-09-26", ideas: [], cursor: 0, dropped: 0 }));
+    const cut = make(() => "", "cut-short");
+    cut.f.ensure();
+    expect(cut.calls.length).toBeGreaterThan(0);
+    writeFileSync(`${root}/settled.json`, JSON.stringify({ day: "2026-09-26", settled: "2026-09-26", ideas: [], cursor: 0, dropped: 0 }));
+    const done = make(() => "", "settled");
+    done.f.ensure();
+    expect(done.calls.length).toBe(0);
+  });
   test("the first view: six batches in parallel, ideas land in their rows, the gate and dedupe drop the weak ones", async () => {
     const { f, calls, judged } = make((o, n) => {
       const rows = FEED_BATCHES[n - 1];
