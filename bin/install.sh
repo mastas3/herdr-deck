@@ -31,8 +31,12 @@ cat > "$PLIST" <<PLIST
 </plist>
 PLIST
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
+# Already loaded: restart in place (bootout+bootstrap races launchd and fails with EIO).
+if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then
+  launchctl kickstart -k "gui/$(id -u)/$LABEL"
+else
+  launchctl bootstrap "gui/$(id -u)" "$PLIST"
+fi
 for _ in $(seq 1 40); do
   curl -s -o /dev/null "http://127.0.0.1:$PORT/health" && { echo "herdr-deck running on http://127.0.0.1:$PORT (log: $LOG)"; exit 0; }
   sleep 0.25
