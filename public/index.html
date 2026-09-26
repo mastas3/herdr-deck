@@ -2360,6 +2360,366 @@ svg.jg { display: block; width: 100%; overflow: visible; font-family: var(--sans
   .jpage .jbar i, .jring .fg { transition: none; }
 }
 /* ───────────────────────────────────────────────────────────────────────── </journey> */
+/* ── Quest board (the game) ───────────────────────────────────────────── <quests> */
+:root {
+  --qgold: color-mix(in oklch, #e7ac2f 84%, var(--ink)); --qember: color-mix(in oklch, #ff6a2b 82%, var(--ink)); --qboss: color-mix(in oklch, #e5484d 88%, var(--ink));
+  --qmint: color-mix(in oklch, #2fbf8f 80%, var(--ink)); --qblue: color-mix(in oklch, #4aa8ff 82%, var(--ink)); --qviolet: color-mix(in oklch, #9b7bff 82%, var(--ink));
+}
+.lv-maker { --lv-a: #7f97b8; --lv-b: #c3d0e0; } .lv-shipper { --lv-a: #22b5a6; --lv-b: #86e6cf; } .lv-seller { --lv-a: #e2a324; --lv-b: #ffd97a; }
+.lv-founder { --lv-a: #8a68ff; --lv-b: #cdb8ff; } .lv-operator { --lv-a: #e5484d; --lv-b: #f7c04a; }
+.view[data-view="quests"] { max-width: 1180px; }
+.qb { position: relative; }
+.qtop { display: flex; align-items: baseline; gap: 10px; min-height: 30px; margin: 0 52px 8px 2px; color: var(--ink-3); font-size: 13.5px; }
+.qb .qk { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/1.2 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-3); }
+.qb .qk svg { width: 12px; height: 12px; }
+.qb .qhint, .qdlg .qhint { color: var(--ink-3); font-size: 13px; }
+.qb .spacer { flex: 1; }
+.qb .btn svg { width: 14px; height: 14px; }
+.qb .link.danger { color: var(--blocked); }
+
+/* hero: level, XP bar, revenue, streak, today */
+.qhero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 22px; padding: 20px 22px; margin: 2px 0 16px; border: 1px solid color-mix(in oklch, var(--lv-a) 32%, var(--line)); border-radius: 20px; overflow: hidden; isolation: isolate;
+  background: color-mix(in oklch, var(--lv-a) 7%, var(--raise)); }
+.qhero.skel { min-height: 118px; }
+.qlvl { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.qbadge { flex: none; overflow: visible; animation: qbadge .5s var(--ease) both; }
+.qbadge .hx-o { fill: var(--lv-a); }
+.qbadge .hx-i { fill: color-mix(in oklch, var(--lv-a) 16%, var(--bg)); stroke: color-mix(in oklch, var(--lv-b) 55%, transparent); stroke-width: 1; }
+.qbadge .glyph { color: color-mix(in oklch, var(--lv-a) 70%, var(--ink)); }
+.qbadge .rkc { fill: var(--lv-a); stroke: var(--raise); stroke-width: 2.5; }
+.qbadge .rk { font: 700 10.5px/1 var(--mono); fill: #10151b; text-anchor: middle; }
+.qbadge-sk { width: 76px; height: 76px; border-radius: 22px; background: var(--hover); animation: qsk 1.2s ease-in-out infinite alternate; }
+.qlvl-t { min-width: 0; display: grid; gap: 4px; flex: 1; max-width: 520px; }
+.qlvl-t h2 { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 34px/1 var(--sans); letter-spacing: .01em; text-transform: uppercase; }
+.qlvl-t h2 em { font: 600 14px/1 var(--mono); font-style: normal; color: color-mix(in oklch, var(--lv-a) 70%, var(--ink)); text-transform: none; letter-spacing: 0; }
+.qxpbar { position: relative; height: 8px; margin-top: 6px; border-radius: 99px; background: color-mix(in oklch, var(--ink) 10%, var(--bg)); overflow: hidden; }
+.qxpbar i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left; transform: scaleX(var(--p)); background: var(--lv-a); animation: qfill 1s var(--ease) .15s both; }
+.qxpl { font: 500 12.5px/1.3 var(--mono); color: var(--ink-3); }
+.qxpl b { color: var(--ink); }
+.qnextlv { font-size: 13.5px; color: var(--ink-2); line-height: 1.35; }
+.qnextlv b { color: color-mix(in oklch, var(--lv-a) 70%, var(--ink)); }
+.qstats { display: flex; gap: 10px; }
+.qstat { display: grid; gap: 3px; align-content: center; min-width: 112px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in oklch, var(--bg) 45%, var(--raise)); }
+.qstat b { display: flex; align-items: center; gap: 4px; font: 700 28px/1 var(--sans); font-variant-numeric: tabular-nums; color: var(--ink); }
+.qstat small { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+.qrev b { color: var(--qmint); }
+.qtodayxp b { color: var(--qgold); }
+.qflame b svg { width: 26px; height: 26px; color: var(--ink-3); transform-origin: 50% 90%; }
+.qflame b svg .f2 { fill: currentColor; opacity: .35; }
+.qflame.on b svg { color: var(--qember); }
+.qflame.lit { border-color: color-mix(in oklch, var(--qember) 45%, var(--line)); }
+.qflame.lit b svg { animation: qflick 1.6s ease-in-out infinite; }
+.qflame.lit b svg .f2 { fill: var(--qgold); opacity: .9; }
+.qflame.risk b svg { color: color-mix(in oklch, var(--qember) 55%, var(--ink-3)); animation: qrisk 2.2s ease-in-out infinite; }
+.qflame.risk small { color: var(--working); }
+
+/* grid & cards */
+.qgrid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.qcol { display: grid; gap: 16px; min-width: 0; }
+.qcard { position: relative; min-width: 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--raise); animation: qin .35s var(--ease) both; }
+.qb.calm .qcard, .qb.calm .qq, .qb.calm .qa, .qb.calm .qbadge, .qb.calm .qxpbar i { animation: none; }
+.qsec-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 12px; }
+.qsec-h h3 { margin: 0; font: 700 13px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.qcount { font: 600 12px/1 var(--mono); color: var(--ink-3); padding: 3px 7px; border-radius: 99px; background: var(--hover); }
+.qtag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 99px; font: 700 11px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--qgold); background: color-mix(in oklch, var(--qgold) 15%, transparent); border: 1px solid color-mix(in oklch, var(--qgold) 35%, transparent); }
+.qtag svg { width: 12px; height: 12px; }
+
+/* main quest */
+.qmain { border-color: color-mix(in oklch, var(--pc) 40%, var(--line)); border-top: 3px solid var(--pc); }
+.qmain-h { display: flex; align-items: center; gap: 8px; }
+.qmain-p { margin: 10px 0 0; font: 600 32px/1.05 var(--serif); letter-spacing: -.015em; overflow-wrap: anywhere; }
+.qmain-p .link { font: inherit; color: var(--ink); text-decoration: none; }
+.qmain-p .link:hover { color: var(--pc); }
+.qpitch { margin: 6px 0 0; font: italic 400 16px/1.45 var(--serif); color: var(--ink-2); }
+.qarena { position: relative; margin: 16px 0 12px; padding: 14px; border-radius: 14px; border: 1px solid color-mix(in oklch, var(--qboss) 26%, var(--line)); overflow: hidden; isolation: isolate;
+  background: color-mix(in oklch, var(--qboss) 5%, var(--bg)); }
+.qboss { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 16px; align-items: center; }
+.qsigwrap { position: relative; width: 84px; height: 84px; }
+.qsig { width: 100%; height: 100%; overflow: visible; }
+.qsig .sh { fill: color-mix(in oklch, var(--qboss) 20%, var(--raise)); stroke: var(--qboss); stroke-width: 1.6; }
+.qsig .sh2 { fill: none; stroke: color-mix(in oklch, var(--qboss) 45%, transparent); stroke-width: 1; stroke-dasharray: 3 3; }
+.qsig .g { color: color-mix(in oklch, var(--qboss) 60%, #fff); }
+.qboss .qsig { animation: qbob 3.2s ease-in-out infinite; }
+.qboss.hit .qsig { animation: qshake .55s cubic-bezier(.36, .07, .19, .97) .5s both, qbob 3.2s ease-in-out 1.1s infinite; }
+.qboss.hit .qsig .sh { animation: qflash .55s ease-out .5s both; }
+.qdmg { position: absolute; top: 4px; right: -6px; font: 700 18px/1 var(--mono); color: #ff6b6b; text-shadow: 0 2px 8px #000a; opacity: 0; pointer-events: none; }
+.qboss.hit .qdmg { animation: qdmg 1.3s var(--ease) .55s both; }
+.qboss.cleared .qsig .sh, .qsig.won .sh { fill: color-mix(in oklch, var(--qgold) 22%, var(--raise)); stroke: var(--qgold); }
+.qsig.won .g { color: var(--qgold); }
+.qboss-b { display: grid; gap: 5px; min-width: 0; }
+.qboss-t { font: 700 22px/1.1 var(--sans); letter-spacing: .01em; }
+.qhp { position: relative; height: 16px; border-radius: 6px; background: color-mix(in oklch, var(--qboss) 12%, var(--bg)); border: 1px solid color-mix(in oklch, var(--qboss) 35%, var(--line)); overflow: hidden; }
+.qhp i { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--hp)); background: var(--qboss); animation: qhp 1.1s var(--ease) .2s both; }
+.qhp::before { content: ""; position: absolute; inset: 0; z-index: 1; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), color-mix(in oklch, var(--bg) 70%, transparent) calc(10% - 1px) 10%); pointer-events: none; }
+.qhp span { position: absolute; right: 6px; top: 50%; z-index: 2; transform: translateY(-50%); font: 700 11px/1 var(--mono); color: #fff; text-shadow: 0 1px 2px #000c; }
+.qhp.low i { animation: qhp 1.1s var(--ease) .2s both, qlow 1.4s ease-in-out 1.3s infinite; }
+.qbv { color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qbv b { color: var(--ink); font-family: var(--mono); }
+.qbosses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.qbchip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px 3px 6px; border-radius: 99px; font-size: 12px; color: var(--ink-3); border: 1px solid var(--line); background: color-mix(in oklch, var(--bg) 40%, transparent); }
+.qbchip svg { width: 12px; height: 12px; }
+.qbchip.cur { color: var(--ink); border-color: color-mix(in oklch, var(--qboss) 55%, var(--line)); }
+.qbchip.cur svg { color: var(--qboss); }
+.qbchip.defeated { color: var(--qgold); border-color: color-mix(in oklch, var(--qgold) 35%, var(--line)); }
+.qbchip.defeated span { text-decoration: line-through; text-decoration-thickness: 1px; }
+.qhits { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 4px; }
+.qhits li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; font-size: 13px; }
+.qhits .dmg { font: 700 12px/1 var(--mono); color: #ff6b6b; min-width: 34px; }
+.qhits .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qhits time { color: var(--ink-3); font-size: 12px; }
+.qhits li.new { animation: qslide .5s var(--ease) both; }
+.qnohit { margin: 10px 0 0; }
+.qnextms { display: grid; grid-template-columns: auto minmax(0, 1fr) 90px auto; align-items: center; gap: 4px 10px; font-size: 14px; }
+.qnextms b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qnextms small { color: var(--ink-3); font: 500 12px var(--mono); }
+.qmini { height: 6px; border-radius: 99px; background: var(--hover); overflow: hidden; }
+.qmini i { display: block; height: 100%; transform-origin: left; transform: scaleX(var(--p)); background: var(--pc); border-radius: inherit; }
+.qmain-f { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.qcand { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; align-items: center; padding: 12px 14px; margin-bottom: 14px; border-radius: 12px; border: 1px dashed color-mix(in oklch, var(--pc) 55%, var(--line)); background: color-mix(in oklch, var(--pc) 8%, transparent); }
+.qcand .qk, .qcand b, .qcand small { grid-column: 1; }
+.qcand .btn, .qcand .link { grid-column: 2; grid-row: 1 / span 3; }
+.qcand b { font: 600 18px/1.2 var(--serif); }
+.qcand small { color: var(--ink-3); }
+.qcand.mini { margin: 12px 0 0; padding: 8px 12px; }
+.qcand.mini b { font-size: 15px; }
+.qpick h3 { margin: 0 0 6px; font: 600 26px/1.1 var(--serif); }
+.qpicks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
+.qpickb { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; text-align: left; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: color-mix(in oklch, var(--pc) 6%, var(--raise)); color: var(--ink); cursor: pointer; transition: transform .12s var(--ease), border-color .15s; }
+.qpickb:hover { border-color: var(--pc); transform: translateY(-1px); }
+.qpickb .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--pc); }
+.qpickb b { font: 600 15px/1.2 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qpickb small, .qpickb em { grid-column: 2; font-size: 12.5px; color: var(--ink-3); font-style: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.qpickb em { display: flex; align-items: center; gap: 4px; color: var(--qboss); }
+.qpickb em svg { width: 12px; height: 12px; }
+
+/* today's quests */
+.qqs { display: grid; gap: 10px; }
+.qq { --qc: var(--ink-3); position: relative; padding: 13px 14px 12px 16px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--raise); animation: qin .4s var(--ease) calc(var(--i, 0) * 70ms) both; }
+.qq::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--qc); }
+.qq.p-sell { --qc: var(--qgold); } .qq.p-talk { --qc: var(--qmint); } .qq.p-lead { --qc: var(--qblue); } .qq.p-ship { --qc: var(--qviolet); } .qq.p-milestone { --qc: var(--qboss); }
+.qq-top { display: flex; align-items: center; gap: 8px; }
+.qkind { display: inline-flex; align-items: center; gap: 5px; font: 700 11px/1 var(--sans); letter-spacing: .09em; text-transform: uppercase; color: var(--qc); }
+.qkind svg { width: 13px; height: 13px; }
+.qprog { display: inline-flex; gap: 3px; }
+.qprog i { width: 14px; height: 5px; border-radius: 3px; background: var(--hover); }
+.qprog i.on { background: var(--qc); }
+.qxp { margin-left: auto; font: 700 12px/1 var(--mono); color: var(--qgold); padding: 4px 7px; border-radius: 7px; background: color-mix(in oklch, var(--qgold) 13%, transparent); }
+.qq h4 { margin: 8px 0 4px; font: 600 18px/1.25 var(--sans); letter-spacing: .005em; }
+.qwhy { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink-2); }
+.qmove, .qver { display: flex; align-items: flex-start; gap: 6px; margin: 6px 0 0; font-size: 12.5px; color: var(--ink-3); line-height: 1.35; }
+.qmove b { color: var(--ink-2); font-weight: 600; }
+.qmove svg, .qver svg { width: 13px; height: 13px; flex: none; margin-top: 1px; }
+.qq-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.qq-acts .btn { font-size: 13.5px; padding: 5px 11px; }
+.qq-acts .btn.primary { background: var(--qc); border-color: var(--qc); color: #10151b; font-weight: 600; }
+.qq-acts .btn.ghost span { display: inline; }
+.qq-acts .btn:disabled { opacity: .45; }
+.qq.done { background: color-mix(in oklch, var(--qmint) 6%, var(--raise)); border-color: color-mix(in oklch, var(--qmint) 30%, var(--line)); }
+.qq.done h4 { color: var(--ink-2); }
+.qproof { display: flex; align-items: center; gap: 7px; margin-top: 10px; font-size: 13px; color: var(--qmint); }
+.qproof svg { width: 15px; height: 15px; flex: none; }
+.qproof span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.qproof b { font-weight: 700; }
+.qstamp { position: absolute; top: 10px; right: 12px; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; font: 700 13px/1 var(--mono); color: var(--qgold); border: 2px solid color-mix(in oklch, var(--qgold) 70%, transparent); transform: rotate(-12deg); opacity: .9; background: color-mix(in oklch, var(--qgold) 9%, transparent); }
+.qq.done .qxp { visibility: hidden; }
+.qq.fresh .qstamp { animation: qstamp .7s cubic-bezier(.2, 1.6, .4, 1) .25s both; }
+.qq.fresh { animation: qin .4s var(--ease) both, qglow 1.6s ease-out .3s both; }
+.qq.skel { height: 118px; background: var(--hover); animation: qsk 1.1s ease-in-out infinite alternate; }
+.qq.skel::before { display: none; }
+.qgen { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink-3); font-size: 13.5px; }
+.qnote { margin: 10px 0 0; }
+
+/* battle log */
+.qlog { list-style: none; margin: 0; padding: 0; display: grid; }
+.qlog li { display: grid; grid-template-columns: 22px 50px minmax(0, 1fr) auto auto; align-items: start; gap: 8px; padding: 8px 0; border-top: 1px solid var(--line); }
+.qlog li:first-child { border-top: 0; padding-top: 2px; }
+.qli { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; color: var(--ink-3); background: var(--hover); }
+.qli svg { width: 13px; height: 13px; }
+.qlog .t-ship .qli { color: var(--qviolet); background: color-mix(in oklch, var(--qviolet) 14%, transparent); }
+.qlog .t-sell .qli { color: var(--qgold); background: color-mix(in oklch, var(--qgold) 14%, transparent); }
+.qlog .t-talk .qli { color: var(--qmint); background: color-mix(in oklch, var(--qmint) 14%, transparent); }
+.qlog .t-bonus .qli { color: var(--qblue); background: color-mix(in oklch, var(--qblue) 14%, transparent); }
+.qlog .t-prune .qli { color: var(--ink-2); }
+.qlx { font: 700 13px/22px var(--mono); color: var(--qgold); text-align: right; }
+.qlog li.capped .qlx { color: var(--ink-3); }
+.qlb { display: grid; gap: 1px; min-width: 0; }
+.qlb b { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qlb small { color: var(--ink-3); font-size: 12px; }
+.qlb small em { font-style: normal; color: var(--ink-2); }
+.qlb small em.m { color: var(--qgold); }
+.qlb .qev { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qev-a { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 0; border-radius: 6px; background: none; color: var(--accent); cursor: pointer; font-size: 12.5px; text-decoration: none; }
+.qev-a svg { width: 14px; height: 14px; }
+.qev-a:hover { background: var(--hover); }
+.qundo { font-size: 12px; }
+.qmore { margin-top: 8px; font-size: 13px; }
+
+/* season */
+.qseason.sun { border-color: color-mix(in oklch, var(--qgold) 45%, var(--line)); }
+.qtag.sm { padding: 3px 7px; font-size: 10.5px; }
+.qgoal { display: grid; gap: 4px; margin: 0 0 12px; font: italic 400 17px/1.4 var(--serif); }
+.qgoal .link { justify-self: start; font: 13px var(--sans); font-style: normal; }
+.qgoal-set { display: grid; gap: 2px; width: 100%; margin: 0 0 12px; padding: 12px; border: 1.5px dashed var(--line-2); border-radius: 12px; background: none; color: var(--ink); font: 600 15px/1.2 var(--sans); text-align: left; cursor: pointer; }
+.qgoal-set { grid-template-columns: auto 1fr; align-items: center; column-gap: 8px; }
+.qgoal-set svg { width: 16px; height: 16px; color: var(--qgold); }
+.qgoal-set small { grid-column: 2; color: var(--ink-3); font-weight: 400; font-size: 12.5px; }
+.qgoal-set:hover { border-color: var(--qgold); }
+.qscore { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.qsc { display: grid; gap: 2px; padding: 9px 10px; border-radius: 10px; background: color-mix(in oklch, var(--bg) 45%, var(--raise)); border: 1px solid var(--line); }
+.qsc b { font: 700 21px/1 var(--sans); font-variant-numeric: tabular-nums; }
+.qsc span { font-size: 11.5px; color: var(--ink-3); }
+.qsc.so b { color: var(--qgold); } .qsc.sh b { color: var(--qviolet); } .qsc.ta b { color: var(--qmint); } .qsc.bh b { color: var(--qboss); }
+.qreview { margin-top: 12px; }
+.qreview summary { cursor: pointer; font: 600 14px var(--sans); color: var(--ink-2); }
+.qles { display: grid; gap: 4px; margin: 10px 0; }
+.qles textarea { width: 100%; resize: vertical; }
+.qjev { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 12px; align-items: center; }
+.qjev > .btn, .qjev > .qhint { grid-column: 1 / -1; justify-self: start; }
+.qjev > div { display: grid; gap: 2px; }
+.qjev small { color: var(--ink-3); font-size: 12.5px; }
+.qring { width: 58px; height: 58px; transform: rotate(-90deg); }
+.qring circle { fill: none; stroke-width: 5; }
+.qring .bg { stroke: var(--hover); }
+.qring .fg { stroke: var(--qgold); stroke-linecap: round; }
+.qring text { transform: rotate(90deg); transform-origin: 22px 22px; font: 700 11px var(--mono); fill: var(--ink); text-anchor: middle; }
+
+/* achievements */
+.qshelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
+.qa { display: grid; justify-items: center; gap: 4px; padding: 10px 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in oklch, var(--bg) 40%, var(--raise)); color: var(--ink-3); cursor: pointer; text-align: center; animation: qin .35s var(--ease) calc(var(--i, 0) * 25ms) both; }
+.qai { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1.5px dashed var(--line-2); }
+.qai svg { width: 17px; height: 17px; }
+.qat { font: 600 12px/1.15 var(--sans); }
+.qa small { font-size: 10.5px; }
+.qa:not(.got) { opacity: .6; }
+.qa.got { color: var(--ink); border-color: color-mix(in oklch, var(--qgold) 40%, var(--line)); }
+.qa.got .qai { border: 0; color: #1a1406; background: var(--qgold); }
+.qa.got small { color: var(--qgold); }
+.qa.fresh .qai { animation: qpop .8s cubic-bezier(.2, 1.6, .4, 1) .3s both, qglowr 1.8s ease-out .6s both; }
+
+/* side quests */
+.qsl { list-style: none; margin: 0; padding: 0; display: grid; }
+.qsl li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.qsl li:first-child { border-top: 0; padding-top: 0; }
+.qsl .dot { width: 8px; height: 8px; border-radius: 3px; background: var(--pc); }
+.qsb { display: grid; min-width: 0; }
+.qsb .link { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; font-weight: 600; color: var(--ink); text-decoration: none; }
+.qsb small { color: var(--ink-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qsx { font: 700 12px var(--mono); color: var(--qgold); }
+.qsx.capped { color: var(--ink-3); }
+.qsa { display: flex; gap: 10px; font-size: 12.5px; opacity: 0; transition: opacity .15s; }
+.qsl li:hover .qsa, .qsl li:focus-within .qsa { opacity: 1; }
+.qret { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.qret svg { width: 13px; height: 13px; }
+.qpend { display: flex; align-items: center; gap: 6px; margin: 14px 0 0; }
+
+/* a boss falls */
+.qdefeat { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: color-mix(in oklch, #000 58%, transparent); animation: qfade .3s ease both; }
+.qdf-in { display: grid; justify-items: center; gap: 6px; width: min(360px, 100%); padding: 28px 24px 22px; border-radius: 22px; text-align: center; border: 1px solid color-mix(in oklch, var(--qgold) 50%, var(--line)); background: var(--raise); box-shadow: 0 30px 80px #000a; animation: qpop .5s cubic-bezier(.2, 1.4, .4, 1) .1s both; }
+.qdf-in .qsig { width: 96px; height: 96px; }
+.qsig.dead .sh { fill: color-mix(in oklch, var(--ink-3) 18%, var(--raise)); stroke: var(--ink-3); }
+.qsig.dead .g { color: var(--ink-3); }
+.qsig.dead { animation: qdie 1s var(--ease) .3s both; }
+.qdf-in b { font: 700 24px/1.1 var(--sans); }
+.qdf-in .qk { color: var(--qgold); font-size: 13px; margin-top: 6px; }
+.qdf-in small { color: var(--ink-3); font-size: 13px; }
+.qdf-in .btn { margin-top: 12px; }
+
+/* header chip */
+.qchip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--raise); color: var(--ink-2); font: 600 12px/1 var(--sans); cursor: pointer; white-space: nowrap; transition: border-color .15s, transform .1s; }
+.qchip:hover { border-color: var(--line-2); color: var(--ink); }
+.qchip:active { transform: scale(.96); }
+.qchip[hidden] { display: none; }
+.qc-lv { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; color: #10151b; background: var(--lv-a); }
+.qc-lv svg { width: 12px; height: 12px; }
+.qc-rk { font: 700 10.5px/1 var(--mono); color: var(--ink-3); }
+.qc-fl { display: inline-flex; align-items: center; gap: 1px; font: 700 11.5px/1 var(--mono); color: var(--qember); }
+.qc-fl svg { width: 14px; height: 14px; }
+.qc-fl svg .f2 { fill: currentColor; opacity: .4; }
+.qc-fl.risk { color: color-mix(in oklch, var(--qember) 50%, var(--ink-3)); }
+.qc-q { min-width: 16px; padding: 2px 4px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font: 700 10.5px/1 var(--mono); text-align: center; }
+.app.list-off .qchip { display: none; }
+
+/* dialogs */
+.qdlg svg { width: 14px; height: 14px; vertical-align: -2px; }
+.qdlg .qf { display: grid; gap: 4px; margin: 10px 0 0; }
+.qdlg .qf span { font-size: 13px; color: var(--ink-2); }
+.qdlg .qf small { color: var(--ink-3); font-size: 12px; }
+.qdlg .qf .inp { width: 100%; }
+.qsteps { margin: 8px 0 12px; padding-left: 20px; display: grid; gap: 6px; line-height: 1.4; }
+.qleads { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.qleads li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.qleads a { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.qleads small { grid-column: 1; color: var(--ink-3); font-size: 12px; }
+.qleads .btn { grid-column: 2; grid-row: 1 / span 2; }
+.qleads .btn.ok { color: var(--qmint); border-color: var(--qmint); }
+.qwins { display: grid; gap: 8px; margin-top: 10px; }
+.qwin { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 1px 10px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--raise); color: var(--ink); text-align: left; cursor: pointer; }
+.qwin:hover { border-color: var(--accent); }
+.qwin svg { grid-row: 1 / span 2; width: 22px; height: 22px; color: var(--qgold); }
+.qwin b { font: 600 15px/1.2 var(--sans); }
+.qwin small { color: var(--ink-3); font-size: 12.5px; }
+.qachd { display: grid; justify-items: start; gap: 4px; }
+.qachd .qai { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; border: 1.5px dashed var(--line-2); color: var(--ink-3); }
+.qachd .qai svg { width: 22px; height: 22px; }
+.qachd.got .qai { border: 0; color: #1a1406; background: var(--qgold); }
+.qachd p { margin: 4px 0 0; }
+
+@keyframes qin { from { opacity: 0; transform: translateY(8px); } }
+@keyframes qfill { from { transform: scaleX(0); } }
+@keyframes qhp { from { transform: scaleX(1); } }
+@keyframes qbadge { from { opacity: 0; transform: scale(.6) rotate(-20deg); } }
+@keyframes qflick { 0%, 100% { transform: scale(1, 1) rotate(0); } 30% { transform: scale(1.04, .95) rotate(-2deg); } 60% { transform: scale(.97, 1.06) rotate(2deg); } }
+@keyframes qrisk { 50% { opacity: .45; } }
+@keyframes qbob { 50% { transform: translateY(-3px); } }
+@keyframes qshake { 10%, 90% { transform: translateX(-2px) rotate(-2deg); } 20%, 80% { transform: translateX(4px) rotate(3deg); } 30%, 50%, 70% { transform: translateX(-6px) rotate(-4deg); } 40%, 60% { transform: translateX(6px) rotate(4deg); } }
+@keyframes qflash { 0% { fill: #ff4d5e; } }
+@keyframes qdmg { 0% { opacity: 0; transform: translateY(6px) scale(.7); } 25% { opacity: 1; transform: translateY(-4px) scale(1.15); } 100% { opacity: 0; transform: translateY(-26px) scale(1); } }
+@keyframes qlow { 50% { opacity: .65; } }
+@keyframes qslide { from { opacity: 0; transform: translateX(-10px); } }
+@keyframes qstamp { from { opacity: 0; transform: rotate(-12deg) scale(2.4); } }
+@keyframes qglow { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--qmint) 60%, transparent); } 100% { box-shadow: 0 0 0 14px transparent; } }
+@keyframes qglowr { 0% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--qgold) 70%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+@keyframes qpop { from { opacity: 0; transform: scale(.4); } }
+@keyframes qsk { to { opacity: .45; } }
+@keyframes qfade { from { opacity: 0; } }
+@keyframes qdie { 30% { transform: scale(1.12) rotate(-6deg); } 100% { transform: scale(.92) rotate(8deg) translateY(4px); opacity: .8; } }
+
+@media (max-width: 760px) {
+  .qhero { grid-template-columns: 1fr; gap: 14px; padding: 15px 14px; border-radius: 16px; margin-top: 0; }
+  .qlvl { gap: 12px; }
+  .qlvl-t h2 { font-size: 27px; }
+  .qnextlv { font-size: 13px; }
+  .qstats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .qstat { min-width: 0; padding: 9px 10px; border-radius: 12px; }
+  .qstat b { font-size: 22px; }
+  .qflame b svg { width: 21px; height: 21px; }
+  .qstat small { white-space: normal; font-size: 11px; line-height: 1.25; }
+  .qgrid { grid-template-columns: 1fr; gap: 12px; }
+  .qcol { gap: 12px; }
+  .qcard { padding: 14px; border-radius: 14px; }
+  .qmain-p { font-size: 27px; }
+  .qarena { padding: 12px; }
+  .qboss { grid-template-columns: 64px minmax(0, 1fr); gap: 12px; }
+  .qsigwrap { width: 64px; height: 64px; }
+  .qboss-t { font-size: 19px; }
+  .qnextms { grid-template-columns: minmax(0, 1fr) 70px; }
+  .qnextms .qk { grid-column: 1 / -1; }
+  .qnextms small { grid-column: 1 / -1; }
+  .qmain-f .btn { flex: 1; justify-content: center; padding: 9px 12px; }
+  .qq h4 { font-size: 17px; }
+  .qq-acts .btn { flex: 1; justify-content: center; padding: 9px 10px; font-size: 14px; }
+  .qq-acts .btn.ghost { flex: 0 0 auto; }
+  .qlog li { grid-template-columns: 22px 44px minmax(0, 1fr) auto; }
+  .qlog .qundo { grid-column: 3; justify-self: start; }
+  .qshelf { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); }
+  .qsa { opacity: 1; flex-direction: column; gap: 4px; align-items: flex-end; }
+  .qpicks { grid-template-columns: 1fr; }
+  .qchip b { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qb *, .qdefeat, .qdefeat *, .qchip { animation: none !important; transition: none !important; }
+}
+/* ───────────────────────────────────────────────────────────────────────── </quests> */
 </style>
 </head>
 <body>
@@ -2507,6 +2867,7 @@ svg.jg { display: block; width: 100%; overflow: visible; font-family: var(--sans
       <tr><td><kbd>g</kbd></td><td>Group by inbox / project</td></tr>
       <tr><td><kbd>l</kbd></td><td>Live board of everything working</td></tr>
       <tr><td><kbd>d</kbd></td><td>Discover: repos worth forking, the idea lab and your plans</td></tr>
+      <tr><td><kbd>q</kbd></td><td>Quests: your main quest, today’s quests, bosses and streak</td></tr>
       <tr><td><kbd>n</kbd></td><td>New session</td></tr>
       <tr><td><kbd>f</kbd></td><td>Switch herdr to this pane (or open a Codex app thread in the app)</td></tr>
       <tr><td><kbd>y</kbd></td><td>Copy a link to this session</td></tr>

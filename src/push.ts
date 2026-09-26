@@ -7,6 +7,8 @@ export type Prefs = {
   needs: boolean; // a session is waiting for input
   done: boolean; // a session finished a turn you haven't seen
   digest: boolean; // the morning digest
+  questDigest: boolean; // today's quests in the morning digest (the game; on by default)
+  quests: boolean; // quest completions, boss hits, achievements, the Sunday review (off by default)
   quiet: { on: boolean; from: string; to: string }; // "22:00" → "07:30": no needs/finished alerts in between
 };
 export type Device = {
@@ -21,10 +23,10 @@ export type Device = {
   lastErrorAt?: number;
   sent?: number;
 };
-export type Kind = "needs" | "done" | "digest" | "test" | "burst";
+export type Kind = "needs" | "done" | "digest" | "test" | "burst" | "quest";
 export type Message = { title: string; body: string; tag?: string; url?: string; badge?: number; kind: Kind; key?: string; at?: number };
 
-export const DEFAULT_PREFS: Prefs = { needs: true, done: true, digest: true, quiet: { on: false, from: "22:00", to: "07:30" } };
+export const DEFAULT_PREFS: Prefs = { needs: true, done: true, digest: true, questDigest: true, quests: false, quiet: { on: false, from: "22:00", to: "07:30" } };
 const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 const minutesOf = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
@@ -43,6 +45,7 @@ export function wants(d: Device, m: Message, now: Date, only?: string) {
   if (m.kind === "digest") return d.prefs.digest;
   if (inQuiet(now, d.prefs.quiet)) return false;
   if (m.kind === "burst") return d.prefs.needs || d.prefs.done;
+  if (m.kind === "quest") return d.prefs.quests === true;
   return !!d.prefs[m.kind];
 }
 
@@ -52,6 +55,8 @@ export function cleanPrefs(p: any, base: Prefs = DEFAULT_PREFS): Prefs {
     needs: typeof p?.needs === "boolean" ? p.needs : base.needs,
     done: typeof p?.done === "boolean" ? p.done : base.done,
     digest: typeof p?.digest === "boolean" ? p.digest : base.digest,
+    questDigest: typeof p?.questDigest === "boolean" ? p.questDigest : base.questDigest ?? true,
+    quests: typeof p?.quests === "boolean" ? p.quests : base.quests ?? false,
     quiet: {
       on: typeof q.on === "boolean" ? q.on : base.quiet.on,
       from: HHMM.test(q.from) ? q.from : base.quiet.from,
@@ -112,9 +117,9 @@ export class PushStore {
     return this.devices.map(({ keys, endpoint, ...d }) => ({ ...d, service: (() => { try { return new URL(endpoint).hostname; } catch { return "?"; } })() }));
   }
   /** Sends to every device that wants it. Dead subscriptions (404/410) are dropped. */
-  async deliver(m: Message, o: { only?: string; now?: Date; ttl?: number; urgency?: "very-low" | "low" | "normal" | "high"; topic?: string } = {}) {
+  async deliver(m: Message, o: { only?: string; now?: Date; ttl?: number; urgency?: "very-low" | "low" | "normal" | "high"; topic?: string; filter?: (d: Device) => boolean } = {}) {
     const now = o.now ?? new Date();
-    const targets = this.devices.filter((d) => wants(d, m, now, o.only));
+    const targets = this.devices.filter((d) => wants(d, m, now, o.only) && (!o.filter || o.filter(d)));
     const payload = JSON.stringify({ title: m.title, body: m.body, tag: m.tag, url: m.url, badge: m.badge, kind: m.kind, at: m.at ?? now.getTime() });
     const results: { id: string; label: string; ok: boolean; gone: boolean; error?: string }[] = [];
     await Promise.all(targets.map(async (d) => {

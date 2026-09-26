@@ -40,7 +40,7 @@ export type Journey = {
 };
 export type ManualEntry = { metric: string; value: number; at: number; note?: string };
 export type ManualUnlock = { id: string; at: number; note: string };
-export type ManualData = { metrics: ManualEntry[]; unlocks: ManualUnlock[] };
+export type ManualData = { metrics: ManualEntry[]; unlocks: ManualUnlock[]; ladder?: LadderItem[] }; // ladder: seeded by a game run (src/game.ts)
 
 // ── metrics from evidence ──────────────────────────────────────────────────────────
 /** Cumulative series from event times, thinned to at most `max` points (the last point is always kept). */
@@ -196,7 +196,7 @@ export function assemble(project: string, ev: Evidence, ai: AiResult | undefined
   const metrics = computeMetrics({ ...ev, sessions }); // live and worktree sessions count too
   const commitsN = g?.commits ?? 0;
   const nature = ai?.nature ?? guessNature(w?.tags ?? [], `${w?.tldr ?? ""}`);
-  const ladder = ai?.ladder?.length ? guardLadder(ai.ladder) : templateLadder(nature);
+  const ladder = ev.manual.ladder?.length ? guardLadder(ev.manual.ladder) : ai?.ladder?.length ? guardLadder(ai.ladder) : templateLadder(nature);
   const milestones = evaluate(ladder, metrics, ev.manual);
   // Unlocks become flags on the line.
   for (const m of milestones) if (m.state === "unlocked" && m.at) events.push({ id: `f${hash(m.id)}`, t: m.at, kind: "milestone", title: `Unlocked: ${m.title}`, detail: m.evidence, weight: 6, link: m.link });
@@ -427,6 +427,14 @@ export function createJourneys(paths: JourneyPaths, deps: JourneyDeps) {
     m.metrics.push({ metric, value, at, note: body.note ? clip(body.note, 200) : undefined });
     saveManual();
   }
+  /** A milestone ladder seeded from an idea (a game run): it wins over the AI's and the template until cleared. */
+  function seedLadder(p: string, items: LadderItem[]) {
+    const m = (manualAll[p] = manualOf(p));
+    m.ladder = guardLadder(items.map((x, i) => ({ ...x, id: slug(x.id || x.title), tier: x.tier ?? i })));
+    saveManual();
+    const c = load(p);
+    c.journey = undefined; // the next open rebuilds with it
+  }
   function markUnlocked(p: string, body: { id: string; note?: string; at?: number; undo?: boolean }) {
     const id = slug(String(body.id ?? ""));
     const m = (manualAll[p] = manualOf(p));
@@ -518,7 +526,7 @@ export function createJourneys(paths: JourneyPaths, deps: JourneyDeps) {
     return undefined;
   }
 
-  return { get, rebuild, handle, index, logMetric, markUnlocked, startAi, stats, whenAiIdle: () => aiQueue, _cache: (p: string) => load(p) };
+  return { get, rebuild, handle, index, logMetric, markUnlocked, seedLadder, startAi, stats, whenAiIdle: () => aiQueue, _cache: (p: string) => load(p) };
 }
 
 // ── glue for the server: rows and history hits as session records ─────────────────────────
