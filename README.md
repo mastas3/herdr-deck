@@ -310,6 +310,16 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
     Starters from your world, **Shuffle** and **Surprise me** (an audience picked from your interests). Only the query
     words leave the machine; nothing is posted and nobody is contacted; emails and phone numbers are stripped.
     Cached per query in `~/.config/herdr-deck/leads-cache.json`. ⌘K has it too; `leadsFor(text)` opens it from code.
+  - **Research:** autoresearch campaigns. Give a goal (presets come from your wiki), optional seeds, a run budget,
+    a daily cap and quiet hours; after you confirm a summary, the deck runs research sessions one at a time: headless
+    Claude plans each next question from what earlier reports found (a built-in planner fills in), a Claude Code
+    session labeled "research: …" runs it with `last30days` and web search and writes a report with scores and a
+    JSON block of findings to `~/.config/herdr-deck/research/<campaign>/`, and the deck scores it (a rubric, plus
+    Jev's chance of 10 paying customers in 60 days), keeps or discards it, and closes that session. Only niches with a
+    named buyer, a linked place they gather, an observed price and linked pains reach the leaderboard; unsourced or
+    generic reports are discarded. Pause, Skip, Stop and a kill switch; two failed runs in a row pause it; pushes when
+    it finishes or finds a new top niche. It only ever closes its own sessions and survives restarts without starting a
+    run twice. `DECK_RESEARCH_FAKE=1` simulates sessions for testing. Code: `src/autoresearch*.ts`.
     Code: `src/leads.ts`.
   - **Ideas:** the plans, rendered, with the session that wrote them and **Start building**.
   - Only interest keywords and the words of your idea go to GitHub. Nothing starts until you confirm the
