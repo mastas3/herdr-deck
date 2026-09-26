@@ -12,7 +12,7 @@ import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCusto
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
-import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap } from "./jev";
+import { RECEIPTS_FILE, cachedById, jevAvailable, jevUsage, setJevCap, setJevFeature } from "./jev";
 import { statsFor } from "./jevstats";
 import { appendAudit, handleMcp, mcpToken, readAudit, type McpCtx } from "./mcp";
 import { Deck, type Row } from "./deck";
@@ -1342,6 +1342,11 @@ async function handle(req: Request): Promise<Response> {
         }
         case "/api/jev/cap": {
           try { setJevCap(Number(body.cap)); } catch (e: any) { return json({ error: e.message }, 400); }
+          broadcast("jev", jevUsage());
+          return json({ ok: true, jev: jevUsage() });
+        }
+        case "/api/jev/feature": {
+          try { setJevFeature(String(body.name), body.on); } catch (e: any) { return json({ error: e.message }, 400); }
           broadcast("jev", jevUsage());
           return json({ ok: true, jev: jevUsage() });
         }

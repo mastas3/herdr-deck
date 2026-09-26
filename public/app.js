@@ -2263,6 +2263,12 @@ function jevBar(j) {
   const label = j.available ? `Jev · ${j.calls ?? 0}/${j.cap ?? "–"} today` : "Jev is off on this machine";
   return `<div class="jevbar"><button class="jevtog" data-jevtog aria-expanded="${!!S.jevOpen}"><span class="jb">Jev</span>${esc(label.replace(/^Jev · /, ""))}<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>${S.jevOpen ? jevPanel(S.jevStats, j) : ""}`;
 }
+// What each Jev feature sends, so you can switch off any of them.
+const JEV_FEATS = [
+  ["risk", "Risk level on permission prompts", "adds one question to the prompt check it already sends"],
+  ["radar", "Stuck radar", "sends the last tool calls of a running session when it looks stuck"],
+  ["route", "Send by description", "sends your message and your sessions' titles when you ask it to route"],
+];
 function jevPanel(st, j) {
   if (!st) return `<section class="jevp"><p class="hint">${S.jevErr ? esc(S.jevErr) : "Reading the receipts…"}</p></section>`;
   const span = (t, x) => `<div class="jst"><span class="jl">${t}</span><b>${x.calls}</b><span>call${x.calls === 1 ? "" : "s"}</span><span class="jm">${ktok(x.inputTokens)} tok · ${money(x.cost)}</span>${x.repeats ? `<span class="jm jwarn" title="Asked again with the exact same state (before the dedupe fix)">${x.repeats} repeat${x.repeats === 1 ? "" : "s"}</span>` : ""}</div>`;
@@ -2276,6 +2282,7 @@ function jevPanel(st, j) {
     return `<li><span class="jt" data-t="${x.at}">${esc(agoText(x.at))}</span><span class="jk">${KS[x.kind]}${rep}</span><span class="jq">${x.label ? esc(x.label) : `<span class="hint">–</span>`}</span><span class="js">Jev <b>${esc(x.suggestion)}</b>${x.pickTitle ? ` <span class="hint">${esc(x.pickTitle)}</span>` : ""}</span><span class="ja">${x.actual ? `You <b>${esc(x.actual)}</b>${x.actualTitle ? ` <span class="hint">${esc(x.actualTitle)}</span>` : ""}` : `<span class="hint">no answer recorded</span>`}</span>${mark}</li>`;
   }).join("") : `<li class="hint">No deck decisions in the receipts yet.</li>`;
   const cap = st.cap;
+  const feats = JEV_FEATS.map(([k, title, sends]) => `<label class="nchk"><input type="checkbox" data-jevfeat="${k}" ${j.features?.[k] !== false ? "checked" : ""}><span><b>${title}</b><small>${sends}</small></span></label>`).join("");
   return `<section class="jevp" aria-label="Jev">
     <div class="jgrid">${span("Today", st.today)}${span("7 days", st.week)}${span("All time", st.total)}</div>
     <div class="jcols">
@@ -2285,6 +2292,7 @@ function jevPanel(st, j) {
     <h4>Last ${st.recent.length} decisions</h4>
     <ul class="jrec">${recent}</ul>
     <form class="jcap"><label>Daily cap <input type="number" min="0" max="100000" step="1" value="${cap.cap}" inputmode="numeric" aria-label="Jev calls per day"></label><button class="btn">Save</button><span class="hint">${cap.used} used today · at the cap ≈ ${money(cap.cap * 1200 * st.price.perMillionInput / 1e6)}/day${cap.source === "env" ? " · from DECK_JEV_DAILY until you save" : ""}</span></form>
+    <div class="jfeat">${feats}</div>
     <p class="hint jfoot">${st.asked} decisions asked, ${st.answered} answered in the deck. All Jev use today: ${st.allAgentsToday.calls} calls, ${money(st.allAgentsToday.cost)}. $${st.price.perMillionInput} per million input tokens, output free.</p>
   </section>`;
 }
@@ -2487,6 +2495,12 @@ $("dbody").addEventListener("click", async (e) => {
   }
   const act = e.target.closest("[data-dact2]")?.dataset.dact2;
   if (act) inboxAct(key, act);
+});
+$("dbody").addEventListener("change", async (e) => {
+  const f = e.target.closest?.("[data-jevfeat]");
+  if (!f) return;
+  const on = f.checked;
+  try { const r = await api("/api/jev/feature", { name: f.dataset.jevfeat, on }); S.jev = r.jev; toast(`${JEV_FEATS.find((x) => x[0] === f.dataset.jevfeat)?.[1] ?? "Jev feature"}: ${on ? "on" : "off"}`); } catch (x) { f.checked = !on; toast(x.message, true); }
 });
 $("dbody").addEventListener("submit", async (e) => {
   const cap = e.target.closest(".jcap");
