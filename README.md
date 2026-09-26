@@ -78,7 +78,7 @@ On Linux, `tailscale serve` needs permission once: `sudo tailscale set --operato
   and a message box that sends to the agent.
 - A service worker keeps icons and fonts instant and shows a clear "your computer isn't reachable" page when
   you're offline. Live data is never cached.
-- Alerts work while the app is open. Push alerts while it's closed would need a push service.
+- Push notifications work with the app closed (see Notifications below). On iPhone they need the installed app (iOS 16.4+).
 
 ## More machines
 
@@ -311,21 +311,6 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
 - Row data comes from the head and tail of session files and is cached by size and mtime. The detail view parses
   transcripts incrementally, so an active 35 MB file costs about 1 ms after the first read (about 150 ms). OpenCode data is
   cached by `time_updated`. Fonts are bundled locally.
-
-## On your phone (PWA over Tailscale)
-
-`bin/install.sh` also runs `tailscale serve --bg --https=8448 http://127.0.0.1:4747`, which serves the deck on
-`https://<this-mac>.<tailnet>.ts.net:8448`. That address is reachable only from your tailnet (not Funnel) and has a real certificate.
-Open it on the phone, then use Add to Home Screen (iOS Safari) or Install app (Android Chrome).
-
-- On a phone the deck has two screens. The sessions list has search and status chips across the top, with more under Filters.
-  Tapping a session opens it with Story and Terminal tabs, and the system back gesture returns to the list.
-- The terminal wraps lines to the screen and has a row of keys (esc, enter, ctrl+c, arrows, 1/2/3, y/n)
-  and a message box that sends to the agent.
-- New session opens as a full-screen sheet.
-- A service worker keeps icons and fonts instant and shows a clear "your Mac isn't reachable" page when you're offline.
-  Live data is never cached.
-- Push notifications work with the app closed (see below). On iPhone they need the installed app (iOS 16.4+).
 
 ## Notifications and automations
 
