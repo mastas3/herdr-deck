@@ -9,7 +9,7 @@ function store(k, v) { try { localStorage.setItem("deck:" + k, JSON.stringify(v)
 function load(k, d) { try { const v = localStorage.getItem("deck:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } }
 const S = {
   token: "", self: "", rows: new Map(), summary: { herdr: [], machines: [] }, graveyard: [], recipes: [],
-  machine: load("machine", "all"), q: "", sel: null, picked: new Set(), view: "inbox", group: load("group", "inbox"),
+  machine: load("machine", "all"), q: "", sel: null, picked: new Set(), view: "inbox", group: load("group", "priority") === "project" ? "project" : "priority",
   tab: load("tab2", "chat"), closedSecs: load("closedSecs", { stale: true, empty: true }), closedProj: load("closedProj", {}),
   notify: false, fit: load("fit", true), autoBrief: load("autoBrief", true),
   details: new Map(), board: false, sub: null,
@@ -147,17 +147,23 @@ function nowWords(now, running = true) {
 }
 
 // ── markdown (safe: escaped first) ───────────────────────────────────────
+const PATHISH = /^(?:~\/|\/|\.{1,2}\/)?[\w@.+-]+(?:\/[\w@.+ -]*[\w@.+-])+\/?(?::\d+(?::\d+)?)?$/;
+const looksLikePath = (c) => PATHISH.test(c) && (/^(~\/|\/)/.test(c) || /\.\w{1,8}(:\d+)*$/.test(c)) && !/^\w+:\/\//.test(c);
 function inline(s) {
   const codes = [];
   let t = esc(s).replace(/`([^`\n]+)`/g, (_, c) => { codes.push(c); return `\u0000${codes.length - 1}\u0000`; });
   t = t.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
     // local file links, "[name](</abs/path>)" or "[name](/abs/path)": show the name, the path on hover
-    .replace(/\[([^\]\n]+)\]\((?:&lt;)?((?:~|\/)[^\s)]*?)(?:&gt;)?\)/g, '<span class="fpath" title="$2">$1</span>')
+    .replace(/\[([^\]\n]+)\]\((?:&lt;)?((?:~|\/|\.{1,2}\/)[^\s)]*?)(?:&gt;)?\)/g, '<a class="fpath" data-path="$2" title="$2">$1</a>')
+    // [[wiki-page]] links into the personal wiki
+    .replace(/\[\[([\w.-]+)(?:\|([^\]\n]+))?\]\]/g, (_, name, label) => `<a class="fpath" data-path="wiki:${name}" title="Wiki: ${name}">${label ?? name}</a>`)
+    // bare paths in prose: ~/… or an absolute home path
+    .replace(/(^|[\s(])((?:~|\/Users\/[\w.-]+|\/home\/[\w.-]+)\/[^\s<>"')\]]*[^\s<>"')\].,;:!?])/g, '$1<a class="fpath" data-path="$2" title="$2">$2</a>')
     .replace(/(^|[\s(])(https?:\/\/[^\s<)]+[^\s<).,;:!?'"])/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>')
     .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
     .replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,;:!?]|$)/g, "$1<i>$2</i>")
     .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, "$1<i>$2</i>");
-  return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
+  return t.replace(/\u0000(\d+)\u0000/g, (_, i) => { const c = codes[Number(i)]; return looksLikePath(c.replace(/&amp;/g, "&")) ? `<code class="fpath" data-path="${c}" title="Open ${c}">${c}</code>` : `<code>${c}</code>`; });
 }
 /**
  * Choices an agent offers ("(a) … (b) …", "A) …", or a numbered list right after a question) become cards
@@ -187,16 +193,30 @@ function parseChoices(lines, start, afterQuestion) {
   }
   return opts.length >= 2 ? { opts, end: i } : null;
 }
-function choicesHTML(opts) {
-  return `<div class="choices">${opts.map((o) => {
-    const first = o.body[0].replace(/\*\*/g, "");
-    const cut = first.search(/(?<=[.!?])\s|\s[—–-]\s|:\s/);
-    const title = (cut > 0 && cut < 110 ? first.slice(0, cut) : first.length < 110 ? first : first.slice(0, 100) + "…").replace(/[.:]$/, "");
-    const rest = [cut > 0 && cut < 110 ? first.slice(cut).replace(/^\s*[—–:-]?\s*/, "") : first.length < 110 ? "" : first, ...o.body.slice(1)].filter((x) => x.trim());
+const DECIDE = /\b(pick|choose|choice|options?|ways?\b|paths?|approach(?:es)?|alternatives?|directions?|decide|decision|go with|prefer|should (?:i|we)|would you like|want me to|which (?:one|option|way|path|approach|of these|do you|would you|should))\b/i;
+const ASKS = /\?\s*\**\s*$|\b(pick one|choose|which (?:one|do you|would you)|prefer|your call|let me know which|tell me which)\b/i;
+/** Title = a leading **bold** phrase, else the first sentence; the rest describes it. */
+function splitOption(body) {
+  const first = body[0];
+  const bold = first.match(/^\*\*(.+?)\*\*[\s:—–.-]*(.*)$/);
+  let title, restFirst;
+  if (bold) { title = bold[1]; restFirst = bold[2]; }
+  else {
+    const plainFirst = first.replace(/\*\*/g, "");
+    const cut = plainFirst.search(/(?<=[.!?])\s|\s[—–-]\s|:\s|;\s/);
+    title = cut > 0 && cut < 100 ? plainFirst.slice(0, cut) : plainFirst.length <= 100 ? plainFirst : plainFirst.slice(0, 90).replace(/\s+\S*$/, "") + "…";
+    restFirst = cut > 0 && cut < 100 ? plainFirst.slice(cut).replace(/^\s*[—–:;-]?\s*/, "") : plainFirst.length <= 100 ? "" : plainFirst;
+  }
+  return { title: title.replace(/[\s,;:.—–-]+$/, ""), rest: [restFirst, ...body.slice(1)].filter((x) => x && x.trim()) };
+}
+function choicesHTML(opts, question) {
+  return `<div class="choices">${question ? `<div class="cq">${inline(question)}</div>` : ""}${opts.map((o) => {
+    const { title, rest } = splitOption(o.body);
     const rec = /recommend|\bpreferred\b/i.test(o.body[0]);
     const lab = o.label.toUpperCase();
-    return `<div class="choice${rec ? " rec" : ""}" data-choice="${esc(o.label)}" data-title="${esc(title.replace(/\s*\((my )?recommend(ed|ation)\)/i, ""))}"><span class="cl">${esc(lab)}</span><div class="cb"><div class="ct">${inline(title)}${rec ? '<span class="rp">Recommended</span>' : ""}</div>${rest.length ? `<div class="cd">${rest.map(inline).join("<br>")}</div>` : ""}</div><button class="btn primary cs" data-choose="${esc(o.label)}" tabindex="-1">Choose ${esc(lab)}</button></div>`;
-  }).join("")}</div>`;
+    const clean = title.replace(/\s*\((my )?recommend(ed|ation)\)/i, "");
+    return `<div class="choice${rec ? " rec" : ""}" data-choice="${esc(o.label)}" data-title="${esc(clean)}"><span class="cl">${esc(lab)}</span><div class="cb"><div class="ct">${inline(clean)}${rec ? '<span class="rp">Recommended</span>' : ""}</div>${rest.length ? `<div class="cd">${rest.map(inline).join("<br>")}</div>` : ""}</div><button class="btn primary cs" data-choose="${esc(o.label)}" tabindex="-1">Choose ${esc(lab)}</button></div>`;
+  }).join("")}<div class="chint">Click an option to put it in your reply · <b>Choose</b> sends it</div></div>`;
 }
 function diffHTML(code) {
   return `<pre class="diff"><code>${code.replace(/\n$/, "").split("\n").map((l) => `<span class="${/^\+(?!\+\+)/.test(l) ? "add" : /^-(?!--)/.test(l) ? "del" : /^@@/.test(l) ? "hunk" : ""}">${esc(l)}</span>`).join("\n")}</code></pre>`;
@@ -213,9 +233,25 @@ function md(text) {
     while (i < lines.length) {
       const l = lines[i];
       if (!l.trim()) { i++; continue; }
-      const prevText = (out[out.length - 1] ?? "").replace(/<[^>]+>/g, "");
-      const ch = OPT_RE.test(l) ? parseChoices(lines, i, /\?\s*$/.test(prevText) || /\b(choose|option|which|prefer|pick|decide)\b/i.test(prevText)) : null;
-      if (ch) { out.push(choicesHTML(ch.opts)); i = ch.end; continue; }
+      const prevHTML = out[out.length - 1] ?? "";
+      const prevText = prevHTML.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim();
+      const intro = prevText.split(/(?<=[.!?:])\s+/).pop() ?? "";
+      const decisive = /\?\s*$/.test(intro) || (DECIDE.test(intro) && /[:?]\s*$/.test(intro));
+      const ch = OPT_RE.test(l) ? parseChoices(lines, i, decisive) : null;
+      if (ch) {
+        const outro = lines.slice(ch.end).find((x) => x.trim()) ?? "";
+        const rec = ch.opts.some((o) => /recommend/i.test(o.body[0]));
+        const numeric = /^\d$/.test(ch.opts[0].label);
+        if (decisive || (!numeric && (rec || ASKS.test(outro)))) {
+          // The question moves into the card group, so the options read as answers to it.
+          // A short question/lead-in paragraph moves into the card group so the options read as answers to it.
+          let q = "";
+          if (/[?:]\s*\**\s*$/.test(prevText) && (prevText === intro || prevText.length < 140) && /^<(p|h\d)>/.test(prevHTML)) { out.pop(); q = prevText.replace(/\*\*/g, ""); }
+          out.push(choicesHTML(ch.opts, q));
+          i = ch.end;
+          continue;
+        }
+      }
       let m;
       if ((m = l.match(/^(#{1,4})\s+(.*)/))) { out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); i++; continue; }
       if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push("<hr>"); i++; continue; }
@@ -259,13 +295,22 @@ function md(text) {
 const mdLite = (t) => esc(t).replace(/`([^`\n]+)`/g, '<code class="mono" style="font-size:.86em">$1</code>').replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>").replace(/^#{1,4}\s+(.+)$/gm, "<b>$1</b>");
 
 // ── inbox & projects ─────────────────────────────────────────────────────
+/** A finished session stops needing you once you've opened it (on any device). */
+const unseenDone = (r) => r.status === "done" && !r.seen;
+const needsYou = (r) => r.status === "blocked" || unseenDone(r);
+/** herdr's "priority" order: an attention queue. Lower rank comes first. */
+function rank(r) {
+  if (r.status === "blocked") return 0;
+  if (unseenDone(r)) return 1;
+  if (r.status === "working") return 2;
+  if (r.empty) return 6;
+  if (r.stale) return 5;
+  return 3;
+}
 const SECTIONS = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"], ["stale", "Stale"], ["empty", "Empty"]];
 function sectionOf(r) {
-  if (r.status === "blocked" || r.status === "done") return "needs";
-  if (r.status === "working") return "running";
-  if (r.empty) return "empty";
-  if (r.stale) return "stale";
-  return "quiet";
+  const k = rank(r);
+  return k <= 1 ? "needs" : k === 2 ? "running" : k === 6 ? "empty" : k === 5 ? "stale" : "quiet";
 }
 function parseQuery(q) {
   const inc = [], exc = [], is = [], agent = [];
@@ -277,6 +322,7 @@ function parseQuery(q) {
   }
   return { inc, exc, is, agent };
 }
+const hayHit = (r) => { const q = parseQuery(S.q); return q.inc.length && q.inc.every((w) => hay(r).includes(w)); };
 function hay(r) {
   return (r._hay ??= [r.title, r.project, r.launch, r.branch, r.cwd, r.agent, r.status, r.model, r.tab, r.workspace, machineLabel(r.machine), r.firstPrompt, r.lastMessage, r.now, r.tail.join(" ")].filter(Boolean).join(" \u0001 ").toLowerCase());
 }
@@ -290,12 +336,16 @@ function visibleRows() {
     if (q.agent.length && !q.agent.some((a) => r.agent.startsWith(a))) continue;
     if (q.inc.length || q.exc.length) {
       const h = hay(r);
-      if (!q.inc.every((w) => h.includes(w)) || q.exc.some((w) => h.includes(w))) continue;
+      if (q.exc.some((w) => h.includes(w))) continue;
+      if (!q.inc.every((w) => h.includes(w)) && !(S.deep?.q === S.q && S.deep.byKey.has(r.key))) continue;
     }
     out.push(r);
   }
   const act = (r) => r.lastActiveAt ?? r.startedAt ?? 0;
-  out.sort((a, b) => (a.status === "blocked" ? 0 : 1) - (b.status === "blocked" ? 0 : 1) || act(b) - act(a));
+  const deep = S.deep?.q === S.q ? S.deep.byKey : null;
+  // Deep-search hits come first when the words only appear inside the conversation.
+  out.sort((a, b) => rank(a) - rank(b) || act(b) - act(a));
+  if (deep) out.sort((a, b) => Number(!!hayHit(b)) - Number(!!hayHit(a)) || 0);
   return out;
 }
 
@@ -310,11 +360,17 @@ function rowHTML(r, byProject) {
   const tail = r.tail?.length ? plain(r.tail[r.tail.length - 1]) : "";
   if (r.status === "blocked") line = `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
   else if (live) line = `<span class="ln now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span>` : ""}${r.now ? esc(nowWords(r.now)) : r.step ? esc(r.step) : "thinking…"}</span>`;
-  else if (r.status === "done") line = `<span class="ln">Finished · ${esc(plain(r.lastMessage) || tail)}</span>`;
+  else if (unseenDone(r)) line = `<span class="ln">Finished · ${esc(plain(r.lastMessage) || tail)}</span>`;
   else if (r.empty) line = `<span class="ln">${r.agent === "shell" ? "empty shell" : "no conversation yet"}</span>`;
+  const hit = S.q && S.deep?.q === S.q ? S.deep.byKey.get(r.key) : null;
+  if (hit) {
+    let snip = esc(hit.snippet);
+    for (const w of parseQuery(S.q).inc) snip = snip.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), (x) => `<mark>${x}</mark>`);
+    line = `<span class="ln hit">${hit.role === "user" ? "You: " : hit.role === "tool" ? "" : "Agent: "}“${snip}”${hit.count > 1 ? ` <span class="hint">· ${hit.count} messages</span>` : ""}</span>`;
+  }
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs">${running.slice(0, 3).map((x) => `<div><span class="spin"></span>${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` <span class="mono">${esc(x.now)}</span>` : ""}</div>`).join("")}${running.length > 3 ? `<div>+${running.length - 3} more</div>` : ""}</span>` : "";
-  const dot = `<span class="dot" style="--c:${statusVar(r.status)}"></span>`;
+  const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""} ${mach}</span>${agoEl}${line}${subs}`;
   return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${mach}</span>${agoEl}${title}${line}${subs}`;
 }
@@ -330,7 +386,7 @@ function renderNow() {
   renderLive();
   renderFooter();
   renderDetail();
-  const n = [...S.rows.values()].filter((r) => r.status === "blocked" || r.status === "done").length;
+  const n = [...S.rows.values()].filter(needsYou).length;
   document.title = (n ? `(${n}) ` : "") + "herdr deck";
 }
 function renderMachines() {
@@ -363,9 +419,11 @@ function listGroups(rows) {
     if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty, closed: S.closedSecs.empty !== false });
     return groups;
   }
-  const g = Object.fromEntries(SECTIONS.map(([k]) => [k, []]));
-  for (const r of rows) g[sectionOf(r)].push(r);
-  return SECTIONS.map(([k, label]) => ({ key: k, label, rows: g[k], closed: !!S.closedSecs[k] })).filter((x) => x.rows.length);
+  // Priority: one attention-ordered list; old and empty sessions fold away at the bottom.
+  const main = rows.filter((r) => rank(r) < 5), tail = rows.filter((r) => rank(r) >= 5);
+  const out = [{ key: "all", label: "", rows: main, closed: false, flat: true }];
+  if (tail.length) out.push({ key: "old", label: `Stale & empty`, rows: tail, closed: S.closedSecs.old !== false, tail: true });
+  return out.filter((x) => x.rows.length);
 }
 function renderList() {
   const box = $("rows");
@@ -382,7 +440,8 @@ function renderList() {
       c = { el, sig: "" };
       rowCache.set(r.key, c);
     }
-    const sig = JSON.stringify(r) + S.machine + multiMachine() + byProject;
+    const sig = JSON.stringify(r) + S.machine + multiMachine() + byProject + (S.q && S.deep?.q === S.q ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
       const was = c.el.dataset.status;
       c.el.innerHTML = rowHTML(r, byProject); c.el.dataset.status = r.status; c.sig = sig;
@@ -404,7 +463,8 @@ function renderList() {
       if (g.proj) sec.style.setProperty("--pc", pc(g.proj));
       const nb = g.rows.filter((r) => r.status === "blocked" || r.status === "done").length, nw = g.rows.filter((r) => r.status === "working").length;
       const dots = g.proj ? `<span class="dots">${nb ? `<span class="dot" style="--c:var(--blocked)" title="${nb} need you"></span>` : ""}${nw ? `<span class="dot" style="--c:var(--working)" title="${nw} working"></span>` : ""}</span>` : "";
-      const extra = g.key === "empty" ? `<span class="act link" data-secact="closeEmpty" role="button">Close all</span>` : "";
+      const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>` : "";
+      if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
       sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
       for (const r of g.rows) body.append(rowCache.get(r.key).el);
@@ -432,6 +492,7 @@ function renderRail(rows) {
   const groups = { needs: [], running: [], quiet: [] };
   let hidden = 0;
   for (const r of rows) { const s = sectionOf(r); if (groups[s]) groups[s].push(r); else hidden++; }
+  for (const g of Object.values(groups)) g.sort((a, b) => rank(a) - rank(b) || (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
   const tile = (r) => {
     const subs = (r.subagents ?? []).filter((x) => x.running).length;
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
@@ -507,6 +568,8 @@ function select(key, opts = {}) {
     chatDom.key = null;
     chatSel.clear(); lastPicked = null; $("msgbar")?.remove(); $("detail").classList.remove("selecting");
   }
+  const row = S.rows.get(key);
+  if (row && unseenDone(row)) { row.seen = true; api("/api/seen", { key }).catch(() => {}); }
   render();
   loadDetail(key);
   pollTerm(true);
@@ -563,7 +626,7 @@ function chatOf(id) {
 }
 function mergeChat(key, slice, sub) {
   const c = chatOf(chatId(key, sub));
-  if (c.gen !== slice.gen || slice.reset) { c.msgs.clear(); c.first = Infinity; c.last = -1; c.gen = slice.gen; }
+  if (c.gen !== slice.gen || slice.reset) { c.msgs.clear(); c.first = Infinity; c.last = -1; c.gen = slice.gen; if (S.sel === key) chatDom.key = null; }
   c.total = slice.total;
   for (const m of slice.messages) {
     c.msgs.set(m.i, m);
@@ -598,6 +661,32 @@ async function chatTick(now) {
   }
   chatTimer = setTimeout(chatTick, live ? 900 : 2500);
 }
+async function loadGap(from, to) {
+  const c = chatOf(chatId(S.sel, S.sub));
+  try { mergeChat(S.sel, await api("/api/chat", { key: S.sel, sub: S.sub, gen: c.gen, from, to: Math.min(to, from + 150) }), S.sub); } catch (e) { toast(e.message, true); }
+}
+/** Open a session's chat at one message (from a search hit), highlighted. */
+async function jumpTo(key, i) {
+  if (S.sel !== key) select(key, { open: true });
+  S.tab = "chat"; S.sub = null;
+  const c = chatOf(chatId(key));
+  // Hold the jump for a moment: the refreshes that follow opening a session must not scroll away from it.
+  S.jump = { key, i, until: Date.now() + 3000, flashed: false };
+  if (!c.msgs.has(i)) { try { mergeChat(key, await api("/api/chat", { key, around: i })); } catch { return; } }
+  headSig = ""; bodySig = ""; renderDetail();
+  applyJump();
+}
+function applyJump() {
+  const j = S.jump;
+  if (!j || j.key !== S.sel || Date.now() > j.until) { S.jump = null; return false; }
+  const b = (chatDom.data ?? []).find((x) => x.ms.some((m) => m.i === j.i));
+  const el = b && chatDom.blocks.find((o) => o.key === b.key)?.el;
+  if (!el) return false;
+  el.scrollIntoView({ block: "center" });
+  if (!el.classList.contains("hl")) el.classList.add("hl"); // a redraw replaced the element: mark the new one too
+  j.flashed = true;
+  return true;
+}
 async function loadEarlier() {
   const c = chatOf(chatId(S.sel, S.sub));
   if (c.busy || !(c.first > 0) || c.gen == null) return;
@@ -616,7 +705,10 @@ function chatBlocks(c) {
   const ms = [...c.msgs.values()].sort((a, b) => a.i - b.i);
   const blocks = [];
   let group = null;
+  let prevI = null;
   for (const m of ms) {
+    if (prevI != null && m.i - prevI > 1) { group = null; blocks.push({ key: "gap" + prevI, kind: "gap", ms: [{ i: prevI + 1, to: m.i }] }); }
+    prevI = m.i;
     const agent = m.role === "tool" && /^(agent|task)$/i.test(m.tool ?? "");
     if (m.role === "tool" && !agent) {
       if (!group) { group = { key: "t" + m.i, kind: "tools", ms: [] }; blocks.push(group); }
@@ -634,6 +726,7 @@ const MSG_TOOLS = `<span class="mt"><button class="ib" data-copy title="Copy" ar
 function blockHTML(b, key) {
   const m = b.ms[0];
   const imgs = (list) => (list?.length ? `<div class="thumbs">${list.map((id) => `<button data-cimg="${esc(id)}"><img loading="lazy" decoding="async" alt="" src="${imgUrl(key, id, S.sub)}" onerror="this.parentElement.hidden=true"></button>`).join("")}</div>` : "");
+  if (b.kind === "gap") return `<button class="gapbtn" data-gap="${m.i}" data-gapto="${m.to}">⋯ ${m.to - m.i} more messages here · show them</button>`;
   if (b.kind === "user" || b.kind === "pending") {
     const long = (m.text ?? "").length > 900;
     return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
@@ -715,7 +808,8 @@ function renderChat() {
   decorateLatest(wrap, blocks, S.rows.get(key));
   const grew = next.length && next[next.length - 1].key !== chatDom.lastKey;
   chatDom.lastKey = next[next.length - 1]?.key;
-  if (chatDom.fresh !== id) { chatDom.fresh = id; body.scrollTop = body.scrollHeight; }
+  if (applyJump()) chatDom.fresh = id;
+  else if (chatDom.fresh !== id) { chatDom.fresh = id; body.scrollTop = body.scrollHeight; }
   else if (nearBottom) body.scrollTop = body.scrollHeight;
   else if (grew) showNewPill();
 }
@@ -725,6 +819,7 @@ function decorateLatest(wrap, blocks, r) {
   wrap.querySelector(".thinking")?.remove();
   for (const el of wrap.querySelectorAll(".choices.pickable")) el.classList.remove("pickable");
   if (!r || S.sub) return;
+  for (const el of wrap.querySelectorAll(".choices")) el.classList.toggle("can", !r.app && isAgent(r));
   const canSend = !r.app && isAgent(r) && r.status !== "working";
   const lastAsst = [...blocks].reverse().find((b) => b.kind === "assistant");
   const tailBlock = blocks[blocks.length - 1];
@@ -970,7 +1065,7 @@ function renderBoard() {
   chatDom.key = null;
   const rows = [...S.rows.values()].filter(inScope);
   const live = rows.filter((r) => r.status === "working" || r.status === "blocked").sort((a, b) => (a.status === "blocked" ? 0 : 1) - (b.status === "blocked" ? 0 : 1) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
-  const done = rows.filter((r) => r.status === "done").sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
+  const done = rows.filter(unseenDone).sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0));
   const card = (r) => {
     const subs = (r.subagents ?? []).filter((x) => x.running);
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
@@ -1498,7 +1593,7 @@ function paletteItems(q) {
     cur && { t: "Write or rewrite the brief", k: "b", run: () => writeBrief(cur.key) },
     cur && { t: "Close this session…", k: "x", run: () => askClose([cur.key]) },
     n > 1 && { t: `Close ${n} selected sessions…`, run: () => askClose(targets()) },
-    { t: `Group the list by ${S.group === "project" ? "what needs you" : "project"}`, k: "g", run: () => setGroup(S.group === "project" ? "inbox" : "project") },
+    { t: S.group === "project" ? "Sort the list by priority" : "Group the list by project", k: "g", run: () => setGroup(S.group === "project" ? "priority" : "project") },
     ...(!isPhone() ? TPOS.filter((p) => p !== S.tpos).map((p) => ({ t: `Terminal: ${TPOS_NAME[p].toLowerCase()}`, run: () => setTpos(p) })) : []),
     { t: "Standup: ask every idle agent for a status line", run: standup },
     { t: "Select close candidates", run: suggestClose },
@@ -1642,7 +1737,7 @@ $("rows").addEventListener("click", async (e) => {
   if (sec) {
     const k = sec.dataset.sec;
     if (k.startsWith("p:")) { const p = k.slice(2); S.closedProj = { ...S.closedProj, [p]: !S.closedProj[p] }; store("closedProj", S.closedProj); }
-    else { S.closedSecs = { ...S.closedSecs, [k]: !(k === "empty" && S.group === "project" ? S.closedSecs.empty !== false : S.closedSecs[k]) }; store("closedSecs", S.closedSecs); }
+    else { const closed = k === "old" ? S.closedSecs.old !== false : k === "empty" && S.group === "project" ? S.closedSecs.empty !== false : !!S.closedSecs[k]; S.closedSecs = { ...S.closedSecs, [k]: !closed }; store("closedSecs", S.closedSecs); }
     lastOrder = ""; return render();
   }
   if (e.target.closest("[data-lf]")?.dataset.lf === "inbox") { S.view = "inbox"; lastOrder = ""; return render(); }
@@ -1661,6 +1756,8 @@ $("rows").addEventListener("click", async (e) => {
   const row = e.target.closest(".row[data-key]");
   if (!row) return;
   if (e.metaKey || e.ctrlKey || e.shiftKey) { e.preventDefault(); return togglePick(row.dataset.key); }
+  const hit = S.q && S.deep?.q === S.q ? S.deep.byKey.get(row.dataset.key) : null;
+  if (hit) return jumpTo(row.dataset.key, hit.i);
   select(row.dataset.key, { open: true });
 });
 let hoverTimer = null;
@@ -1680,6 +1777,8 @@ $("mini").addEventListener("click", (e) => {
 });
 $("detail").addEventListener("click", (e) => {
   if (e.target.closest("#appbar")) return;
+  const fp = e.target.closest("[data-path]");
+  if (fp && !chatSel.size) { e.preventDefault(); e.stopPropagation(); return openFile(fp.dataset.path); }
   const blockEl = e.target.closest("[data-b]");
   if (e.target.closest("[data-copy]") && blockEl) return copyBlocks([blockEl.dataset.b]);
   if (e.target.closest("[data-pick]") && blockEl) return pickBlock(blockEl.dataset.b, e.shiftKey);
@@ -1689,7 +1788,7 @@ $("detail").addEventListener("click", (e) => {
   if (e.target.closest("[data-selclear]")) return clearPicks();
   const choose = e.target.closest("[data-choose]");
   if (choose && choose.closest(".choices.pickable")) { const c = choose.closest("[data-choice]"); return sendMessage(`(${c.dataset.choice}) ${c.dataset.title}`, $("cText")); }
-  const choice = e.target.closest(".choices.pickable [data-choice]");
+  const choice = e.target.closest(".choices.can [data-choice]");
   if (choice) {
     for (const x of choice.parentElement.children) x.classList.toggle("on", x === choice);
     $("cText").value = `(${choice.dataset.choice}) ${choice.dataset.title}${$("cText").value.trim() ? "" : ". "}`;
@@ -1703,6 +1802,8 @@ $("detail").addEventListener("click", (e) => {
   const t = e.target.closest("[data-toggle]");
   if (t) return t.classList.toggle("clamp");
   if (e.target.closest("[data-earlier]")) return loadEarlier();
+  const gap = e.target.closest("[data-gap]");
+  if (gap) return loadGap(Number(gap.dataset.gap), Number(gap.dataset.gapto));
   const sub = e.target.closest("[data-sub]");
   if (sub) return openSub(sub.dataset.sub);
   const card = e.target.closest("[data-card]");
@@ -1745,9 +1846,26 @@ $("lf").addEventListener("click", (e) => {
 $("selRecipe").onclick = (e) => openRecipeMenu(e.currentTarget);
 $("selClose").onclick = () => askClose([...S.picked]);
 $("selClear").onclick = () => { S.picked.clear(); render(); };
-$("q").addEventListener("input", (e) => { S.q = e.target.value; render(); });
+let deepTimer = null, deepSeq = 0;
+/** Searches inside every conversation (server-side), so a word said once, weeks ago, still finds its session. */
+function deepSearch() {
+  clearTimeout(deepTimer);
+  const q = S.q.trim();
+  const words = parseQuery(q).inc;
+  if (q.length < 3 || !words.length) { if (S.deep) { S.deep = null; lastOrder = ""; render(); } return; }
+  deepTimer = setTimeout(async () => {
+    const seq = ++deepSeq;
+    try {
+      const { hits } = await api("/api/search", { q: words.join(" ") });
+      if (seq !== deepSeq || S.q.trim() !== q) return;
+      S.deep = { q: S.q, byKey: new Map(hits.map((h) => [h.key, h])) };
+      lastOrder = ""; render();
+    } catch {}
+  }, 160);
+}
+$("q").addEventListener("input", (e) => { S.q = e.target.value; render(); deepSearch(); });
 $("q").addEventListener("keydown", (e) => {
-  if (e.key === "Escape") { e.target.value = ""; S.q = ""; e.target.blur(); render(); }
+  if (e.key === "Escape") { e.target.value = ""; S.q = ""; S.deep = null; e.target.blur(); render(); }
   if (e.key === "Enter") { const first = S.visible?.[0]; if (first) { select(first.key, { open: true }); e.target.blur(); } }
 });
 $("paletteBtn").onclick = (e) => { e.preventDefault(); openPalette(); };
@@ -1756,6 +1874,36 @@ $("newBtn").onclick = openNew;
 $("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed font size"); };
 $("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); lastOrder = ""; $("mini")._h = ""; render(); setTimeout(fitTerm, 0); };
 $("termToggle").onclick = () => { app.classList.toggle("term-off"); store("termOff", app.classList.contains("term-off")); pollTerm(); };
+
+let fileCtx = null;
+async function openFile(path, key = S.sel) {
+  const r = S.rows.get(key);
+  try {
+    const f = await api("/api/file", { key, path });
+    fileCtx = { key, path: f.path, raw: path };
+    $("fTitle").textContent = home(f.path);
+    const mac = r && (r.machine === S.self || r.machine === "codex-app");
+    $("fOpen").hidden = !mac; $("fReveal").hidden = !mac;
+    const body = $("fBody");
+    if (f.kind === "dir") body.innerHTML = `<ul class="dirlist">${f.entries.map((n) => `<li><a class="fpath" data-path="${esc(f.path + "/" + n)}">${esc(n)}</a></li>`).join("") || "<li class=hint>Empty folder</li>"}</ul>`;
+    else if (f.kind === "image") body.innerHTML = `<img class="fimg" alt="" src="/api/file-raw?key=${encodeURIComponent(key)}&path=${encodeURIComponent(f.path)}&t=${encodeURIComponent(S.token)}">`;
+    else if (f.kind === "binary") body.innerHTML = `<p class="hint">A binary file (${mem(f.size / 1024)}). Open it on the Mac instead.</p>`;
+    else if (f.kind === "markdown") body.innerHTML = `<div class="md fmd">${md(f.content)}</div>`;
+    else body.innerHTML = `<pre class="fcode">${f.content.split("\n").map((l, n) => `<span class="ln${f.line === n + 1 ? " at" : ""}" data-n="${n + 1}">${esc(l) || " "}</span>`).join("\n")}</pre>`;
+    $("fMeta").textContent = f.size != null ? `${mem(f.size / 1024)} · changed ${agoText(f.mtime)}` : `${f.entries?.length ?? 0} items`;
+    if (!$("fileDlg").open) $("fileDlg").showModal();
+    if (f.line) requestAnimationFrame(() => body.querySelector(".ln.at")?.scrollIntoView({ block: "center" }));
+    else body.scrollTop = 0;
+  } catch (e) { toast(e.message, true); }
+}
+$("fileDlg").addEventListener("click", (e) => {
+  const fp = e.target.closest("[data-path]");
+  if (fp) { e.preventDefault(); return openFile(fp.dataset.path, fileCtx?.key); }
+  if (e.target === $("fileDlg")) $("fileDlg").close();
+});
+$("fOpen").onclick = () => fileCtx && api("/api/file-open", { key: fileCtx.key, path: fileCtx.path }).then(() => toast("Opened on the Mac")).catch((x) => toast(x.message, true));
+$("fReveal").onclick = () => fileCtx && api("/api/file-open", { key: fileCtx.key, path: fileCtx.path, reveal: true }).then(() => toast("Shown in Finder")).catch((x) => toast(x.message, true));
+$("fCopy").onclick = () => fileCtx && copy(fileCtx.path, "path");
 
 function openLightbox(i) {
   const g = S.gallery ?? [];
@@ -1817,7 +1965,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "t" && cur) { e.preventDefault(); focusTerminal(); }
   else if (k === "`" && S.tpos === "tab") { e.preventDefault(); setMain(S.main === "chat" ? "term" : "chat"); }
   else if (k === "\\") { e.preventDefault(); setTpos(TPOS[(TPOS.indexOf(S.tpos) + 1) % TPOS.length]); toast(`Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}`); }
-  else if (k === "g") setGroup(S.group === "project" ? "inbox" : "project");
+  else if (k === "g") setGroup(S.group === "project" ? "priority" : "project");
   else if (k === "l") setBoard(!S.board);
   else if (k === "n") { e.preventDefault(); openNew(); }
   else if (k === "f" && cur) S.rows.get(cur)?.app ? codexAct("codex-open", S.rows.get(cur)) : focusPane(cur);
@@ -1914,7 +2062,7 @@ function applyFull(data) {
     S.sel = null;
     const saved = load("sel", null);
     if (saved && S.rows.has(saved) && !isPhone()) return select(saved);
-    if (!isPhone()) { S.board = [...S.rows.values()].some((r) => r.status === "working" || r.status === "blocked"); if (!S.board) { const f = visibleRows()[0]; if (f) return select(f.key); } }
+    if (!isPhone()) { S.board = [...S.rows.values()].some((r) => r.status === "working" || needsYou(r)); if (!S.board) { const f = visibleRows()[0]; if (f) return select(f.key); } }
   }
   render();
 }

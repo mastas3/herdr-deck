@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
 const HIDDEN_FILE = `${homedir()}/.config/herdr-deck/codex-app-hidden.json`;
+const SEEN_FILE = `${homedir()}/.config/herdr-deck/seen.json`;
 
 export type Row = {
   key: string;
@@ -61,6 +62,7 @@ export type Row = {
   stale: boolean;
   duplicate: boolean;
   approx: boolean;
+  seen?: boolean; // you opened it (in the deck) since it last changed: a finished session no longer needs you
   app?: "codex"; // a Codex desktop app thread: no pane, no terminal; open it in the app or resume in herdr
 };
 
@@ -135,6 +137,22 @@ export class Deck {
       this.scheduleRebuild();
     } catch {}
     this.appBusy = false;
+  }
+
+  /** When you last looked at each session, by row key → its lastActiveAt at that moment. Shared by every device. */
+  seen: Record<string, number> = (() => { try { return JSON.parse(readFileSync(SEEN_FILE, "utf8")); } catch { return {}; } })();
+  markSeen(key: string) {
+    const r = this.rows.get(key);
+    if (!r) return false;
+    this.seen[key] = r.lastActiveAt ?? Date.now();
+    for (const k of Object.keys(this.seen)) if (!this.rows.has(k) && Object.keys(this.seen).length > 400) delete this.seen[k];
+    try { writeFileSync(SEEN_FILE, JSON.stringify(this.seen)); } catch {}
+    this.rebuildNow();
+    return true;
+  }
+  private isSeen(key: string, lastActiveAt?: number) {
+    const s = this.seen[key];
+    return s != null && s >= (lastActiveAt ?? 0);
   }
 
   hideAppThread(id: string) {
@@ -431,6 +449,7 @@ export class Deck {
           rows: rects.get(p.pane_id)?.height ?? p.scroll?.viewport_rows,
           empty,
           stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && status !== "working" && status !== "blocked",
+          seen: this.isSeen(key, lastActiveAt),
           duplicate: false,
           approx: !!meta?.approx,
         });
@@ -455,6 +474,7 @@ export class Deck {
         model: meta?.model, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
         rssKB: 0, cpu: 0, procs: 0, sessionId: t.id, resume: resumeCommand("codex", t.id), tail: [],
         empty: false, stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && t.status === "idle", duplicate: false, approx: false, app: "codex",
+        seen: this.isSeen(key, lastActiveAt),
       });
     }
     // Two panes on the same agent conversation: one of them is redundant.

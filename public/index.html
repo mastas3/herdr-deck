@@ -190,6 +190,11 @@ body.moving { cursor: grabbing; user-select: none; }
 .sec.closed .chev { transform: rotate(-90deg); }
 .sec.closed .sec-b { display: none; }
 .sec-h .act { margin-left: auto; font-weight: 400; }
+.sec.flat { margin-top: 2px; }
+.row.unseen .tl b { font-weight: 700; }
+.row.unseen::before { content: ""; position: absolute; left: 1px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--c-need, var(--done)); }
+.row[data-status="blocked"].unseen { --c-need: var(--blocked); }
+.row { position: relative; }
 .sec.proj .sec-h { color: var(--ink); font-size: 14.5px; }
 .sec.proj .sec-h .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--pc); flex: none; }
 .sec.proj .sec-h .dots { margin-left: auto; display: flex; gap: 3px; }
@@ -426,6 +431,40 @@ body.moving { cursor: grabbing; user-select: none; }
 @keyframes flash { 0% { background: color-mix(in srgb, var(--blocked) 22%, transparent); } 100% { background: transparent; } }
 @media (hover: none) { .mt { opacity: 1; transform: none; pointer-events: auto; position: static; float: right; margin: -4px -6px 0 6px; background: transparent; border: 0; } .msg.user .mt { float: left; margin: -4px 6px 0 -6px; } .choices.pickable .choice .cs { opacity: 1; } }
 
+/* ── choices context, links, search hits, file viewer ─────────── */
+.choices .cq { font: 600 15.5px/1.4 var(--read); padding: 2px 2px 4px; }
+.choices .chint { font-size: 12.5px; color: var(--ink-3); padding: 2px 2px 0; display: none; }
+.choices.can .chint { display: block; }
+.choices:not(.pickable) .chint b { display: none; }
+.choices.can .choice { cursor: pointer; }
+.choices.can .choice:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--raise)); }
+.choices.can .choice:hover .cl { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.choices.can .choice.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.choice .cd { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.choice:hover .cd, .choice.on .cd { -webkit-line-clamp: unset; }
+.fpath { color: var(--accent); cursor: pointer; text-decoration: none; border-bottom: 1px dotted color-mix(in srgb, var(--accent) 60%, transparent); }
+.fpath:hover { border-bottom-style: solid; }
+code.fpath { color: var(--accent); }
+.row .ln.hit { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; color: var(--ink-2); }
+mark { background: color-mix(in srgb, var(--working) 38%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.gapbtn { align-self: center; border: 1px dashed var(--line-2); background: transparent; color: var(--ink-2); border-radius: 99px; padding: 4px 14px; font-size: 13px; }
+.gapbtn:hover { color: var(--ink); border-color: var(--ink-3); }
+.msg.hl { animation: hl 2.2s var(--ease); }
+@keyframes hl { 0%, 30% { box-shadow: 0 0 0 3px var(--working); border-radius: 12px; } 100% { box-shadow: 0 0 0 3px transparent; } }
+.filedlg { width: min(1100px, 96vw); height: min(86vh, 900px); }
+.filedlg[open] { display: flex; flex-direction: column; }
+.fhead { display: flex; gap: 6px; align-items: center; padding: 10px 12px 10px 16px; border-bottom: 1px solid var(--line); min-width: 0; }
+.fhead b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.fbody { flex: 1; overflow: auto; min-height: 0; }
+.fmeta { padding: 6px 16px; border-top: 1px solid var(--line); }
+.fcode { margin: 0; padding: 10px 0; font: 12.5px/1.55 var(--mono); counter-reset: none; white-space: pre; }
+.fcode .ln { display: block; padding: 0 14px 0 0; }
+.fcode .ln::before { content: attr(data-n); display: inline-block; width: 4.5em; padding-right: 1em; text-align: right; color: var(--ink-3); user-select: none; }
+.fcode .ln.at { background: color-mix(in srgb, var(--working) 18%, transparent); }
+.fmd { padding: 18px 26px; max-width: 900px; }
+.fimg { display: block; max-width: 100%; margin: 12px auto; }
+.dirlist { margin: 0; padding: 12px 22px; list-style: none; columns: 2; font: 13.5px/1.9 var(--mono); }
+
 /* ── terminal ─────────────────────────────────────────────────── */
 .term { grid-area: term; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--term-bg); }
 .th { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 6px; background: var(--side); border-bottom: 1px solid var(--line); min-height: 37px; font-size: 13.5px; color: var(--ink-3); user-select: none; }
@@ -541,6 +580,9 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
   .chat { padding: 10px 12px 14px; }
   .msg.user { max-width: 88%; }
   .msgbar { padding: 8px 12px; }
+  .filedlg { width: 100vw; height: 92dvh; }
+  .fhead #fReveal, .fhead #fOpen { display: none; }
+  .dirlist { columns: 1; }
   .pad { padding: 16px 16px 40px; }
   .nowbar, .askbox { padding-left: 14px; padding-right: 14px; }
   .appbar { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
@@ -590,7 +632,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
         <button class="ib keep" id="newBtn" title="New session (n)" aria-label="New session"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg></button>
       </div>
       <div class="machines" id="machines" role="tablist" aria-label="Machines"></div>
-      <div class="lh-row"><label class="find" style="flex:1;min-width:0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="q" type="search" placeholder="Filter sessions" autocomplete="off" spellcheck="false" aria-label="Filter sessions"><button type="button" class="ib" id="paletteBtn" title="Commands and search everywhere (⌘K)" aria-label="Commands" style="width:auto;padding:0 4px"><kbd>⌘K</kbd></button></label><div class="seg2" id="groupSeg" role="tablist" aria-label="Group by"><button role="tab" data-group="inbox" title="Group by what needs you (g)">Inbox</button><button role="tab" data-group="project" title="Group by project (g)">Projects</button></div></div>
+      <div class="lh-row"><label class="find" style="flex:1;min-width:0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="q" type="search" placeholder="Filter sessions" autocomplete="off" spellcheck="false" aria-label="Filter sessions"><button type="button" class="ib" id="paletteBtn" title="Commands and search everywhere (⌘K)" aria-label="Commands" style="width:auto;padding:0 4px"><kbd>⌘K</kbd></button></label><div class="seg2" id="groupSeg" role="tablist" aria-label="Group by"><button role="tab" data-group="priority" title="Attention order, like herdr (g)">Priority</button><button role="tab" data-group="project" title="Group by project (g)">Projects</button></div></div>
       <button class="livebar" id="live" hidden aria-pressed="false" title="Show the live board"></button>
     </div>
     <div class="mini" id="mini" aria-label="Sessions (collapsed)"></div>
@@ -687,6 +729,12 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
     <div class="dlg-b recipes-ed"><h3>Recipes</h3><p class="hint">Prompts you send with one click. <span class="mono">{project}</span>, <span class="mono">{branch}</span> and <span class="mono">{title}</span> are filled in per session.</p><div id="recList"></div><button type="button" class="btn" id="recAdd" style="margin-top:10px">Add recipe</button></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save recipes</button></div>
   </form>
+</dialog>
+
+<dialog id="fileDlg" class="filedlg" aria-label="File">
+  <div class="fhead"><b id="fTitle" class="mono"></b><span class="spacer"></span><button class="btn ghost" id="fCopy" type="button">Copy path</button><button class="btn ghost" id="fReveal" type="button">Show in Finder</button><button class="btn" id="fOpen" type="button">Open on Mac</button><form method="dialog" style="display:inline"><button class="ib" aria-label="Close">✕</button></form></div>
+  <div class="fbody" id="fBody"></div>
+  <div class="fmeta hint" id="fMeta"></div>
 </dialog>
 
 <dialog id="lightbox" class="lightbox">

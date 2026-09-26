@@ -230,18 +230,96 @@ const detailFor = (row: Row) => detailOf(who(row));
 const imageFor = (row: Row, id: string, sub?: string) => imageOf(who(row), id, sub);
 
 /** A window of the chat: the newest `limit` messages, those after a cursor (live updates) or before one (scrollback). */
-function chatSlice(d: Detail, q: { gen?: number; after?: number; before?: number; limit?: number }) {
+function chatSlice(d: Detail, q: { gen?: number; after?: number; before?: number; limit?: number; around?: number; from?: number; to?: number }) {
   const limit = Math.min(Math.max(Number(q.limit) || 120, 1), 400);
   const all = d.messages;
   let msgs: Msg[];
   const sameGen = q.gen === d.gen;
-  if (sameGen && q.after != null) {
+  if (q.around != null) {
+    // Jumping to a search hit: a window around it, plus the newest messages so the chat still ends where it is.
+    const a = Math.max(0, Math.min(all.length - 1, Number(q.around)));
+    const win = all.slice(Math.max(0, a - 30), a + 120);
+    const tail = all.slice(-60).filter((m) => m.i >= a + 120);
+    return { gen: d.gen, total: all.length, reset: true, messages: [...win, ...tail] };
+  }
+  if (sameGen && q.from != null) msgs = all.slice(Math.max(0, Number(q.from)), Math.min(all.length, Number(q.to ?? Number(q.from) + limit)));
+  else if (sameGen && q.after != null) {
     // Tool calls flip from running to done, so resend the tail window the client already has as well.
     const from = Math.max(0, Math.min(Number(q.after) + 1, all.length) - 12);
     msgs = all.slice(from);
   } else if (sameGen && q.before != null) msgs = all.slice(Math.max(0, Number(q.before) - limit), Number(q.before));
   else msgs = all.slice(-limit);
   return { gen: d.gen, total: all.length, reset: !sameGen && (q.after != null || q.before != null), messages: msgs };
+}
+
+// ── deep search across every conversation ────────────────────────────────
+
+/** Every word must appear in one message; hits rank by how many messages match and how recent the best one is. */
+async function searchLocal(q: string) {
+  const words = q.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !/^(is|agent):/.test(w) && !w.startsWith("-"));
+  if (!words.length || q.length < 3) return [];
+  const hits: any[] = [];
+  const t0 = performance.now();
+  for (const row of deck.rows.values()) {
+    if (!row.sessionId || performance.now() - t0 > 400) continue;
+    const d = await detailFor(row).catch(() => undefined);
+    if (!d) continue;
+    let best: Msg | undefined, count = 0;
+    for (let i = d.messages.length - 1; i >= 0; i--) {
+      const m = d.messages[i];
+      const text = (m.text ?? `${m.tool ?? ""} ${m.summary ?? ""}`).toLowerCase();
+      if (!words.every((w) => text.includes(w))) continue;
+      count++;
+      if (!best || (best.role === "tool" && m.role !== "tool")) best = m;
+      if (count > 50) break;
+    }
+    if (!best) continue;
+    const text = best.text ?? `${best.tool}: ${best.summary}`;
+    const at = text.toLowerCase().indexOf(words[0]);
+    const from = Math.max(0, at - 70);
+    const snippet = (from > 0 ? "…" : "") + text.slice(from, at + 150).replace(/\s+/g, " ").trim() + (at + 150 < text.length ? "…" : "");
+    hits.push({ key: row.key, i: best.i, role: best.role, at: best.at, count, snippet });
+  }
+  return hits.sort((a, b) => b.count - a.count || (b.at ?? 0) - (a.at ?? 0)).slice(0, 80);
+}
+
+// ── files the agents mention ───────────────────────────────────────────────
+
+const DENY = /(^|\/)(\.ssh|\.gnupg|\.aws|\.config\/gcloud|Library\/Keychains)(\/|$)|(^|\/)\.env(\.|$)|\.(pem|key|p12|keychain)$|api\.token$|id_(rsa|ed25519)/;
+/** Paths an agent mentioned, resolved against its folder; only files in your home, and never keys or secrets. */
+function resolveSafe(cwd: string | undefined, raw: string): string | undefined {
+  let p = raw.trim().replace(/^file:\/\//, "").replace(/:\d+(:\d+)?$/, "");
+  if (!p) return;
+  // [[wiki-page]]: the LLM wiki's page folders, first match wins
+  const wiki = p.match(/^wiki:([\w.-]+)$/);
+  if (wiki) {
+    const base = process.env.DECK_WIKI_DIR ?? `${homedir()}/wiki`;
+    p = ["projects", "concepts", "entities", "synthesis", "sources", ""].map((d) => `${base}/${d ? d + "/" : ""}${wiki[1]}.md`).find((f) => existsSync(f)) ?? `${base}/${wiki[1]}.md`;
+  }
+  if (p.startsWith("~/")) p = homedir() + p.slice(1);
+  else if (!p.startsWith("/")) { if (!cwd) return; p = `${cwd}/${p}`; }
+  p = new URL("file://" + p).pathname; // normalises ../
+  p = decodeURIComponent(p);
+  if (!p.startsWith(homedir() + "/") && !p.startsWith("/tmp/") && !p.startsWith("/private/tmp/")) return;
+  if (DENY.test(p)) return;
+  return p;
+}
+async function readFileFor(cwd: string | undefined, raw: string) {
+  const p = resolveSafe(cwd, raw);
+  if (!p) return { error: "That path isn’t one the deck will show (outside your home folder, or a secret)." };
+  let st;
+  try { st = statSync(p); } catch { return { error: `Not found: ${p.replace(homedir(), "~")}` }; }
+  const line = Number(raw.match(/:(\d+)(?::\d+)?$/)?.[1]) || undefined;
+  if (st.isDirectory()) {
+    const entries = readdirSync(p, { withFileTypes: true }).filter((e) => !e.name.startsWith(".")).slice(0, 300).map((e) => (e.isDirectory() ? e.name + "/" : e.name));
+    return { path: p, kind: "dir", entries, mtime: st.mtimeMs };
+  }
+  const ext = p.split(".").pop()?.toLowerCase() ?? "";
+  if (/^(png|jpe?g|gif|webp|svg|avif)$/.test(ext)) return { path: p, kind: "image", size: st.size, mtime: st.mtimeMs };
+  if (st.size > 1_500_000) return { path: p, kind: "binary", size: st.size, mtime: st.mtimeMs };
+  const buf = new Uint8Array(await Bun.file(p).arrayBuffer());
+  if (buf.subarray(0, 8000).includes(0)) return { path: p, kind: "binary", size: st.size, mtime: st.mtimeMs };
+  return { path: p, kind: /^(md|markdown|mdx)$/.test(ext) ? "markdown" : "text", ext, size: st.size, mtime: st.mtimeMs, line, content: new TextDecoder().decode(buf) };
 }
 
 async function chatFor(row: Row, body: any) {
@@ -593,6 +671,18 @@ async function handle(req: Request): Promise<Response> {
         if (!img) return new Response("image not found", { status: 404 });
         return new Response(img.data, { headers: { "content-type": img.type, "cache-control": "private, max-age=86400" } });
       }
+      if (url.pathname === "/api/file-raw") {
+        if (url.searchParams.get("t") !== TOKEN && !hasApiToken(req)) return new Response("forbidden", { status: 403 });
+        const route = splitKey(url.searchParams.get("key") ?? "", remotes);
+        if (route.remote) {
+          const res = await route.remote.get(`/api/file-raw?${new URLSearchParams({ key: route.key, path: url.searchParams.get("path") ?? "" })}`).catch(() => null);
+          return res?.ok ? new Response(res.body, { headers: { "content-type": res.headers.get("content-type") ?? "application/octet-stream", "cache-control": "private, max-age=300" } }) : new Response("not found", { status: 404 });
+        }
+        const p = resolveSafe(localRow(route.key)?.cwd, url.searchParams.get("path") ?? "");
+        const f = p && Bun.file(p);
+        if (!f || !(await f.exists())) return new Response("not found", { status: 404 });
+        return new Response(f, { headers: { "cache-control": "private, max-age=300" } });
+      }
       if (url.pathname === "/health") return json({ ok: true, clients: clients.size, ...deck.health(), machines: machines().map(({ herdr, ...m }) => m) });
       return new Response("not found", { status: 404 });
     }
@@ -625,6 +715,30 @@ async function handle(req: Request): Promise<Response> {
             } catch (e: any) { results.push({ key, ok: false, error: e?.message ?? String(e) }); }
           }
           return json({ results });
+        }
+        case "/api/seen": {
+          return json({ ok: deck.markSeen(String(body.key)) });
+        }
+        case "/api/search": {
+          const q = String(body.q ?? "").trim();
+          const local = await searchLocal(q);
+          // Other machines search their own transcripts; their hits come back with their key prefix.
+          const remoteHits = await Promise.all([...remotes.values()].filter((h) => h.online).map((h) =>
+            Promise.race([h.post("/api/search", { q, local: true }).then((r) => (r.data.hits ?? []).map((x: any) => ({ ...x, key: `${h.conf.id}|${x.key}` }))), Bun.sleep(1500).then(() => [])]).catch(() => [])));
+          return json({ q, hits: [...local, ...(body.local ? [] : remoteHits.flat())] });
+        }
+        case "/api/file": {
+          const lr = localRow(body.key);
+          const r = await readFileFor(lr?.cwd, String(body.path ?? ""));
+          return json(r, r.error ? 400 : 200);
+        }
+        case "/api/file-open": {
+          const lr = localRow(body.key);
+          const p = resolveSafe(lr?.cwd, String(body.path ?? ""));
+          if (!p) return json({ error: "That path isn’t one the deck will open." }, 400);
+          if (process.platform !== "darwin") return json({ error: "Opening files only works on a Mac." }, 400);
+          Bun.spawn(body.reveal ? ["open", "-R", p] : ["open", p]);
+          return json({ ok: true });
         }
         case "/api/codex-open": {
           // Opens the thread in the Codex app on this machine.
