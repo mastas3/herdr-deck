@@ -242,7 +242,8 @@ const NULLISH = /^[\[(<"']*(null|none|n\/a|na|unknown|not (mentioned|stated|spec
 function str(x: unknown, max = 240): string | null {
   if (x == null || typeof x === "object") return null;
   const s = String(x).replace(/\s+/g, " ").trim();
-  return NULLISH.test(s) ? null : s.slice(0, max);
+  // "[No specific failed business mentioned, …]": the model saying there's nothing, in brackets.
+  return NULLISH.test(s) || /^\[(no |not |none)/i.test(s) ? null : s.slice(0, max);
 }
 const oneOf = <T extends readonly string[]>(xs: T, v: unknown, d: T[number]): T[number] => { const s = String(v ?? "").toLowerCase().trim().replace(/[\s/-]+/g, "_"); return (xs as readonly string[]).includes(s) ? (s as T[number]) : d; };
 const dedupe = <T extends { text: string }>(xs: T[]) => xs.filter((x, i) => xs.findIndex((y) => y.text.toLowerCase() === x.text.toLowerCase()) === i);

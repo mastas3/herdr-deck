@@ -95,6 +95,11 @@ const FAIL_THEMES: [string, RegExp][] = [
   ["Co-founder and team problems", /co-?founder|partner(ship)? (broke|split)|hire|hired too|team/i],
   ["Money ran out or spent too much", /ran out of (money|cash)|burn|spent too much|debt|funding|raised/i],
   ["Quit too early or gave up", /gave up|quit|stopped|abandon|lost motivation|too early/i],
+  ["Launched to silence: no traction", /no one cared|nobody cared|no traction|plateau|didn.t (blow up|take off|get users)|did not result|no users|bounce rate|hard to scale/i],
+  ["Too slow: the day job, or years of building", /full[- ]time job|day job|safe job|delayed|took (me )?(\d+|two|three) (years|months)|wasted time|months trying/i],
+  ["Too many ideas at once", /shiny object|too many (products|ideas)|next \d+ products|every sort of|jumping between/i],
+  ["A product people couldn't use or didn't like", /quality|too hard|hard to (use|understand)|confus|unsellable|didn.t like/i],
+  ["Earlier businesses that didn't work", /\b(agency|drop ?shipping|clothing|e-?commerce|newsletter|candle|vending|resell|game|consulting|app called|business)\b.*\b(fail|didn.t|did not|no one|nobody|stopped|shut|never)|\bfailed\b|didn.t work|did not work|flopped/i],
 ];
 function failures(cards: Card[]): Playbook {
   const items = cards.flatMap((c) => c.failed.map((f) => ({ c, f })));
