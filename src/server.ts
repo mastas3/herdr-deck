@@ -84,7 +84,16 @@ const isNode = () => process.env.DECK_ROLE === "node" || (process.env.DECK_ROLE 
 /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
 const presence = new Map<string, { key: string | null; at: number }>();
 const viewing = (key: string) => [...presence.values()].some((p) => p.key === key && Date.now() - p.at < 70_000);
-let auto: Automations | undefined;
+// Built now (its rules gate proof-of-done from the first patch on); its timers start once the server listens.
+let auto: Automations | undefined = new Automations({
+  file: `${PUSH_DIR}/automations.json`,
+  rows: () => allRows(),
+  deliver: (m, o) => push.deliver(m, o),
+  changed: () => broadcast("auto", auto!.publicState()),
+  viewing,
+  ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => decisions.get(key)?.question }),
+  canSend: () => !isNode(),
+});
 /** Test-only rows (DECK_DEV): exercise alerts, the digest and the empty-session card without touching real sessions. */
 const fakeRows = new Map<string, Row>();
 
@@ -1460,15 +1469,6 @@ for (let attempt = 0; ; attempt++) {
   }
 }
 for (const h of remotes.values()) h.start();
-auto = new Automations({
-  file: `${PUSH_DIR}/automations.json`,
-  rows: allRows,
-  deliver: (m, o) => push.deliver(m, o),
-  changed: () => broadcast("auto", auto!.publicState()),
-  viewing,
-  ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => decisions.get(key)?.question }),
-  canSend: () => !isNode(),
-});
 auto.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
