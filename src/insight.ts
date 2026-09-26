@@ -56,6 +56,8 @@ export type Insight = {
   project?: Project;
   now?: string; // the tool call in flight, or the todo item in progress
   turnStartedAt?: number;
+  todo?: string;
+  todos?: { done: number; total: number };
   subagents: Sub[];
   msgs: number;
 };
@@ -79,5 +81,5 @@ export async function insightFor(w: Who): Promise<Insight | undefined> {
     if (m.role === "tool" && m.state === "running") { now = m.summary ? `${m.tool}: ${m.summary}` : String(m.tool); break; }
   }
   const subagents = await subagentsFor(w, d).catch(() => []);
-  return { project: pc.project, now: now ?? (d.todo ? `Todo: ${d.todo}` : undefined), turnStartedAt: d.turnStartedAt, subagents, msgs: d.messages.length };
+  return { project: pc.project, now, todo: d.todo, todos: d.todos, turnStartedAt: d.turnStartedAt, subagents, msgs: d.messages.length };
 }

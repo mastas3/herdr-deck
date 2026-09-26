@@ -91,6 +91,42 @@ function paneName(r) {
   return s;
 }
 
+// ── tool calls in plain words ────────────────────────────────────────────
+const TI = {
+  edit: '<path d="M10.5 2.5l3 3-8 8H2.5v-3z"/>',
+  read: '<path d="M4 2h6l3 3v9H4z"/><path d="M6.5 8h4M6.5 10.5h4"/>',
+  run: '<rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m5 7 2 1.5L5 10M8.5 10.5H11"/>',
+  find: '<circle cx="7" cy="7" r="4"/><path d="m10 10 3.5 3.5"/>',
+  web: '<circle cx="8" cy="8" r="5.5"/><path d="M2.5 8h11M8 2.5c2 2.2 2 8.8 0 11M8 2.5c-2 2.2-2 8.8 0 11"/>',
+  plan: '<path d="M3 4h1M3 8h1M3 12h1M6.5 4H13M6.5 8H13M6.5 12H13"/>',
+  agent: '<rect x="3" y="5" width="10" height="8" rx="2"/><path d="M8 2.5V5M6 9h.01M10 9h.01"/>',
+  tool: '<path d="M9.5 2.5a3 3 0 0 0-3.8 3.8L2.5 9.5l2 2 3.2-3.2a3 3 0 0 0 3.8-3.8L9.8 6.2 8 5.8l-.4-1.8z"/>',
+};
+/** What a tool call did, as a verb a person would use: "Edited", "Ran", "Searched"… (present tense while running). */
+function toolWords(name) {
+  const n = String(name ?? "").toLowerCase().replace(/^.* · /, "");
+  const k = /^(edit|multiedit|write|apply_patch|notebookedit|patch)$/.test(n) ? "edit"
+    : /^(read|view|cat)$/.test(n) ? "read"
+    : /^(bash|shell|exec|exec_command|local_shell|local_shell_call|shell_command|run)$/.test(n) ? "run"
+    : /^(grep|glob|search|ls|list|find|codebase_search)$/.test(n) ? "find"
+    : /^(webfetch|websearch|web_search|fetch)$/.test(n) || /browser|navigate|playwright/.test(n) ? "web"
+    : /^(todowrite|update_plan|todo)$/.test(n) ? "plan"
+    : /^(agent|task)$/.test(n) ? "agent" : "tool";
+  const V = { edit: ["Edited", "Editing"], read: ["Read", "Reading"], run: ["Ran", "Running"], find: ["Searched", "Searching"], web: ["Browsed", "Browsing"], plan: ["Updated the plan", "Planning"], agent: ["Subagent", "Subagent"], tool: [String(name ?? "Tool"), String(name ?? "Tool")] };
+  if (/^websearch|web_search/.test(n)) V.web = ["Searched the web", "Searching the web"];
+  if (/^write$/.test(n)) V.edit = ["Wrote", "Writing"];
+  return { k, done: V[k][0], doing: V[k][1] };
+}
+const toolIcon = (k) => `<svg class="ti" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">${TI[k] ?? TI.tool}</svg>`;
+/** "Bash: npm test" → "Running npm test", for the now lines. */
+function nowWords(now, running = true) {
+  if (!now) return "";
+  const i = now.indexOf(": ");
+  const name = i > 0 ? now.slice(0, i) : now, rest = i > 0 ? now.slice(i + 2) : "";
+  const w = toolWords(name);
+  return w.k === "tool" ? now : `${running ? w.doing : w.done}${rest ? " " + rest : ""}`;
+}
+
 // ── markdown (safe: escaped first) ───────────────────────────────────────
 function inline(s) {
   const codes = [];
@@ -102,16 +138,63 @@ function inline(s) {
     .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,;:!?]|$)/g, "$1<i>$2</i>");
   return t.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${codes[Number(i)]}</code>`);
 }
+/**
+ * Choices an agent offers ("(a) … (b) …", "A) …", or a numbered list right after a question) become cards
+ * you can pick with one click. Returns null when the lines aren't a clean, sequential set of 2+ options.
+ */
+const OPT_RE = /^\s*(?:[-*]\s+)?(?:\*\*)?(?:\(([a-hA-H1-9])\)|([a-hA-H1-9])[).:]|Option ([A-Ha-h1-9])[:.)]?)(?:\*\*)?\s+(.+)$/;
+function parseChoices(lines, start, afterQuestion) {
+  const opts = [];
+  const labelOf = (l) => { const m = l?.match(OPT_RE); return m ? { label: (m[1] ?? m[2] ?? m[3]).toLowerCase(), text: m[4] } : null; };
+  let i = start;
+  for (;;) {
+    const o = labelOf(lines[i]);
+    if (!o) break;
+    const want = opts.length ? String.fromCharCode(opts[opts.length - 1].label.charCodeAt(0) + 1) : null;
+    if (want ? o.label !== want : !/^[a1]$/.test(o.label)) break;
+    if (/^\d$/.test(o.label) && !afterQuestion) return null; // a plain numbered list stays a list
+    const body = [o.text];
+    i++;
+    const next = String.fromCharCode(o.label.charCodeAt(0) + 1);
+    // An option runs until the next option's label (even across blank lines); the last one ends at a blank line.
+    let j = i;
+    while (j < lines.length && j - i < 40 && labelOf(lines[j])?.label !== next) j++;
+    const until = j < lines.length && labelOf(lines[j])?.label === next ? j : (() => { let k = i; while (k < lines.length && lines[k].trim() && !OPT_RE.test(lines[k])) k++; return k; })();
+    for (; i < until; i++) if (lines[i].trim()) body.push(lines[i]);
+    opts.push({ label: o.label, body });
+    if (until >= lines.length || labelOf(lines[until])?.label !== next) break;
+  }
+  return opts.length >= 2 ? { opts, end: i } : null;
+}
+function choicesHTML(opts) {
+  return `<div class="choices">${opts.map((o) => {
+    const first = o.body[0].replace(/\*\*/g, "");
+    const cut = first.search(/(?<=[.!?])\s|\s[—–-]\s|:\s/);
+    const title = (cut > 0 && cut < 110 ? first.slice(0, cut) : first.length < 110 ? first : first.slice(0, 100) + "…").replace(/[.:]$/, "");
+    const rest = [cut > 0 && cut < 110 ? first.slice(cut).replace(/^\s*[—–:-]?\s*/, "") : first.length < 110 ? "" : first, ...o.body.slice(1)].filter((x) => x.trim());
+    const rec = /recommend|\bpreferred\b/i.test(o.body[0]);
+    const lab = o.label.toUpperCase();
+    return `<div class="choice${rec ? " rec" : ""}" data-choice="${esc(o.label)}" data-title="${esc(title.replace(/\s*\((my )?recommend(ed|ation)\)/i, ""))}"><span class="cl">${esc(lab)}</span><div class="cb"><div class="ct">${inline(title)}${rec ? '<span class="rp">Recommended</span>' : ""}</div>${rest.length ? `<div class="cd">${rest.map(inline).join("<br>")}</div>` : ""}</div><button class="btn primary cs" data-choose="${esc(o.label)}" tabindex="-1">Choose ${esc(lab)}</button></div>`;
+  }).join("")}</div>`;
+}
+function diffHTML(code) {
+  return `<pre class="diff"><code>${code.replace(/\n$/, "").split("\n").map((l) => `<span class="${/^\+(?!\+\+)/.test(l) ? "add" : /^-(?!--)/.test(l) ? "del" : /^@@/.test(l) ? "hunk" : ""}">${esc(l)}</span>`).join("\n")}</code></pre>`;
+}
 function md(text) {
   const out = [];
-  const parts = String(text ?? "").split(/^```[^\n]*\n([\s\S]*?)^```[ \t]*$/m);
+  const src = String(text ?? "");
+  const langs = [...src.matchAll(/^```([^\n]*)\n/gm)].map((m) => m[1].trim().toLowerCase());
+  const parts = src.split(/^```[^\n]*\n([\s\S]*?)^```[ \t]*$/m);
   for (let p = 0; p < parts.length; p++) {
-    if (p % 2 === 1) { out.push(`<pre><code>${esc(parts[p].replace(/\n$/, ""))}</code></pre>`); continue; }
+    if (p % 2 === 1) { const lang = langs[(p - 1) / 2] ?? ""; out.push(lang === "diff" || lang === "patch" ? diffHTML(parts[p]) : `<pre><code>${esc(parts[p].replace(/\n$/, ""))}</code></pre>`); continue; }
     const lines = parts[p].split("\n");
     let i = 0;
     while (i < lines.length) {
       const l = lines[i];
       if (!l.trim()) { i++; continue; }
+      const prevText = (out[out.length - 1] ?? "").replace(/<[^>]+>/g, "");
+      const ch = OPT_RE.test(l) ? parseChoices(lines, i, /\?\s*$/.test(prevText) || /\b(choose|option|which|prefer|pick|decide)\b/i.test(prevText)) : null;
+      if (ch) { out.push(choicesHTML(ch.opts)); i = ch.end; continue; }
       let m;
       if ((m = l.match(/^(#{1,4})\s+(.*)/))) { out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); i++; continue; }
       if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) { out.push("<hr>"); i++; continue; }
@@ -138,7 +221,9 @@ function md(text) {
           if (/^\s*([-*•]|\d+[.)])\s+/.test(ln)) items.push(ln.replace(/^\s*([-*•]|\d+[.)])\s+/, ""));
           else items[items.length - 1] += "\n" + ln.trim();
         }
-        out.push(`<${ordered ? "ol" : "ul"}>${items.map((x) => `<li>${inline(x).replace(/\n/g, "<br>")}</li>`).join("")}</${ordered ? "ol" : "ul"}>`);
+        const check = (x) => { const c = x.match(/^\[( |x|X)\]\s+/); return c ? `<span class="ck${c[1] !== " " ? " on" : ""}"></span>${inline(x.slice(c[0].length)).replace(/\n/g, "<br>")}` : inline(x).replace(/\n/g, "<br>"); };
+        const task = items.some((x) => /^\[( |x|X)\]\s/.test(x));
+        out.push(`<${ordered ? "ol" : "ul"}${task ? ' class="tasks"' : ""}>${items.map((x) => `<li>${check(x)}</li>`).join("")}</${ordered ? "ol" : "ul"}>`);
         continue;
       }
       const para = [];
@@ -203,7 +288,7 @@ function rowHTML(r, byProject) {
   let line = "";
   const tail = r.tail?.length ? plain(r.tail[r.tail.length - 1]) : "";
   if (r.status === "blocked") line = `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
-  else if (live) line = `<span class="ln now">${r.now ? esc(r.now) : esc(r.tail?.[r.tail.length - 1]?.trim() ?? "")}</span>`;
+  else if (live) line = `<span class="ln now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span>` : ""}${r.now ? esc(nowWords(r.now)) : r.step ? esc(r.step) : "thinking…"}</span>`;
   else if (r.status === "done") line = `<span class="ln">Finished · ${esc(plain(r.lastMessage) || tail)}</span>`;
   else if (r.empty) line = `<span class="ln">${r.agent === "shell" ? "empty shell" : "no conversation yet"}</span>`;
   const running = (r.subagents ?? []).filter((x) => x.running);
@@ -277,7 +362,11 @@ function renderList() {
       rowCache.set(r.key, c);
     }
     const sig = JSON.stringify(r) + S.machine + multiMachine() + byProject;
-    if (c.sig !== sig) { c.el.innerHTML = rowHTML(r, byProject); c.el.dataset.status = r.status; c.sig = sig; }
+    if (c.sig !== sig) {
+      const was = c.el.dataset.status;
+      c.el.innerHTML = rowHTML(r, byProject); c.el.dataset.status = r.status; c.sig = sig;
+      if (was && was !== r.status && (r.status === "blocked" || r.status === "done")) { c.el.classList.remove("flash"); void c.el.offsetWidth; c.el.classList.add("flash"); }
+    }
     c.el.classList.toggle("sel", S.sel === r.key && !S.board);
     c.el.classList.toggle("picked", S.picked.has(r.key));
     c.el.classList.toggle("stale", !!r.stale && r.status !== "working" && r.status !== "blocked");
@@ -395,6 +484,7 @@ function select(key, opts = {}) {
     termText = ""; termHash = ""; $("screen").innerHTML = ""; headSig = ""; bodySig = "";
     $("cText").value = S.drafts?.get(key) ?? ""; autosize($("cText"));
     chatDom.key = null;
+    chatSel.clear(); lastPicked = null; $("msgbar")?.remove(); $("detail").classList.remove("selecting");
   }
   render();
   loadDetail(key);
@@ -519,14 +609,15 @@ function chatBlocks(c) {
   return blocks;
 }
 const expanded = new Set();
+const MSG_TOOLS = `<span class="mt"><button class="ib" data-copy title="Copy" aria-label="Copy">${'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/></svg>'}</button><button class="ib" data-pick title="Select (for copying several)" aria-label="Select"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="m5.5 8 2 2 3-4"/></svg></button></span>`;
 function blockHTML(b, key) {
   const m = b.ms[0];
   const imgs = (list) => (list?.length ? `<div class="thumbs">${list.map((id) => `<button data-cimg="${esc(id)}"><img loading="lazy" decoding="async" alt="" src="${imgUrl(key, id, S.sub)}" onerror="this.parentElement.hidden=true"></button>`).join("")}</div>` : "");
   if (b.kind === "user" || b.kind === "pending") {
     const long = (m.text ?? "").length > 900;
-    return `<div class="msg user${b.kind === "pending" ? " pending" : ""}"><div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
+    return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
   }
-  if (b.kind === "assistant") return `<div class="msg assistant"><div class="md">${md(m.text)}</div><div class="t">${esc(when(m.at))}</div></div>`;
+  if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS}<div class="md">${md(m.text)}</div><div class="t">${esc(when(m.at))}</div></div>`;
   if (b.kind === "note") return `<div class="note${/^Recap:/.test(m.text) ? " recap" : ""}">${/^Recap:/.test(m.text) ? mdLite(m.text) : esc(m.text)}</div>`;
   if (b.kind === "agent") {
     const d = S.details.get(S.sel)?.data;
@@ -540,9 +631,9 @@ function blockHTML(b, key) {
   const all = b.ms;
   const open = expanded.has(b.key) || all.length <= 4;
   const shown = open ? all : all.slice(-3);
-  const line = (t) => `<div class="tool">${t.state === "running" ? '<span class="spin"></span>' : `<span class="st ${t.state === "error" ? "error" : ""}"></span>`}<span class="nm">${esc(t.tool)}</span><span class="sm">${esc(t.summary ?? "")}</span></div>`;
+  const line = (t) => { const w = toolWords(t.tool); const run = t.state === "running"; return `<div class="tool${run ? " run" : ""}${t.state === "error" ? " err" : ""}" title="${esc(t.tool)}">${toolIcon(w.k)}<span class="nm">${esc(run ? w.doing : w.done)}</span><span class="sm">${esc(t.summary ?? "")}</span>${run ? '<span class="spin"></span>' : t.state === "error" ? '<span class="x">failed</span>' : ""}</div>`; };
   const allImgs = all.flatMap((t) => t.images ?? []);
-  return `<div class="tools msg">${!open ? `<button class="fold" data-fold="${b.key}">▸ ${all.length - 3} earlier tool calls</button>` : all.length > 4 ? `<button class="fold" data-fold="${b.key}">▾ hide</button>` : ""}${shown.map(line).join("")}${imgs(allImgs.slice(-6))}</div>`;
+  return `<div class="tools msg">${MSG_TOOLS}${!open ? `<button class="fold" data-fold="${b.key}">▸ ${all.length - 3} earlier tool calls</button>` : all.length > 4 ? `<button class="fold" data-fold="${b.key}">▾ hide</button>` : ""}${shown.map(line).join("")}${imgs(allImgs.slice(-6))}</div>`;
 }
 const chatDom = { key: null, blocks: [], el: null };
 function renderChat() {
@@ -560,8 +651,9 @@ function renderChat() {
     return;
   }
   const dref = S.details.get(key)?.data;
-  if (chatDom.key === id && chatDom.v === c.v && chatDom.dref === dref && chatDom.el && body.contains(chatDom.el)) return;
-  chatDom.v = c.v; chatDom.dref = dref;
+  const st = S.rows.get(key)?.status;
+  if (chatDom.key === id && chatDom.v === c.v && chatDom.dref === dref && chatDom.st === st && chatDom.el && body.contains(chatDom.el)) return;
+  chatDom.v = c.v; chatDom.dref = dref; chatDom.st = st;
   const blocks = chatBlocks(c);
   const nearBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 90;
   if (chatDom.key !== id || !chatDom.el || !body.contains(chatDom.el)) {
@@ -585,9 +677,12 @@ function renderChat() {
       const t = document.createElement("template");
       t.innerHTML = blockHTML(b, key).trim();
       const el = t.content.firstElementChild;
+      el.dataset.b = b.key;
       if (o) o.el.replaceWith(el);
+      else if (chatDom.fresh === id) el.classList.add("enter"); // new while you watch: ease it in
       o = { key: b.key, sig, el };
     }
+    o.el.classList.toggle("picked", chatSel.has(b.key));
     if (prevEl.nextElementSibling !== o.el) prevEl.after(o.el);
     prevEl = o.el;
     old.delete(b.key);
@@ -595,12 +690,81 @@ function renderChat() {
   }
   for (const o of old.values()) o.el.remove();
   chatDom.blocks = next;
+  chatDom.data = blocks;
+  decorateLatest(wrap, blocks, S.rows.get(key));
   const grew = next.length && next[next.length - 1].key !== chatDom.lastKey;
   chatDom.lastKey = next[next.length - 1]?.key;
   if (chatDom.fresh !== id) { chatDom.fresh = id; body.scrollTop = body.scrollHeight; }
   else if (nearBottom) body.scrollTop = body.scrollHeight;
   else if (grew) showNewPill();
 }
+/** Only the newest agent message is actionable: its choices become buttons, a closing question gets quick replies. */
+function decorateLatest(wrap, blocks, r) {
+  wrap.querySelector(".quick")?.remove();
+  wrap.querySelector(".thinking")?.remove();
+  for (const el of wrap.querySelectorAll(".choices.pickable")) el.classList.remove("pickable");
+  if (!r || S.sub) return;
+  const canSend = !r.app && isAgent(r) && r.status !== "working";
+  const lastAsst = [...blocks].reverse().find((b) => b.kind === "assistant");
+  const tailBlock = blocks[blocks.length - 1];
+  const lastEl = lastAsst && chatDom.blocks.find((o) => o.key === lastAsst.key)?.el;
+  if (lastEl && canSend && tailBlock === lastAsst) {
+    const ch = lastEl.querySelector(".choices");
+    if (ch) ch.classList.add("pickable");
+    else {
+      const text = String(lastAsst.ms[0].text ?? "").trim();
+      const q = text.split(/\n\s*\n/).pop() ?? "";
+      if (/\?\s*\**\s*$/.test(q) && /\b(should|shall|want|do you|would you|can i|may i|ok to|okay to|go ahead|proceed|ready)\b/i.test(q)) {
+        const d = document.createElement("div");
+        d.className = "quick";
+        d.innerHTML = ["Yes, go ahead", "No, not now", "Tell me more first"].map((t) => `<button class="btn" data-quick="${esc(t)}">${esc(t)}</button>`).join("");
+        lastEl.after(d);
+      }
+    }
+  }
+  // A turn is running but nothing has come back yet: say so, in the chat, where you're looking.
+  if (r.status === "working" && tailBlock && (tailBlock.kind === "user" || tailBlock.kind === "pending")) {
+    const d = document.createElement("div");
+    d.className = "thinking";
+    d.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>${esc(r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent)} is thinking`;
+    wrap.append(d);
+  }
+}
+
+// ── copy & select messages ───────────────────────────────────────────────
+const chatSel = new Set();
+function blockText(b, withHeader) {
+  const r = S.rows.get(S.sel);
+  const who = b.kind === "user" || b.kind === "pending" ? "You" : b.kind === "assistant" ? (r?.agent === "claude" ? "Claude" : r?.agent === "codex" ? "Codex" : r?.agent ?? "Agent") : b.kind === "tools" ? "Tools" : "Note";
+  const body = b.kind === "tools" ? b.ms.map((t) => `${toolWords(t.tool).done} ${t.summary ?? ""}`.trim()).join("\n")
+    : b.kind === "agent" ? `Subagent: ${b.ms[0].summary ?? ""}` : String(b.ms[0].text ?? "");
+  return withHeader ? `**${who}**${b.ms[0].at ? ` (${when(b.ms[0].at)})` : ""}\n${body}` : body;
+}
+function copyBlocks(keys) {
+  const blocks = (chatDom.data ?? []).filter((b) => keys.includes(b.key));
+  if (!blocks.length) return;
+  copy(blocks.length === 1 ? blockText(blocks[0], false) : blocks.map((b) => blockText(b, true)).join("\n\n"), blocks.length === 1 ? "message" : `${blocks.length} messages`);
+}
+let lastPicked = null;
+function pickBlock(key, range) {
+  const keys = (chatDom.data ?? []).map((b) => b.key);
+  if (range && lastPicked && keys.includes(lastPicked)) {
+    const [a, z] = [keys.indexOf(lastPicked), keys.indexOf(key)].sort((x, y) => x - y);
+    for (const k of keys.slice(a, z + 1)) chatSel.add(k);
+  } else chatSel.has(key) ? chatSel.delete(key) : chatSel.add(key);
+  lastPicked = key;
+  renderSelBar();
+}
+function renderSelBar() {
+  for (const o of chatDom.blocks) o.el.classList.toggle("picked", chatSel.has(o.key));
+  $("detail").classList.toggle("selecting", chatSel.size > 0);
+  let bar = $("msgbar");
+  if (!chatSel.size) { bar?.remove(); return; }
+  if (!bar) { bar = document.createElement("div"); bar.id = "msgbar"; bar.className = "msgbar"; $("composer").before(bar); }
+  bar.innerHTML = `<b>${chatSel.size}</b> selected <span class="hint">· shift-click to select a range</span><span class="spacer"></span><button class="btn primary" data-selcopy>Copy</button><button class="btn ghost" data-selall>All</button><button class="btn ghost" data-selclear>Clear</button>`;
+}
+function clearPicks() { chatSel.clear(); lastPicked = null; renderSelBar(); }
+
 function showNewPill() {
   if (chatDom.el?.querySelector(".newpill")) return;
   const b = document.createElement("button");
@@ -692,7 +856,8 @@ function renderNowbar(r, d) {
   el.hidden = !on;
   if (!on) return;
   const since = r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
-  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span><span class="what">${esc(r.now ?? "thinking…")}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
+  const prog = r.todos?.total ? `<span class="prog" title="${r.todos.done} of ${r.todos.total} steps done"><i style="width:${Math.round((100 * r.todos.done) / r.todos.total)}%"></i></span><span class="stp">${r.todos.done}/${r.todos.total}</span>` : "";
+  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span>${prog}<span class="what">${r.step ? `<span class="step">${esc(r.step)}</span>` : ""}${esc(r.now ? nowWords(r.now) : r.step ? "" : "thinking…")}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
@@ -790,7 +955,7 @@ function renderBoard() {
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
     return `<div class="card" data-card="${esc(r.key)}" data-status="${r.status}"><div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
       <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>
-      ${r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.now ? `<div class="now">${esc(r.now)}</div>` : ""}
+      ${r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.step || r.now ? `<div class="now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span> ` : ""}${esc(r.step ?? "")}${r.step && r.now ? " · " : ""}${esc(nowWords(r.now))}</div>` : ""}
       ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
       <pre>${ansi((r.tail ?? []).slice(-4).join("\n"))}</pre></div>`;
   };
@@ -1487,6 +1652,24 @@ $("mini").addEventListener("click", (e) => {
 });
 $("detail").addEventListener("click", (e) => {
   if (e.target.closest("#appbar")) return;
+  const blockEl = e.target.closest("[data-b]");
+  if (e.target.closest("[data-copy]") && blockEl) return copyBlocks([blockEl.dataset.b]);
+  if (e.target.closest("[data-pick]") && blockEl) return pickBlock(blockEl.dataset.b, e.shiftKey);
+  if (chatSel.size && blockEl && !e.target.closest("a, button, [data-toggle]")) return pickBlock(blockEl.dataset.b, e.shiftKey);
+  if (e.target.closest("[data-selcopy]")) { copyBlocks([...chatSel]); return clearPicks(); }
+  if (e.target.closest("[data-selall]")) { for (const b of chatDom.data ?? []) chatSel.add(b.key); return renderSelBar(); }
+  if (e.target.closest("[data-selclear]")) return clearPicks();
+  const choose = e.target.closest("[data-choose]");
+  if (choose && choose.closest(".choices.pickable")) { const c = choose.closest("[data-choice]"); return sendMessage(`(${c.dataset.choice}) ${c.dataset.title}`, $("cText")); }
+  const choice = e.target.closest(".choices.pickable [data-choice]");
+  if (choice) {
+    for (const x of choice.parentElement.children) x.classList.toggle("on", x === choice);
+    $("cText").value = `(${choice.dataset.choice}) ${choice.dataset.title}${$("cText").value.trim() ? "" : ". "}`;
+    autosize($("cText")); $("cText").focus();
+    return;
+  }
+  const quick = e.target.closest("[data-quick]");
+  if (quick) return sendMessage(quick.dataset.quick, $("cText"));
   const fold = e.target.closest("[data-fold]");
   if (fold) { const k = fold.dataset.fold; expanded.has(k) ? expanded.delete(k) : expanded.add(k); chatDom.v = -1; return renderChat(); }
   const t = e.target.closest("[data-toggle]");
@@ -1593,6 +1776,7 @@ $("splitH").addEventListener("keydown", (e) => {
 new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
   if (e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1618,6 +1802,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "c") { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); }
   else if (k === "?") $("help").showModal();
   else if (/^[1-9]$/.test(k)) { const ids = ["all", ...(S.summary.machines ?? []).map((m) => m.id)]; if (ids[k - 1] && ids.length > 2) setMachine(ids[k - 1]); }
+  else if (k === "Escape" && chatSel.size) clearPicks();
   else if (k === "Escape") { if (S.sub) { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); } else if (S.board) setBoard(false); else if (S.q) { S.q = ""; $("q").value = ""; } else if (S.picked.size) S.picked.clear(); render(); }
 });
 

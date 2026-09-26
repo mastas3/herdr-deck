@@ -59,13 +59,10 @@ describe("Codex app turn state", () => {
   test("a task_started without task_complete is an open turn; completion or abort closes it", async () => {
     const { turnState } = await import("../src/codexapp");
     const dir = tmp();
-    const f = `${dir}/rollout.jsonl`;
     const ev = (type: string, ts: string) => line({ timestamp: ts, type: "event_msg", payload: { type } });
-    writeFileSync(f, ev("task_started", "2026-09-26T10:00:00Z") + ev("item_completed", "2026-09-26T10:00:05Z"));
-    expect(await turnState(f)).toMatchObject({ open: true, startedAt: Date.parse("2026-09-26T10:00:00Z") });
-    writeFileSync(f, ev("task_started", "2026-09-26T10:00:00Z") + ev("task_complete", "2026-09-26T10:01:00Z") + " ");
-    expect(await turnState(f)).toMatchObject({ open: false, endedAt: Date.parse("2026-09-26T10:01:00Z") });
-    writeFileSync(f, ev("task_started", "2026-09-26T10:02:00Z") + ev("turn_aborted", "2026-09-26T10:03:00Z") + "  ");
-    expect((await turnState(f)).open).toBe(false);
+    const file = (name: string, body: string) => { const f = `${dir}/${name}.jsonl`; writeFileSync(f, body); return f; };
+    expect(await turnState(file("open", ev("task_started", "2026-09-26T10:00:00Z") + ev("item_completed", "2026-09-26T10:00:05Z")))).toMatchObject({ open: true, startedAt: Date.parse("2026-09-26T10:00:00Z") });
+    expect(await turnState(file("done", ev("task_started", "2026-09-26T10:00:00Z") + ev("task_complete", "2026-09-26T10:01:00Z")))).toMatchObject({ open: false, endedAt: Date.parse("2026-09-26T10:01:00Z") });
+    expect((await turnState(file("aborted", ev("task_started", "2026-09-26T10:02:00Z") + ev("turn_aborted", "2026-09-26T10:03:00Z")))).open).toBe(false);
   });
 });

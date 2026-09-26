@@ -34,7 +34,9 @@ export type Row = {
   project: string; // what the session is really about (from the work it did), else its folder's project
   projectRoot?: string;
   launch?: string; // the folder's project, when it differs from `project` (sessions started from a hub)
-  now?: string; // the tool call in flight / todo in progress
+  now?: string; // the tool call in flight
+  step?: string; // the todo/plan item in progress
+  todos?: { done: number; total: number };
   turnStartedAt?: number;
   subagents?: { id: string; type?: string; description?: string; model?: string; running: boolean; now?: string; startedAt?: number; lastActiveAt?: number; tools: number }[];
   branch?: string;
@@ -406,6 +408,7 @@ export class Deck {
           projectRoot: projRoot,
           launch: projRoot !== cwdRoot ? basename(cwdRoot) : undefined,
           now: status === "working" || status === "blocked" ? ins?.now : undefined,
+          step: ins?.todo, todos: ins?.todos,
           turnStartedAt: ins?.turnStartedAt,
           subagents: ins?.subagents?.length ? ins.subagents.map((x) => ({ id: x.id, type: x.type, description: x.description, model: x.model, running: x.running, now: x.running ? x.now : undefined, startedAt: x.startedAt, lastActiveAt: x.lastActiveAt, tools: x.tools })) : undefined,
           branch: g?.branch,
@@ -447,7 +450,7 @@ export class Deck {
         key, herdr: "codex-app", workspaceId: "codex-app", workspace: "Codex app", tabId: t.id, tab: "", tabNumber: 0, tabPanes: 1, paneId: t.id,
         agent: "codex", status: t.status, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
         cwd: t.cwd, project: basename(projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
-        now: t.status === "working" ? ins?.now : undefined, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
+        now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
         branch: t.branch ?? g?.branch, dirty: g?.dirty, createdAt: t.createdAt ?? meta?.createdAt, lastActiveAt,
         model: meta?.model, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
         rssKB: 0, cpu: 0, procs: 0, sessionId: t.id, resume: resumeCommand("codex", t.id), tail: [],

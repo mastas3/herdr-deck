@@ -36,6 +36,7 @@ export type Detail = {
   workMs?: number;
   turnStartedAt?: number; // when the current (or last) turn began
   todo?: string; // the task the agent marked in progress, if it keeps a todo list
+  todos?: { done: number; total: number }; // progress through that list (Claude/OpenCode todos, Codex plans)
   touch: Map<string, number>; // folder → how much work happened there (edits weigh most)
 };
 
@@ -85,6 +86,14 @@ export function prettyTool(name: string): string {
   if (!m) return name;
   const server = m[1].replace(/^plugin_/, "").replace(/^claude_ai_/, "").split("_").filter(Boolean);
   return `${server[server.length - 1] ?? m[1]} · ${m[2]}`;
+}
+
+/** Todo lists (Claude TodoWrite, OpenCode todowrite) and Codex plans all reduce to: current step + done/total. */
+function trackTodos(d: Detail, items: any[] | undefined, text = (t: any) => t?.activeForm ?? t?.content ?? t?.step) {
+  if (!Array.isArray(items) || !items.length) return;
+  const cur = items.find((t) => t?.status === "in_progress");
+  d.todo = cur ? oneLine(text(cur)) : undefined;
+  d.todos = { done: items.filter((t) => t?.status === "completed" || t?.status === "done").length, total: items.length };
 }
 
 /** One line saying what a tool call does, for the chat and the "now" line. */
@@ -206,10 +215,7 @@ function feedClaude(st: State, line: string, offset: number) {
         const m = push(d, { role: "tool", at, tool: prettyTool(name), summary: toolSummary(name, p.input), state: "running", ...(isAgent ? { sub: "", subType: p.input?.subagent_type } : {}) });
         if (p.id) { st.open.set(p.id, m); if (isAgent) Object.defineProperty(m, "_tid", { value: p.id, enumerable: false }); }
         workFromInput(d, name, p.input);
-        if (name.toLowerCase() === "todowrite") {
-          const cur = (p.input?.todos ?? []).find((t: any) => t?.status === "in_progress");
-          d.todo = cur ? oneLine(cur.activeForm ?? cur.content) : undefined;
-        }
+        if (name.toLowerCase() === "todowrite") trackTodos(d, p.input?.todos);
       }
     }
   }
@@ -410,6 +416,7 @@ function feedCodex(st: State, line: string, offset: number) {
     if (p.call_id) st.open.set(p.call_id, m);
     let args: any = raw;
     try { args = JSON.parse(raw); } catch {}
+    if (name === "update_plan" && typeof args === "object") trackTodos(d, args?.plan);
     workFromInput(d, name === "apply_patch" ? "apply_patch" : name, args);
     if (typeof args === "string") {
       const wd = args.match(/workdir\s*:\s*["'`]([^"'`]+)/)?.[1];
@@ -535,10 +542,7 @@ export function opencodeDetail(sessionId: string): Detail | undefined {
           const tool = String(p.tool ?? "tool");
           push(d, { role: "tool", at: m.time_created, tool: prettyTool(tool), summary: toolSummary(tool, input), state: p.status === "error" ? "error" : p.status === "completed" ? "done" : "running" });
           workFromInput(d, tool, input);
-          if (tool === "todowrite") {
-            const cur = (input.todos ?? []).find((t: any) => t?.status === "in_progress");
-            d.todo = cur ? oneLine(cur.content) : undefined;
-          }
+          if (tool === "todowrite") trackTodos(d, input.todos);
         }
       }
     }

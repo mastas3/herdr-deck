@@ -126,8 +126,9 @@ setInterval(() => {
 // app.js is served under a content hash so browsers (and the service worker) keep it forever.
 const APP_PATH = new URL("../public/app.js", import.meta.url).pathname;
 let appJs = { mtime: 0, body: new Uint8Array(), gz: new Uint8Array(), hash: "" };
+/** Loaded once at startup, like the HTML, so a running service never mixes new JS with an old page. DEV reloads. */
 function appAsset() {
-  const m = statSync(APP_PATH).mtimeMs;
+  const m = appJs.mtime && !DEV ? appJs.mtime : statSync(APP_PATH).mtimeMs;
   if (m !== appJs.mtime) {
     const body = new Uint8Array(readFileSync(APP_PATH));
     appJs = { mtime: m, body, gz: Bun.gzipSync(body), hash: Bun.hash(body).toString(36) };
