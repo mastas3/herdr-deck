@@ -883,7 +883,7 @@ const json = (data: unknown, status = 200) => Response.json(data, { status });
 const tsUsers = new Set((process.env.DECK_TS_USERS ?? "").split(",").map((s) => s.trim()).filter(Boolean));
 if (!tsUsers.size) {
   try {
-    const bin = ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((p) => existsSync(p));
+    const bin = ["/usr/local/bin/tailscale", "/opt/homebrew/bin/tailscale", "/usr/bin/tailscale", "/Applications/Tailscale.app/Contents/MacOS/Tailscale"].find((p) => existsSync(p));
     if (bin) {
       const st = JSON.parse(Bun.spawnSync([bin, "status", "--json"], { stderr: "ignore" }).stdout.toString());
       const login = st.User?.[String(st.Self?.UserID)]?.LoginName;
@@ -1162,7 +1162,7 @@ async function handle(req: Request): Promise<Response> {
         case "/api/machines": {
           if (body.op === "add") {
             const ssh = String(body.ssh ?? "").trim();
-            if (!/^[\w.@-]+$/.test(ssh)) return json({ error: "Use an SSH host from your ~/.ssh/config, like conductor-linux or me@host" }, 400);
+            if (!/^[\w.@-]+$/.test(ssh)) return json({ error: "Use an SSH host from your ~/.ssh/config, like my-server or me@host" }, 400);
             const label = String(body.label ?? "").trim().slice(0, 40) || ssh;
             const id = (String(body.id ?? "") || label).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "machine";
             if (id === SELF.id || remotes.has(id)) return json({ error: `There's already a machine called “${id}”` }, 400);
@@ -1205,7 +1205,7 @@ async function handle(req: Request): Promise<Response> {
           for (const h of remotes.values()) if (h.online) { try { const r = await h.post("/api/connections", {}); if (r.data?.sections) maps.push(inventoryText(r.data)); } catch {} }
           const recent = [...new Set(allRows().filter((r) => !r.empty).map((r) => r.project))].slice(0, 25).join(", ");
           const prompt = `You are helping me plan ambitious work. Below is everything my machines can reach (agents, subscriptions, MCP servers, signed-in CLIs, API key names, skills). My active projects: ${recent}.\n\nPropose 6 "mega projects" that are only possible because of this combination: for each, the outcome, which of my connections it uses, the first 3 concrete steps an agent could start today, rough effort, and the main risk. Rank them by value to me. Also list any connection I'm missing that would unlock something big. Don't start building; wait for me to pick.\n\n${maps.join("\n\n---\n\n")}`;
-          return json(await startSession({ kind: "claude", cwd: body.cwd || process.env.DECK_HUB_DIR || `${homedir()}/wiki`, prompt, label: "Mega project ideas", focus: false }));
+          return json(await startSession({ kind: "claude", cwd: body.cwd || process.env.DECK_HUB_DIR || (existsSync(`${homedir()}/wiki`) ? `${homedir()}/wiki` : homedir()), prompt, label: "Mega project ideas", focus: false }));
         }
         case "/api/decide": {
           // You acted on a decision in the inbox: record it for Jev, and mark the session seen.

@@ -1,16 +1,86 @@
 # herdr deck
 
-A live web dashboard for everything running in [herdr](https://herdr.dev): every pane in every
-herdr session, as one searchable, filterable list you can act on.
+**One live screen for every AI coding agent you're running.** Claude Code, Codex and OpenCode sessions
+in [herdr](https://herdr.dev), on this computer and your others, as one list you can triage, answer and
+steer, from your desk or your phone.
+
+- See at a glance which agents are working, which are waiting on you, and which finished.
+- Open any session as a chat: read the whole conversation, answer permission prompts with one tap, send
+  messages, attach files, or type straight into its terminal.
+- Start, rename, close and resume sessions. Search every past conversation.
+- Install it on your phone as an app (over [Tailscale](https://tailscale.com), private to you).
+- Watch several machines from one deck.
+
+It's a single [Bun](https://bun.sh) process with no dependencies and no build step. It reads only local
+files and herdr's socket, and it listens only on `127.0.0.1`.
+
+## Install
+
+You need **macOS or Linux** and **[herdr](https://herdr.dev)** (`brew install herdr`), where your agents run.
+Then paste this into a terminal:
 
 ```bash
-bin/install.sh          # run at login on http://127.0.0.1:4747 (launchd, auto-restart)
-bin/uninstall.sh        # stop and remove the login service
-bun run dev             # or run it in the foreground (DECK_PORT=4748 to use another port)
+curl -fsSL https://raw.githubusercontent.com/mastas3/herdr-deck/main/bin/bootstrap.sh | bash
+```
+
+That installs Bun if you don't have it, puts the deck in `~/.local/share/herdr-deck`, and starts it as a
+login service (launchd on macOS, `systemd --user` on Linux) so it's always there. Open
+**http://127.0.0.1:4747**. Run the same line again to update.
+
+### Or let your AI agent set it up
+
+New to all this? Paste this to Claude Code, Codex, or any coding agent that can run commands on your computer:
+
+```text
+Set up herdr deck on this computer for me. Follow the guide at
+https://raw.githubusercontent.com/mastas3/herdr-deck/main/AGENT_SETUP.md step by step.
+I'm not technical, so explain what you're doing in plain words and ask me before anything optional.
+```
+
+The guide ([AGENT_SETUP.md](AGENT_SETUP.md)) walks the agent through checking your computer, installing
+what's missing, starting the deck, and the optional extras: the phone app, more machines, local AI summaries.
+
+### From a clone
+
+```bash
+git clone https://github.com/mastas3/herdr-deck.git && cd herdr-deck
+bin/install.sh          # run it as a login service on http://127.0.0.1:4747 (restarts it if it's running)
+bin/uninstall.sh        # stop it and remove the service (your data in ~/.config/herdr-deck stays)
+bun run dev             # or run it in the foreground with reload (DECK_PORT=4748 to use another port)
 bun test
 ```
 
-## Machines
+## What you need
+
+| | Needed? | What for |
+|---|---|---|
+| macOS or Linux | yes | Windows isn't supported (herdr doesn't run there either) |
+| [herdr](https://herdr.dev) | yes | The terminal your agents run in. The deck reads its socket at `~/.config/herdr/herdr.sock`. For accurate working/waiting status, run `herdr integration install claude` (and `codex`, `opencode`) |
+| [Bun](https://bun.sh) 1.2+ | yes | Runs the deck. The installer gets it for you |
+| Claude Code, Codex or OpenCode | at least one | The agents the deck shows. Their transcripts are read from `~/.claude`, `~/.codex` and OpenCode's database. Codex desktop app threads show up too |
+| [Tailscale](https://tailscale.com) | optional | The phone app and reaching the deck from your other devices, privately |
+| [Ollama](https://ollama.com) | optional | Three-line session summaries written by a local model (`ollama pull gemma4:e4b`) |
+| SSH access to other machines | optional | Watching more than one machine from one deck |
+
+## On your phone (PWA over Tailscale)
+
+When Tailscale is running, the installer also runs `tailscale serve --bg --https=8448 http://127.0.0.1:4747`,
+which serves the deck on `https://<this-computer>.<tailnet>.ts.net:8448`. That address is reachable only from
+your own tailnet (never Funnel, never the public internet) and has a real certificate. Open it on the phone,
+then use **Add to Home Screen** (iOS Safari) or **Install app** (Android Chrome).
+
+On Linux, `tailscale serve` needs permission once: `sudo tailscale set --operator=$USER`, then run
+`bin/install.sh` again.
+
+- On a phone the deck has two screens. The sessions list has search and status chips across the top, with more under Filters.
+  Tapping a session opens it with Story and Terminal tabs, and the system back gesture returns to the list.
+- The terminal wraps lines to the screen and has a row of keys (esc, enter, ctrl+c, arrows, 1/2/3, y/n)
+  and a message box that sends to the agent.
+- A service worker keeps icons and fonts instant and shows a clear "your computer isn't reachable" page when
+  you're offline. Live data is never cached.
+- Alerts work while the app is open. Push alerts while it's closed would need a push service.
+
+## More machines
 
 Every machine with herdr can run its own deck (a node), and one deck (the hub) shows them all as tabs.
 
@@ -18,34 +88,63 @@ Every machine with herdr can run its own deck (a node), and one deck (the hub) s
 bin/deploy-node.sh my-linux-box      # copies the deck over SSH, runs it as a systemd --user (or launchd) service
 ```
 
-Or do it from the deck: **Settings → Machines…** lists every machine, adds one by SSH host (it runs the same
-install and connects without a restart), renames or removes one (removing only stops watching it).
-By hand, list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
+The other machine needs Bun installed, and `my-linux-box` must be a host you can `ssh` into without a
+password prompt (a key in `~/.ssh/config`). Or do it from the deck: **Settings → Machines…** lists every
+machine, adds one by SSH host (it runs the same install and connects without a restart), renames or removes
+one (removing only stops watching it). By hand, list the machine in the hub's `~/.config/herdr-deck/hosts.json`:
 
 ```json
-{ "self": { "id": "mac", "label": "MacBook" },
-  "remotes": [{ "id": "linux", "label": "Linux · work", "ssh": "my-linux-box" }] }
+{ "self": { "id": "laptop", "label": "My laptop" },
+  "remotes": [{ "id": "linux", "label": "Linux box", "ssh": "my-linux-box" }] }
 ```
 
 The hub opens an SSH tunnel to each node's loopback port. It authenticates with the node's
 `~/.config/herdr-deck/api.token` (file mode 600, read once over SSH), mirrors the node's event stream, and forwards actions.
 Tunnels pick a free port and close when the hub exits. Remote sessions get briefs from the hub's own local model.
 
-## Layout
+## Settings
 
-```
-┌ sessions ───────────┬ details ───────────────────────────────┐
-│ search, filters,    │ project · title · status · dates        │
-│ sort, group         │ In short (local-model brief)            │
-│ rows (project-      │ How it started · latest recap           │
-│ coloured)           │ images · history of asks and replies    │
-├─────────────────────┴─────────────────────────────────────────┤
-│ terminal: live view of the pane; click it to type into it     │
-└───────────────────────────────────────────────────────────────┘
-```
+Put settings in `~/.config/herdr-deck/env`, one `NAME=value` per line, then restart the deck
+(`bin/install.sh` again). All of them are optional.
 
-The list collapses (`[`) to a column of coloured squares and resizes by dragging its edge; the terminal
-collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
+| Setting | Default | What it does |
+|---|---|---|
+| `DECK_BRIEF_MODEL` | `gemma4:e4b` | Ollama model that writes the session summaries |
+| `OLLAMA_HOST` | `http://127.0.0.1:11434` | Where Ollama runs |
+| `DECK_PROJECT_DIRS` | `~/Documents/Projects:~/Projects:~/code:…` | Folders (colon-separated) that hold your projects; used for project names and the New session folder list |
+| `DECK_TERMINAL` | `WezTerm` | macOS app that **Jump to pane** brings forward (for example `Ghostty`, `iTerm`, `Terminal`) |
+| `DECK_HUB_DIR` | `~/wiki` if it exists, else `~` | Folder for deck-started planning sessions |
+| `DECK_WIKI_DIR` | `~/wiki` | Where `[[page]]` links in agent replies point, if you keep a Markdown wiki |
+| `DECK_TS_USERS` | this machine's Tailscale owner | Comma-separated Tailscale logins allowed in through the tailnet |
+| `DECK_CODEX_APP_DAYS` | `3` | How many days of Codex desktop app threads to show |
+| `DECK_NO_HISTORY` | | Set to `1` to turn off the History index |
+| `DECK_CHECK_TIMEOUT_MS` | `600000` | Time limit for "proof of done" checks |
+
+These are set when you install instead, as `DECK_PORT=4800 bin/install.sh`:
+
+| Setting | Default | What it does |
+|---|---|---|
+| `DECK_PORT` | `4747` | Loopback port |
+| `DECK_TS_PORT` | `8448` | Tailnet HTTPS port |
+| `DECK_PUBLIC_URL` | the tailnet address | Base address for shareable session links |
+| `DECK_NO_TAILSCALE` | | Set to `1` to leave Tailscale alone |
+
+Everything the deck keeps (closed sessions, held messages, briefs, tools, the History index, tokens) lives in
+`~/.config/herdr-deck/`.
+
+## Troubleshooting
+
+- **The page is empty and says herdr isn't running.** Open a terminal and run `herdr`, then start your agents
+  inside it. `herdr status` should say `server: running`.
+- **Sessions show but the status is always idle.** Install herdr's agent hooks: `herdr integration install claude`
+  (and `codex` / `opencode`), then restart those agents.
+- **http://127.0.0.1:4747 doesn't open.** Check `curl http://127.0.0.1:4747/health`. Logs: macOS
+  `~/Library/Logs/herdr-deck.log`, Linux `journalctl --user -u herdr-deck -n 50`. Run `bin/install.sh` again
+  to restart it.
+- **Linux: the deck stops when I log out.** Run `sudo loginctl enable-linger $USER` once.
+- **The phone link says "forbidden host".** The deck only lets in the Tailscale account that owns the computer.
+  Sign the phone into the same account, or add the phone's login to `DECK_TS_USERS`.
+- **Summaries never appear.** They need Ollama running with the model pulled: `ollama pull gemma4:e4b`.
 
 ## Daily use
 
@@ -85,7 +184,7 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 - **Inbox** (`i`): every session waiting on you, reduced to the decision. Permission prompts (numbered or
   cursor menus) answer with one tap; a question with options shows the options; "done" gets **Looks good**,
   **Send back**, **Verify now**. Filters: quick ones, permissions, questions, done.
-  - **Jev** (TypeSafe, via your `jev` CLI and its receipts) suggests which option you'd pick, whether a
+  - **Jev** (optional and hidden unless a `jev` CLI with a TypeSafe API key is installed) suggests which option you'd pick, whether a
     decision is low-stakes, and how likely a "done" really is. It never answers for you. What you actually did
     is recorded with `jev outcome`, however you answered (inbox, keys, the list and board cards, or a reply
     typed in the session). Each request is asked once: the answer is cached by a fingerprint of what's sent
@@ -144,7 +243,7 @@ and opens the link.
 
 - **In short**: three lines covering what the session is for, how it started and where it stands.
   A local Ollama model (`gemma4:e4b` by default; set `DECK_BRIEF_MODEL` to change it) writes them on request,
-  so conversation text never leaves the Mac. Briefs are cached in `~/.config/herdr-deck/briefs/`.
+  so conversation text never leaves your computer. Briefs are cached in `~/.config/herdr-deck/briefs/`.
 - **How it started**: your first message, quoted in full.
 - **Recap**: Claude's own recap (`away_summary`) when there is one, otherwise the agent's latest reply.
 - **Images**: screenshots you pasted and images the agent looked at, with a full-size viewer.
@@ -163,7 +262,7 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
 ## Starting and closing sessions
 
 - **New** (`n`): choose Claude Code, Codex, OpenCode or a plain shell, a folder (recent folders and
-  `~/Documents/Projects/*` are suggested), optional flags and an optional first message. It opens a herdr tab,
+  your project folders are suggested; see `DECK_PROJECT_DIRS`), optional flags and an optional first message. It opens a herdr tab,
   waits for the shell prompt, starts the agent through herdr's API and sends the message. Progress appears
   as notifications, and the new session is selected as soon as its tab exists.
 - **Close** works on one session or a selection. A confirmation lists what will stop, warns about anything
@@ -183,22 +282,7 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
   transcripts incrementally, so an active 35 MB file costs about 1 ms after the first read (about 150 ms). OpenCode data is
   cached by `time_updated`. Fonts are bundled locally.
 
-## On your phone (PWA over Tailscale)
-
-`bin/install.sh` also runs `tailscale serve --bg --https=8448 http://127.0.0.1:4747`, which serves the deck on
-`https://<this-mac>.<tailnet>.ts.net:8448`. That address is reachable only from your tailnet (not Funnel) and has a real certificate.
-Open it on the phone, then use Add to Home Screen (iOS Safari) or Install app (Android Chrome).
-
-- On a phone the deck has two screens. The sessions list has search and status chips across the top, with more under Filters.
-  Tapping a session opens it with Story and Terminal tabs, and the system back gesture returns to the list.
-- The terminal wraps lines to the screen and has a row of keys (esc, enter, ctrl+c, arrows, 1/2/3, y/n)
-  and a message box that sends to the agent.
-- New session opens as a full-screen sheet.
-- A service worker keeps icons and fonts instant and shows a clear "your Mac isn't reachable" page when you're offline.
-  Live data is never cached.
-- Alerts work while the app is open. Push alerts while it's closed would need a push service.
-
-## Safety
+## Security
 
 Binds to 127.0.0.1 only. Local requests must use a localhost `Host` header, which blocks DNS rebinding.
 Requests through `tailscale serve` are accepted only when Tailscale stamps them with the machine owner's login
@@ -206,3 +290,15 @@ Requests through `tailscale serve` are accepted only when Tailscale stamps them 
 `~/.config/herdr-deck/graveyard.json`.
 The MCP token only works on `/mcp`, which can't close anything. Jev gets trimmed recent output with home paths,
 emails and anything key-like scrubbed (and the `jev` CLI redacts again).
+
+Found a security problem? Please report it privately; see [SECURITY.md](SECURITY.md).
+
+## Contributing
+
+Issues and pull requests are welcome. The code is plain TypeScript run by Bun with no dependencies and no
+build step: `src/` is the server, `public/` is the page. `bun run dev` runs it with reload and `bun test` runs
+the tests. [AGENTS.md](AGENTS.md) has the conventions (it's also what coding agents read).
+
+## License
+
+[MIT](LICENSE)
