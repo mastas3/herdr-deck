@@ -3535,7 +3535,7 @@ function pushBlocker() {
   if (PUSH.ios && !PUSH.standalone) return "On iPhone and iPad, notifications only work in the installed app. In Safari tap Share → Add to Home Screen, open herdr deck from your Home Screen, then turn them on there.";
   if (!isSecureContext) return "Notifications need a secure address: open the deck over https (your tailnet link) or on localhost.";
   if (!PUSH.supported) return "This browser can’t receive push notifications.";
-  if (Notification.permission === "denied") return PUSH.ios ? "Notifications are turned off for herdr deck. Turn them on in iOS Settings → Notifications → herdr deck." : "Notifications are blocked for this site. Allow them in the browser’s site settings, then try again.";
+  if (Notification.permission === "denied") return PUSH.ios ? "Notifications are turned off for herdr deck. Turn them on in iOS Settings → Notifications → herdr deck." : /Android/i.test(navigator.userAgent) ? "Notifications are blocked for herdr deck. Long-press the herdr deck icon → App info → Notifications → Allow (or in Chrome: ⋮ → Settings → Site settings → Notifications), then reopen the deck." : "Notifications are blocked for this site. Allow them in the browser’s site settings, then try again.";
   return null;
 }
 /** Keep the hub's copy of this device's subscription current (it can change under us). */
