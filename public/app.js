@@ -2472,13 +2472,13 @@ async function loadConnections(refresh) {
 }
 const CAT = [["services", "Services"], ["ai", "AI"], ["mcp", "MCP"], ["machines", "Machines"], ["keys", "Keys"], ["dev", "Dev tools"], ["browser", "Browsers"], ["skills", "Skills"], ["custom", "Yours"], ["missing", "Not set up"]];
 const ST = { ready: ["ok", "Ready"], partial: ["warn", "Needs sign-in"], off: ["off", "Not set up"] };
-function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
+function connHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 function connCard(i, secId) {
   const [cls, label] = ST[i.status ?? "ready"] ?? ST.ready;
   const picked = S.conn.pick.has(i.id);
   const open = S.conn.open === i.id;
   const via = i.via ?? [];
-  return `<article class="ccard${picked ? " picked" : ""}${open ? " open" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--h:${hue(i.name)}">
+  return `<article class="ccard${picked ? " picked" : ""}${open ? " open" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--h:${connHue(i.name)}">
     <button class="cpick" data-cpick aria-pressed="${picked}" aria-label="Select ${esc(i.name)}" ${i.status === "off" ? "disabled" : ""}>${ICON.check}</button>
     <div class="ctop" data-copen><span class="cbadge">${esc(initials(i.name.replace(/^[a-z]+:/, "")))}</span><span class="cname">${esc(i.name)}</span><span class="cst ${cls}">${label}</span></div>
     ${i.detail ? `<div class="cwhat" data-copen>${esc(i.detail)}</div>` : ""}
