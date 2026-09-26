@@ -69,7 +69,7 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
   **Send back**, **Verify now**. Filters: quick ones, permissions, questions, done.
   - **Jev** (TypeSafe, via your `jev` CLI and its receipts) suggests which option you'd pick, whether a
     decision is low-stakes, and how likely a "done" really is. It never answers for you. What you actually did
-    is recorded with `jev outcome`. The deck caps itself at `DECK_JEV_DAILY` calls a day (default 80).
+    is recorded with `jev outcome`. TypeSafe has no daily limit (1,200 requests/min); the deck caps its own calls at `DECK_JEV_DAILY` a day (default 1000, about $0.08).
   - **Proof of done:** when an agent says it's done, the deck re-runs the project's own checks (detected from
     package.json, Cargo, go.mod, pytest, Makefile). You approve the command once per project, or turn it off.
     Results show on the row and in the Inbox. Stored in `~/.config/herdr-deck/checks.json`.

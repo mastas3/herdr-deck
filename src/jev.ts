@@ -8,7 +8,9 @@ const HOME = homedir();
 const BIN = [`${HOME}/.local/bin/jev`, `${HOME}/.local/share/jev-kit/bin/jev.mjs`].find((p) => existsSync(p));
 const KEY_FILE = process.env.JEV_KEY_FILE ?? `${HOME}/.config/typesafe/api-key`;
 const COUNT_FILE = `${HOME}/.config/herdr-deck/jev-usage.json`;
-export const JEV_DAILY = Number(process.env.DECK_JEV_DAILY ?? 80);
+// TypeSafe itself has no daily limit (1,200 requests/min, 250k tokens/s). This is only the deck's own
+// spending guard: ~2k input tokens a call at $0.042/M, so 1,000 calls is about $0.08 a day.
+export const JEV_DAILY = Number(process.env.DECK_JEV_DAILY ?? 1000);
 
 export const jevAvailable = () => !!BIN && (existsSync(KEY_FILE) || !!process.env.TYPESAFE_API_KEY) && !process.env.DECK_NO_JEV;
 
@@ -18,7 +20,9 @@ try { const u = JSON.parse(readFileSync(COUNT_FILE, "utf8")); if (u.day === toda
 export const jevUsage = () => ({ day: usage.day, calls: usage.day === today() ? usage.n : 0, cap: JEV_DAILY, available: jevAvailable() });
 
 async function run(args: string[], stdin?: string, timeout = 30_000): Promise<any> {
-  const env: Record<string, string> = { ...(process.env as any), JEV_AGENT: "herdr-deck", PATH: `${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin` };
+  // The jev kit's own default guard (300 calls/day, shared by all your Jev use) mustn't starve the deck;
+  // the deck's cap above is the one that applies to its calls.
+  const env: Record<string, string> = { ...(process.env as any), JEV_AGENT: "herdr-deck", JEV_DAILY_BUDGET: String(Math.max(Number(process.env.JEV_DAILY_BUDGET ?? 300), JEV_DAILY + 5000)), PATH: `${HOME}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin` };
   if (!env.TYPESAFE_API_KEY && existsSync(KEY_FILE)) env.JEV_KEY_FILE = KEY_FILE;
   // Bun runs the Node script fine, and doesn't depend on node being on the service's PATH.
   const p = Bun.spawn([process.execPath, BIN!, ...args], { stdin: stdin ? new TextEncoder().encode(stdin) : "ignore", stdout: "pipe", stderr: "pipe", env, cwd: HOME });
