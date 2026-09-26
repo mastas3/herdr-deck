@@ -34,7 +34,9 @@ export const PLUGIN_ID = /^[a-z0-9][a-z0-9-]{1,39}$/;
 export const MAX_PROMPT = 8000;
 /** A prompt field that names a file beside plugin.json: plain segments only, so it can never climb out of the folder. */
 const FILE_REF = /^[A-Za-z0-9_][\w-]*(\/[A-Za-z0-9_][\w-]*){0,3}\.(md|txt)$/;
-export const isFileRef = (s: unknown): s is string => typeof s === "string" && FILE_REF.test(s);
+/** cache/ and work/ beside plugin.json are the deck's runtime folders, so a plugin can't put files there. */
+const RUNTIME_DIR = /^(cache|work)\//i;
+export const isFileRef = (s: unknown): s is string => typeof s === "string" && FILE_REF.test(s) && !RUNTIME_DIR.test(s);
 
 // ── tools ─────────────────────────────────────────────────────────────────────
 const BUILTIN = ["Read", "Glob", "Grep", "WebFetch", "WebSearch", "Write", "Edit", "Bash"];
@@ -204,7 +206,8 @@ class Check {
     if (isFileRef(v)) {
       if (files[v] === undefined) this.bad(path, `points at ${v}, which isn't in the plugin`);
       else if (files[v].length > MAX_PROMPT) this.bad(path, `${v} is longer than ${MAX_PROMPT} characters`);
-    } else if (typeof v === "string" && LOOKS_LIKE_FILE.test(v)) this.bad(path, "looks like a file, but plugin files must be plain relative paths like prompts/inbox.md");
+    } else if (typeof v === "string" && RUNTIME_DIR.test(v) && LOOKS_LIKE_FILE.test(v)) this.bad(path, "can't be inside cache/ or work/: those folders belong to the deck");
+    else if (typeof v === "string" && LOOKS_LIKE_FILE.test(v)) this.bad(path, "looks like a file, but plugin files must be plain relative paths like prompts/inbox.md");
     else this.str(v, path, { max: MAX_PROMPT });
   }
   need(v: unknown, path: string) {

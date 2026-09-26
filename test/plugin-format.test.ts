@@ -231,6 +231,16 @@ describe("validate", () => {
     raw.sources[0].prompt = "x".repeat(8001);
     has(validate(raw, files), "sources[0].prompt", "longer than 8000");
   });
+  test("prompt files can't be inside the deck's cache/ or work/ folders", () => {
+    for (const ref of ["work/CLAUDE.md", "cache/x.md", "Work/notes.txt"]) {
+      const { raw, files } = mail();
+      raw.sources[0].prompt = ref;
+      files[ref] = "planted";
+      expect(isFileRef(ref)).toBe(false);
+      has(validate(raw, files), "sources[0].prompt", "can't be inside cache/ or work/");
+      expect(referencedFiles({ sources: [{ prompt: ref }], projects: [{ playbook: ref }] })).toEqual([]);
+    }
+  });
   test("business pack references and formats", () => {
     const { raw, files } = pack();
     raw.roles[0].project = "nope";

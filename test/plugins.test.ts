@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createPlugins, hashFiles, readFolder, runCapped } from "../src/plugins";
@@ -129,6 +129,43 @@ describe("catalog → review → install", () => {
     p.install({ staged: pv.staged, approve: pv.hash });
     expect(p.list().plugins[0].version).toBe("1.1.0");
     expect(existsSync(join(dataDir, "plugins", "demo-mail", "cache", "inbox.json"))).toBe(true);
+  });
+  test("a failed write says so plainly, keeps runtime state and leaves no half-written folder", () => {
+    const { dataDir, catalogDir, p } = setup();
+    writePlugin(join(catalogDir, "demo-mail"), mail(), MAIL_FILES);
+    let pv = p.stageCatalog("demo-mail"); if (!pv.ok) throw 0;
+    p.install({ staged: pv.staged, approve: pv.hash });
+    const dir = join(dataDir, "plugins", "demo-mail");
+    mkdirSync(join(dir, "cache"), { recursive: true }); writeFileSync(join(dir, "cache", "inbox.json"), "{}");
+    writePlugin(join(catalogDir, "demo-mail"), mail({ version: "1.1.0" }), MAIL_FILES);
+    pv = p.stageCatalog("demo-mail"); if (!pv.ok) throw 0;
+    chmodSync(join(dataDir, "plugins"), 0o555); // the new folder can't be created beside the old one
+    let msg = "";
+    try { p.install({ staged: pv.staged, approve: pv.hash }); } catch (e: any) { msg = e.message; } finally { chmodSync(join(dataDir, "plugins"), 0o755); }
+    expect(msg).toBe("Couldn't write the plugin's files. Try again, or remove it and install it fresh.");
+    expect(msg).not.toContain(dataDir);
+    expect(readdirSync(join(dataDir, "plugins")).filter((f) => f.startsWith(".new-"))).toEqual([]);
+    expect(readFileSync(join(dir, "cache", "inbox.json"), "utf8")).toBe("{}");
+    expect(p.list().plugins[0]).toMatchObject({ version: "1.0.0", state: "on" });
+    // Failing later, after the cache was carried into the new folder: it goes back where it was.
+    chmodSync(join(dir, "prompts"), 0o555); // the old folder can't be fully removed
+    msg = "";
+    try { p.install({ staged: pv.staged, approve: pv.hash }); } catch (e: any) { msg = e.message; } finally { chmodSync(join(dir, "prompts"), 0o755); }
+    expect(msg).toStartWith("Couldn't write the plugin's files");
+    expect(readdirSync(join(dataDir, "plugins")).filter((f) => f.startsWith(".new-"))).toEqual([]);
+    expect(readFileSync(join(dir, "cache", "inbox.json"), "utf8")).toBe("{}");
+  });
+  test("install sweeps half-written folders older than an hour", () => {
+    const { dataDir, catalogDir, p } = setup();
+    const old = join(dataDir, "plugins", ".new-demo-mail-deadbeef"), fresh = join(dataDir, "plugins", ".new-demo-mail-0badf00d");
+    mkdirSync(old, { recursive: true }); mkdirSync(fresh, { recursive: true });
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600_000);
+    utimesSync(old, twoHoursAgo, twoHoursAgo);
+    writePlugin(join(catalogDir, "demo-mail"), mail(), MAIL_FILES);
+    const pv = p.stageCatalog("demo-mail"); if (!pv.ok) throw 0;
+    p.install({ staged: pv.staged, approve: pv.hash });
+    expect(existsSync(old)).toBe(false);
+    expect(existsSync(fresh)).toBe(true);
   });
   test("a Bash grant needs the tick", () => {
     const { catalogDir, p } = setup();

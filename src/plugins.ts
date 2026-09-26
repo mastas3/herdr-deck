@@ -128,10 +128,12 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
     return rec;
   };
 
-  function sweep() {
+  /** Drop entries in dir older than an hour: reviews nobody installed, or installs that died half-way. */
+  function sweep(dir: string, match: (name: string) => boolean = () => true) {
     try {
-      for (const f of readdirSync(stageDir)) {
-        const p = join(stageDir, f);
+      for (const f of readdirSync(dir)) {
+        if (!match(f)) continue;
+        const p = join(dir, f);
         try { if (Date.now() - lstatSync(p).mtimeMs > STAGE_TTL) rmSync(p, { recursive: true, force: true }); } catch {}
       }
     } catch {}
@@ -139,7 +141,7 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
   function stage(files: Record<string, string>, from: From, compare = true): Preview {
     const r = parseBundle(files);
     if (!r.ok) return { ok: false, problems: r.problems };
-    sweep();
+    sweep(stageDir);
     mkdirSync(stageDir, { recursive: true });
     const staged = randomUUID();
     writeFileSync(join(stageDir, `${staged}.json`), JSON.stringify({ files, from }));
@@ -181,6 +183,7 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
   }
 
   function install(body: { staged?: unknown; approve?: unknown; bash?: unknown }): Installed {
+    sweep(root, (f) => f.startsWith(".new-"));
     const staged = String(body.staged ?? "");
     if (!STAGED_ID.test(staged)) throw new Error("Review the plugin first.");
     const stagedFile = join(stageDir, `${staged}.json`);
@@ -197,15 +200,24 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
     const missing = (m.requires?.plugins ?? []).filter((id) => !list.some((x) => x.id === id));
     if (missing.length) throw new Error(`Install ${missing.join(", ")} first.`);
     // Write the new files beside the old folder, carry runtime state across, then swap.
-    mkdirSync(root, { recursive: true });
     const dest = dirOf(m.id), tmp = join(root, `.new-${m.id}-${randomUUID().slice(0, 8)}`);
-    for (const [rel, text] of Object.entries(saved.files)) {
-      mkdirSync(dirname(join(tmp, rel)), { recursive: true });
-      writeFileSync(join(tmp, rel), text);
+    const moved: string[] = [];
+    try {
+      mkdirSync(root, { recursive: true });
+      for (const [rel, text] of Object.entries(saved.files)) {
+        mkdirSync(dirname(join(tmp, rel)), { recursive: true });
+        writeFileSync(join(tmp, rel), text);
+      }
+      for (const k of KEEP) if (existsSync(join(dest, k))) { renameSync(join(dest, k), join(tmp, k)); moved.push(k); }
+      rmSync(dest, { recursive: true, force: true });
+      renameSync(tmp, dest);
+    } catch {
+      // Put back the runtime state we'd carried across, so a failed update loses nothing, and never show the page
+      // a raw fs error: it names folders on this machine.
+      for (const k of moved) try { mkdirSync(dest, { recursive: true }); renameSync(join(tmp, k), join(dest, k)); } catch {}
+      rmSync(tmp, { recursive: true, force: true });
+      throw new Error("Couldn't write the plugin's files. Try again, or remove it and install it fresh.");
     }
-    for (const k of KEEP) if (existsSync(join(dest, k))) renameSync(join(dest, k), join(tmp, k));
-    rmSync(dest, { recursive: true, force: true });
-    renameSync(tmp, dest);
     const prev = list.find((x) => x.id === m.id), now = Date.now();
     const rec: Installed = { id: m.id, name: m.name, version: m.version, from: saved.from, enabled: true, hash, bash: trust.needsTick, installedAt: prev?.installedAt ?? now, updatedAt: now };
     save([...list.filter((x) => x.id !== m.id), rec]);
