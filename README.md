@@ -253,7 +253,27 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   `src/recipes.ts`. Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`; your notes, hidden
   cards and additions live in `~/.config/herdr-deck/connections.json`.
 - **Discover** (`d`, or ⌘K): repos worth forking and ideas worth building.
-  - **For you:** your interests, read from the wiki (project tags, status and recency, concepts, the last month
+  - **For you** opens on the idea gallery: today's top pick (cover, hook, buyer, price, Jev's chance of 10 paying
+    customers in 60 days, quality) and Netflix-style lanes from the idea engine (`src/ideagen/`, recipe and results in
+    `docs/idea-lab/report.md`): Top picks, Hot right now, Just starting to trend, Fastest to first $, Your audience is
+    asking, Built on what you own, Human Design, Weekend-sized, Trending tech, Boring businesses, Moonshots, Wildcards
+    Jev loves, plus Fresh from Studio (the older feed below) and Saved. Only ideas that passed the engine's slop gate are
+    shown. Today's set is written in the background the first time Discover opens that day (never on a timer), with
+    its progress on the page; until it's ready you see the latest earlier set (or the idea lab's). A run cut short by a
+    restart continues at boot, reusing every model reply it already had. **More** on a lane writes a few more for it.
+    Arrow keys move between cards and lanes, Enter opens one; on a phone you swipe. An idea opens as a side panel (a
+    bottom sheet on a phone): who buys and where they gather, their pain in their words with the posts, the offer, the
+    stack mapped to what you own, "why this could fail → how this version fixes it", trend signals, missing connectors
+    (open the service in Connections, the repo on GitHub, or add it to the Studio tray) and the **starter kit** (one
+    Claude call, cached: spec, architecture, a build plan whose tasks carry prompts to paste into an agent, connectors
+    and keys, go-to-market copy for you to send, quests, and a readiness meter). **Play** says exactly what will happen,
+    and only after you confirm writes the kit into `~/Documents/Projects/<slug>` (`DECK_PROJECTS_DIR`), starts a run on
+    the quest board, asks about the main quest and opens the New session dialog with task 1 in that folder. Every card
+    shown goes into the idea archive, so the covers job paints the best ones. Cached in
+    `~/.config/herdr-deck/gallery/`. Settings: `DECK_GALLERY_CLAUDE_MAX` / `DECK_GALLERY_JEV_MAX` (daily model-call
+    caps, 30 / 150), `DECK_GALLERY_RECIPE` (e.g. `C-audience:6,B-pain:6` for a smaller day), `DECK_GALLERY_PREMORTEMS`,
+    `DECK_GALLERY_RUBRIC=0`. Code: `src/gallery-server.ts`, `public/js/gallery-*.js`.
+    Below the gallery: your interests, read from the wiki (project tags, status and recency, concepts, the last month
     of `log.md`), your local repos (languages, keywords, dependencies) and your connections, as chips you can
     add to or remove. For each one the deck searches GitHub with `gh` for hidden gems: 30–5,000 stars, pushed in
     the last six months, licensed, not archived or a fork, not yours or already cloned. They're ranked by fit ×

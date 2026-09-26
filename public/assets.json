@@ -1,0 +1,4 @@
+{
+  "scripts": ["js/gallery-core.js", "js/gallery-cards.js", "js/gallery-nav.js", "js/gallery-detail.js", "js/gallery-kit.js", "js/gallery-play.js"],
+  "styles": ["css/gallery.css", "css/gallery-sheet.css"]
+}

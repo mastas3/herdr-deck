@@ -18,6 +18,8 @@ export type CoverState = {
 };
 export const freshState = (now: number): CoverState => ({ day: dayOf(now), today: 0, lastAt: 0, fails: 0, retryAt: 0, failed: {}, queue: [] });
 const ID = /^[\w-]{1,64}$/;
+/** Ids with other characters (the gallery's "C-audience:4:name:x1") are painted and served under this one. */
+export const coverIdOf = (id: string) => String(id).replace(/[^\w-]+/g, "_").slice(0, 64);
 const MIN = 60_000;
 
 // ── which idea next ──
@@ -170,13 +172,13 @@ export function createCovers(deps: CoverDeps) {
     };
   }
   const coverUrl = (id: string) => (have.has(id) ? `/covers/${id}.webp?v=${have.get(id)}` : undefined);
-  /** JSON with covers: every idea-shaped object (id, title and a pitch or data) gets coverUrl/thumbUrl when painted, and coverCat. Nothing is mutated. */
+  /** JSON with covers: every idea-shaped object (id, title and a pitch or data) gets coverUrl/thumbUrl when painted (looked up by its coverId when it has one), and coverCat. Nothing is mutated. */
   function respond(data: unknown): Response {
     const body = JSON.stringify(data, (_k, v) => {
       if (!v || typeof v !== "object" || Array.isArray(v) || typeof v.id !== "string" || typeof v.title !== "string") return v;
       const inner = typeof v.pitch === "string" ? v : v.data && typeof v.data === "object" ? v.data : undefined;
       if (!inner) return v;
-      const url = coverUrl(v.id);
+      const url = coverUrl(typeof v.coverId === "string" ? v.coverId : v.id);
       return { ...v, coverCat: categoryOf({ ...inner, row: v.row ?? inner.row, title: v.title }), ...(url ? { coverUrl: url, thumbUrl: url.replace(".webp?", "_thumb.webp?") } : {}) };
     });
     return new Response(body, { headers: { "content-type": "application/json;charset=utf-8" } });

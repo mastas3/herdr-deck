@@ -9,7 +9,10 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - `src/server.ts` is the HTTP server, SSE and API routes. `src/deck.ts` builds the session rows from herdr's socket
   (`src/herdr.ts`). Transcripts come from `src/agents.ts` / `src/transcript.ts` (Claude Code JSONL, Codex rollouts,
   OpenCode SQLite). `src/federation.ts` is the hub-to-node tunnel. `src/mcp.ts` is the MCP endpoint.
-- `public/` is the page: vanilla JS (`app.js`) and CSS in `index.html`, a service worker and a manifest.
+- `public/` is the page: vanilla JS (`app.js`) and CSS in `index.html`, a service worker and a manifest. New client
+  code goes in `public/js/*.js` and `public/css/*.css`, listed in `public/assets.json` (scripts in load order; they run
+  as classic scripts right after `app.js` and share its globals). `src/assets.ts` serves each under a content hash with
+  immutable caching and the service worker keeps them the same way; keep each file under 400 lines.
 - `bin/` holds the install scripts: `bootstrap.sh` (one-line install), `install.sh` (the launchd or systemd
   service), `deploy-node.sh` (another machine over SSH) and `uninstall.sh`.
 - Data lives in `~/.config/herdr-deck/`. Never write elsewhere in the user's home without a clear reason.

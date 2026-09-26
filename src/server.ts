@@ -8,6 +8,7 @@ import { historyProjects, historySession, historyStats, rescanHistory, searchHis
 import { claimsDone, onCheck, resultFor, setApproval, verify, detectCheck, approvalFor, type CheckResult } from "./verify";
 import { inventory, inventoryText, loadConnConf, saveConnConf, usage, type Item as ConnItem } from "./connections";
 import { CATEGORIES, enrich } from "./store";
+import { RECS } from "./catalog";
 import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCustom } from "./recipes";
 import { upsertAccount } from "./accounts";
 import { slashCommands, warmSlash } from "./slash";
@@ -24,8 +25,10 @@ import type { Detail, Msg } from "./transcript";
 import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
-import { createDiscover } from "./discover";
+import { createDiscover, gh } from "./discover";
 import { createCovers } from "./covers";
+import { galleryForServer } from "./gallery-server";
+import { createAssets } from "./assets";
 import { createLeads } from "./leads";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
@@ -103,6 +106,8 @@ const discover = createDiscover(
 // Cover images for Discover ideas, a few a day from Codex on the hub (src/covers.ts). DECK_COVERS_DIR moves them and their covers.json (tests).
 const COVERS_DIR = process.env.DECK_COVERS_DIR || `${process.env.DECK_DISCOVER_DIR || DATA_DIR}/covers`;
 const covers = createCovers({ dir: COVERS_DIR, confFile: process.env.DECK_COVERS_DIR ? `${COVERS_DIR}/covers.json` : `${DATA_DIR}/covers.json`, dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, enabled: () => !isNode() });
+// The gallery ("For you": today's idea lanes, starter kits, Play), from the idea engine (src/gallery-server.ts, src/ideagen/).
+const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS });
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
 const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
@@ -307,23 +312,13 @@ setInterval(() => {
 }, 15_000);
 
 // ── HTML ─────────────────────────────────────────────────────────────────────
-// app.js is served under a content hash so browsers (and the service worker) keep it forever.
-const APP_PATH = new URL("../public/app.js", import.meta.url).pathname;
-let appJs = { mtime: 0, body: new Uint8Array(), gz: new Uint8Array(), hash: "" };
-/** Loaded once at startup, like the HTML, so a running service never mixes new JS with an old page. DEV reloads. */
-function appAsset() {
-  const m = appJs.mtime && !DEV ? appJs.mtime : statSync(APP_PATH).mtimeMs;
-  if (m !== appJs.mtime) {
-    const body = new Uint8Array(readFileSync(APP_PATH));
-    appJs = { mtime: m, body, gz: Bun.gzipSync(body), hash: Bun.hash(body).toString(36) };
-  }
-  return appJs;
-}
+// app.js and the files public/assets.json names are served under content hashes (src/assets.ts).
+const assets = createAssets(new URL("../public", import.meta.url).pathname, { dev: DEV, log: (s) => console.warn(s) });
 let htmlTemplate = readFileSync(HTML_PATH, "utf8");
 function page() {
   if (DEV) htmlTemplate = readFileSync(HTML_PATH, "utf8");
   const boot = JSON.stringify(fullState()).replace(/</g, "\\u003c");
-  return htmlTemplate.replace("/*__BOOT__*/", `window.__BOOT__=${boot};`).replace('src="/app.js"', `src="/app.js?v=${appAsset().hash}"`);
+  return assets.inject(htmlTemplate.replace("/*__BOOT__*/", `window.__BOOT__=${boot};`));
 }
 
 /** gzip for anything text-like and big enough to matter (the tailnet path is the slow one). */
@@ -1022,12 +1017,7 @@ async function handle(req: Request): Promise<Response> {
     if (req.method === "GET") {
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
       if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/")) return send(req, page(), "text/html; charset=utf-8");
-      if (url.pathname === "/app.js") {
-        const a = appAsset();
-        const cache = url.searchParams.get("v") === a.hash ? "public, max-age=31536000, immutable" : "no-cache";
-        const gz = /\bgzip\b/.test(req.headers.get("accept-encoding") ?? "");
-        return new Response(gz ? a.gz : a.body, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": cache, vary: "accept-encoding", ...(gz ? { "content-encoding": "gzip" } : {}) } });
-      }
+      { const a = assets.serve(req, url); if (a) return a; }
       if (url.pathname === "/events") {
         let ctrl: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({
@@ -1116,6 +1106,7 @@ async function handle(req: Request): Promise<Response> {
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
+      if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }

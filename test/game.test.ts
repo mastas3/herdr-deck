@@ -167,6 +167,9 @@ describe("the quest board service", () => {
     expect(r.prompt).toMatch(/don't post/i);
     expect(r.quest.title).toContain("Transit Buddy");
     expect(game._state()!.candidate).toBe("transit-buddy");
+    // The gallery's Play: the kit's folder slug and its task 1 become the run's prompt.
+    const k = await game.handle("/api/game/run", { idea: { name: "Transit Buddy", slug: "transit-buddy-2", firstTask: { title: "T1 Read the log format", prompt: "Do task T1 from TASKS.md" } } });
+    expect(k).toMatchObject({ project: "transit-buddy-2", quest: { title: "T1 Read the log format" }, prompt: "Do task T1 from TASKS.md" });
   });
   test("the morning digest gets today's quest lines", async () => {
     const lines = await game.digestLines();

@@ -3,6 +3,8 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import type { StarterKit } from "./types";
 
+/** What a kit writes, in order (Play's confirm dialog lists them before anything is written). */
+export const KIT_FILES = ["README.md", "CLAUDE.md", "AGENTS.md", ".env.example", "SPEC.md", "ARCHITECTURE.md", "TASKS.md", "CONNECTORS.md", "GTM.md", "QUESTS.md", "graphics/PROMPTS.md", "kit.json"];
 const bullets = (xs: string[]) => xs.map((x) => `- ${x}`).join("\n");
 function renderKit(k: StarterKit, name: string): Record<string, string> {
   const c = k.connectors;

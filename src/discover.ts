@@ -980,5 +980,5 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   }
   // Leads (src/leads.ts) keeps its saved pains and ideas in discover.json too; this is its only door into it.
   const leadsSaved = { get: () => conf.leads ?? [], set: (v: any[]) => { conf.leads = v; saveConf(); } };
-  return { handle, refresh, profile, state, ingredients, mixer, studio, feed, leadsSaved, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); feed.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
+  return { handle, refresh, profile, state, ingredients, mixer, studio, feed, leadsSaved, archive, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); feed.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
 }
