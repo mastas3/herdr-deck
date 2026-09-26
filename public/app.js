@@ -298,10 +298,36 @@ function renderList() {
     box.replaceChildren(frag);
     if (!rows.length) box.innerHTML = `<div class="empty-state">${S.rows.size ? "Nothing matches. Press Esc to clear the filter." : "No sessions yet. Press n to start one."}</div>`;
   }
-  setHTML($("mini"), rows.filter((r) => !r.empty).map((r) => `<button data-key="${esc(r.key)}" class="${S.sel === r.key ? "sel" : ""}" style="--c:${statusVar(r.status)}" title="${esc(r.title)} · ${esc(r.project)}"></button>`).join(""));
+  if (app.classList.contains("list-off")) renderRail(rows);
   for (const k of S.picked) if (!S.rows.has(k)) S.picked.delete(k);
   $("selbar").hidden = !S.picked.size;
   if (S.picked.size) $("selInfo").textContent = `${S.picked.size} selected`;
+}
+/** Project initials for the rail: "herdr-deck" → "HD", "Conductor" → "Co". */
+function initials(p) {
+  const parts = String(p || "?").split(/[-_.\s]+/).filter(Boolean);
+  return parts.length > 1 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).replace(/^./, (c) => c.toUpperCase());
+}
+function shortTitle(t) {
+  const w = String(t || "").replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((x) => x.length > 2 && !/^(the|and|for|with|from|into)$/i.test(x));
+  return w.slice(0, 2).join(" ") || t || "";
+}
+/** Collapsed list: a tile per session (project badge, status, a word of title, time), grouped by what needs you. */
+function renderRail(rows) {
+  const groups = { needs: [], running: [], quiet: [] };
+  let hidden = 0;
+  for (const r of rows) { const s = sectionOf(r); if (groups[s]) groups[s].push(r); else hidden++; }
+  const tile = (r) => {
+    const subs = (r.subagents ?? []).filter((x) => x.running).length;
+    const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
+    const tm = since ? `<span class="tm" data-since="${since}">${clock(Date.now() - since)}</span>` : r.status === "blocked" ? `<span class="tm">waiting</span>` : `<span class="tm" data-t="${r.lastActiveAt ?? ""}">${ago(r.lastActiveAt)}</span>`;
+    const tip = `${r.title || r.agent}\n${r.project}${r.launch ? " (via " + r.launch + ")" : ""} · ${paneName(r)}${multiMachine() ? " · " + machineLabel(r.machine) : ""}\n${STATUS_NAME[r.status] ?? r.status}${r.now ? " · " + r.now : ""}${subs ? `\n${subs} subagent${subs === 1 ? "" : "s"} running` : ""}`;
+    return `<button class="tile${S.sel === r.key && !S.board ? " sel" : ""}" data-key="${esc(r.key)}" data-status="${r.status}" style="--pc:${pc(r.project)};--c:${statusVar(r.status)}" title="${esc(tip)}"><span class="ab">${esc(initials(r.project))}</span>${r.status !== "idle" ? '<span class="sd"></span>' : ""}${subs ? `<span class="sb">+${subs}</span>` : ""}<span class="tt">${esc(shortTitle(r.title))}</span>${tm}</button>`;
+  };
+  const html = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"]].filter(([k]) => groups[k].length)
+    .map(([k, label]) => `<div class="mh">${label.split(" ")[0]} <span class="n">${groups[k].length}</span></div>${groups[k].map(tile).join("")}`).join("")
+    + (hidden ? `<button class="more" data-railmore>+${hidden} stale or empty</button>` : "");
+  setHTML($("mini"), html);
 }
 function renderFooter() {
   const all = [...S.rows.values()].filter(inScope);
@@ -624,7 +650,7 @@ function renderHead(r, d, tab) {
   const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
   setHTML($("dh"), `<div class="dh-where">${where}</div>
     <div class="dh-top"><h1 class="dh-title">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts"><button class="btn" data-dact="recipes" title="Recipes (.)">${ICON.star}Recipes</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
+      <div class="dh-acts">${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="recipes" title="Recipes (.)">${ICON.star}Recipes</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
     <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
 }
@@ -635,7 +661,7 @@ function renderNowbar(r, d) {
   el.hidden = !on;
   if (!on) return;
   const since = r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
-  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span><span class="what">${esc(r.now ?? plain(r.tail?.[r.tail.length - 1] ?? ""))}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
+  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span><span class="what">${esc(r.now ?? "thinking…")}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
@@ -788,7 +814,8 @@ function focusReply() {
 
 // ── terminal ─────────────────────────────────────────────────────────────
 let termTimer = null, termText = "", termHash = "", typing = false;
-const termVisible = () => (isPhone() ? app.dataset.mview === "term" : S.tpos === "tab" ? S.main === "term" : !app.classList.contains("term-off"));
+const termVisible = () => (isPhone() ? app.dataset.mview === "term" : S.tpos === "none" ? false : S.tpos === "tab" ? S.main === "term" : !app.classList.contains("term-off"));
+const showTerminal = () => setTpos(load("lastTpos", "bottom"));
 async function pollTerm(first) {
   clearTimeout(termTimer);
   const key = S.sel;
@@ -908,14 +935,15 @@ function ansi(text) {
 }
 
 // ── layout: where the terminal lives ─────────────────────────────────────
-const TPOS = ["bottom", "right", "top", "tab"];
-const TPOS_NAME = { bottom: "Bottom", right: "Right", top: "Top", tab: "Shared with chat" };
+const TPOS = ["bottom", "right", "top", "tab", "none"];
+const TPOS_NAME = { bottom: "Bottom", right: "Right", top: "Top", tab: "Shared with chat", none: "Hidden" };
 function setTpos(p) {
   if (!TPOS.includes(p)) return;
+  if (p !== "none") store("lastTpos", p);
   S.tpos = p; store("tpos", p); app.dataset.tpos = p;
   if (p === "tab" && app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
   $("tMain").hidden = p !== "tab";
-  $("termToggle").hidden = p === "tab";
+  $("termToggle").hidden = p === "tab" || p === "none";
   $("splitH").setAttribute("aria-orientation", p === "right" ? "vertical" : "horizontal");
   headSig = "";
   render();
@@ -932,7 +960,8 @@ function layoutMenu(anchor) {
   openMenu(anchor, TPOS.map((p) => ({ html: `Terminal: ${TPOS_NAME[p]}${p === "tab" ? "<small>Switch between them with `</small>" : ""}`, on: S.tpos === p, run: () => setTpos(p) })), "Move the terminal (or drag its handle)");
 }
 $("layoutBtn").onclick = (e) => layoutMenu(e.currentTarget);
-$("tMain").addEventListener("click", (e) => { const m = e.target.closest("[data-main]")?.dataset.main; if (m) setMain(m); });
+$("termHide").onclick = () => { setTpos("none"); toast("Terminal hidden. Bring it back with the Terminal button or \\"); };
+$("tMain").addEventListener("click", (e) => { const m = e.target.closest("button[data-main]")?.dataset.main; if (m) setMain(m); });
 // Drag the terminal's handle onto a drop zone to move it.
 $("tGrip").addEventListener("pointerdown", (e) => {
   if (e.button !== 0) return;
@@ -1161,6 +1190,7 @@ async function standup() {
 }
 function setGroup(g) { S.group = g; store("group", g); lastOrder = ""; render(); }
 function focusTerminal() {
+  if (S.tpos === "none") showTerminal();
   if (S.tpos === "tab") setMain("term");
   else if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
   $("screen").focus();
@@ -1381,7 +1411,11 @@ $("rows").addEventListener("pointerover", (e) => {
   row.addEventListener("pointerleave", () => { row._warm = false; clearTimeout(hoverTimer); }, { once: true });
 });
 $("rows").addEventListener("touchstart", (e) => { const row = e.target.closest(".row[data-key]"); if (row) prefetch(row.dataset.key); }, { passive: true });
-$("mini").addEventListener("click", (e) => { const b = e.target.closest("[data-key]"); if (b) select(b.dataset.key); });
+$("mini").addEventListener("click", (e) => {
+  if (e.target.closest("[data-railmore]")) return $("listToggle").click();
+  const b = e.target.closest("[data-key]");
+  if (b) select(b.dataset.key);
+});
 $("detail").addEventListener("click", (e) => {
   const fold = e.target.closest("[data-fold]");
   if (fold) { const k = fold.dataset.fold; expanded.has(k) ? expanded.delete(k) : expanded.add(k); chatDom.v = -1; return renderChat(); }
@@ -1400,7 +1434,7 @@ $("detail").addEventListener("click", (e) => {
   }
   const img = e.target.closest("[data-img]");
   if (img) return openLightbox(Number(img.dataset.img));
-  const main = e.target.closest("[data-main]");
+  const main = e.target.closest("button[data-main]");
   if (main) return setMain(main.dataset.main);
   const tab = e.target.closest("[data-tab]");
   if (tab) { S.tab = tab.dataset.tab; store("tab2", S.tab); if (S.tab !== "chat") S.sub = null; headSig = ""; bodySig = ""; renderDetail(); if (S.tab === "chat") chatTick(true); return; }
@@ -1411,6 +1445,7 @@ $("detail").addEventListener("click", (e) => {
   const r = S.rows.get(S.sel);
   if (!r) return;
   if (act === "recipes") openRecipeMenu(b);
+  if (act === "showterm") showTerminal();
   if (act === "focus") focusPane(r.key);
   if (act === "more") moreMenu(b);
   if (act === "brief") writeBrief(r.key);
@@ -1434,7 +1469,7 @@ $("paletteBtn").onclick = (e) => { e.preventDefault(); openPalette(); };
 $("paletteMini").onclick = () => openPalette();
 $("newBtn").onclick = openNew;
 $("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed font size"); };
-$("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); setTimeout(fitTerm, 0); };
+$("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); lastOrder = ""; $("mini")._h = ""; render(); setTimeout(fitTerm, 0); };
 $("termToggle").onclick = () => { app.classList.toggle("term-off"); store("termOff", app.classList.contains("term-off")); pollTerm(); };
 
 function openLightbox(i) {

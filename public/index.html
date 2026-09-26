@@ -91,14 +91,16 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line-2); border-bottom-wid
 .app[data-tpos="bottom"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 1px var(--th); grid-template-areas: "list vs detail" "hs hs hs" "term term term"; }
 .app[data-tpos="top"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: var(--th) 1px minmax(0, 1fr); grid-template-areas: "term term term" "hs hs hs" "list vs detail"; }
 .app[data-tpos="right"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr) 1px var(--tw); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail hs term"; }
-.app[data-tpos="tab"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
-.app[data-tpos="tab"] .term { grid-area: detail; }
-.app[data-tpos="tab"] .split.h { display: none; }
-.app[data-tpos="tab"][data-main="chat"] .term, .app[data-tpos="tab"][data-main="term"] .detail { display: none; }
-.app.list-off { --lw: 52px; }
+.app:is([data-tpos="tab"], [data-tpos="none"]) { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
+@media (min-width: 761px) {
+  .app[data-tpos="tab"] .term { grid-area: detail; }
+  .app:is([data-tpos="tab"], [data-tpos="none"]) .split.h { display: none; }
+  .app[data-tpos="tab"][data-main="chat"] .term, .app[data-tpos="tab"][data-main="term"] .detail, .app[data-tpos="none"] .term { display: none; }
+}
+.app.list-off { --lw: 88px; }
 .app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) { --th: 38px; }
 .app.term-off[data-tpos="right"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr) 0 0; }
-.app.term-off[data-tpos="right"] :is(.term, .split.h) { display: none; }
+@media (min-width: 761px) { .app.term-off[data-tpos="right"] :is(.term, .split.h) { display: none; } }
 .split { background: var(--line); position: relative; z-index: 5; touch-action: none; }
 .split::before { content: ""; position: absolute; }
 .split.v { grid-area: vs; cursor: col-resize; }
@@ -190,9 +192,25 @@ body.moving { cursor: grabbing; user-select: none; }
 .lf { padding: 7px 12px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-3); border-top: 1px solid var(--line); }
 .lf b { color: var(--ink-2); font-weight: 600; }
 .selbar { padding: 8px 10px; display: flex; gap: 6px; align-items: center; border-top: 1px solid var(--line); background: var(--raise); font-size: 14px; flex-wrap: wrap; }
-.mini { display: none; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0; overflow-y: auto; flex: 1; }
-.mini button { width: 14px; height: 14px; border-radius: 50%; border: 0; padding: 0; background: var(--c); flex: none; outline: 2px solid transparent; outline-offset: 2px; }
-.mini button.sel { outline-color: var(--accent); }
+.mini { display: none; flex-direction: column; align-items: stretch; gap: 2px; padding: 2px 6px 10px; overflow-y: auto; flex: 1; scrollbar-width: none; }
+.mini::-webkit-scrollbar { display: none; }
+.mini .mh { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); text-align: center; margin: 8px 0 2px; display: flex; gap: 4px; align-items: center; justify-content: center; }
+.mini .mh .n { color: var(--ink-2); }
+.tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; border: 0; border-radius: 10px; background: transparent; transition: background .1s, transform .08s; }
+.tile:hover { background: var(--hover); }
+.tile.sel { background: var(--sel); }
+.tile:active { transform: scale(.96); }
+.tile .ab { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font: 700 13.5px/1 var(--sans); letter-spacing: .02em; color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent); }
+.tile[data-status="working"] .ab { animation: tilepulse 1.8s ease-in-out infinite; }
+@keyframes tilepulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--working) 55%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--working) 0%, transparent); } }
+.tile .sd { position: absolute; top: 3px; right: 12px; width: 11px; height: 11px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--side); }
+.tile .sb { position: absolute; top: 30px; left: 10px; font: 600 10px/1 var(--sans); background: var(--working); color: #1a1405; border-radius: 99px; padding: 2px 4px; box-shadow: 0 0 0 2px var(--side); }
+.tile .tt { font-size: 11.5px; line-height: 1.15; color: var(--ink-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile .tm { font: 10.5px/1.1 var(--mono); color: var(--ink-3); }
+.tile[data-status="working"] .tm { color: var(--working); }
+.tile[data-status="blocked"] .tt { color: var(--blocked); }
+.mini .more { font-size: 11px; color: var(--ink-3); text-align: center; padding: 6px 2px; border: 0; background: none; border-radius: 8px; }
+.mini .more:hover { background: var(--hover); color: var(--ink); }
 .app.list-off .lh > :not(.lh-top), .app.list-off .rows, .app.list-off .lf, .app.list-off .selbar, .app.list-off .lh-top > :not(.keep) { display: none; }
 .app.list-off .lh-top { flex-direction: column; }
 .app.list-off .mini { display: flex; }
@@ -332,7 +350,7 @@ body.moving { cursor: grabbing; user-select: none; }
 .term.typing .screen { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--working) 70%, transparent); }
 .reply { display: none; gap: 6px; align-items: flex-end; padding: 8px 10px; background: var(--side); border-top: 1px solid var(--line); }
 .reply textarea { flex: 1; resize: none; min-height: 38px; max-height: 30vh; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px; font: 15px/1.4 var(--read); color: var(--ink); outline: none; }
-.app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) :is(.screen, .keys) { display: none; }
+@media (min-width: 761px) { .app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) :is(.screen, .keys) { display: none; } }
 
 /* ── menus, palette, dialogs ──────────────────────────────────── */
 .menu { position: fixed; z-index: 30; min-width: 230px; max-width: min(360px, 92vw); max-height: 60vh; overflow-y: auto; background: var(--raise); border: 1px solid var(--line-2); border-radius: 11px; padding: 5px; box-shadow: 0 14px 40px rgba(0,0,0,.35); animation: pop .12s var(--ease); }
@@ -396,7 +414,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
 @media (max-width: 760px) {
   body { font-size: 16px; overscroll-behavior: none; }
   .app, .app.list-off, .app.term-off { display: block; height: 100dvh; }
-  .split, .keep-mini, #listToggle, .mini, #fitBtn, #termToggle, .t-mode, .th .t-title, #keysBtn, #paletteBtn kbd, .th .grip, #layoutBtn, .dh-acts .desk, .tabsbar .seg2 { display: none !important; }
+  .split, .keep-mini, #listToggle, .mini, #fitBtn, #termToggle, #termHide, .t-mode, .th .t-title, #keysBtn, #paletteBtn kbd, .th .grip, #layoutBtn, .dh-acts .desk, .tabsbar .seg2 { display: none !important; }
   .list, .detail, .term { position: fixed; inset: 0; }
   .detail, .term, .mbar { transition: transform .26s var(--ease), visibility 0s linear .26s; will-change: transform; }
   .app[data-mview="list"] :is(.detail, .term, .mbar) { transform: translateX(104%); visibility: hidden; }
@@ -516,6 +534,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
       <button class="btn ghost" id="keysBtn" aria-expanded="false" title="Quick keys">Keys</button>
       <button class="ib" id="fitBtn" title="Fit the pane's width" aria-label="Fit width"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3"/></svg></button>
       <button class="ib" id="layoutBtn" title="Where the terminal goes (\)" aria-label="Terminal position"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 9.5h12"/></svg></button>
+      <button class="ib" id="termHide" title="Hide the terminal" aria-label="Hide the terminal"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
       <button class="ib" id="termToggle" title="Collapse the terminal (])" aria-label="Collapse the terminal"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 6 4 4 4-4"/></svg></button>
     </div>
     <div class="keys" id="keys" hidden></div>
@@ -590,7 +609,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
       <tr><td><kbd>.</kbd></td><td>Recipes for the session (or the selection)</td></tr>
       <tr><td><kbd>t</kbd></td><td>Type straight into the terminal (<kbd>Ctrl</kbd>+<kbd>]</kbd> to stop)</td></tr>
       <tr><td><kbd>`</kbd></td><td>Switch chat ⇄ terminal (when they share a place)</td></tr>
-      <tr><td><kbd>\</kbd></td><td>Move the terminal: bottom → right → top → shared with chat</td></tr>
+      <tr><td><kbd>\</kbd></td><td>Move the terminal: bottom → right → top → shared with chat → hidden</td></tr>
       <tr><td><kbd>g</kbd></td><td>Group by inbox / project</td></tr>
       <tr><td><kbd>l</kbd></td><td>Live board of everything working</td></tr>
       <tr><td><kbd>n</kbd></td><td>New session</td></tr>
