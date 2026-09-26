@@ -204,9 +204,9 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
 - Every view has a ✕ (and Esc) to get back to the session.
 - **Tools** (Tools menu → Manage tools): what every tool does and exactly what it sends; add, edit and delete your own.
 - **Connections** (Tools menu → Connections, or ⌘K): an app store of what each machine can reach. Categories down the
-  side (chips on a phone): AI models & agents, Code & Git, Cloud & deploy, Data & databases, Communication, Media &
-  creative, Knowledge & notes, Commerce & payments, Automation, Search & OSINT, Devices & network, Browsers, MCP
-  servers, Skills, Keys & secrets, Yours, and Not set up. Every card has a category, a colored badge, what it's for,
+  side (chips on a phone): AI models & agents, Your projects, Code & Git, Cloud & deploy, Data & databases,
+  Communication, Social media, Media & creative, Knowledge & notes, Commerce & payments, Sites & accounts, Automation,
+  Search & OSINT, Devices & network, Browsers, MCP servers, Skills, Keys & secrets, Yours, Recommended, and Not set up. Every card has a category, a colored badge, what it's for,
   a state (ready, signed out, installed only, offline) and which machines have it. **Featured** shows what's ready
   and what's new (first seen in the last two weeks); search spans everything. The scan finds CLIs and apps (with
   sign-in checks), npx packages, MCP servers from every agent app (Claude Code and plugins, claude.ai connectors,
@@ -214,10 +214,39 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   key NAMES from shell files, agent env files (`~/.hermes/.env`…), `~/.config/*/.env` and project `.env` files (never
   values), local Postgres databases, Redis, Docker, rclone remotes, Shortcuts, Obsidian vaults, the wiki, tailnet
   devices, SSH hosts, launchd/systemd user services, browser profiles and skills. macOS-only probes are skipped on Linux.
+  - **Your projects:** projects under `~/Documents/Projects` (and the other usual project folders, plus wiki pages
+    whose `**Path:**` points elsewhere) that agents can use: an MCP server registered in any agent app or a project's
+    `.mcp.json` (matched by the paths in its command, args and cwd, or a local URL's port; those are never stored,
+    since args can hold tokens), a CLI (package.json `bin`, pyproject scripts, `bin/*.sh`), a port (from the wiki page,
+    its launchd/systemd service or skill), or a skill that mentions the project folder. Each card has the wiki's TLDR,
+    MCP tool names read from the server's source, and whether it's running now: a listening port whose process was
+    started from that folder (from `lsof`/`ss`; nothing connects to any port). A project's MCP card and a service card
+    it fully explains (e.g. `fb-group` → fb-group-scraper) fold into it; recipes still match the old ids.
+  - **Social media** and **Sites & accounts:** one card per account, merging every sign of it: the site NAMES you have
+    saved logins for in Chrome, Brave, Edge, Arc, Vivaldi and Chromium (every profile, macOS and Linux), desktop apps
+    (Telegram, WhatsApp, Discord), API key names, MCP servers, CLIs, and accounts you add with **Add account** (your
+    public handle or profile link and how agents may use it, saved in `connections.json` and listed in CONNECTIONS.md).
+    Each card says what agents can do there and how to connect (official API, CLI, MCP, Claude in Chrome, RSS,
+    export). A saved login in Chrome makes a browser-first account ready for Claude in Chrome; a login only in another
+    browser, or a service whose CLI/API isn't set up, shows as **Has account**. Logins the catalog doesn't know are
+    counted under one collapsed **Other sites** card (hide it if you like); their names never go into CONNECTIONS.md.
+    How the login list is read: each profile's `Login Data` file is copied to a private temp folder (the browser
+    locks it), only `origin_url` and `signon_realm` are read and reduced to a site name, and the copy is deleted.
+    Usernames, passwords and cookies are never read; neither is history, Safari or the Keychain. Banks, payments and
+    investing, health, government, dating and adult sites are dropped before anything else sees them. It runs in its
+    own process with a 6-second cap (`DECK_LOGINS_MS`); `DECK_NO_LOGINS=1` turns it off. Nothing leaves the machine
+    except the usual inventory your hub reads over the tailnet.
+  - **Recommended for you:** services worth signing up for (email, analytics, error tracking, newsletters, schedulers,
+    scrapers, GPUs, video and music models, game portals…), filtered to what the machine doesn't have yet and ranked
+    by fit with your projects and interests from `~/wiki/index.md` and `overview.md`. Each says which project it fits
+    and why, whether there's a free tier (well-known facts only; otherwise "check pricing"), the official sign-up link,
+    and which recipes it unlocks. The deck never signs up for anything. **Not interested** hides one.
   **Select** cards one by one, or all in the category or search in view, then **Add to** a session (the agent gets
   them as context) or **Use in a recipe**.
-- **Recipes** (a tab in Connections): about thirty workflows that combine your connections: ship-and-show, YouTube
-  channel → RAG → wiki digest, morning revenue brief, nightly repo health, render on the Linux box, and more. Each
+- **Recipes** (a tab in Connections): about thirty-five workflows that combine your connections: ship-and-show, YouTube
+  channel → RAG → wiki digest, morning revenue brief, nightly repo health, render on the Linux box, cross-post a short
+  to YouTube/TikTok/Instagram as drafts, 2027 prophecy mentions on Reddit and HN, a weekly X thread or newsletter
+  issue from the wiki, a launch kit, consistent social profiles, and more. Each
   shows which connections it needs and whether this machine has them; ready ones sort first. **Run** opens the New
   session dialog with the prompt, folder and agent filled in (nothing starts until you press Start). **Copy prompt**,
   or **Customize** to save your own copy in the hub's `~/.config/herdr-deck/recipes.json`. Built-ins live in

@@ -8,7 +8,7 @@ import { RECIPES, fillPrompt, rankRecipes, readiness, recipeIds, type Recipe } f
 // The store's pure helpers live in the browser script between <conn-store> markers; run exactly that block.
 const src = readFileSync(new URL("../public/app.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("// <conn-store>"), src.indexOf("// </conn-store>"));
-const B = new Function(`"use strict";${block};return { connState, connItems, connView, connSelectAll, connSelectNone, connAllPicked, recipesFor, connFeatured, connRecent, connMatch };`)();
+const B = new Function(`"use strict";${block};return { connState, connItems, connView, connSelectAll, connSelectNone, connAllPicked, recipesFor, connFeatured, connRecent, connMatch, connInCat, connLoginsElsewhere, connCatalogGroups };`)();
 
 const it = (id: string, name: string, over: Partial<Item> = {}): Item => ({ id, name, kind: "service", status: "ready", ...over });
 
@@ -92,7 +92,7 @@ describe("recipe readiness", () => {
     for (const x of RECIPES) {
       expect(x.title && x.pitch && x.steps.length >= 3 && x.needs.length >= 1).toBeTruthy();
       expect(x.prompt).toContain("{connections}");
-      for (const n of [...x.needs, ...(x.optional ?? [])]) for (const id of n.any) expect(id).toMatch(/^(svc|agent|sub|mcp|ssh|dev|bg|skill|key|device):/);
+      for (const n of [...x.needs, ...(x.optional ?? [])]) for (const id of n.any) expect(id).toMatch(/^(svc|agent|sub|mcp|ssh|dev|bg|skill|key|device|acct|proj):/);
     }
   });
 });
@@ -134,6 +134,32 @@ describe("select all", () => {
     expect(B.connFeatured(many, ["ai", "media"]).map((i: Item) => i.id)).toEqual(["svc:a", "svc:b", "svc:m"]);
     const now = Date.now();
     expect(B.connRecent([it("a", "a", { since: now - 1000 }), it("b", "b", { since: 0 }), it("c", "c", { since: now - 30 * 864e5 })], now).map((i: Item) => i.id)).toEqual(["a"]);
+  });
+});
+
+describe("accounts and recommendations in the store", () => {
+  const items = [
+    it("svc:x-twitter", "X (Twitter)", { cat: "social" }), it("acct:instagram", "Instagram", { cat: "social", state: "account", status: "partial" }),
+    it("sites:other", "Other sites", { kind: "sites", cat: "sites" }), it("svc:github", "GitHub", { cat: "code", logins: ["Chrome · Default profile"] }),
+    it("rec:resend", "Resend", { kind: "rec", cat: "recommended", state: "off", status: "off" }), it("svc:aws", "AWS", { cat: "cloud", state: "off", status: "off" }),
+  ];
+  test("recommendations have their own category and never count as Not set up", () => {
+    expect(B.connView(items, { cat: "recommended" }).map((i: Item) => i.id)).toEqual(["rec:resend"]);
+    expect(B.connView(items, { cat: "off" }).map((i: Item) => i.id)).toEqual(["svc:aws"]);
+    expect(B.connView(items, { cat: "social" }).map((i: Item) => i.id)).toEqual(["svc:x-twitter", "acct:instagram"]); // "Has account" shows in its category
+    expect(B.connInCat(items[4], "recommended")).toBe(true);
+    expect(B.connView(items, { q: "resend" }).map((i: Item) => i.id)).toEqual(["rec:resend"]);
+  });
+  test("recommendations can't be selected; an account-only card can", () => {
+    expect([...B.connSelectAll(new Set(), items)].sort()).toEqual(["acct:instagram", "sites:other", "svc:github", "svc:x-twitter"]);
+  });
+  test("logins that merged into other categories are listed for Sites & accounts", () => {
+    expect(B.connLoginsElsewhere(items).map((i: Item) => i.id)).toEqual(["svc:github"]);
+  });
+  test("the Add account picker puts Social media, then Sites & accounts, first", () => {
+    const g = B.connCatalogGroups([{ id: "vercel", name: "Vercel", cat: "cloud" }, { id: "x", name: "X", cat: "social" }, { id: "amazon", name: "Amazon", cat: "sites" }, { id: "bsky", name: "Bluesky", cat: "social" }], { social: "Social media", sites: "Sites & accounts", cloud: "Cloud & deploy" });
+    expect(g.map((x: any) => x.cat)).toEqual(["social", "sites", "cloud"]);
+    expect(g[0].items.map((x: any) => x.name)).toEqual(["Bluesky", "X"]);
   });
 });
 

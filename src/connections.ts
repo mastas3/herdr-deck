@@ -6,8 +6,12 @@
 // The one rule: this records names, versions and signed-in flags only. It never reads a secret value
 // into memory it keeps: env files are matched line by line for the NAME, credential files are only
 // checked for existence (or a user/account field's presence), and probes print names, never tokens.
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { homedir, hostname, platform } from "node:os";
+import { mergeAccounts, recommend, type Account, type Evidence, type RecInfo } from "./accounts";
+import type { Site } from "./catalog";
+import type { LoginScan } from "./logins";
+import { detectProjects, projectItems, type ServiceRef, type SkillRef } from "./projconn";
 import type { Cat, State } from "./store";
 
 const HOME = homedir();
@@ -32,6 +36,19 @@ export type Item = {
   use?: string; // how an agent should use it
   since?: number; // first seen on this machine (0 = there since the first scan)
   custom?: boolean; hidden?: boolean;
+  // accounts (social media, sites): see src/accounts.ts
+  site?: string; // catalog id
+  glyph?: string; // short badge text
+  handle?: string; url?: string; // your public handle / profile link, when you added one
+  own?: { handle?: string; url?: string; notes?: string }; // the account as you added it
+  logins?: string[]; // where a saved login is: "Chrome · Default profile"
+  connect?: string[]; // how agents can connect it, best first
+  sites?: string[]; // "Other sites" only: registrable domains, shown in the deck, never written to CONNECTIONS.md
+  rec?: RecInfo; // "Recommended" only
+  // your projects (src/projconn.ts)
+  path?: string; // ~/Documents/Projects/x
+  aliases?: string[]; // card ids this one replaces (its MCP server, a service card), so recipes still match
+  tools?: string[]; // MCP tool names found in the server's source
 };
 export type Section = { id: string; title: string; hint: string; items: Item[] };
 export type Inventory = { machine: string; at: number; ms: number; sections: Section[]; file?: string; platform?: string };
@@ -387,21 +404,37 @@ const AGENTS: [string, string, string][] = [
 ];
 
 const AGENT_COLOR: Record<string, string> = { claude: "#d97757", codex: "#10a37f", opencode: "#211e1e", gemini: "#4285f4", hermes: "#7c3aed", "cursor-agent": "#1b1b1b", aider: "#14b014", amp: "#f34e3f", goose: "#000000", copilot: "#6e40c9", crush: "#6b50ff" };
-type McpEntry = { name: string; where: string; remote: boolean };
+/** `hints`: the command, args, cwd and local URL, used only to match a server to one of your projects (src/projconn.ts). Never stored or shown: args can hold tokens. */
+type McpEntry = { name: string; where: string; remote: boolean; hints: string[] };
+const LOCAL_URL = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])[:/]/;
+function mcpHints(c: any): string[] {
+  const h: string[] = [];
+  const push = (v: unknown) => { if (typeof v === "string" && v.length < 600) h.push(v); };
+  (Array.isArray(c?.command) ? c.command : [c?.command]).forEach(push);
+  (Array.isArray(c?.args) ? c.args : []).forEach(push);
+  push(c?.cwd);
+  for (const u of [c?.url, c?.httpUrl, c?.serverUrl]) if (typeof u === "string" && LOCAL_URL.test(u)) h.push(u);
+  return h;
+}
 /** Server names (and whether they're remote) from every agent app's config. Env, headers and args are never kept. */
 export function mcpEntries(): McpEntry[] {
   const out: McpEntry[] = [];
-  const add = (obj: any, where: string) => { if (obj && typeof obj === "object") for (const [n, c] of Object.entries<any>(obj)) out.push({ name: n, where, remote: !!(c?.url || c?.httpUrl || c?.serverUrl || c?.type === "remote" || c?.type === "http" || c?.type === "sse") }); };
+  const add = (obj: any, where: string) => { if (obj && typeof obj === "object") for (const [n, c] of Object.entries<any>(obj)) out.push({ name: n, where, remote: !!(c?.url || c?.httpUrl || c?.serverUrl || c?.type === "remote" || c?.type === "http" || c?.type === "sse"), hints: mcpHints(c) }); };
   const cj = readJson(`${HOME}/.claude.json`) ?? {};
   add(cj.mcpServers, "Claude Code");
   for (const p of Object.values<any>(cj.projects ?? {})) add(p?.mcpServers, "Claude Code (project)");
-  for (const n of cj.claudeAiMcpEverConnected ?? []) out.push({ name: String(n).replace(/^claude\.ai /, ""), where: "claude.ai connector", remote: true });
+  for (const n of cj.claudeAiMcpEverConnected ?? []) out.push({ name: String(n).replace(/^claude\.ai /, ""), where: "claude.ai connector", remote: true, hints: [] });
   const plugins = readJson(`${HOME}/.claude/plugins/installed_plugins.json`)?.plugins ?? {};
   for (const [id, inst] of Object.entries<any>(plugins)) {
     const root = (Array.isArray(inst) ? inst[inst.length - 1] : inst)?.installPath;
     if (root) { const j = readJson(`${root}/.mcp.json`); add(j?.mcpServers ?? j, `Claude plugin ${id.split("@")[0]}`); }
   }
-  for (const m of readText(`${HOME}/.codex/config.toml`).matchAll(/^\[mcp_servers\.([^\].]+)\]\s*\n([\s\S]*?)(?=^\[|$(?![\s\S]))/gm)) out.push({ name: m[1], where: "Codex", remote: /^\s*url\s*=/m.test(m[2]) });
+  for (const m of readText(`${HOME}/.codex/config.toml`).matchAll(/^\[mcp_servers\.([^\].]+)\]\s*\n([\s\S]*?)(?=^\[|$(?![\s\S]))/gm)) {
+    const hints = [...m[2].matchAll(/^\s*(?:command|cwd|args|url)\s*=\s*(.+)$/gm)].flatMap((x) => [...x[1].matchAll(/"([^"]*)"/g)].map((y) => y[1])).filter((v) => !/^https?:/.test(v) || LOCAL_URL.test(v));
+    out.push({ name: m[1], where: "Codex", remote: /^\s*url\s*=/m.test(m[2]), hints });
+  }
+  // Project-scoped servers: a .mcp.json at the top of a project (Claude Code reads it there).
+  for (const root of PROJECT_ROOTS) for (const d of ls(`${HOME}/${root}`)) { if (d.startsWith(".")) continue; const j = readJson(`${HOME}/${root}/${d}/.mcp.json`); if (j?.mcpServers) add(j.mcpServers, `Claude Code (${d} project)`); }
   const oc = readJsonc(`${HOME}/.config/opencode/opencode.jsonc`) ?? readJson(`${HOME}/.config/opencode/opencode.json`) ?? readJson(`${HOME}/.config/opencode/config.json`) ?? {};
   add(oc.mcp, "OpenCode");
   add(readJson(`${HOME}/.gemini/settings.json`)?.mcpServers, "Gemini CLI");
@@ -421,7 +454,7 @@ export function mcpEntries(): McpEntry[] {
       if (lead === 0) break;
       if (indent < 0) indent = lead;
       const m = lead === indent && l.trim().match(/^([\w.-]+):/);
-      if (m) out.push({ name: m[1], where, remote: false });
+      if (m) out.push({ name: m[1], where, remote: false, hints: [] });
     }
   }
   if (MAC) {
@@ -580,6 +613,78 @@ function browsers(): Item[] {
   return out;
 }
 
+/** Saved-login site names, read in their own process with a hard timeout (src/logins.ts). DECK_NO_LOGINS=1 turns it off. */
+async function loginScan(): Promise<LoginScan> {
+  if (process.env.DECK_NO_LOGINS) return { profiles: [], files: 0, ms: 0, error: "turned off (DECK_NO_LOGINS)" };
+  const { out } = await run([process.execPath, `${import.meta.dir}/logins.ts`, "--logins"], Number(process.env.DECK_LOGINS_MS) || 6000);
+  try { const j = JSON.parse(out); if (Array.isArray(j?.profiles)) return j; } catch {}
+  return { profiles: [], files: 0, ms: 0, error: "didn't finish in time" };
+}
+/** Apps, CLIs, key names and MCP servers that show you have a catalog account. Names only, like the rest of the scan. */
+function accountEvidence(names: Map<string, boolean>, mcps: McpEntry[]) {
+  return (s: Site): Evidence => {
+    const via: string[] = [];
+    let strong = false, app = false;
+    for (const b of s.bins ?? []) if (which(b)) { via.push(b); if (s.cat === "social") app = true; else strong = true; }
+    if (MAC) for (const a of s.apps ?? []) if (appPath(a)) { via.push(`${a.replace(/\.app$/, "")} app`); app = true; }
+    const k = s.env ? [...names.keys()].filter((n) => s.env!.test(n)) : [];
+    for (const x of k.slice(0, 3)) via.push(`key ${x}`);
+    const m = s.mcp ? [...new Set(mcps.filter((x) => s.mcp!.test(mcpName(x.name))).map((x) => mcpName(x.name)))] : [];
+    for (const x of m.slice(0, 2)) via.push(`MCP ${x}`);
+    if (k.length || m.length) strong = true;
+    return { via: [...new Set(via)], strong, app };
+  };
+}
+
+/** Ports something listens on right now, each with its process's working folder (lsof on macOS, ss + /proc on Linux).
+ *  Nothing connects to the ports; the folders are only used to tell which project is running. Undefined when unknown. */
+async function listeningPorts(): Promise<Map<number, string | undefined> | undefined> {
+  const lsof = which("lsof") ?? (existsSync("/usr/sbin/lsof") ? "/usr/sbin/lsof" : undefined);
+  const portPid = new Map<number, number>();
+  if (lsof) {
+    const { out } = await run([lsof, "-nP", "-iTCP", "-sTCP:LISTEN", "-Fpn"], 3000);
+    let pid = 0;
+    for (const l of out.split("\n")) { if (l[0] === "p") pid = Number(l.slice(1)); else if (l[0] === "n") { const m = l.match(/:(\d+)$/); if (m && !portPid.has(Number(m[1]))) portPid.set(Number(m[1]), pid); } }
+    if (!out) return undefined;
+    const pids = [...new Set(portPid.values())].filter(Boolean);
+    const cwd = new Map<number, string>();
+    if (pids.length) {
+      const { out: o2 } = await run([lsof, "-a", "-d", "cwd", "-Fn", "-p", pids.join(",")], 3000);
+      let p = 0;
+      for (const l of o2.split("\n")) { if (l[0] === "p") p = Number(l.slice(1)); else if (l[0] === "n" && p) cwd.set(p, l.slice(1)); }
+    }
+    return new Map([...portPid].map(([port, p]) => [port, cwd.get(p)]));
+  }
+  const ss = which("ss");
+  if (!ss) return undefined;
+  const { out, code } = await run([ss, "-ltnpH"], 2500);
+  if (code !== 0) return undefined;
+  const res = new Map<number, string | undefined>();
+  for (const l of out.split("\n")) {
+    const port = Number(l.trim().split(/\s+/)[3]?.match(/:(\d+)$/)?.[1]);
+    if (!port || res.has(port)) continue;
+    const pid = l.match(/pid=(\d+)/)?.[1];
+    let dir: string | undefined;
+    try { if (pid) dir = readlinkSync(`/proc/${pid}/cwd`); } catch {}
+    res.set(port, dir);
+  }
+  return res;
+}
+/** Your launchd agents / systemd units with their file text, so a project can be matched to the service that runs it. */
+function serviceRefs(bg: Item[]): ServiceRef[] {
+  return bg.map((b) => {
+    const label = b.via?.[0] ?? b.name;
+    const file = MAC ? `${HOME}/Library/LaunchAgents/${label}.plist` : `${HOME}/.config/systemd/user/${label}`;
+    return { label, kind: MAC ? "launchd" as const : "systemd" as const, running: b.note === "running", loaded: b.note !== "not loaded", text: readText(file, 64 * 1024) };
+  });
+}
+const SKILL_DIRS = [".claude/skills", ".agents/skills", ".codex/skills", ".config/opencode/skills", ".hermes/skills"];
+function skillRefs(): SkillRef[] {
+  const out: SkillRef[] = [];
+  for (const dir of SKILL_DIRS) for (const n of ls(`${HOME}/${dir}`)) { const t = readText(`${HOME}/${dir}/${n}/SKILL.md`, 128 * 1024); if (t && !out.some((x) => x.name === n)) out.push({ name: n, text: t }); }
+  return out;
+}
+
 function skills(): Item[] {
   const out = new Map<string, Item>();
   for (const [where, dir] of [["Claude Code", ".claude/skills"], ["Codex / agents", ".agents/skills"], ["Codex", ".codex/skills"], ["OpenCode", ".config/opencode/skills"], ["Hermes", ".hermes/skills"]] as const) {
@@ -598,10 +703,10 @@ function skills(): Item[] {
 
 // ── your edits: custom connections, hidden items, notes ─────────────────────
 const CONF = `${HOME}/.config/herdr-deck/connections.json`;
-export type ConnConf = { custom: Item[]; hidden: string[]; notes: Record<string, string> };
+export type ConnConf = { custom: Item[]; hidden: string[]; notes: Record<string, string>; accounts: Account[] };
 export function loadConnConf(): ConnConf {
   const j = readJson(CONF) ?? {};
-  return { custom: j.custom ?? [], hidden: j.hidden ?? [], notes: j.notes ?? {} };
+  return { custom: j.custom ?? [], hidden: j.hidden ?? [], notes: j.notes ?? {}, accounts: Array.isArray(j.accounts) ? j.accounts : [] };
 }
 export function saveConnConf(c: ConnConf) {
   try { mkdirSync(`${HOME}/.config/herdr-deck`, { recursive: true }); writeFileSync(CONF, JSON.stringify(c, null, 1)); } catch {}
@@ -676,15 +781,18 @@ export async function inventory(force = false): Promise<Inventory> {
 
 /** First-seen times per item id, per machine, so the store can show what's new. The first scan is the baseline (0). */
 const SEEN = `${HOME}/.config/herdr-deck/connections-seen.json`;
+const SEEN_V = 2;
 function stampSeen(items: Item[], dry: boolean) {
   const j = readJson(SEEN) ?? {};
   const ids: Record<string, number> = j.ids ?? {};
-  const first = !j.ids;
+  // The first scan is the baseline, and so is the first scan of a deck version that adds kinds of cards
+  // (v2: accounts, your projects), so an upgrade doesn't mark everything "New".
+  const first = !j.ids || (j.v ?? 1) < SEEN_V;
   const now = Date.now();
   let changed = first;
   for (const i of items) if (!(i.id in ids)) { ids[i.id] = first ? 0 : now; changed = true; }
   for (const i of items) if (ids[i.id]) i.since = ids[i.id];
-  if (changed && !dry) { try { mkdirSync(`${HOME}/.config/herdr-deck`, { recursive: true }); writeFileSync(SEEN, JSON.stringify({ ids })); } catch {} }
+  if (changed && !dry) { try { mkdirSync(`${HOME}/.config/herdr-deck`, { recursive: true }); writeFileSync(SEEN, JSON.stringify({ v: SEEN_V, ids })); } catch {} }
 }
 
 async function scan(): Promise<Inventory> {
@@ -698,15 +806,39 @@ async function scan(): Promise<Inventory> {
     bin: which,
     tailscale: () => (ts ??= (async () => { const b = which("tailscale") ?? (MAC && existsSync("/Applications/Tailscale.app/Contents/MacOS/Tailscale") ? "/Applications/Tailscale.app/Contents/MacOS/Tailscale" : undefined); if (!b) return; const { out } = await run([b, "status", "--json"], 3000); try { return JSON.parse(out); } catch { return undefined; } })()),
   };
-  const [svc, ag, dev, bg, tsj] = await Promise.all([
+  const listenP = listeningPorts();
+  const [svc0, ag, dev, bg, tsj, lg] = await Promise.all([
     cap(services(names, mcps, npx, ctx), [] as Item[], "services"), cap(agents(), [] as Item[], "agents"), cap(devTools(), [] as Item[], "dev tools"),
     cap(background(), [] as Item[], "background services"), cap(ctx.tailscale(), undefined, "tailscale"),
+    cap(loginScan(), { profiles: [], files: 0, ms: 0, error: "didn't finish in time" } as LoginScan, "saved-login site names"),
   ]);
-  console.error(`connections: scanned in ${Date.now() - t0}ms (files ${t1 - t0}ms, probes ${Date.now() - t1}ms)`);
+  const listening = await cap(listenP, undefined, "listening ports");
+  console.error(`connections: scanned in ${Date.now() - t0}ms (files ${t1 - t0}ms, probes ${Date.now() - t1}ms, saved-login names ${lg.ms}ms from ${lg.profiles.length} profiles${lg.error ? `: ${lg.error}` : ""})`);
   const conf = loadConnConf();
   const hid = new Set(conf.hidden);
   const dress = (it: Item): Item => ({ ...it, use: conf.notes[it.id] ?? it.use, hidden: hid.has(it.id) });
-  const used = new Set(svc.filter((x) => x.status !== "off").flatMap((x) => x.via ?? []));
+  const merged = mergeAccounts({ svc: svc0, logins: lg.profiles, accounts: conf.accounts, evidence: accountEvidence(names, mcps) });
+  // Your projects that agents can use. A project's MCP card, and a service card it fully explains, fold into it.
+  const projs = detectProjects({ home: HOME, roots: PROJECT_ROOTS.map((r) => `${HOME}/${r}`), mcps, services: serviceRefs(bg), skills: skillRefs(), listening, wikiDir: `${HOME}/wiki` });
+  const projItems = projectItems(projs, HOME);
+  const defs = new Map(SERVICES.map((d) => [`svc:${slug(d.name)}`, d]));
+  const folded = new Set<string>();
+  projs.forEach((p, k) => {
+    const it = projItems[k];
+    const names = p.mcp.map((m) => mcpName(m.name));
+    for (const sv of merged.svc) {
+      const d = defs.get(sv.id);
+      if (!d || sv.status === "off") continue;
+      const byPath = (d.paths ?? []).some((x) => { const a = abs(x); return a === p.root || a.startsWith(`${p.root}/`); });
+      const explained = (sv.via ?? []).every((v) => names.some((n) => v.startsWith(`MCP ${n} `)) || p.cli.includes(v.split(" ")[0]));
+      if (!explained || !(byPath || (d.mcp && names.some((n) => d.mcp!.test(n))) || (d.bins ?? []).some((b) => p.cli.includes(b)))) continue;
+      folded.add(sv.id);
+      it.aliases = [...(it.aliases ?? []), sv.id];
+      if (!it.detail || it.detail.startsWith("Your project at")) it.detail = sv.detail;
+    }
+  });
+  const svc = merged.svc.filter((x) => !folded.has(x.id));
+  const used = new Set([...svc.filter((x) => x.status !== "off"), ...merged.accounts].flatMap((x) => x.via ?? []));
   const mcpItems: Item[] = [];
   const byName = new Map<string, McpEntry[]>();
   for (const m of mcps) byName.set(m.name, [...(byName.get(m.name) ?? []), m]);
@@ -714,8 +846,10 @@ async function scan(): Promise<Inventory> {
   const keyItems: Item[] = keys.map((k) => ({ id: `key:${slug(k.name)}`, name: k.name, kind: "key", cat: "keys", status: "ready", detail: k.projects ? `in ${k.where}` : `set in ${k.where}`, note: used.has(`key ${k.name}`) ? "used by a service above" : "", use: k.projects ? `Env var ${k.name} is in the .env of ${k.projects.slice(0, 5).join(", ")} (value never shown).` : `Env var ${k.name} is available (value never shown).` }));
   const sections: Section[] = [
     { id: "services", title: "Services", hint: "What agents can deploy to, pay with, store in, and talk to — and how", items: svc.filter((x) => x.status !== "off") },
+    { id: "projects", title: "Your projects", hint: "Your own projects agents can use: MCP servers, CLIs, dashboards, services and skills", items: projItems },
+    { id: "accounts", title: "Accounts", hint: "Social media and sites you have accounts on: site names from saved logins, apps, key names, or added by you", items: [...merged.accounts, ...(merged.other ? [merged.other] : [])] },
     { id: "ai", title: "AI", hint: "Coding agents and the plans and models behind them", items: [...ag, ...subscriptions()] },
-    { id: "mcp", title: "MCP servers & connectors", hint: "Tool servers each agent app can call", items: mcpItems },
+    { id: "mcp", title: "MCP servers & connectors", hint: "Tool servers each agent app can call", items: mcpItems.filter((m) => !projItems.some((p) => p.aliases?.includes(m.id))) },
     { id: "machines", title: "Machines", hint: "SSH hosts this machine can reach", items: sshHosts() },
     { id: "devices", title: "Tailnet devices", hint: "Devices on your Tailscale network", items: devices(tsj) },
     { id: "keys", title: "API keys", hint: "Names and where they're set. Values are never read or sent.", items: keyItems },
@@ -725,24 +859,37 @@ async function scan(): Promise<Inventory> {
     { id: "skills", title: "Skills", hint: "Packaged know-how agents can load", items: skills() },
     { id: "custom", title: "Yours", hint: "Connections you added by hand", items: conf.custom.map((c) => ({ ...c, custom: true, kind: c.kind || "custom", status: c.status ?? "ready" })) },
     { id: "missing", title: "Not set up", hint: "Common services this machine can't reach yet", items: svc.filter((x) => x.status === "off") },
-  ].map((sec) => ({ ...sec, items: sec.items.map(dress) }));
-  stampSeen(sections.filter((s) => s.id !== "missing").flatMap((s) => s.items), dry);
+  ];
+  // Services you don't have yet, best fit first. A recommended service replaces its "Not set up" card.
+  const wiki = `${readText(`${HOME}/wiki/index.md`, 512 * 1024)}\n${readText(`${HOME}/wiki/overview.md`, 256 * 1024)}`;
+  const recs = recommend(sections.flatMap((x) => x.items), lg.profiles, conf.accounts, wiki);
+  const recOwn = new Set(recs.flatMap((x) => x.rec?.owns ?? []));
+  sections.find((x) => x.id === "missing")!.items = svc.filter((x) => x.status === "off" && !recOwn.has(x.id));
+  sections.push({ id: "recommended", title: "Recommended for you", hint: "Services worth signing up for, ranked by fit with your projects", items: recs });
+  for (const sec of sections) sec.items = sec.items.map(dress);
+  stampSeen(sections.filter((s) => s.id !== "missing" && s.id !== "recommended").flatMap((s) => s.items), dry);
   const inv: Inventory = { machine: hostname().replace(/\.local$/, ""), platform: platform(), at: Date.now(), ms: Date.now() - t0, sections };
   inv.file = dry ? undefined : writeConnectionsMd(inv);
   return inv;
 }
 
 
-const stateWord = (i: Item) => (i.state === "installed" ? " (installed; not signed in or not running)" : i.state === "offline" ? " (offline)" : i.status === "partial" ? " (needs sign-in)" : "");
-const itemLine = (i: Item) => `- **${i.name}**${stateWord(i)}${i.detail ? ` — ${i.detail}` : ""}${i.via?.length ? `. Via: ${i.via.join(", ")}` : ""}${i.use ? `\n  How: ${i.use}` : ""}`;
+const stateWord = (i: Item) => (i.kind === "project" ? (i.state === "installed" ? " (not running now)" : "") : i.state === "installed" ? " (installed; not signed in or not running)" : i.state === "offline" ? " (offline)" : i.state === "account" ? " (you have an account; not set up for agents here)" : i.status === "partial" ? " (needs sign-in)" : "");
+const handleOf = (h?: string) => { const t = String(h ?? "").trim(); return !t ? "" : /^https?:\/\//.test(t) || t.startsWith("@") || t.includes(".") || t.includes("/") ? t : `@${t}`; };
+/** An account for agents: name, your public handle, where it's signed in, how they may use it. Never a password or token. */
+const accountLine = (i: Item) => i.kind === "sites"
+  ? `- **${i.name}**: ${i.sites?.length ?? 0} more site${i.sites?.length === 1 ? "" : "s"} with saved logins (the names stay in the deck)`
+  : `- **${i.name}**${i.handle ? ` ${handleOf(i.handle)}` : ""}${i.url ? ` (${i.url})` : ""}${stateWord(i)}${i.detail ? ` — ${i.detail}` : ""}${i.logins?.length ? `. Signed in: saved login in ${i.logins.join(", ")}` : ""}${i.use ? `\n  How agents may use it: ${i.use}` : ""}${i.connect?.length ? `\n  Connect: ${i.connect.slice(0, 2).join("; ")}` : ""}`;
+const itemLine = (i: Item) => `- **${i.name}**${stateWord(i)}${i.detail ? ` — ${i.detail.replace(/\.$/, "")}` : ""}${i.via?.length ? `. Via: ${i.via.join(", ")}` : ""}${i.use ? `\n  How: ${i.use}` : ""}`;
 
 /** Plain text for agents (MCP, "suggest projects", CONNECTIONS.md): capabilities and how to use them, never secrets. */
 export function inventoryText(inv: Inventory, only?: Set<string>): string {
   const lines = [`# Connections on ${inv.machine}`, "", "What this machine can reach and how to use it. Never print or log secret values; ask before anything public, paid or destructive."];
   for (const s of inv.sections) {
-    if (s.id === "missing") continue;
+    if (s.id === "missing" || s.id === "recommended") continue;
     const items = s.items.filter((i) => !i.hidden && (!only || only.has(i.id)) && (s.id !== "keys" || !i.note) && (s.id !== "skills" || only));
     if (!items.length) continue;
+    if (s.id === "accounts") { lines.push("", "## Accounts", "Accounts you have (never passwords or tokens). Handles are public. Ask before posting, messaging, buying or changing anything.", ...items.map(accountLine)); continue; }
     lines.push("", `## ${s.title}`, ...items.map(itemLine));
   }
   if (!only) {

@@ -9,6 +9,7 @@ import { claimsDone, onCheck, resultFor, setApproval, verify, detectCheck, appro
 import { inventory, inventoryText, loadConnConf, saveConnConf, usage, type Item as ConnItem } from "./connections";
 import { CATEGORIES, enrich } from "./store";
 import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCustom } from "./recipes";
+import { upsertAccount } from "./accounts";
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
@@ -1253,6 +1254,8 @@ async function handle(req: Request): Promise<Response> {
             const item: ConnItem = { id: `custom:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name, kind: "custom", status: "ready", detail: String(it.detail ?? "").slice(0, 200), use: String(it.use ?? "").slice(0, 1000), via: String(it.via ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6), ...(CATEGORIES.some((x) => x.id === it.cat) ? { cat: it.cat } : {}) };
             c.custom = [...c.custom.filter((x) => x.id !== item.id), item];
           } else if (body.op === "remove") c.custom = c.custom.filter((x) => x.id !== id);
+          else if (body.op === "account") { try { c.accounts = upsertAccount(c.accounts, body.account); } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); } }
+          else if (body.op === "unaccount") c.accounts = c.accounts.filter((x) => x.id !== id);
           else return json({ error: "unknown op" }, 400);
           saveConnConf(c);
           return json(enrich(await inventory(true)));

@@ -2648,10 +2648,24 @@ function connMatch(i, q, catLabel) {
   const hay = `${i.name} ${i.detail ?? ""} ${i.note ?? ""} ${(i.via ?? []).join(" ")} ${i.group ?? ""} ${catLabel ?? ""}`.toLowerCase();
   return words.every((w) => hay.includes(w));
 }
+/** Whether a card belongs to a rail category: "off" = not set up (recommendations have their own), "recommended" = services to sign up for. */
+function connInCat(i, cat) {
+  if (cat === "recommended") return i.cat === "recommended";
+  if (cat === "off") return connState(i) === "off" && i.kind !== "rec";
+  return i.cat === cat && connState(i) !== "off";
+}
 /** The cards in view: a search spans every category; otherwise one category ("off" = not set up). */
 function connView(items, { cat, q, showHidden, labels }) {
-  const inCat = (i) => (cat === "off" ? connState(i) === "off" : i.cat === cat && connState(i) !== "off");
-  return items.filter((i) => (q ? true : inCat(i)) && (showHidden || q || !i.hidden) && connMatch(i, q, labels?.[i.cat]));
+  return items.filter((i) => (q ? true : connInCat(i, cat)) && (showHidden || q || !i.hidden) && connMatch(i, q, labels?.[i.cat]));
+}
+/** Cards whose saved login merged into a card outside Social media and Sites & accounts (GitHub, Netlify…). */
+function connLoginsElsewhere(items) { return items.filter((i) => i.logins?.length && !["social", "sites"].includes(i.cat) && !i.hidden); }
+/** The "Add account" picker: catalog entries grouped by category, account categories first. */
+function connCatalogGroups(catalog, labels) {
+  const order = ["social", "sites"], groups = new Map();
+  for (const c of catalog ?? []) { const k = c.cat; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(c); }
+  return [...groups.entries()].sort(([a], [b]) => (order.includes(a) ? order.indexOf(a) : 9) - (order.includes(b) ? order.indexOf(b) : 9) || String(labels?.[a] ?? a).localeCompare(String(labels?.[b] ?? b)))
+    .map(([cat, list]) => ({ cat, label: labels?.[cat] ?? cat, items: [...list].sort((x, y) => x.name.localeCompare(y.name)) }));
 }
 /** Select every selectable card in `items` (the category or search in view). Returns a new set. */
 function connSelectAll(pick, items) { const s = new Set(pick); for (const i of items) if (connSelectable(i)) s.add(i.id); return s; }
@@ -2665,7 +2679,7 @@ function recipesFor(recipes, pick) {
 /** "Ready to use": ready services, agents and plans, at most two per category, up to `max`. */
 function connFeatured(items, order, max = 14) {
   const per = new Map(), out = [];
-  const pool = items.filter((i) => connState(i) === "ready" && !i.hidden && ["service", "agent", "sub"].includes(i.kind)).sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat) || Number(!b.color) - Number(!a.color));
+  const pool = items.filter((i) => connState(i) === "ready" && !i.hidden && ["service", "agent", "sub", "project"].includes(i.kind)).sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat) || Number(!b.color) - Number(!a.color));
   for (const i of pool) { const n = per.get(i.cat) ?? 0; if (n >= 2) continue; per.set(i.cat, n + 1); out.push(i); if (out.length >= max) break; }
   return out;
 }
@@ -2693,8 +2707,13 @@ const CICON = {
   off: TI2('<circle cx="8" cy="8" r="5.5"/><path d="M5.5 8h5"/>'),
   recipe: TI2('<path d="M3.5 2.5h6l3 3v8h-9z"/><path d="M9.5 2.5v3h3M5.5 8.5h5M5.5 11h3"/>'),
   sliders: TI2('<path d="M3 4.5h10M3 11.5h10"/><circle cx="6" cy="4.5" r="1.5"/><circle cx="10.5" cy="11.5" r="1.5"/>'),
+  social: TI2('<circle cx="5" cy="8" r="1.8"/><circle cx="11.5" cy="4" r="1.8"/><circle cx="11.5" cy="12" r="1.8"/><path d="m6.6 7.1 3.3-2.1M6.6 8.9l3.3 2.1"/>'),
+  sites: TI2('<rect x="2" y="3" width="12" height="10" rx="1.6"/><path d="M2 6h12M4.2 4.5h.01M5.8 4.5h.01M5 9h3M5 11h6"/>'),
+  recommended: TI2('<path d="M8 2.2v2.2M8 11.6v2.2M2.2 8h2.2M11.6 8h2.2M4 4l1.5 1.5M10.5 10.5 12 12M4 12l1.5-1.5M10.5 5.5 12 4"/><circle cx="8" cy="8" r="1.6"/>'),
+  projects: TI2('<path d="M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z"/><path d="m6.5 8.5-1.5 1.5 1.5 1.5M9.5 8.5l1.5 1.5-1.5 1.5"/>'),
+  ext: TI2('<path d="M9 3h4v4M13 3 7.5 8.5M11.5 9.5V13h-8.5V4.5H6.5"/>'),
 };
-const CST = { ready: ["ok", "Ready"], "signed-out": ["warn", "Signed out"], installed: ["mid", "Installed only"], offline: ["mid", "Offline"], off: ["off", "Not set up"] };
+const CST = { ready: ["ok", "Ready"], "signed-out": ["warn", "Signed out"], installed: ["mid", "Installed only"], offline: ["mid", "Offline"], account: ["mid", "Has account"], off: ["off", "Not set up"] };
 S.conn = { machine: null, data: new Map(), mcp: null, pick: new Set(), cat: load("connCat2", "home"), q: "", tab: load("connTab", "store"), recipes: new Map(), rcat: "all", ropen: null, rfor: null, open: null };
 
 function openConnections(key, tab) {
@@ -2735,8 +2754,8 @@ function connHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.char
 const KGLYPH = { key: "keys", skill: "skills", mcp: "mcp", background: "automation", ssh: "devices", device: "devices", browser: "browsers" };
 function connBadge(i, big) {
   const style = i.color ? `--bg:${i.color};--fg:${hexLight(i.color) ? "#141414" : "#fff"}` : `--bg:oklch(0.8 0.09 ${connHue(i.name)});--fg:oklch(0.26 0.06 ${connHue(i.name)})`;
-  const g = KGLYPH[i.kind] ? CICON[KGLYPH[i.kind]] : esc(initials(String(i.name).replace(/[^\p{L}\p{N}\s._-]/gu, " ").trim() || "?"));
-  return `<span class="cbadge${big ? " big" : ""}" style="${style}" aria-hidden="true">${g}</span>`;
+  const g = KGLYPH[i.kind] ? CICON[KGLYPH[i.kind]] : i.kind === "sites" ? CICON.sites : esc(i.glyph || initials(String(i.name).replace(/[^\p{L}\p{N}\s._-]/gu, " ").trim() || "?"));
+  return `<span class="cbadge${big ? " big" : ""}${String(i.glyph ?? "").length >= 3 ? " g3" : ""}" style="${style}" aria-hidden="true">${g}</span>`;
 }
 function connWhere(id) {
   if (S.conn.data.size < 2) return null;
@@ -2745,9 +2764,39 @@ function connWhere(id) {
   return out;
 }
 const catLabel = (inv, id) => (id === "off" ? "Not set up" : id === "home" ? "Featured" : inv?.categories?.find((c) => c.id === id)?.label ?? id ?? "");
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? String(u) : "");
+const handleText = (h) => { const t = String(h ?? "").trim(); return !t ? "" : /^https?:\/\//.test(t) || t.startsWith("@") || t.includes(".") || t.includes("/") ? t : `@${t}`; };
+/** A service worth signing up for: why it fits, free tier, the official sign-up link, what it unlocks. */
+function recCard(i, n, inv, showCat) {
+  const r = i.rec ?? {}, open = S.conn.open === i.id, url = safeUrl(r.url ?? i.url);
+  return `<article class="ccard crec${open ? " open" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--i:${Math.min(n, 14)}">
+    <div class="ctop" data-copen>${connBadge(i)}<span class="ctt"><span class="cname">${esc(i.name)}</span><span class="ccat">${esc(showCat ? "Recommended" : catLabel(inv, i.group))}</span></span></div>
+    <div class="cwhat" data-copen>${esc(i.detail ?? "")}</div>
+    <p class="rwhy" data-copen>${r.project ? `<b>${esc(r.project)}</b> · ${esc(String(r.why ?? "").replace(`${r.project}: `, ""))}` : esc(r.why ?? "")}</p>
+    <div class="cfoot"><span class="cst ${/^free\b|free tier|free plan|free \(/i.test(r.free ?? "") ? "ok" : "mid"}" title="Free tier">${esc(r.free ?? "")}</span><span class="spacer"></span>${url ? `<a class="btn ghost csign" href="${esc(url)}" target="_blank" rel="noopener noreferrer">Sign up${CICON.ext}</a>` : ""}</div>
+    ${open ? `<div class="cmore">
+      ${r.unlocks?.length ? `<label class="clab">Unlocks recipes</label><div class="cuses">${r.unlocks.map((u) => `<button class="chip" data-cgorecipe="${esc(u.id)}">${CICON.recipe}${esc(u.title)}</button>`).join("")}</div>` : `<div class="hint">Once it's set up, agents can use it in your own recipes.</div>`}
+      <div class="hint">The deck never signs up for anything. After you sign up, put its key in an env file (or sign in to its CLI) and Rescan.</div>
+      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Not interested"}</button></div>
+    </div>` : ""}
+  </article>`;
+}
+/** Logins the catalog doesn't know: a count, and the site names behind a fold. They never leave this page. */
+function sitesCard(i, n) {
+  const list = i.sites ?? [], picked = S.conn.pick.has(i.id);
+  return `<article class="ccard csites${picked ? " picked" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--i:${Math.min(n, 14)}">
+    <button class="cpick" data-cpick aria-pressed="${picked}" aria-label="Select ${esc(i.name)}">${ICON.check}</button>
+    <div class="ctop">${connBadge(i)}<span class="ctt"><span class="cname">${esc(i.name)}</span><span class="ccat">${list.length} site${list.length === 1 ? "" : "s"}</span></span></div>
+    <div class="cwhat">${esc(i.detail ?? "")}</div>
+    <details class="csl"${S.conn.sitesOpen ? " open" : ""}><summary data-csitesopen>Show the ${list.length} site names</summary><div class="cvia">${list.map((d) => `<span>${esc(d)}</span>`).join("")}</div></details>
+    <div class="cacts"><span class="hint">Names only, from saved logins. Banks, health and government sites are never listed.</span><span class="spacer"></span><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button></div>
+  </article>`;
+}
 function connCard(i, n, inv, showCat) {
+  if (i.kind === "rec") return recCard(i, n, inv, showCat);
+  if (i.kind === "sites") return sitesCard(i, n);
   const st = connState(i);
-  const [cls, label] = CST[st] ?? CST.ready;
+  const [cls, label] = i.kind === "project" && st === "installed" ? ["mid", "Not running"] : CST[st] ?? CST.ready;
   const picked = S.conn.pick.has(i.id), open = S.conn.open === i.id;
   const where = connWhere(i.id);
   const fresh = i.since && Date.now() - i.since < 14 * 864e5;
@@ -2759,18 +2808,26 @@ function connCard(i, n, inv, showCat) {
     <div class="cwhat" data-copen>${esc(i.detail || i.note || " ")}</div>
     <div class="cfoot" data-copen><span class="cst ${cls}">${label}</span>${fresh ? '<span class="cnew">New</span>' : ""}${i.note && i.detail && !open && i.note !== "installed" ? `<span class="cnote2">${esc(i.note)}</span>` : ""}${where?.length ? `<span class="cmach" title="On ${esc(where.join(", "))}">${where.map((w) => `<i>${esc(w)}</i>`).join("")}</span>` : ""}</div>
     ${open ? `<div class="cmore">
+      ${i.handle || i.url ? `<div class="chandle">${safeUrl(i.url) ? `<a href="${esc(safeUrl(i.url))}" target="_blank" rel="noopener noreferrer">${esc(handleText(i.handle) || i.url)}${CICON.ext}</a>` : esc(handleText(i.handle))}</div>` : ""}
       ${via.length ? `<div class="cvia">${via.map((v) => `<span>${esc(v)}</span>`).join("")}</div>` : ""}
       ${i.note ? `<div class="hint">${esc(i.note)}</div>` : ""}
+      ${i.path ? `<div class="hint"><code>${esc(i.path)}</code></div>` : ""}
+      ${i.tools?.length ? `<label class="clab">MCP tools</label><div class="cvia">${i.tools.map((x) => `<span>${esc(x)}</span>`).join("")}</div>` : ""}
+      ${i.connect?.length ? `<label class="clab">How agents connect</label><ul class="cconn">${i.connect.map((c) => { const k = c.indexOf(": "); return `<li><b>${esc(c.slice(0, k))}</b> ${esc(c.slice(k + 2))}</li>`; }).join("")}</ul>` : ""}
       <label class="clab">How agents should use it</label>
       <textarea class="cuse" data-cnote rows="3" placeholder="e.g. Deploy with npx netlify-cli deploy --prod">${esc(i.use ?? "")}</textarea>
       ${uses.length ? `<label class="clab">Recipes that use it</label><div class="cuses">${uses.map((r) => `<button class="chip" data-cgorecipe="${esc(r.id)}">${CICON.recipe}${esc(r.title)}</button>`).join("")}</div>` : ""}
-      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button>${i.custom ? `<button class="btn ghost danger" data-cremove>Remove</button>` : ""}<span class="spacer"></span>${st === "off" ? "" : `<button class="btn" data-cone>Add just this</button>`}</div>
+      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button>${i.custom ? `<button class="btn ghost danger" data-cremove>Remove</button>` : ""}${i.site ? `<button class="btn ghost" data-cacct="${esc(i.site)}">${i.own ? "Edit account" : "Add your handle"}</button>` : ""}${i.own ? `<button class="btn ghost danger" data-cunacct="${esc(i.site)}">Forget handle</button>` : ""}<span class="spacer"></span>${st === "off" ? "" : `<button class="btn" data-cone>Add just this</button>`}</div>
     </div>` : ""}
   </article>`;
 }
 function connMini(i, inv) {
   const st = connState(i);
   return `<button class="cmini" data-cjump="${esc(i.id)}" data-cjcat="${esc(i.cat)}" title="${esc(i.detail ?? "")}">${connBadge(i, true)}<span class="cmn">${esc(i.name)}</span><span class="cms">${esc(catLabel(inv, i.cat))}</span>${st !== "ready" ? `<span class="cst ${CST[st]?.[0] ?? "off"}">${CST[st]?.[1] ?? ""}</span>` : ""}</button>`;
+}
+function recMini(i) {
+  const r = i.rec ?? {};
+  return `<button class="cmini rmini" data-cjump="${esc(i.id)}" data-cjcat="recommended" title="${esc(r.why ?? "")}">${connBadge(i, true)}<span class="cmn">${esc(i.name)}</span><span class="cms">${esc(r.project ?? i.detail ?? "")}</span></button>`;
 }
 function selBar(items, what) {
   const sel = items.filter(connSelectable);
@@ -2791,20 +2848,26 @@ function renderStore(inv, items, labels, q) {
   if (cat === "home") {
     const feat = connFeatured(items, order), recent = connRecent(items, Date.now());
     const readyAll = items.filter((i) => connState(i) === "ready" && !i.hidden);
-    const tiles = order.map((id) => ({ id, label: labels[id], n: items.filter((i) => i.cat === id && connState(i) !== "off" && !i.hidden) })).filter((t) => t.n.length || t.id === "yours");
+    const tiles = order.map((id) => ({ id, label: labels[id], n: items.filter((i) => connInCat(i, id) && !i.hidden) })).filter((t) => t.n.length || t.id === "yours");
+    const recs = items.filter((i) => i.kind === "rec" && !i.hidden).slice(0, 10);
     return `<section class="cfeat"><div class="cfh"><h3>Ready to use</h3><span class="hint">${readyAll.length} ready on ${esc(machineLabel(S.conn.machine ?? S.self))}</span><span class="spacer"></span><button class="btn ghost" data-cseverything>${ICON.check}Select all ${readyAll.length} ready</button></div>
         <div class="cstrip">${feat.map((i) => connMini(i, inv)).join("")}</div></section>
+      ${recs.length ? `<section class="cfeat"><div class="cfh"><h3>Recommended for you</h3><span class="hint">services you don't have yet, picked for your projects</span><span class="spacer"></span><button class="link" data-ccat="recommended">See all</button></div><div class="cstrip">${recs.map(recMini).join("")}</div></section>` : ""}
       ${recent.length ? `<section class="cfeat"><div class="cfh"><h3>Recently added</h3><span class="hint">new on ${esc(machineLabel(S.conn.machine ?? S.self))} in the last two weeks</span></div><div class="cstrip">${recent.map((i) => connMini(i, inv)).join("")}</div></section>` : ""}
       <section class="cfeat"><div class="cfh"><h3>Browse</h3></div><div class="ctiles">${tiles.map((t, n) => `<button class="ctile" data-ccat="${esc(t.id)}" style="--i:${Math.min(n, 14)}"><span class="cti">${CICON[t.id] ?? ""}</span><span class="ctl">${esc(t.label)}</span><span class="ctn">${t.n.length}</span><span class="ctg">${t.n.slice(0, 4).map((i) => connBadge(i)).join("")}</span></button>`).join("")}</div></section>`;
   }
-  const SR = { ready: 0, "signed-out": 1, installed: 2, offline: 3, off: 4 };
-  const view = connView(items, { cat, showHidden: S.conn.showHidden, labels }).sort((a, b) => SR[connState(a)] - SR[connState(b)]);
-  const hid = cat === "off" ? 0 : items.filter((i) => i.cat === cat && i.hidden && connState(i) !== "off").length;
-  const off = cat === "off" ? [] : items.filter((i) => i.cat === cat && connState(i) === "off" && !i.hidden);
+  const SR = { ready: 0, "signed-out": 1, installed: 2, account: 2, offline: 3, off: 4 };
+  const acctCat = cat === "social" || cat === "sites";
+  // Recommendations keep their fit order; "Other sites" sits at the end of Sites & accounts.
+  const view = connView(items, { cat, showHidden: S.conn.showHidden, labels }).sort((a, b) => cat === "recommended" ? 0 : Number(a.kind === "sites") - Number(b.kind === "sites") || SR[connState(a)] - SR[connState(b)]);
+  const hid = cat === "off" ? 0 : items.filter((i) => connInCat(i, cat) && i.hidden).length;
+  const off = cat === "off" || cat === "recommended" ? [] : items.filter((i) => i.cat === cat && connState(i) === "off" && !i.hidden);
   const hint = cat === "off" ? "Common services this machine can’t reach yet" : inv.categories?.find((c) => c.id === cat)?.hint ?? "";
-  return `<div class="cch"><span class="cti big">${CICON[cat] ?? ""}</span><div><h3>${esc(catLabel(inv, cat))}</h3><p class="hint">${esc(hint)}</p></div></div>
-    ${selBar(view, "here")}
-    ${view.length ? `<div class="cgrid2">${view.map((i, n) => connCard(i, n, inv, false)).join("")}</div>` : `<p class="hint cempty">${cat === "yours" ? "Nothing here yet. “Add your own” for anything the scan can’t see: a staging server, a team API, a login in your password manager…" : "Nothing here on this machine."}</p>`}
+  const elsewhere = cat === "sites" ? connLoginsElsewhere(items) : [];
+  return `<div class="cch"><span class="cti big">${CICON[cat] ?? ""}</span><div><h3>${esc(catLabel(inv, cat))}</h3><p class="hint">${esc(hint)}</p></div>${acctCat ? `<span class="spacer"></span><button class="btn ghost" data-cacct>${ICON.plus}Add account</button>` : ""}</div>
+    ${elsewhere.length ? `<div class="celse"><span class="hint">Your logins also added to:</span>${elsewhere.slice(0, S.conn.elseAll ? 99 : 10).map((i) => `<button class="chip" data-cjump="${esc(i.id)}" data-cjcat="${esc(i.cat)}">${esc(i.name)}</button>`).join("")}${elsewhere.length > 10 && !S.conn.elseAll ? `<button class="link" data-celseall>+${elsewhere.length - 10} more</button>` : ""}</div>` : ""}
+    ${cat === "recommended" ? `<p class="hint crech">Picked from your wiki (projects and interests) and filtered to what ${esc(machineLabel(S.conn.machine ?? S.self))} doesn’t have yet. Free-tier notes are well-known facts; “check pricing” means look before you sign up. The deck never signs up for you.</p>` : selBar(view, "here")}
+    ${view.length ? `<div class="cgrid2">${view.map((i, n) => connCard(i, n, inv, false)).join("")}</div>` : `<p class="hint cempty">${cat === "yours" ? "Nothing here yet. “Add your own” for anything the scan can’t see: a staging server, a team API, a login in your password manager…" : acctCat ? "No accounts found on this machine yet. <button class=\"link\" data-cacct>Add one</button> with your handle." : cat === "recommended" ? "You already have everything on the list." : "Nothing here on this machine."}</p>`}
     ${hid ? `<button class="link" data-cshowhid>${S.conn.showHidden ? "Hide" : "Show"} ${hid} hidden</button>` : ""}
     ${off.length ? `<h4 class="csub">Not set up here</h4><div class="cgrid2">${off.map((i, n) => connCard(i, n, inv, false)).join("")}</div>` : ""}`;
 }
@@ -2855,7 +2918,7 @@ function renderConnections() {
   const items = connItems(inv);
   const labels = Object.fromEntries((inv?.categories ?? []).map((c) => [c.id, c.label]));
   const order = (inv?.categories ?? []).map((c) => c.id);
-  const count = (id) => items.filter((i) => (id === "off" ? connState(i) === "off" : i.cat === id && connState(i) !== "off") && !i.hidden).length;
+  const count = (id) => items.filter((i) => connInCat(i, id) && !i.hidden).length;
   const cats = ["home", ...order.filter((id) => count(id) || id === "yours"), ...(count("off") ? ["off"] : [])];
   if (!cats.includes(S.conn.cat) && inv) S.conn.cat = "home";
   const n = S.conn.pick.size;
@@ -2991,6 +3054,12 @@ $("dbody").addEventListener("click", async (e) => {
   if (t.closest("[data-cuse]")) { S.conn.rfor = new Set(S.conn.pick); S.conn.tab = "recipes"; S.conn.rcat = "all"; S.conn.q = ""; $("dbody").scrollTop = 0; loadRecipes(); return renderConnections(); }
   if (t.closest("[data-csend]")) return sendConnections([...S.conn.pick], S.conn.target);
   if (t.closest("[data-csendpick]")) return pickSessionFor(t.closest("[data-csendpick]"), (k) => sendConnections([...S.conn.pick], k));
+  if (t.closest("[data-celseall]")) return connRerender(() => { S.conn.elseAll = true; });
+  if (t.closest("[data-csitesopen]")) { S.conn.sitesOpen = !t.closest("details")?.open; return; }
+  const acct = t.closest("[data-cacct]");
+  if (acct) return addAccount(acct.dataset.cacct || "");
+  const unacct = t.closest("[data-cunacct]")?.dataset.cunacct;
+  if (unacct) { if (await askDialog({ title: "Forget this handle?", text: "Removes the handle, link and notes you added. The card stays if a saved login or an app shows you have the account.", ok: "Forget", danger: true })) connConf({ op: "unaccount", id: unacct }); return; }
   if (t.closest("[data-cadd]")) return addConnection();
   if (t.closest("[data-csuggest]")) return suggestProjects();
   const rc = t.closest("[data-rid]");
@@ -3035,11 +3104,47 @@ async function addConnection() {
     <label class="lab">What it’s for</label><input class="inp" name="detail" placeholder="Pre-production copy of the funnel">
     <label class="lab">Category</label><select class="inp" name="cat">${cats.map((c) => `<option value="${esc(c.id)}"${c.id === "yours" ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select>
     <label class="lab">How agents should use it</label><textarea class="inp" name="use" rows="3" placeholder="ssh staging, app in /srv/app, restart with pm2 restart app"></textarea>
-    <label class="lab">Reached via <span class="hint">(comma separated, optional)</span></label><input class="inp" name="via" placeholder="ssh staging, key STAGING_TOKEN"></div>
+    <label class="lab">Reached via <span class="hint">(comma separated, optional)</span></label><input class="inp" name="via" placeholder="ssh staging, key STAGING_TOKEN">
+    <p class="hint" style="margin-top:12px">A social network or a site you have an account on? <button type="button" class="link" data-dacct>Add an account</button> instead, with your handle.</p></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Add</button></div></form>`;
+  d.querySelector("[data-dacct]").addEventListener("click", () => { d.close("cancel"); addAccount(""); });
   document.body.append(d);
   d.addEventListener("close", () => {
     if (d.returnValue === "ok") { const f = Object.fromEntries(new FormData(d.querySelector("form"))); S.conn.cat = f.cat || "yours"; S.conn.q = ""; connConf({ op: "add", item: f }); }
+    d.remove();
+  });
+  d.showModal();
+}
+/** Add (or edit) one of your accounts: a catalog service, your public handle or profile link, and how agents may use it. */
+function addAccount(siteId) {
+  const m = S.conn.machine ?? S.self;
+  const inv = S.conn.data.get(m);
+  const labels = Object.fromEntries((inv?.categories ?? []).map((c) => [c.id, c.label]));
+  const groups = connCatalogGroups(inv?.accountCatalog, labels);
+  const cur = connItems(inv).find((i) => i.site === siteId);
+  const own = cur?.own ?? {};
+  const d = document.createElement("dialog");
+  d.className = "ask";
+  d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${cur?.own ? `Edit ${esc(cur.name)}` : "Add an account"}</h3><p class="hint">Your own public handle, so agents know which account is yours. Saved on ${esc(machineLabel(m))} in <code>~/.config/herdr-deck/connections.json</code> and listed in CONNECTIONS.md. Never a password.</p>
+    <label class="lab">Service</label><select class="inp" name="id" required><option value="">Choose…</option>${groups.map((g) => `<optgroup label="${esc(g.label)}">${g.items.map((c) => `<option value="${esc(c.id)}"${c.id === siteId ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</optgroup>`).join("")}</select>
+    <label class="lab">Handle <span class="hint">(optional)</span></label><input class="inp" name="handle" maxlength="100" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="@yourname" value="${esc(own.handle ?? "")}">
+    <label class="lab">Profile link <span class="hint">(optional)</span></label><input class="inp" name="url" type="url" maxlength="300" placeholder="https://…" value="${esc(own.url ?? "")}">
+    <label class="lab">How agents may use it</label><textarea class="inp" name="notes" rows="3" maxlength="1000" placeholder="Draft posts for my approval; never DM, follow or buy anything.">${esc(own.notes ?? "")}</textarea></div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save account</button></div></form>`;
+  document.body.append(d);
+  d.addEventListener("close", async () => {
+    if (d.returnValue === "ok") {
+      const f = Object.fromEntries(new FormData(d.querySelector("form")));
+      try {
+        const next = await api("/api/connections-conf", { machine: m, op: "account", account: f });
+        S.conn.data.set(m, next);
+        const card = connItems(next).find((i) => i.site === f.id);
+        if (card) { S.conn.cat = card.cat; store("connCat2", card.cat); S.conn.open = card.id; S.conn.q = ""; }
+        renderConnections();
+        if (card) $("dbody").querySelector(`[data-cid="${CSS.escape(card.id)}"]`)?.scrollIntoView({ block: "center", behavior: reduceMotion.matches ? "auto" : "smooth" });
+        toast(`Saved ${card?.name ?? "the account"}`);
+      } catch (e) { toast(e.message, true); }
+    }
     d.remove();
   });
   d.showModal();

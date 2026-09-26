@@ -33,7 +33,7 @@ const N = {
   git: C("Git", "dev:git"),
   playwright: C("Playwright", "svc:playwright"),
   ytdlp: C("yt-dlp", "svc:yt-dlp"),
-  ytrag: C("YouTube RAG (yt-transcriber)", "svc:youtube-rag-yt-transcriber"),
+  ytrag: C("YouTube RAG (yt-transcriber)", "proj:yt-transcriber", "svc:youtube-rag-yt-transcriber"),
   wiki: C("LLM Wiki or Obsidian", "svc:llm-wiki", "svc:obsidian"),
   ollama: C("Ollama", "svc:ollama", "sub:ollama"),
   gumroad: C("Gumroad", "svc:gumroad", "mcp:gumroad"),
@@ -41,7 +41,7 @@ const N = {
   telegram: C("Telegram", "svc:telegram"),
   jev: C("Jev", "svc:jev"),
   herdr: C("herdr", "dev:herdr"),
-  deckMcp: C("herdr deck MCP", "mcp:herdr-deck"),
+  deckMcp: C("herdr deck MCP", "proj:herdr-deck", "mcp:herdr-deck"),
   adobe: C("Adobe", "svc:adobe", "mcp:adobe-for-creativity"),
   canva: C("Canva", "svc:canva"),
   x: C("X (Twitter)", "svc:x-twitter"),
@@ -54,7 +54,7 @@ const N = {
   postgres: C("Postgres", "svc:postgres"),
   rclone: C("rclone (Dropbox / Drive)", "svc:rclone"),
   last30: C("last30days", "svc:last30days", "skill:last30days"),
-  fbgroup: C("Facebook group archive", "svc:facebook-group-archive", "mcp:fb-group"),
+  fbgroup: C("Facebook group archive", "proj:fb-group-scraper", "svc:facebook-group-archive", "mcp:fb-group"),
   maigret: C("Maigret", "svc:maigret"),
   holehe: C("Holehe", "svc:holehe"),
   ghunt: C("GHunt", "svc:ghunt"),
@@ -74,6 +74,17 @@ const N = {
   onepass: C("1Password", "svc:1password"),
   reminders: C("Reminders", "svc:reminders"),
   notes: C("Apple Notes", "svc:notes"),
+  linear: C("Linear", "svc:linear"),
+  // Accounts (src/catalog.ts): a saved login in Chrome makes the browser-first ones ready for Claude in Chrome.
+  chrome: C("Chrome (Claude in Chrome)", "svc:chrome"),
+  shorts: C("YouTube, TikTok or Instagram", "svc:youtube-data-api", "acct:tiktok", "acct:instagram"),
+  xAcct: C("X account", "svc:x-twitter"),
+  mentions: C("last30days or a search API", "svc:last30days", "skill:last30days", "svc:brave-search", "svc:serper", "svc:perplexity", "svc:tavily", "acct:exa"),
+  forums: C("Reddit or Hacker News account", "acct:reddit", "acct:hacker-news"),
+  launch: C("Product Hunt, Hacker News or Reddit", "acct:product-hunt", "acct:hacker-news", "acct:reddit"),
+  newsletter: C("Substack, beehiiv, Buttondown or Kit", "acct:substack", "acct:beehiiv", "acct:buttondown", "acct:kit", "acct:mailchimp"),
+  scheduler: C("Buffer, Typefully or Hootsuite", "acct:buffer", "acct:typefully", "acct:hootsuite"),
+  social: C("Your social accounts", "svc:x-twitter", "acct:instagram", "acct:tiktok", "svc:youtube-data-api", "acct:facebook", "acct:linkedin", "acct:reddit", "acct:threads", "acct:bluesky", "acct:pinterest", "acct:medium", "acct:substack"),
 };
 
 const SAFE = "Ask me before anything public, paid, destructive, or that messages another person.";
@@ -82,7 +93,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "ship-and-show", cat: "cloud", title: "Ship and show",
     pitch: "Build, put a preview on Netlify or Vercel, share the dev build on your tailnet, and email yourself both links with screenshots.",
-    needs: [N.deploy, N.tailscale, N.email], optional: [N.github, N.playwright],
+    needs: [N.deploy, N.tailscale, N.email], optional: [N.github, N.playwright, C("Sentry or PostHog", "acct:sentry", "acct:posthog")],
     steps: ["Build and run the project's tests", "Deploy a preview (never production)", "Share the dev server on the tailnet with tailscale serve", "Screenshot the preview at 390×844 and 1400×900", "Draft an email to me with both links and the screenshots"],
     prompt: "Ship-and-show this project. 1) Build it and run its tests; stop and tell me if they fail. 2) Deploy a PREVIEW (not production) with whichever deploy target this repo is linked to. 3) Start the dev server if it isn't running and share it on the tailnet with `tailscale serve --bg --https=<port> http://localhost:<port>` (never funnel). 4) Take Playwright screenshots of the preview at 390×844 and 1400×900 and look at them. 5) Draft an email to me (don't send unless I say so) with the preview link, the tailnet link, what changed, and the screenshots attached. " + SAFE + "\n\n{connections}",
     agent: "claude",
@@ -90,7 +101,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "youtube-to-wiki", cat: "knowledge", title: "Channel → RAG → weekly wiki digest",
     pitch: "Pull a channel's new videos into the local RAG, ask it what changed this week, and file a cited digest page in the wiki.",
-    needs: [N.ytdlp, N.ytrag, N.wiki], optional: [N.ollama, C("YouTube Data API", "svc:youtube-data-api")],
+    needs: [N.ytdlp, N.ytrag, N.wiki], optional: [N.ollama, C("YouTube Data API", "svc:youtube-data-api"), C("Modal (cloud GPUs)", "acct:modal")],
     steps: ["Ask which channels (or reuse the ones already ingested)", "Ingest videos from the last 7 days with yt-transcriber", "Query the corpus for this week's themes, claims and disagreements", "Write synthesis/<channel>-weekly-{date}.md with [hh:mm:ss] quotes", "Update index.md and log.md per the wiki schema"],
     prompt: "Weekly YouTube digest into my wiki. Read ~/wiki/CLAUDE.md first and follow its schema. Ask me which channel(s) to cover, or list the channels already in the yt-transcriber RAG and suggest those. Use the yt-transcriber skill to ingest only videos from the last 7 days, then query the channel corpus for the week's main themes, new claims, and anything that contradicts what my wiki already says. Write `synthesis/<channel>-weekly-{date}.md` with a TLDR, 5–8 takeaways, notable quotes with [hh:mm:ss] timestamps and video links, and [[wikilinks]] into my projects where it connects (Human Design apps, AI video, agent orchestration). Update index.md and append log.md. Summarize; never paste transcripts wholesale.\n\n{connections}",
     folder: "~/wiki", agent: "claude",
@@ -106,7 +117,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "nightly-repo-report", cat: "code", title: "Nightly repo health",
     pitch: "Every repo's tests, uncommitted work, unpushed commits and stale branches in one report — then offer to make it a nightly job.",
-    needs: [N.git, N.github], optional: [N.herdr, N.telegram, N.jev],
+    needs: [N.git, N.github], optional: [N.herdr, N.telegram, N.jev, C("Sentry", "acct:sentry"), N.linear],
     steps: ["Walk every git repo under ~/Documents/Projects", "Uncommitted files, unpushed commits, stale branches, last activity", "Run each project's own test command (read-only, time-boxed)", "Rank what needs attention first", "Write the report; offer a launchd/systemd timer to repeat it"],
     prompt: "Make a repo health report for every git repository under ~/Documents/Projects (one level deep). For each: branch, uncommitted files, unpushed commits, stale local branches (>30 days), last commit date, and the result of the project's own test command (detect from package.json/Cargo/go.mod/pytest/Makefile; 3-minute cap each; never install dependencies or change files). Rank the repos by what needs me most (failing tests on active repos first, then uncommitted work older than 3 days). Save it as ~/Documents/Projects/REPO-HEALTH-{date}.md and summarize the top 5 here. If Jev is available, use `jev ask` to flag which items are low-stakes. Then offer (don't create) a nightly launchd/systemd timer that reruns this.\n\n{connections}",
     folder: "~/Documents/Projects", agent: "claude",
@@ -138,7 +149,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "daily-transit-short", cat: "media", title: "Today's transit → 20-second short",
     pitch: "Today's Human Design transit as a vertical short: script, ElevenLabs voice, HyperFrames render, captions in three languages.",
-    needs: [N.hyperframes, N.eleven, N.ffmpeg], optional: [N.postgres, N.higgsfield],
+    needs: [N.hyperframes, N.eleven, N.ffmpeg], optional: [N.postgres, N.higgsfield, C("fal or Replicate", "svc:fal", "svc:replicate"), C("Suno", "acct:suno")],
     steps: ["Compute today's Sun and Moon gates with my HD engine", "Write a 3-beat, 20-second script (hook, meaning, invitation)", "Voice it with ElevenLabs (say the credit cost first)", "Render 9:16 with HyperFrames; normalize audio with ffmpeg", "Captions in EN / HE / RU; save to the project, publish nothing"],
     prompt: "Make today's ({date}) Human Design transit short. Use my own HD engine (hd-core / astra-apple, or the hd_kb Postgres database if it's quicker) to get today's Sun and Moon gates and any channels they complete; don't invent gate meanings: pull them from my sources. Write a 20-second, 3-beat script (hook, what it means today, a small invitation). Tell me the ElevenLabs credit cost, then voice it. Load the hyperframes skill and render a 9:16 MP4 with the bodygraph as the hero visual; normalize loudness with ffmpeg. Write burned-in captions plus caption files in English, Hebrew and Russian. Save everything under a dated folder here. Publish nothing.\n\n{connections}",
     folder: "~/Documents/Projects/story-reel", agent: "claude",
@@ -146,7 +157,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "funnel-pulse", cat: "commerce", title: "2027 Prophecy funnel pulse",
     pitch: "Sales, community chatter and replies about the 2027 funnel in one weekly page, with three content ideas that answer real questions.",
-    needs: [N.gumroad, N.last30], optional: [N.fbgroup, N.gmail, N.wiki],
+    needs: [N.gumroad, N.last30], optional: [N.fbgroup, N.gmail, N.wiki, C("PostHog or Plausible", "acct:posthog", "acct:plausible")],
     steps: ["Load the astra-2027-ops skill", "Gumroad sales for the 2027 products, week over week", "last30days on '2027 human design' across Reddit, X and YouTube", "Hebrew FB group questions about 2027", "Weekly page in the wiki + three content ideas"],
     prompt: "Weekly 2027 Prophecy funnel pulse. Load the astra-2027-ops skill first. Pull Gumroad sales for the 2027 products (this week vs last), run last30days on '2027 human design prophecy' (Reddit, X, YouTube), and, if the Facebook group archive is available, search it for this week's 2027 questions (Hebrew is fine, summarize in English). Check Gmail for buyer replies. Write ~/wiki/synthesis/2027-funnel-pulse-{date}.md: numbers, what people are actually asking, objections, and three content ideas that answer a real question each (with the source link). Update the wiki index and log. Change nothing on the live site.\n\n{connections}",
     folder: "~/Documents/Projects/astra-apple", agent: "claude",
@@ -170,7 +181,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "community-pulse", cat: "research", title: "What the HD community is asking",
     pitch: "The Facebook group archive plus Reddit, X and YouTube chatter, turned into a ranked board of questions worth answering.",
-    needs: [N.fbgroup, N.last30], optional: [N.wiki, N.docs],
+    needs: [N.fbgroup, N.last30], optional: [N.wiki, N.docs, C("Apify", "svc:apify")],
     steps: ["Search the FB group archive for the last 30 days", "Run last30days on Human Design topics", "Cluster questions and pain points; count and quote", "Rank by demand × fit with my products", "File the board in the wiki"],
     prompt: "Build a 'what people are asking' board for Human Design. Use the fb-group MCP (recent_posts, semantic_search, top_authors) for the last 30 days of the Hebrew group, and last30days for Reddit (r/humandesign), X and YouTube. Cluster the questions and pain points, with counts and 1–2 short quotes each (link, no personal details). Rank clusters by demand and by fit with my products (HD Chat / Atlas, 2027 Prophecy, bodygraph apps). Write it to ~/wiki/synthesis/hd-community-questions-{date}.md with [[links]] to the relevant project pages; update index and log.\n\n{connections}",
     folder: "~/wiki", agent: "claude",
@@ -186,7 +197,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "model-bakeoff", cat: "ai", title: "Model bake-off",
     pitch: "One real task through Claude, Codex and a few OpenRouter models, scored with promptfoo, judged blind.",
-    needs: [N.claude, N.openrouter], optional: [N.codex, N.promptfoo, N.ollama, N.jev],
+    needs: [N.claude, N.openrouter], optional: [N.codex, N.promptfoo, N.ollama, N.jev, C("Groq", "svc:groq")],
     steps: ["Pick one real task and 5–10 test inputs", "Write a promptfoo config with the models", "Run and collect outputs, cost and latency", "Blind-judge (and ask Jev where it's a pick-one)", "Scorecard with a recommendation"],
     prompt: "Run a model bake-off on a real task. Ask me for the task (or suggest one from my current projects) and build 5–10 test inputs with expected qualities. Write a promptfoo config comparing Claude via the API, 2–3 OpenRouter models (one cheap, one strong, one open-weights) and a local Ollama model if present; add Codex as a separate run if it fits. Run it, collect outputs, cost and latency, then judge blind (strip model names). Where it's a pick-one judgment, ask Jev too. Give me a scorecard and a recommendation with the cost per 1,000 runs. Keep spend under $2 and tell me before anything bigger.\n\n{connections}",
     folder: "~/Documents/Projects", agent: "claude",
@@ -202,7 +213,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "one-hour-game", cat: "media", title: "A game in an hour",
     pitch: "A mobile-first Phaser prototype from one sentence, deployed as a preview and playable on your phone before lunch.",
-    needs: [N.netlify, N.tailscale], optional: [N.eleven, N.godot, N.playwright],
+    needs: [N.netlify, N.tailscale], optional: [N.eleven, N.godot, N.playwright, C("itch.io or CrazyGames", "acct:itch", "acct:crazygames"), C("Suno", "acct:suno")],
     steps: ["One-sentence pitch → core loop", "Scaffold with the mobile-web-game-studio skill", "Playable loop with placeholder art, then generated art", "Phone test over the tailnet", "Netlify preview deploy"],
     prompt: "Let's make a small mobile web game in about an hour. Load the mobile-web-game-studio skill. Ask me for a one-sentence pitch (or offer three that fit my world: Israeli comedy, Human Design, noir mystery). Build the core loop first with placeholder shapes, get it playable on my phone over the tailnet, then add generated art and, if ElevenLabs is set up, a few sound effects (tell me the credit cost). Playwright-check it at 390×844. Deploy a Netlify PREVIEW and give me both links.\n\n{connections}",
     folder: "~/Documents/Projects", agent: "claude",
@@ -258,7 +269,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "market-brief-doc", cat: "research", title: "One-page market brief",
     pitch: "What's being said about a topic in the last 30 days plus fresh search results, as a shareable one-page doc.",
-    needs: [N.last30], optional: [N.search, N.docs],
+    needs: [N.last30], optional: [N.search, N.docs, C("Exa", "acct:exa")],
     steps: ["Take the topic", "last30days across Reddit, X, YouTube, HN", "Web search for the latest facts and numbers", "One page: what's true, what's hype, what to do", "Publish to Claude Docs or Google Drive if I want"],
     prompt: "Write a one-page market brief on a topic I'll give you. Run last30days on it, then use web search (Brave or Serper if set up) for the latest facts and numbers. One page: the three things that are actually happening, what's hype, who's winning and why, and what I should do this week given my projects (read ~/wiki/index.md for context). Cite every claim with a link. Save it as markdown here; if Claude Docs or Google Drive is connected, offer to publish it there.\n\n{connections}",
     folder: "~/wiki", agent: "claude",
@@ -290,7 +301,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "calendar-focus-plan", cat: "comms", title: "Calendar-aware focus plan",
     pitch: "Today's meetings plus every agent that's waiting on you, turned into time blocks you can accept in one go.",
-    needs: [N.calendar], optional: [N.deckMcp, N.reminders],
+    needs: [N.calendar], optional: [N.deckMcp, N.reminders, C("Cal.com or Calendly", "acct:cal-com", "acct:calendly")],
     steps: ["Today's events", "Sessions waiting on me (deck MCP)", "Estimate each decision's time", "Propose time blocks around meetings", "Create holds only after I accept"],
     prompt: "Plan my day ({date}). Read today's calendar. From the herdr deck MCP, list sessions that need me (waiting, finished unseen, failing checks) and estimate how long each decision takes. Propose a time-blocked plan around my meetings: short decisions batched, one deep-work block, a buffer. Show it as a simple timeline. Create calendar holds (or Reminders) only for the blocks I accept.\n\n{connections}",
     folder: "~", agent: "claude",
@@ -306,7 +317,7 @@ export const RECIPES: Recipe[] = [
   {
     id: "hd-report-product", cat: "commerce", title: "HD report → Gumroad draft",
     pitch: "A Human Design report rendered to a designed PDF and set up as an unpublished Gumroad product with a launch offer code.",
-    needs: [N.pandoc, N.gumroad], optional: [N.adobe],
+    needs: [N.pandoc, N.gumroad], optional: [N.adobe, C("Stripe or Lemon Squeezy", "svc:stripe", "svc:lemon-squeezy")],
     steps: ["Pick the report source (markdown or chart output)", "Render a designed PDF (Pandoc / nano-pdf)", "Polish the cover with Adobe", "Create the Gumroad product as a draft", "Make a launch offer code, disabled until I say"],
     prompt: "Package a Human Design report as a product. Ask me for the source (a markdown report or chart output from my HD engine). Render it to a clean, designed PDF with Pandoc (nano-pdf for fixes), a cover page and a table of contents; polish the cover with Adobe if connected. Show me the PDF. Then create the product on Gumroad as a DRAFT (not published), with title, description in my voice, price I confirm, and a launch offer code. Publish nothing and enable nothing until I say so.\n\n{connections}",
     folder: "~/Documents/Projects/astra-apple", agent: "claude",
@@ -314,10 +325,59 @@ export const RECIPES: Recipe[] = [
   {
     id: "storyboard-to-shots", cat: "media", title: "Storyboard → generated shots, on a budget",
     pitch: "An approved storyboard turned into Higgsfield shots with a hard credit budget, then cut together with ffmpeg.",
-    needs: [N.higgsfield], optional: [N.ffmpeg, N.eleven],
+    needs: [N.higgsfield], optional: [N.ffmpeg, N.eleven, C("fal, Kling, Runway or Luma", "svc:fal", "acct:kling", "svc:runway", "acct:luma")],
     steps: ["Read the storyboard", "Estimate credits per shot; agree a budget", "Generate one test shot, review", "Generate the rest within budget", "Assemble a rough cut"],
     prompt: "Turn my storyboard into shots with Higgsfield. Ask me for the storyboard file. For each shot, write the generation prompt and estimate its credit cost, and show me the total; don't generate anything until I set a budget. Generate ONE test shot first and wait for my review. Then generate the rest, stopping if the budget would be exceeded (remember plan credits and API balance are separate). Assemble a rough cut with ffmpeg (and ElevenLabs VO if I ask). Keep a ledger of every generation and its cost.\n\n{connections}",
     agent: "claude",
+  },
+  // ── social and sites (accounts) ──
+  {
+    id: "cross-post-short", cat: "social", title: "Cross-post a short everywhere",
+    pitch: "One rendered 9:16 short, trimmed and captioned per platform, uploaded as private drafts to YouTube, TikTok and Instagram for you to publish.",
+    needs: [N.shorts, N.chrome], optional: [N.hyperframes, N.ffmpeg, N.scheduler],
+    steps: ["Pick the MP4 (newest HyperFrames render, or ask)", "Make platform versions with ffmpeg: length, loudness, safe zones", "Title, description and hashtags per platform in EN / HE / RU", "Upload as private or draft: official API where it's set up, otherwise Claude in Chrome", "Stop before Publish; give me the links"],
+    prompt: "Cross-post a short. Ask me which MP4 (or take the newest 9:16 render under ~/Documents/Projects/story-reel or a HyperFrames project). With ffmpeg, make platform versions: YouTube Shorts (under 60 s), TikTok and Instagram Reels (9:16, -14 LUFS, captions clear of the bottom 20%). Write a title, description and hashtags for each platform in my voice, in English, Hebrew and Russian, and show them to me. Then upload each one as PRIVATE / DRAFT: use the official API where this machine has it set up (YouTube Data API with OAuth), otherwise use Claude in Chrome in my signed-in Chrome (check my Accounts in the connections below). Stop before the final Publish or Post button on every platform and give me the draft links. Never publish, never change account settings. " + SAFE + "\n\n{connections}",
+    folder: "~/Documents/Projects/story-reel", agent: "claude",
+  },
+  {
+    id: "prophecy-mentions", cat: "social", title: "Who's talking about the 2027 prophecy",
+    pitch: "Reddit and Hacker News mentions of the 2027 prophecy and 2027prophecy.com this week, sorted into questions, critiques and chances to help, with reply drafts.",
+    needs: [N.mentions], optional: [N.forums, N.gumroad, N.wiki, C("Apify", "svc:apify")],
+    steps: ["Search Reddit (public JSON / RSS) and HN (Algolia API) for the last 7 days", "Also run last30days on '2027 human design prophecy'", "Sort: questions, critiques, mentions of my site, opportunities", "Draft helpful replies (no links unless asked for)", "File a wiki page; post nothing"],
+    prompt: "Find this week's mentions of the 2027 prophecy. Search Reddit (the public .json or .rss search endpoints; r/humandesign first) and Hacker News (hn.algolia.com/api/v1/search_by_date) for '2027 prophecy', 'human design 2027', '2027prophecy' and '2027prophecy.com' over the last 7 days; add last30days if it's set up. For each hit: link, community, date, one-line summary, and whether it's a question, critique, mention of my site, or a chance to help. Draft short, genuinely helpful replies for the best five (no self-promotion, no links unless someone asks, respect each subreddit's rules). If Gumroad is connected, note whether sales moved on days with mentions. Write ~/wiki/synthesis/2027-mentions-{date}.md and update the wiki index and log. Post nothing, vote nothing.\n\n{connections}",
+    folder: "~/wiki", agent: "claude",
+  },
+  {
+    id: "weekly-x-thread", cat: "social", title: "Weekly X thread from the wiki",
+    pitch: "What changed in your wiki this week, turned into one honest 5–7 post thread, saved as a draft for you to post.",
+    needs: [N.wiki, N.xAcct], optional: [N.scheduler, N.chrome],
+    steps: ["Read the last 7 days of ~/wiki/log.md", "Pick the one story worth telling", "Write a 5–7 post thread in my voice, with one image idea", "Save it as a draft (Typefully/Buffer if set up) or show it", "Post only when I say so"],
+    prompt: "Write this week's X thread from my wiki. Read ~/wiki/log.md for the last 7 days and the pages it touches; pick the ONE story most worth telling (a shipped project, a finding, a lesson), not a changelog. Write a 5–7 post thread in my voice: concrete, curious, no hype, no hashtags spam, first post works on its own. Suggest one image or screenshot per thread. Check nothing private leaks (people, money, health, unreleased client work). If Typefully or Buffer is set up, save it there as a draft; otherwise show it to me. If I say post, use the X API if set up, otherwise Claude in Chrome on x.com. " + SAFE + "\n\n{connections}",
+    folder: "~/wiki", agent: "claude",
+  },
+  {
+    id: "profile-consistency", cat: "social", title: "Make my profiles consistent",
+    pitch: "Every social profile you have, read from its public page and compared: name, bio, avatar and links, with one consistent set proposed.",
+    needs: [N.social, N.chrome], optional: [N.wiki],
+    steps: ["List my accounts and handles from the connections", "Read each public profile page", "Table: name, bio, link, avatar, last post", "Propose one bio per platform and where links should point", "Change nothing; I'll apply what I like"],
+    prompt: "Audit my social profiles for consistency. Take the accounts and handles in the connections below (ask me for any handle that's missing). Open each PUBLIC profile page in Chrome (read only): note display name, bio, link(s), avatar, pinned post and the date of the last post. Put it in one table. Then propose a consistent set: one bio per platform within its length limit (EN, plus HE/RU where the audience is), which link each should point to (2027prophecy.com, my site, or a link page), and which accounts look abandoned. Read ~/wiki/index.md for what I'm working on. Change nothing on any account.\n\n{connections}",
+    folder: "~", agent: "claude",
+  },
+  {
+    id: "launch-kit", cat: "social", title: "Launch kit: Product Hunt, Show HN, Reddit",
+    pitch: "For the project you're in: a Show HN post, a Product Hunt listing, subreddit posts that follow the rules, and screenshots — ready, not posted.",
+    needs: [N.launch], optional: [N.xAcct, N.playwright, N.chrome],
+    steps: ["Read the project's README and what's new", "Show HN title and first comment by HN's guidelines", "Product Hunt tagline, description, gallery list, maker comment", "Two or three subreddits whose rules allow it, with posts", "Screenshots with Playwright; submit nothing"],
+    prompt: "Prepare a launch kit for this project. Read its README and recent commits. Write: 1) a Show HN title and first comment that follow HN's Show HN guidelines (plain, no marketing words); 2) a Product Hunt listing: tagline under 60 characters, description, 4–6 gallery shots to capture, the maker's first comment; 3) two or three subreddits where self-posts like this are allowed (check each one's rules and quote the relevant rule), with a post for each; 4) an X post if an X account is connected. Take the gallery screenshots with Playwright at 1270×760 and 390×844 and look at them. Save everything to LAUNCH.md in the repo. Submit, post or schedule nothing.\n\n{connections}",
+    agent: "claude",
+  },
+  {
+    id: "newsletter-from-wiki", cat: "social", title: "Newsletter issue from the wiki",
+    pitch: "A short weekly newsletter drafted from your wiki and blog, saved as a draft on Substack, beehiiv, Buttondown or Kit.",
+    needs: [N.wiki, N.newsletter], optional: [N.chrome],
+    steps: ["Read the week's wiki log and any new blog posts", "Pick three items readers would care about", "Write the issue: subject, preview text, body", "Save as a draft on the newsletter platform", "Send nothing"],
+    prompt: "Draft this week's newsletter issue. Read ~/wiki/log.md (last 7 days) and any new posts in my blogs (hd2027-blog, stasmaksin). Pick three things a reader would care about and write the issue: subject line, preview text, and a body of under 400 words with one clear call to action (2027prophecy.com where it fits). Keep private things out (people, money, clients). Save it as a DRAFT on the newsletter platform I have (API if set up, otherwise Claude in Chrome), and show it to me. Never send or schedule.\n\n{connections}",
+    folder: "~/wiki", agent: "claude",
   },
 ];
 
@@ -329,7 +389,8 @@ export type Readiness = { state: "ready" | "almost" | "missing"; needs: NeedChec
 function check(need: Need, items: Item[]): NeedCheck {
   let best: NeedCheck = { label: need.label, state: "missing" };
   for (const pat of need.any) {
-    const hits = pat.endsWith("*") ? items.filter((i) => i.id.startsWith(pat.slice(0, -1))) : items.filter((i) => i.id === pat);
+    // A card also answers for the ids it replaced (a project card for its MCP server and service card).
+    const hits = pat.endsWith("*") ? items.filter((i) => i.id.startsWith(pat.slice(0, -1)) || i.aliases?.some((a) => a.startsWith(pat.slice(0, -1)))) : items.filter((i) => i.id === pat || i.aliases?.includes(pat));
     for (const i of hits) {
       const st = stateOf(i);
       const s: NeedState = st === "ready" ? "ready" : st === "off" ? "missing" : "partial";
