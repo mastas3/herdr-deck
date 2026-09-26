@@ -19,6 +19,8 @@ import type { Detail, Msg } from "./transcript";
 import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
+import { PushStore, endpointOk, type Message } from "./push";
+import { Automations } from "./automations";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -29,6 +31,9 @@ const GRAVE_FILE = `${DATA_DIR}/graveyard.json`;
 const HTML_PATH = new URL("../public/index.html", import.meta.url).pathname;
 
 mkdirSync(DATA_DIR, { recursive: true });
+// Push keys, subscribed devices and automation rules (DECK_PUSH_DIR moves them, e.g. for a test instance).
+const PUSH_DIR = process.env.DECK_PUSH_DIR ?? DATA_DIR;
+mkdirSync(PUSH_DIR, { recursive: true });
 
 // Nodes authenticate hub requests with this token. Only someone who can already log in to this
 // machine (the hub reads it over SSH) can obtain it.
@@ -72,11 +77,22 @@ const saveGraves = () => writeFileSync(GRAVE_FILE, JSON.stringify(graveyard.slic
 const deck = new Deck();
 await deck.start();
 
+// ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
+const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
+let hubSeenAt = 0;
+const isNode = () => process.env.DECK_ROLE === "node" || (process.env.DECK_ROLE !== "hub" && remotes.size === 0 && Date.now() - hubSeenAt < 15 * 60_000);
+/** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
+const presence = new Map<string, { key: string | null; at: number }>();
+const viewing = (key: string) => [...presence.values()].some((p) => p.key === key && Date.now() - p.at < 70_000);
+let auto: Automations | undefined;
+/** Test-only rows (DECK_DEV): exercise alerts, the digest and the empty-session card without touching real sessions. */
+const fakeRows = new Map<string, Row>();
+
 const remotes = new Map<string, RemoteHost>();
 function addRemote(conf: RemoteConf) {
   if (!conf?.id || !conf.ssh || conf.id === SELF.id || remotes.has(conf.id)) return;
   const host = new RemoteHost(conf, {
-    patch: (upsert, remove) => { broadcast("patch", { upsert, remove, summary: summary() }); scheduleDecisions(); },
+    patch: (upsert, remove) => { broadcast("patch", { upsert, remove, summary: summary() }); scheduleDecisions(); auto?.observe(); },
     full: () => broadcast("full", fullState()),
     graveyard: () => broadcast("graveyard", allGraves()),
     notice: (n) => broadcast("notice", n),
@@ -110,6 +126,7 @@ function summary() {
 function allRows() {
   const out = [...deck.rows.values()].map(tagLocal);
   for (const h of remotes.values()) out.push(...h.rows.values());
+  if (fakeRows.size) out.push(...fakeRows.values());
   return out;
 }
 function allGraves() {
@@ -128,6 +145,7 @@ function fullState() {
   return {
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
     tools: loadTools(), toolGroups: GROUPS, queue: queues, usage: currentUsage, history: historyStats(), decisions: [...decisions.values()], jev: jevUsage(), canShare: canShare(),
+    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() },
   };
 }
 
@@ -136,7 +154,7 @@ function broadcast(event: string, data: unknown) {
   for (const c of clients) try { c.enqueue(chunk); } catch { clients.delete(c); }
 }
 
-deck.onPatch((patch) => broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }));
+deck.onPatch((patch) => { broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }); auto?.observe(); });
 // ── history, usage, sharing, proof of done, decisions ─────────────────────
 startHistory({ changed: () => broadcast("history", historyStats()) });
 setInterval(() => broadcast("history", historyStats()), 5_000);
@@ -156,10 +174,15 @@ setInterval(refreshShared, 15_000);
 
 // A finished session that claims it's done gets its project's checks re-run (once you've approved them).
 for (const row of deck.rows.values()) { const r = row.projectRoot && resultFor(row.projectRoot); if (r) deck.checks.set(row.projectRoot!, r); }
-onCheck((root, r) => { deck.checks.set(root, r); deck.refresh(); });
+onCheck((root, r) => {
+  deck.checks.set(root, r);
+  deck.refresh();
+  if (["pass", "fail", "error"].includes(r.state)) auto?.record("proof", `${root.split("/").pop()}: ${r.state === "pass" ? "checks passed" : r.state === "fail" ? `checks failed (exit ${r.exit})` : `couldn’t run (${r.reason ?? "error"})`} · ${r.cmd ?? ""}`, r.state === "pass");
+});
 const claimSeen = new Map<string, number>();
 async function maybeVerify(row: Row) {
   if (row.app || !row.projectRoot || row.status !== "done" || row.seen || !row.sessionId) return;
+  if (auto && !auto.rules.proof.on) return; // Settings → Automations → Proof of done
   if (claimSeen.get(row.key) === row.lastActiveAt) return;
   claimSeen.set(row.key, row.lastActiveAt ?? 0);
   const d = await detailFor(row).catch(() => undefined);
@@ -744,6 +767,7 @@ async function saveUpload(req: Request, name: string) {
  * the hub writes them with its own local model from the node's conversation detail.
  */
 async function forwardToMachine(path: string, body: any): Promise<Response | undefined> {
+  if (path.startsWith("/api/push/") || path === "/api/automations" || path.startsWith("/api/dev/")) return;
   if (path === "/api/queue" || path === "/api/machines" || path === "/api/decide" || path === "/api/tool" || path === "/api/history" || path === "/api/connections" || path === "/api/suggest-projects" || path === "/api/mcp-info") return;
   const proxy = async (remote: RemoteHost, payload: unknown) => {
     const r = await remote.post(path, payload);
@@ -891,7 +915,7 @@ if (!tsUsers.size) {
 const hasApiToken = (req: Request) => req.headers.get("authorization") === `Bearer ${API_TOKEN}`;
 
 function allowedHost(req: Request) {
-  if (hasApiToken(req)) return true;
+  if (hasApiToken(req)) { hubSeenAt = Date.now(); return true; }
   const host = req.headers.get("host") ?? "";
   if (host === `127.0.0.1:${PORT}` || host === `localhost:${PORT}`) return true;
   // A cross-site page can't add this header without a CORS preflight, which is never answered.
@@ -984,6 +1008,7 @@ async function handle(req: Request): Promise<Response> {
         if (!f || !(await f.exists())) return new Response("not found", { status: 404 });
         return new Response(f, { headers: { "cache-control": "private, max-age=300" } });
       }
+      if (url.pathname === "/api/push/key") return json({ key: push.vapid.publicKey, node: isNode() });
       if (url.pathname === "/health") return json({ ok: true, clients: clients.size, ...deck.health(), machines: machines().map(({ herdr, ...m }) => m) });
       return new Response("not found", { status: 404 });
     }
@@ -1017,6 +1042,55 @@ async function handle(req: Request): Promise<Response> {
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
+        case "/api/push/key":
+          return json({ key: push.vapid.publicKey, node: isNode(), devices: push.list() });
+        case "/api/push/subscribe": {
+          if (isNode()) return json({ error: "This machine is a node: its sessions already reach you through the hub. Turn notifications on in the hub’s deck." }, 409);
+          const sub = body.subscription ?? {};
+          const id = String(body.id ?? "").replace(/[^\w-]/g, "").slice(0, 64);
+          if (!id) return json({ error: "missing device id" }, 400);
+          if (!endpointOk(String(sub.endpoint ?? ""), DEV)) return json({ error: "That isn’t a push service address" }, 400);
+          if (!sub.keys?.p256dh || !sub.keys?.auth) return json({ error: "The subscription has no encryption keys" }, 400);
+          const dev = push.upsert({ id, endpoint: String(sub.endpoint), keys: sub.keys, label: body.label, prefs: body.prefs });
+          return json({ ok: true, device: push.list().find((d) => d.id === dev.id), devices: push.list() });
+        }
+        case "/api/push/unsubscribe":
+          push.remove({ id: body.id ? String(body.id) : undefined, endpoint: body.endpoint ? String(body.endpoint) : undefined });
+          return json({ ok: true, devices: push.list() });
+        case "/api/push/test": {
+          const dev = push.devices.find((d) => d.id === String(body.id ?? ""));
+          if (!dev) return json({ error: "This device isn’t subscribed" }, 404);
+          const m: Message = { kind: "test", title: "herdr deck", body: `Push works on “${dev.label}”. ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, tag: "test", url: body.url ? String(body.url).slice(0, 300) : "/" };
+          const r = await push.deliver(m, { only: dev.id, ttl: 600, urgency: "high" });
+          const res = r.results[0];
+          return json({ ok: !!res?.ok, error: res?.error, dropped: r.dropped, devices: push.list() }, res?.ok ? 200 : 502);
+        }
+        case "/api/push/presence": {
+          const page = String(body.page ?? "").slice(0, 64);
+          if (!page) return json({ ok: false }, 400);
+          if (body.visible === false || !body.key) presence.set(page, { key: null, at: Date.now() });
+          else presence.set(page, { key: String(body.key), at: Date.now() });
+          for (const [k, v] of presence) if (Date.now() - v.at > 10 * 60_000) presence.delete(k);
+          return json({ ok: true });
+        }
+        case "/api/automations": {
+          if (!auto) return json({ error: "starting up" }, 503);
+          if (body.op === "set") auto.setRules(body.rules ?? {});
+          else if (body.op === "digest") await auto.runDigest(!!body.push);
+          else if (body.op === "dismiss-digest") auto.dismissDigest();
+          else if (body.op === "tick") await auto.tick();
+          return json({ ...auto.publicState(), node: isNode(), devices: push.list() });
+        }
+        case "/api/dev/fake-rows": {
+          // DECK_DEV only: rows that exist nowhere but here, so the automations can be driven end to end.
+          if (!DEV) return json({ error: "dev only" }, 403);
+          const remove = [...fakeRows.keys()];
+          if (body.clear) fakeRows.clear();
+          for (const r of body.rows ?? []) fakeRows.set(String(r.key), { machine: "fake", herdr: "fake", workspaceId: "fake", workspace: "Fake", tabId: String(r.key), tab: "", tabNumber: 0, tabPanes: 1, paneId: String(r.key), agent: "claude", status: "idle", focused: false, title: "fake", cwd: "/tmp", project: "fake", rssKB: 0, cpu: 0, procs: 0, tail: [], empty: false, stale: false, duplicate: false, approx: false, ...r } as Row);
+          broadcast("patch", { upsert: [...fakeRows.values()], remove: remove.filter((k) => !fakeRows.has(k)), summary: summary() });
+          auto?.observe();
+          return json({ ok: true, rows: fakeRows.size });
+        }
         case "/api/history": {
           if (body.local) {
             const live = new Set([...deck.rows.values()].map((r) => r.sessionId).filter(Boolean) as string[]);
@@ -1386,6 +1460,16 @@ for (let attempt = 0; ; attempt++) {
   }
 }
 for (const h of remotes.values()) h.start();
+auto = new Automations({
+  file: `${PUSH_DIR}/automations.json`,
+  rows: allRows,
+  deliver: (m, o) => push.deliver(m, o),
+  changed: () => broadcast("auto", auto!.publicState()),
+  viewing,
+  ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => decisions.get(key)?.question }),
+  canSend: () => !isNode(),
+});
+auto.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 
