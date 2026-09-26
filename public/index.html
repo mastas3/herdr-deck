@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>herdr deck</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='6' rx='1' fill='%23f0b429'/%3E%3Crect x='3' y='13' width='26' height='6' rx='1' fill='%237aa89a'/%3E%3Crect x='3' y='21' width='26' height='6' rx='1' fill='%235ab0ff'/%3E%3C/svg%3E">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#151d26">
+<link rel="preload" href="/fonts/BarlowSemiCondensed-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/BarlowSemiCondensed-600.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/BarlowSemiCondensed-400.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 500; font-display: swap; src: url(/fonts/BarlowSemiCondensed-500.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 600; font-display: swap; src: url(/fonts/BarlowSemiCondensed-600.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Barlow Semi Condensed'; font-style: normal; font-weight: 700; font-display: swap; src: url(/fonts/BarlowSemiCondensed-700.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url(/fonts/JetBrainsMono-400.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 600; font-display: swap; src: url(/fonts/JetBrainsMono-600.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+:root {
+  --board: #1c2631;
+  --rail: #151d26;
+  --strip: #26323f;
+  --strip-hi: #2e3b4a;
+  --line: #3a4757;
+  --ink: #e8eef4;
+  --ink-2: #a9b6c4;
+  --ink-3: #7a8a9c;
+  --focus: #9cc7ff;
+  --working: #f0b429;
+  --blocked: #ff5a5f;
+  --done: #5ab0ff;
+  --idle: #7aa89a;
+  --empty: #56657a;
+  --unknown: #8d7fd1;
+  --danger: #ff5a5f;
+  --danger-ink: #fff;
+  --term-bg: #0f151c;
+  --term-ink: #d5dde6;
+  --k-claude: #e7a17d; --k-codex: #8fd0b6; --k-opencode: #b9a6ff;
+  --sans: "Barlow Semi Condensed", "Avenir Next Condensed", "Arial Narrow", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --board: #d7dee6; --rail: #c6cfd9; --strip: #fbfcfd; --strip-hi: #eef3f8; --line: #b9c4d0;
+    --ink: #16202a; --ink-2: #435365; --ink-3: #66778a; --focus: #1f6fd1;
+    --working: #c98a00; --blocked: #d62f35; --done: #1f7ad6; --idle: #3f8a73; --empty: #8795a6; --unknown: #6a5bc0;
+    --term-bg: #121a22; --term-ink: #d5dde6;
+    --k-claude: #a2522b; --k-codex: #1f7358; --k-opencode: #5a45b8;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --board: #d7dee6; --rail: #c6cfd9; --strip: #fbfcfd; --strip-hi: #eef3f8; --line: #b9c4d0;
+  --ink: #16202a; --ink-2: #435365; --ink-3: #66778a; --focus: #1f6fd1;
+  --working: #c98a00; --blocked: #d62f35; --done: #1f7ad6; --idle: #3f8a73; --empty: #8795a6; --unknown: #6a5bc0;
+  --k-claude: #a2522b; --k-codex: #1f7358; --k-opencode: #5a45b8;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--board); color: var(--ink); font: 15px/1.35 var(--sans); overflow: hidden; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.mono { font-family: var(--mono); }
+
+/* ── top rail ─────────────────────────────────────────────────── */
+.rail { background: var(--rail); border-bottom: 1px solid var(--line); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 20px; letter-spacing: .01em; }
+.brand svg { width: 22px; height: 22px; }
+.conn { width: 8px; height: 8px; border-radius: 50%; background: var(--idle); }
+.conn.off { background: var(--blocked); animation: blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity: .2; } }
+.search { flex: 1 1 280px; position: relative; }
+.search input { width: 100%; background: var(--strip); border: 1px solid var(--line); border-radius: 6px; padding: 7px 34px 7px 10px; font-size: 15px; }
+.search kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+kbd { font: 11px var(--mono); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--ink-3); background: var(--board); }
+.counts { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 10px; font-size: 14px; color: var(--ink-2); white-space: nowrap; }
+.chip b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--strip-hi); color: var(--ink); border-color: var(--ink-3); }
+.chip .dot { width: 9px; height: 9px; border-radius: 2px; }
+.rail-stat { color: var(--ink-3); font-size: 14px; white-space: nowrap; }
+.rail-stat b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.bar2 { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 8px 16px; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+.bar2 label { display: inline-flex; gap: 6px; align-items: center; }
+.bar2 select { background: var(--strip); border: 1px solid var(--line); border-radius: 5px; padding: 3px 6px; }
+.spacer { flex: 1; }
+.linkbtn { background: none; border: none; color: var(--ink-2); padding: 3px 4px; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line); }
+.linkbtn:hover { color: var(--ink); text-decoration-color: currentColor; }
+
+/* ── layout ───────────────────────────────────────────────────── */
+.main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 44%); height: calc(100% - var(--top, 110px)); }
+.main.nopeek { grid-template-columns: minmax(0, 1fr) 0; }
+.board { overflow-y: auto; padding: 10px 12px 90px 16px; }
+.peek { border-left: 1px solid var(--line); background: var(--rail); overflow: hidden; display: flex; flex-direction: column; min-width: 0; }
+.nopeek .peek { display: none; }
+
+/* ── strips ───────────────────────────────────────────────────── */
+.group-h { margin: 14px 0 6px; font-weight: 600; font-size: 14px; color: var(--ink-3); display: flex; gap: 8px; align-items: baseline; }
+.group-h:first-child { margin-top: 2px; }
+.group-h span { font-weight: 400; }
+.strip {
+  --band: var(--idle);
+  position: relative; display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 118px 92px 64px;
+  gap: 2px 12px; align-items: start;
+  background: var(--strip); border: 1px solid var(--line); border-left: 7px solid var(--band);
+  border-radius: 3px 6px 6px 3px; padding: 7px 10px 7px 8px; margin-bottom: 5px; cursor: pointer;
+}
+.strip:hover { background: var(--strip-hi); }
+.strip.sel-peek { box-shadow: inset 0 0 0 1px var(--focus); background: var(--strip-hi); }
+.strip.cursor { outline: 2px solid var(--focus); outline-offset: 1px; }
+.strip[data-status="working"] { --band: var(--working); }
+.strip[data-status="blocked"] { --band: var(--blocked); }
+.strip[data-status="done"] { --band: var(--done); }
+.strip[data-status="empty"] { --band: var(--empty); border-left-style: dashed; }
+.strip[data-status="unknown"] { --band: var(--unknown); }
+.strip.stale:not(.sel-peek) > :not(.chk) { opacity: .66; }
+.strip[data-status="working"] { background-image: linear-gradient(90deg, color-mix(in srgb, var(--working) 9%, transparent), transparent 40%); }
+.strip[data-status="blocked"] { background-image: linear-gradient(90deg, color-mix(in srgb, var(--blocked) 14%, transparent), transparent 50%); }
+.chk { width: 16px; height: 16px; margin: 3px 0 0; accent-color: var(--focus); }
+.t1 { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.title { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.kind { flex: none; font: 600 11px var(--mono); padding: 1px 5px; border-radius: 3px; background: var(--board); color: var(--ink-2); border: 1px solid var(--line); }
+.kind[data-k="claude"] { color: var(--k-claude); }
+.kind[data-k="codex"] { color: var(--k-codex); }
+.kind[data-k="opencode"] { color: var(--k-opencode); }
+.tag { flex: none; font-size: 12px; font-weight: 600; padding: 0 6px; border-radius: 3px; border: 1px solid currentColor; }
+.tag.stale { color: var(--ink-3); }
+.tag.dup { color: var(--working); }
+.tag.empty { color: var(--empty); }
+.tag.blocked { color: var(--blocked); }
+.tag.hot { color: var(--blocked); }
+.t2 { font-size: 13.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t2 .proj { color: var(--ink-2); font-weight: 500; }
+.t2 .dirty { color: var(--working); }
+.tail { grid-column: 2 / -1; font: 12px/1.45 var(--mono); color: var(--ink-2); white-space: pre; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.tail div { overflow: hidden; text-overflow: ellipsis; }
+.when, .res { font-size: 13.5px; color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; line-height: 1.3; }
+.when b, .res b { color: var(--ink); font-weight: 600; }
+.acts { display: flex; gap: 4px; justify-content: flex-end; }
+.icon { width: 28px; height: 26px; border-radius: 5px; border: 1px solid var(--line); background: var(--board); color: var(--ink-2); display: grid; place-items: center; padding: 0; }
+.icon:hover { color: var(--ink); border-color: var(--ink-3); }
+.icon.x:hover { color: var(--danger-ink); background: var(--danger); border-color: var(--danger); }
+.icon svg { width: 15px; height: 15px; }
+.empty-state { padding: 60px 20px; text-align: center; color: var(--ink-3); }
+
+/* ── peek ─────────────────────────────────────────────────────── */
+.peek-h { padding: 12px 14px 8px; border-bottom: 1px solid var(--line); }
+.peek-h h2 { margin: 0 0 4px; font-size: 19px; line-height: 1.2; font-weight: 600; }
+.peek-h .sub { color: var(--ink-3); font-size: 14px; }
+.peek-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.btn { border: 1px solid var(--line); background: var(--strip); border-radius: 6px; padding: 4px 10px; font-size: 14px; color: var(--ink); }
+.btn:hover { border-color: var(--ink-3); background: var(--strip-hi); }
+.btn.danger { background: var(--danger); border-color: var(--danger); color: var(--danger-ink); font-weight: 600; }
+.btn.danger:hover { filter: brightness(1.08); }
+.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; padding: 8px 14px; font-size: 13.5px; border-bottom: 1px solid var(--line); max-height: 34%; overflow: auto; }
+.facts dt { color: var(--ink-3); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts dd.mono { font-size: 12px; }
+.copy { background: none; border: none; color: var(--ink-3); padding: 0 0 0 6px; font-size: 12px; text-decoration: underline; text-underline-offset: 2px; }
+.copy:hover { color: var(--ink); }
+.term { flex: 1; min-height: 120px; background: var(--term-bg); color: var(--term-ink); font: 12px/1.4 var(--mono); padding: 8px 10px; overflow: auto; white-space: pre; margin: 0; }
+.keys { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 10px; border-top: 1px solid var(--line); align-items: center; }
+.keys .lbl { color: var(--ink-3); font-size: 13px; margin-right: 4px; }
+.keys button { font: 12px var(--mono); padding: 2px 7px; border-radius: 4px; border: 1px solid var(--line); background: var(--strip); }
+.keys button:hover { border-color: var(--ink-3); }
+.send { display: flex; gap: 6px; padding: 8px 10px 10px; }
+.send textarea { flex: 1; resize: none; height: 38px; background: var(--strip); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 14px; }
+.peek-empty { margin: auto; color: var(--ink-3); padding: 20px; text-align: center; max-width: 34ch; }
+
+/* ── bulk bar & modals ────────────────────────────────────────── */
+.bulk { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); background: var(--rail); border: 1px solid var(--ink-3); border-radius: 10px; padding: 8px 10px 8px 16px; display: flex; gap: 12px; align-items: center; box-shadow: 0 10px 30px rgba(0,0,0,.35); z-index: 5; font-size: 15px; }
+.bulk[hidden] { display: none; }
+dialog { background: var(--rail); color: var(--ink); border: 1px solid var(--ink-3); border-radius: 10px; padding: 0; width: min(620px, calc(100vw - 32px)); box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+dialog::backdrop { background: rgba(8, 12, 18, .55); }
+.dlg-b { padding: 16px 18px; }
+.dlg-b h3 { margin: 0 0 6px; font-size: 20px; }
+.dlg-b p { margin: 6px 0; color: var(--ink-2); }
+.warn { color: var(--working); font-weight: 600; }
+.dlg-list { max-height: 45vh; overflow: auto; margin: 10px 0; border: 1px solid var(--line); border-radius: 6px; }
+.dlg-list div { padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 14px; display: flex; gap: 8px; align-items: baseline; }
+.dlg-list div:last-child { border-bottom: none; }
+.dlg-list .st { width: 9px; height: 9px; flex: none; border-radius: 2px; }
+.dlg-list .meta { margin-left: auto; color: var(--ink-3); white-space: nowrap; font-size: 13px; }
+.dlg-f { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.dlg-opt { display: flex; gap: 8px; align-items: center; color: var(--ink-2); font-size: 14px; }
+
+/* ── closed view ──────────────────────────────────────────────── */
+.grave { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; background: var(--strip); border: 1px solid var(--line); border-left: 7px solid var(--empty); border-radius: 3px 6px 6px 3px; padding: 8px 10px; margin-bottom: 5px; }
+.grave .t2 { white-space: normal; }
+
+.toast { position: fixed; right: 16px; bottom: 16px; background: var(--strip-hi); border: 1px solid var(--ink-3); border-radius: 8px; padding: 8px 14px; z-index: 20; max-width: 420px; font-size: 14px; }
+.toast.err { border-color: var(--danger); }
+.help { font-size: 14px; }
+.help td { padding: 3px 12px 3px 0; }
+
+@media (max-width: 900px) {
+  body { overflow: auto; }
+  .main, .main.nopeek { display: block; height: auto; }
+  .board { overflow: visible; padding: 10px 16px 90px; }
+  .peek { border-left: none; border-top: 1px solid var(--line); height: 80vh; }
+  .strip { grid-template-columns: 22px minmax(0, 1fr) 64px; }
+  .when, .res { display: none; }
+  .tail { grid-column: 2 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { .conn.off { animation: none; } }
+</style>
+</head>
+<body>
+<header class="rail" id="rail">
+  <div class="brand" title="herdr deck: every pane in every herdr session">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="6" rx="1" fill="var(--working)"/><rect x="3" y="13" width="26" height="6" rx="1" fill="var(--idle)"/><rect x="3" y="21" width="26" height="6" rx="1" fill="var(--done)"/></svg>
+    herdr deck <span class="conn" id="conn" title="Live"></span>
+  </div>
+  <div class="search"><input id="q" type="search" placeholder="Search titles, projects, output, prompts…  (-word excludes)" autocomplete="off" spellcheck="false"><kbd>/</kbd></div>
+  <div class="counts" id="statusChips" role="group" aria-label="Filter by status"></div>
+  <div class="rail-stat" id="totals"></div>
+</header>
+<div class="bar2" id="bar2">
+  <div class="counts" id="agentChips" role="group" aria-label="Filter by agent"></div>
+  <label>Project <select id="project"><option value="">All</option></select></label>
+  <label>Sort <select id="sort">
+    <option value="attention">Needs me first</option>
+    <option value="active">Last active</option>
+    <option value="started">Started</option>
+    <option value="mem">Memory</option>
+    <option value="ctx">Context size</option>
+    <option value="project">Project</option>
+  </select></label>
+  <label>Group <select id="group">
+    <option value="">None</option>
+    <option value="project">Project</option>
+    <option value="status">Status</option>
+    <option value="workspace">Workspace</option>
+    <option value="agent">Agent</option>
+  </select></label>
+  <span class="spacer"></span>
+  <button class="linkbtn" id="suggest" title="Select empty panes, redundant duplicates and anything untouched for a week">Select close candidates</button>
+  <button class="linkbtn" id="viewClosed">Closed</button>
+  <button class="linkbtn" id="notify" title="Notify when an agent finishes or needs input">Alerts off</button>
+  <button class="linkbtn" id="theme">Theme</button>
+  <button class="linkbtn" id="helpBtn" aria-label="Keyboard shortcuts">?</button>
+</div>
+<main class="main" id="main">
+  <section class="board" id="board" aria-label="Panes"></section>
+  <aside class="peek" id="peek" aria-label="Pane detail"></aside>
+</main>
+<div class="bulk" id="bulk" hidden>
+  <span id="bulkInfo"></span>
+  <button class="btn" id="bulkClear">Clear</button>
+  <button class="btn danger" id="bulkClose">Close…</button>
+</div>
+
+<dialog id="confirm">
+  <form method="dialog">
+    <div class="dlg-b">
+      <h3 id="cTitle"></h3>
+      <p id="cWarn"></p>
+      <div class="dlg-list" id="cList"></div>
+      <p id="cNote"></p>
+      <label class="dlg-opt" id="cWholeWrap"><input type="checkbox" id="cWhole"> Close the whole tab, including other panes in it</label>
+    </div>
+    <div class="dlg-f">
+      <button class="btn" value="cancel" id="cCancel">Cancel</button>
+      <button class="btn danger" value="ok" id="cOk"></button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="help">
+  <div class="dlg-b help">
+    <h3>Keyboard</h3>
+    <table>
+      <tr><td><kbd>/</kbd></td><td>Search</td></tr>
+      <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>Move down / up</td></tr>
+      <tr><td><kbd>Enter</kbd></td><td>Show the pane's live output</td></tr>
+      <tr><td><kbd>f</kbd></td><td>Jump to the pane in herdr and bring the terminal forward</td></tr>
+      <tr><td><kbd>x</kbd></td><td>Close the pane (asks first)</td></tr>
+      <tr><td><kbd>s</kbd> / <kbd>Space</kbd></td><td>Select for bulk close</td></tr>
+      <tr><td><kbd>a</kbd></td><td>Select everything shown</td></tr>
+      <tr><td><kbd>p</kbd></td><td>Type a message to the agent</td></tr>
+      <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Filter: working, needs input, finished, empty</td></tr>
+      <tr><td><kbd>c</kbd></td><td>Closed panes</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Clear search, selection, detail</td></tr>
+    </table>
+    <p>Search matches every word you type; prefix a word with <span class="mono">-</span> to exclude it. <span class="mono">is:stale</span>, <span class="mono">is:dup</span>, <span class="mono">is:empty</span> and <span class="mono">agent:codex</span> also work.</p>
+  </div>
+  <form method="dialog" class="dlg-f"><button class="btn">Done</button></form>
+</dialog>
+
+<script>/*__BOOT__*/</script>
+<script>
+"use strict";
+// ── state ────────────────────────────────────────────────────────────────
+const S = {
+  token: "", rows: new Map(), summary: { herdr: [] }, graveyard: [],
+  q: "", statuses: new Set(), agents: new Set(), project: "", sort: "attention", group: "",
+  selected: new Set(), peek: null, cursor: null, view: "live", notify: false,
+};
+const STATUS = [
+  ["working", "Working", "--working"],
+  ["blocked", "Needs input", "--blocked"],
+  ["done", "Finished", "--done"],
+  ["idle", "Idle", "--idle"],
+  ["empty", "Empty", "--empty"],
+];
+const RANK = { blocked: 0, done: 1, working: 2, unknown: 3, idle: 4, empty: 5 };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function store(k, v) { try { localStorage.setItem("deck:" + k, JSON.stringify(v)); } catch {} }
+function load(k, d) { try { const v = localStorage.getItem("deck:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } }
+S.sort = load("sort", "attention"); S.group = load("group", ""); S.notify = load("notify", false) && "Notification" in window && Notification.permission === "granted";
+S.statuses = new Set(load("statuses", [])); S.agents = new Set(load("agents", []));
+const theme = load("theme", ""); if (theme) document.documentElement.dataset.theme = theme;
+
+// ── formatting ───────────────────────────────────────────────────────────
+function ago(t) {
+  if (!t) return "";
+  const s = (Date.now() - t) / 1000;
+  if (s < 45) return "now";
+  if (s < 3600) return Math.round(s / 60) + "m";
+  if (s < 86400) return Math.round(s / 3600) + "h";
+  if (s < 86400 * 60) return Math.round(s / 86400) + "d";
+  return Math.round(s / 86400 / 30) + "mo";
+}
+const DTF = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const abs = (t) => (t ? DTF.format(new Date(t)) : "—");
+const mem = (kb) => (kb >= 1048576 ? (kb / 1048576).toFixed(1) + " GB" : Math.round(kb / 1024) + " MB");
+const tok = (n) => (n == null ? "" : n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : Math.round(n / 1000) + "k");
+
+// ── filtering & sorting ──────────────────────────────────────────────────
+function haystack(r) {
+  return (r._hay ??= [r.title, r.project, r.branch, r.cwd, r.agent, r.status, r.model, r.tab, r.workspace, r.paneId, r.sessionId, r.firstPrompt, r.lastMessage, r.tail.join(" "), r.command]
+    .filter(Boolean).join(" \u0001 ").toLowerCase());
+}
+function parseQuery(q) {
+  const inc = [], exc = [], is = [], agent = [];
+  for (const w of q.toLowerCase().split(/\s+/).filter(Boolean)) {
+    if (w.startsWith("is:")) is.push(w.slice(3));
+    else if (w.startsWith("agent:")) agent.push(w.slice(6));
+    else if (w.startsWith("-") && w.length > 1) exc.push(w.slice(1));
+    else inc.push(w);
+  }
+  return { inc, exc, is, agent };
+}
+function visibleRows() {
+  const q = parseQuery(S.q);
+  const out = [];
+  for (const r of S.rows.values()) {
+    if (S.statuses.size && !S.statuses.has(r.status === "unknown" ? "idle" : r.status) && !(S.statuses.has("stale") && r.stale)) continue;
+    if (S.agents.size && !S.agents.has(r.agent)) continue;
+    if (S.project && r.project !== S.project) continue;
+    if (q.is.length && !q.is.every((f) => (f === "stale" ? r.stale : f === "dup" ? r.duplicate : f === "empty" ? r.empty : r.status === f))) continue;
+    if (q.agent.length && !q.agent.some((a) => r.agent.startsWith(a))) continue;
+    if (q.inc.length || q.exc.length) {
+      const h = haystack(r);
+      if (!q.inc.every((w) => h.includes(w)) || q.exc.some((w) => h.includes(w))) continue;
+    }
+    out.push(r);
+  }
+  const act = (r) => r.lastActiveAt ?? r.startedAt ?? 0;
+  const cmp = {
+    attention: (a, b) => (RANK[a.status] ?? 9) - (RANK[b.status] ?? 9) || Number(a.stale) - Number(b.stale) || act(b) - act(a),
+    active: (a, b) => act(b) - act(a),
+    started: (a, b) => (b.createdAt ?? b.startedAt ?? 0) - (a.createdAt ?? a.startedAt ?? 0),
+    mem: (a, b) => b.rssKB - a.rssKB,
+    ctx: (a, b) => (b.ctxTokens ?? 0) - (a.ctxTokens ?? 0),
+    project: (a, b) => a.project.localeCompare(b.project) || act(b) - act(a),
+  }[S.sort] ?? (() => 0);
+  out.sort(cmp);
+  return out;
+}
+
+// ── rendering: keyed strips, only changed rows touch the DOM ─────────────
+const stripCache = new Map(); // key -> { el, sig }
+const ICON = {
+  focus: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3H3v10h10v-3M9 2h5v5M14 2 7.5 8.5"/></svg>',
+  close: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8"/></svg>',
+};
+function stripHTML(r) {
+  const tags = [];
+  if (r.status === "blocked") tags.push('<span class="tag blocked">needs input</span>');
+  if (r.empty) tags.push('<span class="tag empty">empty</span>');
+  if (r.duplicate) tags.push('<span class="tag dup" title="Another pane is on the same conversation">duplicate</span>');
+  if (r.stale) tags.push('<span class="tag stale" title="No activity for 2+ days">stale</span>');
+  if (r.rssKB > 1.5 * 1048576) tags.push('<span class="tag hot" title="This pane and its child processes use a lot of memory">heavy</span>');
+  const branch = r.branch ? ` · ${esc(r.branch)}${r.dirty ? ` <span class="dirty" title="${r.dirty} changed files">±${r.dirty}</span>` : ""}` : "";
+  const model = r.model ? ` · ${esc(r.model.replace(/^claude-/, ""))}` : "";
+  const tail = (r.tail.length ? r.tail.slice(-2) : r.lastMessage ? [r.lastMessage] : []).map((l) => `<div>${esc(l)}</div>`).join("");
+  const ctx = r.ctxTokens != null ? `<b>${tok(r.ctxTokens)}</b> ctx` : r.agent === "shell" ? "" : "";
+  const created = r.createdAt ?? r.startedAt;
+  return `<input type="checkbox" class="chk" tabindex="-1" aria-label="Select" ${S.selected.has(r.key) ? "checked" : ""}>
+<div class="t0"><div class="t1"><span class="kind" data-k="${esc(r.agent)}">${esc(r.agent)}</span><span class="title" title="${esc(r.title)}">${esc(r.title || "(untitled)")}</span>${tags.join("")}</div>
+<div class="t2"><span class="proj">${esc(r.project)}</span>${branch}${model} · tab ${esc(r.tab || r.tabNumber)}${r.tabPanes > 1 ? ` (${r.tabPanes} panes)` : ""}${S.summary.herdr.length > 1 ? ` · ${esc(r.herdr)}` : ""}</div></div>
+<div class="when" title="Last active ${abs(r.lastActiveAt)}\nConversation started ${abs(r.createdAt)}\nProcess started ${abs(r.startedAt)}">active <b data-t="${r.lastActiveAt ?? ""}">${r.lastActiveAt ? ago(r.lastActiveAt) : "—"}</b><br>since <span data-t="${created ?? ""}">${ago(created)}</span></div>
+<div class="res" title="${r.procs} processes · CPU ${r.cpu}%${r.cost ? ` · $${r.cost.toFixed(2)}` : ""}"><b>${mem(r.rssKB)}</b><br>${ctx}</div>
+<div class="acts"><button class="icon" data-act="focus" title="Jump to this pane (f)">${ICON.focus}</button><button class="icon x" data-act="close" title="Close (x)">${ICON.close}</button></div>
+${tail ? `<div class="tail">${tail}</div>` : ""}`;
+}
+function sigOf(r) { return JSON.stringify(r) + S.selected.has(r.key) + S.summary.herdr.length; }
+
+function groupKey(r) {
+  switch (S.group) {
+    case "project": return r.project;
+    case "status": return (STATUS.find((s) => s[0] === r.status) ?? [0, r.status])[1];
+    case "workspace": return `${r.workspace}${S.summary.herdr.length > 1 ? " · " + r.herdr : ""}`;
+    case "agent": return r.agent;
+  }
+  return "";
+}
+
+let lastOrder = "";
+let renderQueued = false;
+function render() {
+  if (renderQueued) return;
+  renderQueued = true;
+  requestAnimationFrame(() => { renderQueued = false; renderNow(); });
+}
+function renderNow() {
+  renderChips();
+  if (S.view === "closed") return renderClosed();
+  const board = $("board");
+  const rows = visibleRows();
+  S.visible = rows;
+  const live = new Set(rows.map((r) => r.key));
+  for (const [k, c] of stripCache) if (!S.rows.has(k)) { c.el.remove(); stripCache.delete(k); }
+  for (const r of rows) {
+    let c = stripCache.get(r.key);
+    const sig = sigOf(r);
+    if (!c) {
+      const el = document.createElement("article");
+      el.className = "strip";
+      el.dataset.key = r.key;
+      c = { el, sig: "" };
+      stripCache.set(r.key, c);
+    }
+    if (c.sig !== sig) {
+      c.el.innerHTML = stripHTML(r);
+      c.el.dataset.status = r.status;
+      c.sig = sig;
+    }
+    c.el.classList.toggle("stale", r.stale);
+    c.el.classList.toggle("sel-peek", S.peek === r.key);
+    c.el.classList.toggle("cursor", S.cursor === r.key);
+  }
+  // Rebuild order only when the sequence or grouping changed.
+  const order = S.group + "|" + rows.map((r) => r.key + (S.group ? "@" + groupKey(r) : "")).join(",");
+  if (order !== lastOrder || board.querySelector(".empty-state, .grave")) {
+    lastOrder = order;
+    const frag = document.createDocumentFragment();
+    let g = null;
+    const counts = {};
+    if (S.group) for (const r of rows) counts[groupKey(r)] = (counts[groupKey(r)] ?? 0) + 1;
+    for (const r of rows) {
+      if (S.group && groupKey(r) !== g) {
+        g = groupKey(r);
+        const h = document.createElement("h3");
+        h.className = "group-h";
+        h.innerHTML = `${esc(g)} <span>${counts[g]}</span>`;
+        frag.append(h);
+      }
+      frag.append(stripCache.get(r.key).el);
+    }
+    board.replaceChildren(frag);
+    if (!rows.length) board.innerHTML = `<div class="empty-state">${S.rows.size ? "No panes match. Press Esc to clear the search and filters." : "No herdr panes are open. Start herdr and they will show up here."}</div>`;
+  }
+  for (const [k, c] of stripCache) if (!live.has(k) && c.el.isConnected) c.el.remove();
+  renderBulk();
+  renderPeekMeta();
+  updateTitle();
+}
+
+function renderChips() {
+  const all = [...S.rows.values()];
+  const n = (f) => all.filter(f).length;
+  const sc = $("statusChips");
+  const chips = STATUS.map(([k, label, color]) => {
+    const c = n((r) => (r.status === "unknown" ? "idle" : r.status) === k);
+    return `<button class="chip" data-status="${k}" aria-pressed="${S.statuses.has(k)}"><span class="dot" style="background:var(${color})"></span>${label} <b>${c}</b></button>`;
+  });
+  chips.push(`<button class="chip" data-status="stale" aria-pressed="${S.statuses.has("stale")}"><span class="dot" style="background:var(--ink-3);opacity:.5"></span>Stale <b>${n((r) => r.stale)}</b></button>`);
+  const html = chips.join("");
+  if (sc._h !== html) { sc.innerHTML = html; sc._h = html; }
+
+  const agents = {};
+  for (const r of all) agents[r.agent] = (agents[r.agent] ?? 0) + 1;
+  const ah = Object.entries(agents).sort((a, b) => b[1] - a[1])
+    .map(([a, c]) => `<button class="chip" data-agent="${esc(a)}" aria-pressed="${S.agents.has(a)}">${esc(a)} <b>${c}</b></button>`).join("");
+  if ($("agentChips")._h !== ah) { $("agentChips").innerHTML = ah; $("agentChips")._h = ah; }
+
+  const projects = [...new Set(all.map((r) => r.project))].sort((a, b) => a.localeCompare(b));
+  const ph = `<option value="">All</option>` + projects.map((p) => `<option ${p === S.project ? "selected" : ""}>${esc(p)}</option>`).join("");
+  if ($("project")._h !== ph) { $("project").innerHTML = ph; $("project")._h = ph; }
+
+  const total = all.reduce((s, r) => s + r.rssKB, 0);
+  const cost = all.reduce((s, r) => s + (r.cost ?? 0), 0);
+  const off = S.summary.herdr.filter((h) => !h.online).map((h) => h.name);
+  $("totals").innerHTML = `<b>${all.length}</b> panes · <b>${mem(total)}</b> RAM${cost ? ` · <b>$${cost.toFixed(0)}</b> OpenCode spend` : ""}${off.length ? ` · stopped: ${esc(off.join(", "))}` : ""}`;
+  $("viewClosed").textContent = S.view === "closed" ? "Back to live panes" : `Closed (${S.graveyard.length})`;
+  $("notify").textContent = S.notify ? "Alerts on" : "Alerts off";
+}
+
+function renderBulk() {
+  for (const k of S.selected) if (!S.rows.has(k)) S.selected.delete(k);
+  const sel = [...S.selected].map((k) => S.rows.get(k));
+  $("bulk").hidden = !sel.length || S.view !== "live";
+  if (sel.length) {
+    $("bulkInfo").textContent = `${sel.length} selected · ${mem(sel.reduce((s, r) => s + r.rssKB, 0))}`;
+    $("bulkClose").textContent = `Close ${sel.length}…`;
+  }
+}
+
+function updateTitle() {
+  const n = [...S.rows.values()].filter((r) => r.status === "blocked" || r.status === "done").length;
+  document.title = (n ? `(${n}) ` : "") + "herdr deck";
+}
+
+// Relative times tick without re-rendering rows.
+setInterval(() => { for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (t) el.textContent = ago(t); } }, 20000);
+
+// ── peek panel ───────────────────────────────────────────────────────────
+let peekTimer = null, peekText = "", peekKeyRendered = null;
+function openPeek(key) {
+  S.peek = key;
+  S.cursor = key;
+  $("main").classList.remove("nopeek");
+  peekKeyRendered = null;
+  peekText = "";
+  renderPeekShell();
+  render();
+  pollPeek(true);
+}
+function closePeek() {
+  S.peek = null;
+  $("main").classList.add("nopeek");
+  $("peek").innerHTML = "";
+  clearTimeout(peekTimer);
+  render();
+}
+function renderPeekShell() {
+  const r = S.rows.get(S.peek);
+  if (!r) return;
+  peekKeyRendered = r.key;
+  $("peek").innerHTML = `
+  <div class="peek-h"><h2 id="pTitle"></h2><div class="sub" id="pSub"></div>
+    <div class="peek-actions">
+      <button class="btn" data-pact="focus">Jump to pane</button>
+      <button class="btn" data-pact="rename">Rename tab</button>
+      ${r.resume ? `<button class="btn" data-pact="copyResume">Copy resume command</button>` : ""}
+      <button class="btn" data-pact="copyCwd">Copy path</button>
+      <span class="spacer"></span>
+      <button class="btn danger" data-pact="close">Close…</button>
+      <button class="btn" data-pact="hide" aria-label="Hide detail">Hide</button>
+    </div></div>
+  <dl class="facts" id="pFacts"></dl>
+  <pre class="term" id="pTerm" tabindex="0" aria-label="Live terminal output"></pre>
+  <div class="keys"><span class="lbl">Send key</span>${["esc", "enter", "ctrl+c", "up", "down", "tab", "1", "2", "3", "y", "n"].map((k) => `<button data-key="${k}">${k}</button>`).join("")}</div>
+  <div class="send"><textarea id="pSend" placeholder="${r.agent === "shell" ? "Run a command in this shell" : `Message ${esc(r.agent)}`} (Enter sends, Shift+Enter for a new line)"></textarea><button class="btn" data-pact="send">Send</button></div>`;
+  renderPeekMeta();
+}
+function renderPeekMeta() {
+  if (!S.peek) return;
+  const r = S.rows.get(S.peek);
+  if (!r) {
+    $("peek").innerHTML = `<div class="peek-empty">This pane was closed.</div>`;
+    return;
+  }
+  if (peekKeyRendered !== r.key) return renderPeekShell();
+  const status = (STATUS.find((s) => s[0] === r.status) ?? [0, r.status])[1];
+  $("pTitle").textContent = r.title || "(untitled)";
+  $("pSub").innerHTML = `<span style="color:var(--${r.status in RANK ? r.status : "unknown"})">■</span> ${esc(status)} · ${esc(r.agent)} · ${esc(r.project)}${r.branch ? " · " + esc(r.branch) : ""} · pane ${esc(r.paneId)}`;
+  const f = [];
+  const row = (k, v, mono) => v != null && v !== "" && f.push(`<dt>${k}</dt><dd${mono ? ' class="mono"' : ""}>${v}</dd>`);
+  row("Last active", r.lastActiveAt ? `${abs(r.lastActiveAt)} (${ago(r.lastActiveAt) === "now" ? "just now" : ago(r.lastActiveAt) + " ago"})` : "");
+  row("Conversation", r.createdAt ? `started ${abs(r.createdAt)}${r.approx ? " (matched by folder, may be off)" : ""}` : "");
+  row("Process", r.startedAt ? `started ${abs(r.startedAt)}` : "");
+  row("Model", esc(r.model));
+  row("Context", r.ctxTokens != null ? `${tok(r.ctxTokens)} tokens${r.ctxWindow ? ` of ${tok(r.ctxWindow)} (${Math.round((r.ctxTokens / r.ctxWindow) * 100)}%)` : ""}` : "");
+  row("Spend", r.cost ? `$${r.cost.toFixed(2)}` : "");
+  row("Memory", `${mem(r.rssKB)} across ${r.procs} processes · CPU ${r.cpu}%`);
+  row("Folder", `${esc(r.cwd)}`, true);
+  row("Command", esc(r.command), true);
+  row("Resume", r.resume ? esc(r.resume) : "", true);
+  row("First ask", esc(r.firstPrompt));
+  row("Last reply", esc(r.lastMessage));
+  const html = f.join("");
+  if ($("pFacts")._h !== html) { $("pFacts").innerHTML = html; $("pFacts")._h = html; }
+}
+async function pollPeek(first) {
+  clearTimeout(peekTimer);
+  if (!S.peek || !S.rows.has(S.peek)) return;
+  const key = S.peek;
+  if (!document.hidden) {
+    try {
+      const res = await api("/api/read", { key, lines: 300 });
+      if (S.peek !== key) return;
+      if (res.text !== peekText) {
+        peekText = res.text;
+        const t = $("pTerm");
+        if (t) {
+          const atBottom = first || t.scrollHeight - t.scrollTop - t.clientHeight < 40;
+          t.innerHTML = ansi(res.text.replace(/\s+$/, ""));
+          if (atBottom) t.scrollTop = t.scrollHeight;
+        }
+      }
+    } catch {}
+  }
+  const r = S.rows.get(key);
+  peekTimer = setTimeout(pollPeek, r?.status === "working" ? 700 : 1500);
+}
+
+// ANSI SGR → spans. Other escape sequences are dropped.
+const PAL16 = ["#1c1f24", "#e06c75", "#98c379", "#e5c07b", "#61afef", "#c678dd", "#56b6c2", "#c8ccd4", "#5c6370", "#ff7b86", "#b5e890", "#ffd580", "#82c4ff", "#dd9cf0", "#7bd6e0", "#ffffff"];
+function c256(n) {
+  if (n < 16) return PAL16[n];
+  if (n >= 232) { const v = 8 + (n - 232) * 10; return `rgb(${v},${v},${v})`; }
+  n -= 16; const s = [0, 95, 135, 175, 215, 255];
+  return `rgb(${s[Math.floor(n / 36)]},${s[Math.floor(n / 6) % 6]},${s[n % 6]})`;
+}
+function ansi(text) {
+  let out = "", st = {}, open = false;
+  const re = /\x1b\[([0-9;:?]*)([A-Za-z])|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[()][A-Z0-9]|\x1b[=>]/g;
+  let last = 0, m;
+  const flush = (s) => { if (s) out += esc(s); };
+  const style = () => {
+    const css = [];
+    let fg = st.fg, bg = st.bg;
+    if (st.inv) [fg, bg] = [bg ?? "var(--term-bg)", fg ?? "var(--term-ink)"];
+    if (fg) css.push("color:" + fg);
+    if (bg) css.push("background:" + bg);
+    if (st.b) css.push("font-weight:600");
+    if (st.d) css.push("opacity:.6");
+    if (st.i) css.push("font-style:italic");
+    if (st.u) css.push("text-decoration:underline");
+    return css.join(";");
+  };
+  while ((m = re.exec(text))) {
+    flush(text.slice(last, m.index));
+    last = re.lastIndex;
+    if (m[2] !== "m") continue;
+    const p = (m[1] || "0").split(/[;:]/).map(Number);
+    for (let i = 0; i < p.length; i++) {
+      const c = p[i];
+      if (c === 0) st = {};
+      else if (c === 1) st.b = 1; else if (c === 2) st.d = 1; else if (c === 3) st.i = 1; else if (c === 4) st.u = 1; else if (c === 7) st.inv = 1;
+      else if (c === 22) { st.b = 0; st.d = 0; } else if (c === 23) st.i = 0; else if (c === 24) st.u = 0; else if (c === 27) st.inv = 0;
+      else if (c >= 30 && c <= 37) st.fg = PAL16[c - 30]; else if (c >= 90 && c <= 97) st.fg = PAL16[c - 82];
+      else if (c >= 40 && c <= 47) st.bg = PAL16[c - 40]; else if (c >= 100 && c <= 107) st.bg = PAL16[c - 92];
+      else if (c === 39) st.fg = null; else if (c === 49) st.bg = null;
+      else if ((c === 38 || c === 48) && p[i + 1] === 5) { st[c === 38 ? "fg" : "bg"] = c256(p[i + 2]); i += 2; }
+      else if ((c === 38 || c === 48) && p[i + 1] === 2) { st[c === 38 ? "fg" : "bg"] = `rgb(${p[i + 2]},${p[i + 3]},${p[i + 4]})`; i += 4; }
+    }
+    if (open) out += "</span>";
+    const css = style();
+    open = !!css;
+    if (css) out += `<span style="${css}">`;
+  }
+  flush(text.slice(last));
+  if (open) out += "</span>";
+  return out;
+}
+
+// ── closed panes ─────────────────────────────────────────────────────────
+function renderClosed() {
+  lastOrder = "";
+  const q = parseQuery(S.q);
+  const list = S.graveyard.filter((g) => {
+    const h = [g.title, g.project, g.cwd, g.agent, g.tab].join(" ").toLowerCase();
+    return q.inc.every((w) => h.includes(w)) && !q.exc.some((w) => h.includes(w));
+  });
+  $("board").innerHTML = (list.length
+    ? `<h3 class="group-h">Closed from this deck <span>${list.length}</span><span class="spacer"></span><button class="linkbtn" data-gact="forgetAll">Clear list</button></h3>`
+    : `<div class="empty-state">Panes you close here are listed so you can reopen them. Nothing closed yet.</div>`) +
+    list.map((g) => `<div class="grave" data-id="${esc(g.id)}"><div><div class="t1"><span class="kind" data-k="${esc(g.agent)}">${esc(g.agent)}</span><span class="title">${esc(g.title || "(untitled)")}</span></div>
+      <div class="t2"><span class="proj">${esc(g.project)}</span> · closed ${ago(g.closedAt)} ago (${abs(g.closedAt)})${g.lastActiveAt ? ` · last active ${abs(g.lastActiveAt)}` : ""}<br><span class="mono" style="font-size:12px">${esc(g.resume ?? g.cwd)}</span></div></div>
+      <div class="acts">${g.resume ? `<button class="btn" data-gact="reopen">Reopen</button><button class="btn" data-gact="copy">Copy command</button>` : `<button class="btn" data-gact="reopen">Open folder in new tab</button>`}<button class="btn" data-gact="forget">Remove</button></div></div>`).join("");
+  $("bulk").hidden = true;
+}
+
+// ── actions ──────────────────────────────────────────────────────────────
+async function api(path, body) {
+  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json", "x-deck-token": S.token }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  return data;
+}
+let toastTimer;
+function toast(msg, err) {
+  let t = document.querySelector(".toast");
+  if (!t) { t = document.createElement("div"); t.setAttribute("role", "status"); document.body.append(t); }
+  t.className = "toast" + (err ? " err" : "");
+  t.textContent = msg;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.remove(), err ? 6000 : 2600);
+}
+async function copy(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`Copied ${what}`); } catch { toast("Copy failed: the browser blocked clipboard access", true); }
+}
+
+function askClose(keys) {
+  const rows = keys.map((k) => S.rows.get(k)).filter(Boolean);
+  if (!rows.length) return;
+  const d = $("confirm");
+  const busy = rows.filter((r) => r.status === "working" || r.status === "blocked");
+  const noResume = rows.filter((r) => !r.resume && !r.empty);
+  const multiTab = rows.some((r) => r.tabPanes > 1);
+  $("cTitle").textContent = rows.length === 1 ? `Close “${rows[0].title || rows[0].agent}”?` : `Close ${rows.length} panes?`;
+  $("cWarn").innerHTML = busy.length ? `<span class="warn">${busy.length === 1 ? "This agent is" : busy.length + " agents are"} working or waiting for you right now. Closing stops ${busy.length === 1 ? "it" : "them"} mid-task.</span>` : "";
+  $("cList").innerHTML = rows.map((r) => `<div><span class="st" style="background:var(--${r.status in RANK ? r.status : "unknown"})"></span><span>${esc(r.title || r.agent)}</span><span class="meta">${esc(r.agent)} · ${esc(r.project)} · ${r.lastActiveAt ? (ago(r.lastActiveAt) === "now" ? "active now" : ago(r.lastActiveAt) + " ago") : "no activity"} · ${mem(r.rssKB)}</span></div>`).join("");
+  const freed = rows.reduce((s, r) => s + r.rssKB, 0);
+  $("cNote").innerHTML = `Frees about <b>${mem(freed)}</b>. ` +
+    (noResume.length ? `<span class="warn">${noResume.length} of these ${noResume.length === 1 ? "is a running process that" : "are running processes that"} can’t be resumed.</span> ` : "") +
+    `Conversations stay on disk; closed agent sessions go to the Closed list with a Reopen button.`;
+  $("cWholeWrap").hidden = !multiTab;
+  $("cWhole").checked = false;
+  $("cOk").textContent = rows.length === 1 ? "Close pane" : `Close ${rows.length} panes`;
+  d.returnValue = "";
+  d.onclose = async () => {
+    if (d.returnValue !== "ok") return;
+    try {
+      const { results } = await api("/api/close", { keys: rows.map((r) => r.key), wholeTab: $("cWhole").checked });
+      const failed = results.filter((x) => !x.ok);
+      for (const x of results) if (x.ok) S.selected.delete(x.key);
+      if (S.peek && results.some((x) => x.ok && x.key === S.peek)) closePeek();
+      toast(failed.length ? `Closed ${results.length - failed.length}; ${failed.length} failed: ${failed[0].error}` : `Closed ${results.length} ${results.length === 1 ? "pane" : "panes"}`, !!failed.length);
+      render();
+    } catch (e) { toast("Close failed: " + e.message, true); }
+  };
+  d.showModal();
+  $("cOk").focus();
+}
+
+async function focusPane(key) {
+  try { await api("/api/focus", { key, raise: true }); toast("Jumped to the pane in herdr"); } catch (e) { toast("Couldn’t jump: " + e.message, true); }
+}
+async function sendText() {
+  const ta = $("pSend");
+  const text = ta.value.trim();
+  if (!text || !S.peek) return;
+  try { await api("/api/send", { key: S.peek, text }); ta.value = ""; toast("Sent"); pollPeek(); } catch (e) { toast("Send failed: " + e.message, true); }
+}
+
+function toggleSelect(key) {
+  S.selected.has(key) ? S.selected.delete(key) : S.selected.add(key);
+  render();
+}
+function moveCursor(d) {
+  const rows = S.visible ?? [];
+  if (!rows.length) return;
+  let i = rows.findIndex((r) => r.key === S.cursor);
+  i = i < 0 ? 0 : Math.max(0, Math.min(rows.length - 1, i + d));
+  S.cursor = rows[i].key;
+  if (S.peek) openPeek(S.cursor); else render();
+  stripCache.get(S.cursor)?.el.scrollIntoView({ block: "nearest" });
+}
+
+// ── events ───────────────────────────────────────────────────────────────
+$("board").addEventListener("click", (e) => {
+  const g = e.target.closest(".grave");
+  if (g) return graveAction(e, g);
+  const gb = e.target.closest("[data-gact]");
+  if (gb?.dataset.gact === "forgetAll") return api("/api/forget", { all: true }).catch((x) => toast(x.message, true));
+  const strip = e.target.closest(".strip");
+  if (!strip) return;
+  const key = strip.dataset.key;
+  const act = e.target.closest("[data-act]")?.dataset.act;
+  if (act === "focus") return focusPane(key);
+  if (act === "close") return askClose([key]);
+  if (e.target.classList.contains("chk") || e.metaKey || e.shiftKey) { e.preventDefault(); return toggleSelect(key); }
+  S.peek === key ? closePeek() : openPeek(key);
+});
+async function graveAction(e, el) {
+  const act = e.target.closest("[data-gact]")?.dataset.gact;
+  const g = S.graveyard.find((x) => x.id === el.dataset.id);
+  if (!act || !g) return;
+  try {
+    if (act === "copy") return copy(g.resume, "resume command");
+    if (act === "forget") return api("/api/forget", { id: g.id });
+    if (act === "reopen") {
+      toast(`Reopening “${g.title}”: waiting for the new shell to start…`);
+      await api("/api/reopen", { id: g.id });
+      toast(`Reopened “${g.title}” in a new tab`);
+    }
+  } catch (x) { toast(x.message, true); }
+}
+$("peek").addEventListener("click", (e) => {
+  const act = e.target.closest("[data-pact]")?.dataset.pact;
+  const key = e.target.closest("[data-key]")?.dataset.key;
+  const r = S.rows.get(S.peek);
+  if (key && r) return api("/api/keys", { key: r.key, keys: [key] }).then(() => setTimeout(pollPeek, 150)).catch((x) => toast(x.message, true));
+  if (!act || !r) return;
+  if (act === "focus") focusPane(r.key);
+  if (act === "close") askClose([r.key]);
+  if (act === "hide") closePeek();
+  if (act === "send") sendText();
+  if (act === "copyResume") copy(r.resume, "resume command");
+  if (act === "copyCwd") copy(r.cwd, "path");
+  if (act === "rename") {
+    const label = prompt("New tab name", r.tab || r.title);
+    if (label != null) api("/api/rename", { key: r.key, label }).then(() => toast("Renamed")).catch((x) => toast(x.message, true));
+  }
+});
+$("peek").addEventListener("keydown", (e) => {
+  if (e.target.id === "pSend" && e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); sendText(); }
+});
+$("statusChips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-status]"); if (!b) return;
+  const k = b.dataset.status;
+  if (e.metaKey || e.shiftKey) S.statuses.has(k) ? S.statuses.delete(k) : S.statuses.add(k);
+  else S.statuses = S.statuses.has(k) && S.statuses.size === 1 ? new Set() : new Set([k]);
+  store("statuses", [...S.statuses]); render();
+});
+$("agentChips").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-agent]"); if (!b) return;
+  const k = b.dataset.agent;
+  if (e.metaKey || e.shiftKey) S.agents.has(k) ? S.agents.delete(k) : S.agents.add(k);
+  else S.agents = S.agents.has(k) && S.agents.size === 1 ? new Set() : new Set([k]);
+  store("agents", [...S.agents]); render();
+});
+$("q").addEventListener("input", (e) => { S.q = e.target.value; render(); });
+$("project").addEventListener("change", (e) => { S.project = e.target.value; render(); });
+$("sort").value = S.sort; $("group").value = S.group;
+$("sort").addEventListener("change", (e) => { S.sort = e.target.value; store("sort", S.sort); render(); });
+$("group").addEventListener("change", (e) => { S.group = e.target.value; store("group", S.group); render(); });
+$("bulkClear").onclick = () => { S.selected.clear(); render(); };
+$("bulkClose").onclick = () => askClose([...S.selected]);
+$("suggest").onclick = () => {
+  const WEEK = 7 * 86400000;
+  const old = (r) => r.lastActiveAt && Date.now() - r.lastActiveAt > WEEK;
+  const c = [...S.rows.values()].filter((r) => (r.empty || r.duplicate || old(r)) && r.status !== "working" && r.status !== "blocked");
+  // Of each duplicate pair, keep the most recently used pane.
+  const seen = new Set();
+  const pick = [];
+  for (const r of c.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))) {
+    const id = r.duplicate && `${r.agent}:${r.sessionId}`;
+    if (id && !seen.has(id) && !old(r) && !r.empty) { seen.add(id); continue; }
+    pick.push(r.key);
+  }
+  S.selected = new Set(pick);
+  toast(pick.length ? `Selected ${pick.length} close candidates. Review, then use Close.` : "Nothing looks safe to close");
+  render();
+};
+$("viewClosed").onclick = () => { S.view = S.view === "closed" ? "live" : "closed"; lastOrder = ""; render(); };
+$("theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  const next = cur === "light" ? "dark" : "light";
+  document.documentElement.dataset.theme = next; store("theme", next);
+};
+$("helpBtn").onclick = () => $("help").showModal();
+$("notify").onclick = async () => {
+  if (!("Notification" in window)) return toast("This browser can’t show notifications", true);
+  if (!S.notify && Notification.permission !== "granted") {
+    const p = await Notification.requestPermission();
+    if (p !== "granted") return toast("Notifications are blocked for this page", true);
+  }
+  S.notify = !S.notify; store("notify", S.notify); render();
+};
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.matches("input, textarea, select") || document.querySelector("dialog[open]")) {
+    if (e.key === "Escape" && e.target.id === "q") { e.target.value = ""; S.q = ""; e.target.blur(); render(); }
+    return;
+  }
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const k = e.key;
+  const cur = S.cursor && S.rows.has(S.cursor) ? S.cursor : null;
+  if (k === "/") { e.preventDefault(); $("q").focus(); $("q").select(); }
+  else if (k === "j" || k === "ArrowDown") { e.preventDefault(); moveCursor(1); }
+  else if (k === "k" || k === "ArrowUp") { e.preventDefault(); moveCursor(-1); }
+  else if (k === "Enter" && cur) openPeek(cur);
+  else if (k === "f" && cur) focusPane(cur);
+  else if (k === "x" && (S.selected.size || cur)) askClose(S.selected.size ? [...S.selected] : [cur]);
+  else if ((k === "s" || k === " ") && cur) { e.preventDefault(); toggleSelect(cur); }
+  else if (k === "a") { S.selected = new Set((S.visible ?? []).map((r) => r.key)); render(); }
+  else if (k === "p" && S.peek) { e.preventDefault(); $("pSend")?.focus(); }
+  else if (k === "c") $("viewClosed").click();
+  else if (k === "?") $("help").showModal();
+  else if (k >= "1" && k <= "4") { const s = ["working", "blocked", "done", "empty"][k - 1]; S.statuses = S.statuses.has(s) && S.statuses.size === 1 ? new Set() : new Set([s]); store("statuses", [...S.statuses]); render(); }
+  else if (k === "Escape") {
+    if (S.q || S.statuses.size || S.agents.size || S.project) { S.q = ""; $("q").value = ""; S.statuses.clear(); S.agents.clear(); S.project = ""; store("statuses", []); store("agents", []); }
+    else if (S.selected.size) S.selected.clear();
+    else if (S.peek) return closePeek();
+    render();
+  }
+});
+
+// ── live data ────────────────────────────────────────────────────────────
+function notifyTransitions(prev, next) {
+  if (!S.notify || !prev || prev.status === next.status) return;
+  const becameDone = next.status === "done" && prev.status === "working";
+  const becameBlocked = next.status === "blocked";
+  if (!becameDone && !becameBlocked) return;
+  try {
+    const n = new Notification(becameBlocked ? `${next.title || next.agent} needs input` : `${next.title || next.agent} finished`, { body: `${next.agent} · ${next.project}`, tag: next.key, silent: false });
+    n.onclick = () => { window.focus(); openPeek(next.key); };
+  } catch {}
+}
+function applyFull(data) {
+  S.token = data.token;
+  S.rows = new Map(data.rows.map((r) => [r.key, r]));
+  S.summary = data.summary;
+  S.graveyard = data.graveyard ?? [];
+  lastOrder = "";
+  render();
+}
+if (window.__BOOT__) applyFull(window.__BOOT__);
+$("main").classList.toggle("nopeek", !S.peek);
+
+function connect() {
+  const es = new EventSource("/events");
+  es.addEventListener("full", (e) => { $("conn").classList.remove("off"); applyFull(JSON.parse(e.data)); });
+  es.addEventListener("patch", (e) => {
+    const p = JSON.parse(e.data);
+    for (const r of p.upsert) { notifyTransitions(S.rows.get(r.key), r); S.rows.set(r.key, r); }
+    for (const k of p.remove) S.rows.delete(k);
+    S.summary = p.summary;
+    render();
+  });
+  es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
+  es.onopen = () => $("conn").classList.remove("off");
+  es.onerror = () => $("conn").classList.add("off");
+}
+connect();
+
+const fit = () => document.documentElement.style.setProperty("--top", $("rail").offsetHeight + $("bar2").offsetHeight + "px");
+new ResizeObserver(fit).observe($("rail"));
+new ResizeObserver(fit).observe($("bar2"));
+fit();
+</script>
+</body>
+</html>

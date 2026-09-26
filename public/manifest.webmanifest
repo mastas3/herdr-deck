@@ -1,0 +1,9 @@
+{
+  "name": "herdr deck",
+  "short_name": "herdr deck",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1c2631",
+  "theme_color": "#151d26",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

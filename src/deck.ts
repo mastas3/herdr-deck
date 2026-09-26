@@ -1,0 +1,427 @@
+// Live state engine: keeps every herdr server's snapshot in memory, enriches each pane
+// (dates, memory, context, git, terminal tail) and emits row-level patches.
+import { basename } from "node:path";
+import { call, discoverSessions, subscribe, type HerdrSession } from "./herdr";
+import { childrenIndex, readProcs, treeUsage, type Proc } from "./procs";
+import { claudeMeta, codexMeta, opencodeMeta, resumeCommand, type AgentMeta } from "./agents";
+import { cleanTail, isShellOnly } from "./tail";
+
+export type Row = {
+  key: string;
+  herdr: string;
+  workspaceId: string;
+  workspace: string;
+  tabId: string;
+  tab: string;
+  tabNumber: number;
+  tabPanes: number;
+  paneId: string;
+  agent: string; // claude | codex | opencode | … | shell | <process name>
+  status: string; // working | blocked | done | idle | unknown | empty
+  focused: boolean;
+  title: string;
+  firstPrompt?: string;
+  lastMessage?: string;
+  cwd: string;
+  project: string;
+  branch?: string;
+  dirty?: number;
+  startedAt?: number;
+  createdAt?: number;
+  lastActiveAt?: number;
+  model?: string;
+  ctxTokens?: number;
+  ctxWindow?: number;
+  cost?: number;
+  rssKB: number;
+  cpu: number;
+  procs: number;
+  command?: string;
+  sessionId?: string;
+  resume?: string;
+  tail: string[];
+  empty: boolean;
+  stale: boolean;
+  duplicate: boolean;
+  approx: boolean;
+};
+
+type FgProc = { pid: number; name?: string; argv0?: string; cmdline?: string };
+type Sess = HerdrSession & {
+  online: boolean;
+  events: number;
+  lastEventAt?: number;
+  error?: string;
+  snap?: any;
+  procInfo: Map<string, { shellPid: number; fg: FgProc[] }>;
+  tails: Map<string, string[]>;
+  unsub?: () => void;
+  refreshTimer?: Timer;
+};
+
+const STALE_MS = 48 * 3600_000;
+
+export class Deck {
+  sessions = new Map<string, Sess>();
+  procs = new Map<number, Proc>();
+  kids = new Map<number, number[]>();
+  metas = new Map<string, AgentMeta>();
+  git = new Map<string, { at: number; root?: string; branch?: string; dirty?: number }>();
+  rows = new Map<string, Row>();
+  private sent = new Map<string, string>();
+  private listeners = new Set<(patch: Patch) => void>();
+  private rebuildTimer?: Timer;
+
+  onPatch(fn: (p: Patch) => void) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  async start() {
+    await this.discover();
+    await Promise.all([this.refreshProcs(), ...[...this.sessions.values()].map((s) => this.refreshSnapshot(s))]);
+    await this.refreshProcInfo(true);
+    await Promise.all([this.refreshTails(), this.refreshMetas()]);
+    this.rebuildNow();
+    this.refreshGit();
+
+    setInterval(() => this.discover(), 10_000);
+    setInterval(() => { for (const s of this.sessions.values()) this.refreshSnapshot(s); }, 2_000);
+    setInterval(() => this.refreshProcs(), 3_000);
+    setInterval(() => this.refreshProcInfo(false), 15_000);
+    setInterval(() => this.refreshTails(), 3_000);
+    setInterval(() => this.refreshYoungProcInfo(), 2_000);
+    setInterval(() => this.refreshMetas(), 4_000);
+    setInterval(() => this.refreshGit(), 45_000);
+  }
+
+  // ── discovery & event stream ─────────────────────────────────────────────
+
+  private async discover() {
+    for (const h of discoverSessions()) {
+      let s = this.sessions.get(h.name);
+      if (!s) {
+        s = { ...h, online: false, events: 0, procInfo: new Map(), tails: new Map() };
+        this.sessions.set(h.name, s);
+      }
+      if (!s.unsub) this.connect(s);
+    }
+  }
+
+  private async connect(s: Sess) {
+    try {
+      s.unsub = await subscribe(
+        s.socket,
+        () => {
+          s.events++;
+          s.lastEventAt = Date.now();
+          this.scheduleSnapshot(s);
+        },
+        () => {
+          s.unsub = undefined;
+          s.online = false;
+          this.scheduleRebuild();
+        },
+      );
+      s.online = true;
+      s.error = undefined;
+    } catch (e: any) {
+      s.online = false;
+      s.error = e?.code === "ENOENT" || e?.code === "ECONNREFUSED" ? "stopped" : String(e?.message ?? e);
+    }
+  }
+
+  /** Events arrive in bursts (a tab close emits several); coalesce into one snapshot. */
+  private scheduleSnapshot(s: Sess) {
+    if (s.refreshTimer) return;
+    s.refreshTimer = setTimeout(async () => {
+      s.refreshTimer = undefined;
+      await this.refreshSnapshot(s);
+      const missing = (s.snap?.panes ?? []).filter((p: any) => !s.procInfo.has(p.pane_id));
+      if (missing.length) await this.refreshProcInfo(false, s, missing.map((p: any) => p.pane_id));
+    }, 30);
+  }
+
+  private async refreshSnapshot(s: Sess) {
+    try {
+      const r = await call(s.socket, "session.snapshot");
+      s.snap = r.snapshot;
+      s.online = true;
+      s.error = undefined;
+    } catch (e: any) {
+      if (s.online) s.error = String(e?.message ?? e);
+      s.online = false;
+      if (e?.code === "ENOENT" || e?.code === "ECONNREFUSED") s.error = "stopped";
+    }
+    this.scheduleRebuild();
+  }
+
+  // ── enrichment ───────────────────────────────────────────────────────────
+
+  private async refreshProcs() {
+    try {
+      this.procs = await readProcs();
+      this.kids = childrenIndex(this.procs);
+      this.scheduleRebuild();
+    } catch {}
+  }
+
+  private async refreshProcInfo(all: boolean, only?: Sess, paneIds?: string[]) {
+    const jobs: Promise<void>[] = [];
+    for (const s of only ? [only] : this.sessions.values()) {
+      if (!s.online || !s.snap) continue;
+      const ids: string[] = paneIds ?? s.snap.panes.map((p: any) => p.pane_id);
+      for (const id of ids) {
+        jobs.push(
+          call(s.socket, "pane.process_info", { pane_id: id })
+            .then((r) => { s.procInfo.set(id, { shellPid: r.process_info.shell_pid, fg: r.process_info.foreground_processes ?? [] }); })
+            .catch(() => {}),
+        );
+      }
+      const live = new Set(s.snap.panes.map((p: any) => p.pane_id));
+      for (const id of s.procInfo.keys()) if (!live.has(id)) s.procInfo.delete(id);
+    }
+    await Promise.all(jobs);
+    if (all || jobs.length) this.scheduleRebuild();
+  }
+
+  /** Shells take seconds to start; keep re-checking what young panes are running. */
+  private async refreshYoungProcInfo() {
+    const now = Date.now();
+    for (const s of this.sessions.values()) {
+      if (!s.online || !s.snap) continue;
+      const young = s.snap.panes
+        .map((p: any) => p.pane_id)
+        .filter((id: string) => {
+          const pi = s.procInfo.get(id);
+          const started = pi && this.procs.get(pi.shellPid)?.startedAt;
+          return !pi || !started || now - started < 60_000;
+        });
+      if (young.length) await this.refreshProcInfo(false, s, young);
+    }
+  }
+
+  private async refreshTails() {
+    const jobs: Promise<void>[] = [];
+    for (const s of this.sessions.values()) {
+      if (!s.online || !s.snap) continue;
+      for (const p of s.snap.panes) {
+        jobs.push(
+          call(s.socket, "pane.read", { pane_id: p.pane_id, source: "recent", lines: 80 })
+            .then((r) => { s.tails.set(p.pane_id, cleanTail(r.read?.text ?? "", 4)); })
+            .catch(() => {}),
+        );
+      }
+    }
+    await Promise.all(jobs);
+    this.scheduleRebuild();
+  }
+
+  private async refreshMetas() {
+    const claimed = new Set<string>();
+    const jobs: Promise<void>[] = [];
+    const opencodePanes: [string, any][] = [];
+    for (const s of this.sessions.values()) {
+      if (!s.online || !s.snap) continue;
+      for (const p of s.snap.panes) {
+        const key = `${s.name}/${p.pane_id}`;
+        const id = p.agent_session?.value;
+        if (p.agent === "claude" && id) jobs.push(claudeMeta(id).then((m) => { this.metas.set(key, m); }).catch(() => {}));
+        else if (p.agent === "codex" && id) jobs.push(codexMeta(id).then((m) => { this.metas.set(key, m); }).catch(() => {}));
+        else if (p.agent === "opencode") {
+          if (id) claimed.add(id);
+          opencodePanes.push([key, p]);
+        } else this.metas.delete(key);
+      }
+    }
+    await Promise.all(jobs);
+    // Panes with a known id or an exact title claim their sessions before directory-only guesses run.
+    opencodePanes.sort((a, b) => Number(!!b[1].agent_session?.value) - Number(!!a[1].agent_session?.value));
+    for (const [key, p] of opencodePanes) {
+      const m = opencodeMeta({ id: p.agent_session?.value, cwd: p.cwd, terminalTitle: p.terminal_title_stripped, claimed });
+      if (m) {
+        if (m.sessionId) claimed.add(m.sessionId);
+        this.metas.set(key, m);
+      } else this.metas.delete(key);
+    }
+    this.scheduleRebuild();
+  }
+
+  private async refreshGit() {
+    const cwds = new Set<string>();
+    for (const s of this.sessions.values()) for (const p of s.snap?.panes ?? []) cwds.add(p.cwd);
+    const queue = [...cwds];
+    const worker = async () => {
+      for (let cwd; (cwd = queue.shift()); ) {
+        try {
+          const root = await sh(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);
+          if (!root) { this.git.set(cwd, { at: Date.now() }); continue; }
+          const st = await sh(["git", "-C", cwd, "status", "--porcelain=v1", "-b", "--untracked-files=no"]);
+          const lines = st.split("\n").filter(Boolean);
+          const branch = lines[0]?.replace(/^## /, "").split("...")[0].replace(/^No commits yet on /, "");
+          this.git.set(cwd, { at: Date.now(), root, branch, dirty: Math.max(0, lines.length - 1) });
+        } catch {}
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    this.scheduleRebuild();
+  }
+
+  // ── rows ─────────────────────────────────────────────────────────────────
+
+  private scheduleRebuild() {
+    if (this.rebuildTimer) return;
+    this.rebuildTimer = setTimeout(() => {
+      this.rebuildTimer = undefined;
+      this.rebuildNow();
+    }, 25);
+  }
+
+  rebuildNow() {
+    const rows = new Map<string, Row>();
+    const now = Date.now();
+    for (const s of this.sessions.values()) {
+      if (!s.online || !s.snap) continue;
+      const tabs = new Map<string, any>(s.snap.tabs.map((t: any) => [t.tab_id, t]));
+      const wss = new Map<string, any>(s.snap.workspaces.map((w: any) => [w.workspace_id, w]));
+      for (const p of s.snap.panes) {
+        const key = `${s.name}/${p.pane_id}`;
+        const tab = tabs.get(p.tab_id) ?? {};
+        const pi = s.procInfo.get(p.pane_id);
+        const meta = this.metas.get(key);
+        const shell = pi ? this.procs.get(pi.shellPid) : undefined;
+        const usage = pi ? treeUsage(pi.shellPid, this.procs, this.kids) : { rssKB: 0, cpu: 0, count: 0 };
+        const fg = pi?.fg ?? [];
+        const shellOnly = !p.agent && !!pi && isShellOnly(fg);
+        const agentProc = fg.find((f) => f.argv0 === p.agent || f.name === p.agent) ?? fg.find((f) => /claude|codex|opencode/.test(f.cmdline ?? ""));
+        const lead = fg[fg.length - 1];
+        const g = this.git.get(p.cwd);
+        const empty = shellOnly || (!!p.agent && !!meta?.empty);
+        const lastActiveAt = meta?.lastActiveAt;
+        let termTitle = cleanTitle(p.terminal_title_stripped, basename(p.cwd));
+        // A title that is just the launch command ("claude --dangerously-…") says nothing about the work.
+        if (p.agent && (termTitle === p.agent || termTitle.startsWith(`${p.agent} `))) termTitle = "";
+        const title =
+          meta?.title && p.agent === "opencode" ? meta.title
+          : termTitle || meta?.title || shortPrompt(meta?.firstPrompt) || p.label || (shellOnly ? "shell" : lead?.cmdline ?? "");
+        const status = empty && p.agent_status !== "working" ? "empty" : p.agent_status ?? "unknown";
+        rows.set(key, {
+          key,
+          herdr: s.name,
+          workspaceId: p.workspace_id,
+          workspace: wss.get(p.workspace_id)?.label ?? p.workspace_id,
+          tabId: p.tab_id,
+          tab: tab.label ?? "",
+          tabNumber: tab.number ?? 0,
+          tabPanes: tab.pane_count ?? 1,
+          paneId: p.pane_id,
+          agent: p.agent ?? (shellOnly ? "shell" : lead?.name ?? "process"),
+          status,
+          focused: !!p.focused && s.snap.focused_pane_id === p.pane_id,
+          title,
+          firstPrompt: meta?.firstPrompt,
+          lastMessage: meta?.lastMessage,
+          cwd: p.cwd,
+          project: basename(g?.root ?? p.cwd),
+          branch: g?.branch,
+          dirty: g?.dirty,
+          startedAt: (agentProc && this.procs.get(agentProc.pid)?.startedAt) ?? shell?.startedAt,
+          createdAt: meta?.createdAt,
+          lastActiveAt,
+          model: meta?.model,
+          ctxTokens: meta?.ctxTokens,
+          ctxWindow: meta?.ctxWindow,
+          cost: meta?.cost,
+          rssKB: usage.rssKB,
+          cpu: Math.round(usage.cpu * 10) / 10,
+          procs: usage.count,
+          command: p.agent ? agentProc?.cmdline : lead?.cmdline,
+          sessionId: meta?.sessionId ?? p.agent_session?.value,
+          resume: resumeCommand(p.agent, meta?.sessionId ?? p.agent_session?.value),
+          tail: s.tails.get(p.pane_id) ?? [],
+          empty,
+          stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && status !== "working" && status !== "blocked",
+          duplicate: false,
+          approx: !!meta?.approx,
+        });
+      }
+    }
+    // Two panes on the same agent conversation: one of them is redundant.
+    const bySession = new Map<string, Row[]>();
+    for (const r of rows.values()) {
+      if (!r.sessionId) continue;
+      const k = `${r.agent}:${r.sessionId}`;
+      bySession.set(k, [...(bySession.get(k) ?? []), r]);
+    }
+    for (const group of bySession.values()) if (group.length > 1) for (const r of group) r.duplicate = true;
+
+    this.rows = rows;
+    this.emit();
+  }
+
+  summary() {
+    return {
+      at: Date.now(),
+      herdr: [...this.sessions.values()].map((s) => ({ name: s.name, online: s.online, error: s.error, version: s.snap?.version })),
+    };
+  }
+
+  health() {
+    return {
+      rows: this.rows.size,
+      herdr: [...this.sessions.values()].map((s) => ({ name: s.name, online: s.online, subscribed: !!s.unsub, events: s.events, lastEventAt: s.lastEventAt })),
+    };
+  }
+
+  private emit() {
+    const upsert: Row[] = [];
+    const remove: string[] = [];
+    for (const [k, r] of this.rows) {
+      const json = JSON.stringify(r);
+      if (this.sent.get(k) !== json) {
+        this.sent.set(k, json);
+        upsert.push(r);
+      }
+    }
+    for (const k of this.sent.keys()) if (!this.rows.has(k)) { this.sent.delete(k); remove.push(k); }
+    const summary = this.summary();
+    const summaryJson = JSON.stringify(summary.herdr);
+    if (!upsert.length && !remove.length && summaryJson === this.lastSummary) return;
+    this.lastSummary = summaryJson;
+    for (const fn of this.listeners) fn({ upsert, remove, summary });
+  }
+  private lastSummary = "";
+
+  find(key: string) {
+    const r = this.rows.get(key);
+    const s = r && this.sessions.get(r.herdr);
+    return r && s ? { row: r, sess: s } : undefined;
+  }
+
+  /** Force a fresh snapshot right after an action so the UI reflects it without waiting for events. */
+  async kick(herdr: string) {
+    const s = this.sessions.get(herdr);
+    if (s) await this.refreshSnapshot(s);
+  }
+}
+
+export type Patch = { upsert: Row[]; remove: string[]; summary: ReturnType<Deck["summary"]> };
+
+function shortPrompt(p?: string) {
+  if (!p) return "";
+  return p.length > 80 ? p.slice(0, 79) + "…" : p;
+}
+
+/** Agents decorate terminal titles: OpenCode prefixes "OC | ", Codex appends " | <dir>". */
+export function cleanTitle(t: string | undefined, dir: string) {
+  let s = (t ?? "").replace(/^OC \| /, "").trim();
+  if (s.endsWith(` | ${dir}`)) s = s.slice(0, -(dir.length + 3));
+  return s === "OpenCode" || s === "Claude Code" ? "" : s;
+}
+
+async function sh(cmd: string[]): Promise<string> {
+  const p = Bun.spawn(cmd, { stdout: "pipe", stderr: "ignore" });
+  const out = await new Response(p.stdout).text();
+  await p.exited;
+  return p.exitCode === 0 ? out.trim() : "";
+}

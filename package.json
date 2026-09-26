@@ -1,0 +1,11 @@
+{
+  "name": "herdr-deck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun src/server.ts",
+    "dev": "DECK_DEV=1 bun --watch src/server.ts",
+    "test": "bun test"
+  }
+}
