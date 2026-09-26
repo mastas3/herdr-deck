@@ -9,6 +9,60 @@ function store(k, v) { try { localStorage.setItem("deck:" + k, JSON.stringify(v)
 function load(k, d) { try { const v = localStorage.getItem("deck:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } }
 /** Live rows, plus past sessions opened from History (kept out of the live list). */
 const rowOf = (k) => S.rows.get(k) ?? S.hrows.get(k);
+
+// ── detail-pane logic (pure: no DOM, no S) ── test/detail.test.ts evaluates this block on its own.
+const TABS = ["chat", "agents", "about", "images", "info"];
+/** The tab the detail pane really shows: a tab with nothing in it (and simple mode) falls back to Chat. */
+function effTab(tab, d, simple) {
+  if (simple || !TABS.includes(tab)) return "chat";
+  if (tab === "images" && !d?.imagesTotal) return "chat";
+  if (tab === "agents" && !d?.subagents?.length) return "chat";
+  return tab;
+}
+/** Opening a different session always starts on Chat; re-rendering the same one keeps its tab. */
+const tabAfterSelect = (prevKey, key, tab) => (prevKey === key ? tab : "chat");
+/** What Esc does, innermost first: picked messages, an open view, a subagent, the search, a selection, then home. */
+function escAction(s) {
+  if (s.chatPicks) return "picks";
+  if (s.mode) return "mode";
+  if (s.sub) return "sub";
+  if (s.q) return "search";
+  if (s.picked) return "picked";
+  if (s.sel && !s.board) return "home";
+  return null;
+}
+/** A permission prompt as Approve / Deny plus whatever other options it has. Deny falls back to Esc. */
+function permChoices(d) {
+  const t = (o) => String(o.title ?? "").replace(/[*_`]/g, "").trim();
+  const approve = d.options.find((o) => /^(yes|allow|approve|proceed|confirm|continue|trust)\b/i.test(t(o))) ?? null;
+  const deny = d.options.find((o) => o !== approve && /^(no|deny|reject|cancel|don.?t|exit)\b/i.test(t(o))) ?? { id: "esc", title: "Deny (Esc)", keys: ["esc"], synthetic: true };
+  return { approve, deny, rest: d.options.filter((o) => o !== approve && o !== deny) };
+}
+/** Context use for the status line. A percentage only when the window is known (or a safe guess for Claude/Codex). */
+function ctxInfo(r) {
+  if (r?.ctxTokens == null) return null;
+  let win = r.ctxWindow || null;
+  if (!win && r.agent === "claude") win = /\[1m\]|1m/i.test(r.model ?? "") || r.ctxTokens > 200_000 ? 1_000_000 : 200_000;
+  if (!win && r.agent === "codex") win = 272_000;
+  return { tokens: r.ctxTokens, window: win, pct: win ? Math.min(100, (r.ctxTokens / win) * 100) : null, guessed: !r.ctxWindow && !!win };
+}
+/** The proof-of-done chip: class, label and what it does. */
+function checkInfo(c, project) {
+  if (!c || c.state === "skipped") return null;
+  const cmd = c.cmd ? `\`${c.cmd}\`` : "the project’s checks";
+  const map = {
+    "needs-approval": ["ask", "Verify it’s done", `Proof of done: runs ${cmd} in ${project || "the project"}’s folder to check the agent’s work really passes. You approve the command once per project.`],
+    pass: ["ok", "✓ Checks pass", `Proof of done: ${cmd} passed. Click to see the output, run it again or change it.`],
+    fail: ["bad", "✗ Checks fail", `Proof of done: ${cmd} failed${c.exit != null ? ` (exit ${c.exit})` : ""}. Click to see the output, run it again or change it.`],
+    running: ["run", "Checking…", `Proof of done: running ${cmd} now.`],
+    queued: ["run", "Check queued", `Proof of done: ${cmd} runs next.`],
+    error: ["bad", "Check error", `Proof of done: ${cmd} couldn’t run.`],
+  };
+  const m = map[c.state];
+  return m ? { cls: m[0], label: m[1], tip: m[2] } : null;
+}
+const dirtyText = (n) => (n ? `${n} uncommitted` : "");
+// ── end detail-pane logic
 const S = {
   token: "", self: "", rows: new Map(), hrows: new Map(), summary: { herdr: [], machines: [] }, graveyard: [], tools: [], toolGroups: {},
   mode: null, usage: {}, hist: {}, decisions: [], jev: {}, canShare: false, done: new Map(),
@@ -101,6 +155,8 @@ const ICON = {
   jump: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3H3v10h10v-3M9 2h5v5M14 2 7.5 8.5"/></svg>',
   star: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8 9.5 6l4.3.2-3.4 2.7 1.2 4.2L8 10.7l-3.6 2.4 1.2-4.2L2.2 6.2 6.5 6z"/></svg>',
   bot: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="10" height="8" rx="2"/><path d="M8 2.5V5M6 9h.01M10 9h.01"/></svg>',
+  home: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 7.2 8 2.8l5.5 4.4M4 6v7h3v-3.5h2V13h3V6"/></svg>',
+  warn: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 2.2 14.3 13H1.7z"/><path d="M8 6.5v3M8 11.4h.01"/></svg>',
   link: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-.9.9M9.5 6.5a3 3 0 0 0-4.2 0L3 8.8a3 3 0 0 0 4.2 4.2l.9-.9"/></svg>',
   term: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m5 7 2 1.5L5 10M8.5 10.5H11"/></svg>',
 };
@@ -751,6 +807,7 @@ let briefTimer = null;
 function select(key, opts = {}) {
   if (!key || !rowOf(key)) return;
   const changed = S.sel !== key;
+  S.tab = tabAfterSelect(S.sel, key, S.tab);
   S.sel = key;
   S.board = false;
   S.mode = null;
@@ -838,7 +895,7 @@ async function chatTick(now) {
   const key = S.sel, sub = S.sub;
   const r = rowOf(key);
   if (!r) return;
-  const visible = !S.board && S.tab === "chat" && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
+  const visible = chatOn() && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
   const c = chatOf(chatId(key, sub));
   const live = r.status === "working" || r.status === "blocked" || (r.subagents ?? []).some((x) => x.running) || c.pending.length;
   if (visible && !document.hidden && !c.busy && r.sessionId) {
@@ -944,10 +1001,12 @@ function blockHTML(b, key) {
   return `<div class="tools msg">${MSG_TOOLS}${!open ? `<button class="fold" data-fold="${b.key}">▸ ${all.length - 3} earlier tool calls</button>` : all.length > 4 ? `<button class="fold" data-fold="${b.key}">▾ hide</button>` : ""}${shown.map(line).join("")}${imgs(allImgs.slice(-6))}</div>`;
 }
 const chatDom = { key: null, blocks: [], el: null };
+/** The chat is what the detail body shows (not a view, the board, or another tab; empty tabs count as chat). */
+const chatOn = () => !!S.sel && !S.board && !S.mode && effTab(S.tab, S.details.get(S.sel)?.data, S.simple) === "chat";
 function renderChat() {
   const body = $("dbody");
   const key = S.sel;
-  if (!key || S.board || S.mode || (S.tab !== "chat" && !S.simple)) return;
+  if (!key || !chatOn()) return;
   const id = chatId(key, S.sub);
   const c = chatOf(id);
   const r = rowOf(key);
@@ -1118,7 +1177,7 @@ function toBottom(smooth) {
 function renderJumpBtn() {
   const btn = $("jumpBottom");
   if (!btn) return;
-  const show = S.tab === "chat" && !S.board && !S.mode && !scrollPin.stick && !!chatDom.el;
+  const show = chatOn() && !scrollPin.stick && !!chatDom.el;
   btn.hidden = !show;
   if (show) btn.style.bottom = Math.max(14, $("detail").getBoundingClientRect().bottom - $("dbody").getBoundingClientRect().bottom + 14) + "px";
   btn.classList.toggle("has-new", scrollPin.unread > 0);
@@ -1134,17 +1193,17 @@ $("dbody").addEventListener("scroll", () => {
   else if (!mine) scrollPin.stick = gap < 40;
   scrollPin.anchor = scrollPin.stick ? null : takeAnchor();
   if (scrollPin.stick) scrollPin.unread = 0;
-  if (S.tab === "chat" && body.scrollTop < 240) loadEarlier();
+  if (chatOn() && body.scrollTop < 240) loadEarlier();
   renderJumpBtn();
 }, { passive: true });
 // Late layout (images, code blocks, fonts): stay pinned, or keep the anchor still.
 new ResizeObserver(() => {
-  if (S.tab !== "chat" || S.board || S.mode || !chatDom.el) return;
+  if (!chatOn() || !chatDom.el) return;
   if (scrollPin.stick) setScroll($("dbody").scrollHeight);
   else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
 }).observe($("dbody"));
 const chatSizeObs = new ResizeObserver(() => {
-  if (S.tab !== "chat" || S.board || S.mode || !chatDom.el) return;
+  if (!chatOn() || !chatDom.el) return;
   if (scrollPin.stick) setScroll($("dbody").scrollHeight);
   else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
 });
@@ -1158,8 +1217,8 @@ function renderDetail() {
   $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
-  const tab = S.simple ? "chat" : S.tab === "images" && !d?.imagesTotal ? "chat" : S.tab === "agents" && !d?.subagents?.length ? "chat" : S.tab;
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.ctxTokens, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
+  const tab = effTab(S.tab, d, S.simple);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -1192,7 +1251,7 @@ function renderDetail() {
     return;
   }
   const bs = JSON.stringify([tab, r.key, d, r.subagents, briefBusy.has(r.key)]);
-  if (bs === bodySig) return;
+  if (bs === bodySig && $("dbody").firstElementChild?.classList.contains("pad")) return;
   bodySig = bs;
   chatDom.key = null;
   const box = $("dbody");
@@ -1201,35 +1260,29 @@ function renderDetail() {
   box.scrollTop = scroll;
 }
 function renderHead(r, d, tab) {
-  const created = d?.startedAt ?? r.createdAt;
-  const where = [
-    `<span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>`,
-    r.launch ? `<span title="Started in ${esc(home(r.cwd))}">via ${esc(r.launch)}</span>` : "",
-    multiMachine() ? `<span>${esc(machineLabel(r.machine))}</span>` : "",
-    `<span>${paneTag(r)}</span>`,
-    r.branch ? `<span>${esc(r.branch)}${r.dirty ? ` · ${r.dirty} uncommitted` : ""}</span>` : "",
-    r.duplicate ? `<span class="warn">another pane has this conversation</span>` : "",
-    ...(r.ports ?? []).map((p) => p.url
-      ? `<a class="port on" href="${esc(p.url)}" target="_blank" rel="noopener" title="Open on your tailnet: ${esc(p.url)}">${ICON.globe}${esc(String(p.port))} ↗</a><button class="port-x" data-dact="unshare" data-port="${p.port}" title="Stop sharing">×</button>`
-      : `<button class="port" data-dact="share" data-port="${p.port}" title="${esc(p.cmd)} is serving on :${p.port}. Share it on your tailnet">${ICON.globe}:${p.port} · share</button>`),
-    r.check ? checkChip(r.check) : "",
-  ].join("");
+  // Title first, then one compact meta row: the signals that matter (status, uncommitted work, proof of done) lead.
+  const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
   const meta = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
-    `<span>${esc(r.agent)}${r.model ? ` · ${esc(r.model.replace(/^claude-/, ""))}` : ""}</span>`,
-    created ? `<span>started <b>${esc(DF.format(new Date(created)))}</b></span>` : "",
-    r.lastActiveAt ? `<span>active <b data-t="${r.lastActiveAt}" data-fmt="long">${agoText(r.lastActiveAt)}</b></span>` : "",
-    d?.asks ? `<span><b>${d.asks}</b> ${d.asks === 1 ? "request" : "requests"}</span>` : "",
-    r.ctxTokens != null && !r.hist ? `<span><b>${tok(r.ctxTokens)}</b> context</span>` : "",
+    `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
+    r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
+    r.check ? checkChip(r.check, r.project) : "",
+    r.duplicate ? `<span class="wchip" title="Two panes are attached to this one conversation">${ICON.warn}duplicate</span>` : "",
+    ...(r.ports ?? []).map((p) => p.url
+      ? `<span class="portw"><a class="port on" href="${esc(p.url)}" target="_blank" rel="noopener" title="Open on your tailnet: ${esc(p.url)}">${ICON.globe}${esc(String(p.port))} ↗</a><button class="port-x" data-dact="unshare" data-port="${p.port}" title="Stop sharing">×</button></span>`
+      : `<button class="port" data-dact="share" data-port="${p.port}" title="${esc(p.cmd)} is serving on :${p.port}. Share it on your tailnet">${ICON.globe}:${p.port} · share</button>`),
+    r.branch ? `<span class="mono br" title="Branch">${esc(r.branch)}</span>` : "",
+    `<span class="ag">${esc(r.agent)}${r.model ? ` · ${esc(r.model.replace(/^claude-/, ""))}` : ""}</span>`,
+    multiMachine() ? `<span class="opt">${esc(machineLabel(r.machine))}</span>` : "",
+    r.lastActiveAt ? `<span class="opt" title="Last active ${esc(abs(r.lastActiveAt))}">active <b data-t="${r.lastActiveAt}" data-fmt="long">${agoText(r.lastActiveAt)}</b></span>` : "",
   ].filter(Boolean).join("");
   const subsRun = d?.subagents?.filter((x) => x.running).length;
   const tabs = [["chat", "Chat"], ["agents", "Subagents", d?.subagents?.length, subsRun], ["about", "About"], ["images", "Images", d?.imagesTotal], ["info", "Info"]]
     .filter(([k, , n]) => (k !== "images" && k !== "agents") || n)
     .map(([k, label, n, run]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${label}${n ? ` <span class="n">${run ? `${run} running · ` : ""}${n}</span>` : ""}</button>`).join("");
   const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
-  setHTML($("dh"), `<div class="dh-where">${where}</div>
-    <div class="dh-top"><h1 class="dh-title">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts">${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${termHidden() ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.bolt}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
+  setHTML($("dh"), `<div class="dh-top"><h1 class="dh-title" title="${esc(r.title || "")}">${esc(r.title || "(untitled)")}</h1>
+      <div class="dh-acts"><button class="ib desk" data-dact="home" aria-label="Home" title="Home: the live board (Esc)">${ICON.home}</button>${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${termHidden() ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.bolt}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
     <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
 }
@@ -1317,6 +1370,10 @@ function factsHTML(r, d) {
   fact("Command", esc(r.command), true);
   fact("Resume with", esc(r.resume), true);
   fact("Model", esc(r.model));
+  fact("Launched via", esc(r.launch));
+  fact("Conversation started", (d?.startedAt ?? r.createdAt) ? esc(abs(d?.startedAt ?? r.createdAt)) : "");
+  fact("Requests", d?.asks || "");
+  fact("Branch", r.branch ? `${esc(r.branch)}${r.dirty ? ` · ${r.dirty} uncommitted` : ""}` : "", true);
   fact("Context", r.ctxTokens != null ? `${tok(r.ctxTokens)} tokens${r.ctxWindow ? ` of ${tok(r.ctxWindow)}` : ""}` : "");
   fact("Agent work", d?.workMs ? dur(d.workMs) : "");
   fact("Compactions", d?.compactions || "");
@@ -1329,33 +1386,90 @@ function factsHTML(r, d) {
 }
 const imgUrl = (key, id, sub) => `/api/image?key=${encodeURIComponent(key)}&id=${encodeURIComponent(id)}${sub ? `&sub=${encodeURIComponent(sub)}` : ""}&t=${encodeURIComponent(S.token)}`;
 
-// Live board: everything working or waiting, at a glance.
+// Home: the live board. Everything working or waiting, at a glance, with pending questions answerable in place.
+/** The one-tap answers on a board card: a permission prompt gets Approve / Deny first; questions look like the list's. */
+function boardAsk(r) {
+  const d = pendingAsk(r);
+  if (!d) return "";
+  if (d.kind !== "prompt") return rowAsk(r);
+  const { approve, deny, rest } = permChoices(d);
+  if (!approve) return rowAsk(r);
+  const chip = (o) => `<button class="ropt" data-ropt="${esc(o.id)}" title="${esc(o.title)}"><span class="ol">${esc(String(o.id).toUpperCase())}</span>${esc(plain(o.title).slice(0, 44))}${plain(o.title).length > 44 ? "…" : ""}</button>`;
+  return `<div class="rask perm" data-rask="${esc(r.key)}"><div class="rq">${esc(plain(d.question))}</div><div class="ropts"><button class="ropt yes" data-ropt="${esc(approve.id)}" title="${esc(approve.title)}">${ICON.check}Approve</button><button class="ropt no" data-rdeny title="${esc(deny.title)}">Deny</button>${rest.slice(0, 3).map(chip).join("")}<button class="ropt ghost" data-rreply>Other…</button></div></div>`;
+}
+function boardCard(r) {
+  const subs = (r.subagents ?? []).filter((x) => x.running);
+  const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
+  const ask = boardAsk(r);
+  const tail = (r.tail ?? []).slice(-4).join("\n");
+  return `<div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
+      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>
+      ${ask ? "" : r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.step || r.now ? `<div class="now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span> ` : ""}${esc(r.step ?? "")}${r.step && r.now ? " · " : ""}${esc(nowWords(r.now))}</div>` : ""}
+      ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
+      ${ask || (tail.trim() ? `<pre>${ansi(tail)}</pre>` : "")}`;
+}
+/** Keyed update of one grid of cards: only cards whose content changed are touched; new ones ease in. */
+function syncCards(grid, rows, animate) {
+  const have = new Map([...grid.children].map((el) => [el.dataset.card, el]));
+  let prev = null;
+  for (const r of rows) {
+    let el = have.get(r.key);
+    have.delete(r.key);
+    if (!el) { el = document.createElement("div"); el.className = "card" + (animate ? " enter" : ""); el.dataset.card = r.key; }
+    if (el.dataset.status !== r.status) el.dataset.status = r.status;
+    el.classList.toggle("asks", !!pendingAsk(r));
+    setHTML(el, boardCard(r));
+    const want = prev ? prev.nextElementSibling : grid.firstElementChild;
+    if (want !== el) grid.insertBefore(el, want);
+    prev = el;
+  }
+  for (const el of have.values()) el.remove();
+}
 function renderBoard() {
   $("dh").hidden = true; $("nowbar").hidden = true; $("askbox").hidden = true; $("composer").hidden = true; $("subcrumb").hidden = true;
   $("statusline").hidden = true; $("appbar").hidden = true; $("jumpBottom").hidden = true;
   $("dbody")._mode = null;
   chatDom.key = null;
   const rows = [...S.rows.values()].filter(inScope);
-  const live = rows.filter((r) => r.status === "working" || r.status === "blocked").sort((a, b) => (a.status === "blocked" ? 0 : 1) - (b.status === "blocked" ? 0 : 1) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
-  const done = rows.filter(unseenDone).sort((a, b) => act(b) - act(a));
-  const card = (r) => {
-    const subs = (r.subagents ?? []).filter((x) => x.running);
-    const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
-    return `<div class="card" data-card="${esc(r.key)}" data-status="${r.status}"><div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
-      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>
-      ${r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.step || r.now ? `<div class="now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span> ` : ""}${esc(r.step ?? "")}${r.step && r.now ? " · " : ""}${esc(nowWords(r.now))}</div>` : ""}
-      ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
-      <pre>${ansi((r.tail ?? []).slice(-4).join("\n"))}</pre></div>`;
-  };
-  const n = live.length;
-  const html = `<div class="d-empty"><h2>${n ? `${live.filter((r) => r.status === "working").length} working, ${live.filter((r) => r.status === "blocked").length} waiting for you` : "Nothing running right now"}</h2><p>${n ? "Live. Click a card to open it." : "Pick a session, press ⌘K to find anything, or n to start one."}</p>
-    ${n ? `<div class="board">${live.map(card).join("")}</div>` : `<p><button class="btn primary" data-dact="new">New session</button></p>`}
-    ${done.length ? `<h4 class="hint" style="margin:22px 0 8px;font-size:14px">Finished, not looked at yet</h4><div class="board">${done.slice(0, 12).map(card).join("")}</div>` : ""}</div>`;
+  const waits = (r) => r.status === "blocked" || !!pendingAsk(r);
+  const live = rows.filter((r) => r.status === "working" || waits(r)).sort((a, b) => Number(waits(b)) - Number(waits(a)) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
+  const done = rows.filter((r) => unseenDone(r) && !live.includes(r)).sort((a, b) => act(b) - act(a)).slice(0, 12);
+  const nWork = live.filter((r) => r.status === "working" && !waits(r)).length, nWait = live.filter(waits).length;
   const box = $("dbody");
-  if (box._board !== html) { box.innerHTML = html; box._board = html; }
+  let root = box.firstElementChild;
+  const fresh = !root?.hasAttribute("data-home");
+  if (fresh) {
+    box.innerHTML = `<div class="d-empty" data-home><div class="hh"></div><div class="board" data-bl="live"></div><h4 class="hint bh" hidden>Finished, not looked at yet</h4><div class="board" data-bl="done"></div></div>`;
+    root = box.firstElementChild;
+    box.scrollTop = 0;
+  }
+  setHTML(root.querySelector(".hh"), `<h2>${live.length ? `${nWork} working, ${nWait} waiting for you` : "Nothing running right now"}</h2><p>${live.length ? `Live. ${nWait ? "Answer right here, or click" : "Click"} a card to open it.` : "Pick a session, press ⌘K to find anything, or n to start one."}</p>${live.length ? "" : `<p><button class="btn primary" data-dact="new">New session</button></p>`}`);
+  syncCards(root.querySelector('[data-bl="live"]'), live, !fresh);
+  syncCards(root.querySelector('[data-bl="done"]'), done, !fresh);
+  root.querySelector(".bh").hidden = !done.length;
   bodySig = "board"; headSig = "";
   $("tTitle").textContent = "Terminal";
+  setHTML($("mTitle"), "Live board");
 }
+// Answers on board cards go straight to the agent; the rest of the card opens the session.
+$("dbody").addEventListener("click", async (e) => {
+  const box = e.target.closest(".card [data-rask]");
+  if (!box) return;
+  e.stopPropagation();
+  const key = box.dataset.rask, d = pendingAsk({ key });
+  if (!d) return;
+  const pick = e.target.closest("[data-ropt], [data-rdeny]");
+  if (pick) {
+    const o = pick.hasAttribute("data-rdeny") ? permChoices(d).deny : d.options.find((x) => String(x.id) === pick.dataset.ropt);
+    if (!o) return;
+    box.classList.add("sending");
+    try { await answerOption(d, o); toast(`${pick.classList.contains("no") ? "Denied" : pick.classList.contains("yes") ? "Approved" : "Answered"}: ${plain(d.question).slice(0, 60)}`); render(); renderViews(); }
+    catch (x) { box.classList.remove("sending"); toast(x.message, true); }
+    return;
+  }
+  if (e.target.closest("[data-rreply], [data-ropen]")) { select(key, { scroll: true, open: true }); if (e.target.closest("[data-rreply]")) focusReply(); return; }
+  select(key, { scroll: true, open: true });
+}, true);
 
 const briefBusy = new Set();
 async function writeBrief(key = S.sel, auto = false) {
@@ -1933,7 +2047,9 @@ function openSub(id) {
   renderDetail();
   chatTick(true);
 }
-function setBoard(on) { S.board = on; headSig = ""; bodySig = ""; if (on && isPhone()) setMView("detail", true); render(); syncUrl(); if (!on) chatTick(true); }
+function setBoard(on) { S.board = on; if (on) S.mode = null; headSig = ""; bodySig = ""; if (on && isPhone()) setMView("detail", true); render(); syncUrl(); if (!on) chatTick(true); }
+/** Home is the live board: what's running and what's waiting on you, answerable in place. */
+function goHome() { if (!S.board || S.mode) setBoard(true); }
 
 // ── tools (replace recipes) ──────────────────────────────────────────────
 const TI2 = (d) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -2037,10 +2153,9 @@ $("dbody").addEventListener("click", (e) => { if (e.target.closest("[data-vclose
 // Inbox ────────────────────────────────────────────────────────────────────
 S.inboxFilter = load("inboxFilter", "all");
 const KIND = { prompt: ["Needs permission", "blocked"], question: ["Asks you", "done"], review: ["Says it’s done", "working"] };
-function checkChip(c) {
-  if (!c) return "";
-  const m = { pass: ["ok", `✓ checks pass`], fail: ["bad", `✗ checks fail`], running: ["run", `checking…`], queued: ["run", `check queued`], "needs-approval": ["ask", `verify?`], error: ["bad", "check error"], skipped: ["", ""] }[c.state] ?? ["", ""];
-  return m[1] ? `<button class="chk ${m[0]}" data-dact="check" title="${esc(c.cmd ?? "")}${c.at ? ` · ${esc(agoText(c.at))}` : ""}">${m[1]}</button>` : "";
+function checkChip(c, project) {
+  const m = checkInfo(c, project);
+  return m ? `<button class="chk ${m.cls}" data-dact="check" title="${esc(m.tip)}${c.at ? ` · ${esc(agoText(c.at))}` : ""}">${m.cls === "ask" ? ICON.check : ""}${esc(m.label)}</button>` : "";
 }
 function jevLine(d) {
   const j = d.jev;
@@ -2607,16 +2722,10 @@ async function suggestProjects() {
 }
 
 // ── status line: project, context, plan limits ──────────────────────────────
-function ctxWindow(r) {
-  if (r.ctxWindow) return r.ctxWindow;
-  if (/\[1m\]|1m/i.test(r.model ?? "") || (r.ctxTokens ?? 0) > 200_000) return 1_000_000;
-  if (r.agent === "codex") return 272_000;
-  return 200_000;
-}
-function meter(pct, label, title, resets) {
+function meter(pct, label, title, resets, extra) {
   const p = Math.max(0, Math.min(100, Math.round(pct)));
   const cls = p >= 85 ? "hot" : p >= 60 ? "warm" : "";
-  return `<span class="meter ${cls}" title="${esc(title)}${resets ? ` · resets ${esc(inText(resets))}` : ""}"><span class="ml">${esc(label)}</span><span class="mb"><i style="width:${p}%"></i></span><b>${p}%</b></span>`;
+  return `<span class="meter ${cls}" title="${esc(title)}${resets ? ` · resets ${esc(inText(resets))}` : ""}"><span class="ml">${esc(label)}</span><span class="mb"><i style="width:${p}%"></i></span><b>${p}%</b>${extra ? `<span class="mx">${esc(extra)}</span>` : ""}</span>`;
 }
 function inText(t) { const ms = t - Date.now(); if (ms <= 0) return "now"; const h = Math.floor(ms / 3600_000), m = Math.round((ms % 3600_000) / 60_000); return h >= 24 ? `in ${Math.floor(h / 24)}d ${h % 24}h` : h ? `in ${h}h ${m}m` : `in ${m}m`; }
 function renderStatusLine(r) {
@@ -2625,15 +2734,18 @@ function renderStatusLine(r) {
   if (!r || r.hist || S.sub || S.mode || S.board) { el.hidden = true; return; }
   el.hidden = false;
   const parts = [`<span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>`];
-  if (r.ctxTokens != null && isAgent(r)) { const w = ctxWindow(r); parts.push(meter((r.ctxTokens / w) * 100, "context", `${tok(r.ctxTokens)} of ${tok(w)} tokens`)); }
+  const cx = isAgent(r) ? ctxInfo(r) : null;
+  if (cx?.pct != null) parts.push(meter(cx.pct, "context", `${tok(cx.tokens)} of ${tok(cx.window)} tokens in context${cx.guessed ? " (window size guessed from the model)" : ""}`, null, tok(cx.tokens)));
+  else if (cx) parts.push(`<span class="meter" title="${esc(`${cx.tokens.toLocaleString()} tokens in context; this model’s window size isn’t known`)}"><span class="ml">context</span><b>${tok(cx.tokens)}</b><span class="mx">tokens</span></span>`);
   const u = S.usage ?? {};
   if (r.agent === "claude" && u.claude) {
     const stale = u.claude.at && Date.now() - u.claude.at > 6 * 3600_000;
     if (u.claude.fiveHour != null) parts.push(meter(u.claude.fiveHour, "5h", `Claude 5-hour limit${stale ? " (last seen " + agoText(u.claude.at) + ")" : ""}`, u.claude.fiveHourResets));
     if (u.claude.weekly != null) parts.push(meter(u.claude.weekly, "week", "Claude weekly limit", u.claude.weeklyResets));
   } else if (r.agent === "codex" && u.codex?.windows?.length) {
-    for (const w of u.codex.windows) parts.push(meter(w.pct, w.label === "Weekly" ? "week" : w.label, `Codex ${w.label.toLowerCase()} limit${u.codex.plan ? ` (${u.codex.plan})` : ""}`, w.resets));
-  }
+    const stale = u.codex.at && Date.now() - u.codex.at > 6 * 3600_000;
+    for (const w of u.codex.windows) parts.push(meter(w.pct, w.label === "Weekly" ? "week" : w.label, `Codex ${w.label.toLowerCase()} limit${u.codex.plan ? ` (${u.codex.plan} plan)` : ""}${stale ? " (last seen " + agoText(u.codex.at) + ")" : ""}`, w.resets));
+  } else if (r.agent === "opencode" && r.cost) parts.push(`<span class="meter" title="What this OpenCode session has cost so far (OpenCode has no plan limits to show)"><span class="ml">spent</span><b>$${r.cost.toFixed(2)}</b></span>`);
   if (r.model) parts.push(`<span class="sl-m">${esc(r.model.replace(/^claude-/, ""))}</span>`);
   if (r.branch) parts.push(`<span class="sl-m">${esc(r.branch)}${r.dirty ? ` · ${r.dirty}±` : ""}</span>`);
   setHTML(el, parts.join(""));
@@ -2763,7 +2875,7 @@ function openMenu(anchor, items, heading, cls = "") {
     const i = bs.indexOf(document.activeElement);
     if (e.key === "ArrowDown") { e.preventDefault(); bs[(i + 1) % bs.length].focus(); }
     if (e.key === "ArrowUp") { e.preventDefault(); bs[(i - 1 + bs.length) % bs.length].focus(); }
-    if (e.key === "Escape") { closeMenu(); anchor.focus?.(); }
+    if (e.key === "Escape") { e.preventDefault(); closeMenu(); anchor.focus?.(); }
   });
 }
 function closeMenu() { menuEl?.remove(); menuEl = null; }
@@ -3160,6 +3272,7 @@ $("detail").addEventListener("click", (e) => {
   if (!b) return;
   const act = b.dataset.dact;
   if (act === "new") return openNew();
+  if (act === "home") return goHome();
   const r = rowOf(S.sel);
   if (!r) return;
   if (act === "tools") openToolMenu(b);
@@ -3299,7 +3412,7 @@ new ResizeObserver(() => fitTerm()).observe($("screen"));
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return $("palette").open ? $("palette").close() : openPalette(); }
-  if (e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
+  if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.mode === "inbox" && inboxKeydown(e)) return;
   const k = e.key, cur = S.sel && S.rows.has(S.sel) ? S.sel : null;
@@ -3327,9 +3440,15 @@ document.addEventListener("keydown", (e) => {
   else if (k === "c") { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); }
   else if (k === "?") $("help").showModal();
   else if (/^[1-9]$/.test(k)) { const ids = ["all", ...(S.summary.machines ?? []).map((m) => m.id)]; if (ids[k - 1] && ids.length > 2) setMachine(ids[k - 1]); }
-  else if (k === "Escape" && chatSel.size) clearPicks();
-  else if (k === "Escape" && S.mode) setMode(null);
-  else if (k === "Escape") { if (S.sub) { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); } else if (S.board) setBoard(false); else if (S.q) { S.q = ""; $("q").value = ""; } else if (S.picked.size) S.picked.clear(); render(); }
+  else if (k === "Escape") {
+    const a = escAction({ chatPicks: chatSel.size, mode: S.mode, sub: S.sub, q: S.q, picked: S.picked.size, sel: S.sel && rowOf(S.sel) ? S.sel : null, board: S.board });
+    if (a === "picks") clearPicks();
+    else if (a === "mode") setMode(null);
+    else if (a === "sub") { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); }
+    else if (a === "search") { S.q = ""; S.deep = null; $("q").value = ""; render(); }
+    else if (a === "picked") { S.picked.clear(); render(); }
+    else if (a === "home") goHome();
+  }
 });
 
 // ── right-click (or long-press) a session ────────────────────────────────
@@ -3474,12 +3593,8 @@ function applyFull(data) {
   S.linkDone = true;
   if (S.machine !== "all" && !S.summary.machines?.some((m) => m.id === S.machine)) S.machine = "all";
   lastOrder = "";
-  if (!S.sel || !rowOf(S.sel)) {
-    S.sel = null;
-    const saved = load("sel", null);
-    if (saved && S.rows.has(saved) && !isPhone()) return select(saved);
-    if (!isPhone()) { S.board = [...S.rows.values()].some((r) => r.status === "working" || needsYou(r)); if (!S.board) { const f = visibleRows()[0]; if (f) return select(f.key); } }
-  }
+  // No deep link: open on home, the live board (the phone opens on the list).
+  if (!S.sel || !rowOf(S.sel)) { S.sel = null; S.board = true; }
   render();
 }
 let es = null, reconnectTimer = null;
@@ -3496,6 +3611,7 @@ function connect() {
     for (const k of p.remove) { S.rows.delete(k); S.details.delete(k); }
     S.summary = p.summary;
     if (pendingSelect && rowOf(pendingSelect)) { const k = pendingSelect; pendingSelect = null; select(k, { scroll: true, open: true }); return; }
+    if (S.sel && !rowOf(S.sel) && S.board) S.sel = null;
     if (S.sel && !rowOf(S.sel)) { S.sel = null; const next = S.visible?.find((r) => S.rows.has(r.key))?.key; if (next && !isPhone()) return select(next); }
     if (S.sel && p.upsert.some((r) => r.key === S.sel)) chatTick();
     render();

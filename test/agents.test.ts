@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
+import { contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
 
 const j = (...o: object[]) => o.map((x) => JSON.stringify(x));
 
@@ -47,6 +47,29 @@ describe("Codex rollouts", () => {
       lastMessage: "Here they are.",
       empty: false,
     });
+  });
+  test("model falls back to the first turn when the tail has no turn_context; the tail's wins", () => {
+    const head = j(
+      { timestamp: "2026-07-26T22:20:53Z", type: "session_meta", payload: { timestamp: "2026-07-26T22:18:05Z" } },
+      { timestamp: "2026-07-26T22:20:54Z", type: "turn_context", payload: { model: "gpt-6-astra" } },
+      { timestamp: "2026-07-26T22:21:00Z", type: "event_msg", payload: { type: "user_message", message: "Hi" } },
+    );
+    const tail = j({ timestamp: "2026-07-27T00:49:11Z", type: "event_msg", payload: { type: "token_count", info: { last_token_usage: { input_tokens: 70000 }, model_context_window: 258400 } } });
+    expect(parseCodex(head, tail)).toMatchObject({ model: "gpt-6-astra", ctxTokens: 70000, ctxWindow: 258400 });
+    const newer = j({ timestamp: "2026-07-27T00:50:00Z", type: "turn_context", payload: { model: "gpt-6-sol" } });
+    expect(parseCodex(head, newer).model).toBe("gpt-6-sol");
+  });
+});
+
+describe("OpenCode context windows", () => {
+  const cat = { openrouter: { models: { "x-ai/grok-4.6": { limit: { context: 500000 } } } }, "x-ai": { models: { "grok-9": { limit: { context: 2000000 } } } }, odd: { models: { m: { limit: { context: 0 } } } } };
+  test("looks the model up under its provider", () => expect(contextLimit(cat, "openrouter", "x-ai/grok-4.6")).toBe(500000));
+  test("falls back to the vendor prefix of the id", () => expect(contextLimit(cat, "nowhere", "x-ai/grok-9")).toBe(2000000));
+  test("unknown or bad entries give nothing", () => {
+    expect(contextLimit(cat, "openrouter", "nope")).toBeUndefined();
+    expect(contextLimit(cat, "odd", "m")).toBeUndefined();
+    expect(contextLimit(undefined, "openrouter", "x-ai/grok-4.6")).toBeUndefined();
+    expect(contextLimit(cat, "openrouter", undefined)).toBeUndefined();
   });
 });
 

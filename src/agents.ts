@@ -1,7 +1,7 @@
 // Reads each agent's own session store to recover what herdr does not track:
 // when a conversation started, when it last did anything, model, context size, cost, last message.
 import { Database } from "bun:sqlite";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 
 export type AgentMeta = {
@@ -166,10 +166,13 @@ export function findCodexFile(id: string): string | undefined {
 
 export function parseCodex(head: string[], tail: string[]): AgentMeta {
   const meta: AgentMeta = {};
+  let headModel: string | undefined;
   for (const o of jsonLines(head)) {
     if (o.type === "session_meta") meta.createdAt = Date.parse(o.payload?.timestamp ?? o.timestamp);
     if (!meta.firstPrompt && o.type === "event_msg" && o.payload?.type === "user_message") meta.firstPrompt = clip(o.payload.message);
-    if (meta.createdAt && meta.firstPrompt) break;
+    // Long sessions log turn_context rarely, so the tail may not have one: the first turn's model is the fallback.
+    if (!headModel && o.type === "turn_context" && o.payload?.model) headModel = o.payload.model;
+    if (meta.createdAt && meta.firstPrompt && headModel) break;
   }
   for (const o of jsonLines(tail)) {
     const t = tsOf(o);
@@ -188,6 +191,7 @@ export function parseCodex(head: string[], tail: string[]): AgentMeta {
       if (text) meta.lastMessage = clip(text);
     }
   }
+  meta.model ??= headModel;
   meta.empty = !meta.firstPrompt && !meta.lastMessage && !meta.ctxTokens;
   return meta;
 }
@@ -234,8 +238,12 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
       if (ctxTokens !== undefined && lastMessage !== undefined) break outer;
     }
   }
-  let model: string | undefined;
-  try { model = row.model ? JSON.parse(row.model).id : undefined; } catch {}
+  let model: string | undefined, ctxWindow: number | undefined;
+  try {
+    const m = row.model ? JSON.parse(row.model) : undefined;
+    model = m?.id;
+    ctxWindow = contextLimit(ocModels(), m?.providerID, m?.id);
+  } catch {}
   const meta: AgentMeta = {
     sessionId: row.id,
     title: row.title,
@@ -244,12 +252,34 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
     cost: row.cost,
     model,
     ctxTokens,
+    ctxWindow,
     lastMessage,
     approx,
     empty: !lastMessage && ctxTokens === undefined,
   };
   ocDetailCache.set(row.id, { updated: row.time_updated, meta });
   return meta;
+}
+
+// OpenCode doesn't store a model's context window with the session; it caches the models.dev catalogue.
+const OC_MODELS = `${HOME}/.cache/opencode/models.json`;
+let ocModelsCache: { mtime: number; data: any } = { mtime: -1, data: undefined };
+function ocModels(): any {
+  let mtime = 0;
+  try { mtime = statSync(OC_MODELS).mtimeMs; } catch { return undefined; }
+  if (mtime !== ocModelsCache.mtime) {
+    let data: any;
+    try { data = JSON.parse(readFileSync(OC_MODELS, "utf8")); } catch {}
+    ocModelsCache = { mtime, data };
+  }
+  return ocModelsCache.data;
+}
+/** A model's context window from a models.dev-style catalogue ({ provider: { models: { id: { limit: { context } } } } }). */
+export function contextLimit(catalog: any, provider: string | undefined, id: string | undefined): number | undefined {
+  if (!catalog || !id) return;
+  const n = (p: string | undefined, m: string) => { const c = p ? catalog[p]?.models?.[m]?.limit?.context : undefined; return typeof c === "number" && c > 0 ? c : undefined; };
+  const slash = id.indexOf("/");
+  return n(provider, id) ?? (slash > 0 ? n(id.slice(0, slash), id.slice(slash + 1)) : undefined);
 }
 
 const OC_COLS = `id, title, directory, time_created, time_updated, cost, model`;
