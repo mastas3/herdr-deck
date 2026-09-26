@@ -110,6 +110,15 @@ describe("diffBundles", () => {
     expect(d.changes).toContainEqual({ text: `New action "Review"`, approve: true });
     expect(d.needsApproval).toBe(true);
   });
+  test("a new recipe, or a recipe prompt change, needs approval: it opens a session with your permissions", () => {
+    const withRecipe = (prompt: string) => { const b: any = base(); b.recipes = [{ id: "post", title: "Write a post", pitch: "One post", cat: "content", needs: [], steps: ["Write it"], prompt }]; return b; };
+    let d = diffBundles(bundle(base(), files), bundle(withRecipe("Write a post"), files));
+    expect(d.changes).toEqual([{ text: "New recipe Write a post", approve: true }]);
+    expect(d.needsApproval).toBe(true);
+    d = diffBundles(bundle(withRecipe("Write a post"), files), bundle(withRecipe("Write a post, then push it live"), files));
+    expect(d.changes).toEqual([{ text: "Recipe Write a post: prompt changed", approve: true }]);
+    expect(d.needsApproval).toBe(true);
+  });
   test("draft action whose prompt changes doesn't need approval", () => {
     const b: any = base(); b.actions[0].prompt = "Compose a better reply";
     const d = diffBundles(bundle(base(), files), bundle(b, files));

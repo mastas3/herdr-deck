@@ -65,7 +65,16 @@ describe("reading plugin folders", () => {
   test("oversized prompt files are left out", () => {
     const { base } = setup();
     writePlugin(join(base, "x"), mail(), { ...MAIL_FILES, "prompts/inbox.md": "x".repeat(70_000) });
-    expect(readFolder(join(base, "x"))["prompts/inbox.md"]).toBeUndefined();
+    const tooBig: string[] = [];
+    expect(readFolder(join(base, "x"), tooBig)["prompts/inbox.md"]).toBeUndefined();
+    expect(tooBig).toEqual(["prompts/inbox.md"]);
+  });
+  test("an oversized prompt file gets its own problem on review", () => {
+    const { catalogDir, p } = setup();
+    writePlugin(join(catalogDir, "demo-mail"), mail(), { ...MAIL_FILES, "prompts/inbox.md": "x".repeat(70_000) });
+    const pv = p.stageCatalog("demo-mail");
+    expect(pv.ok).toBe(false);
+    if (!pv.ok) expect(pv.problems[0]).toEqual({ path: "", message: "prompts/inbox.md is too big (over 64 KB)" });
   });
   test("hashFiles doesn't depend on key order", () => {
     expect(hashFiles({ a: "1", b: "2" })).toBe(hashFiles({ b: "2", a: "1" }));
@@ -259,6 +268,7 @@ describe("uploads", () => {
     const pv = await p.stageUpload("bomb.zip", new Uint8Array(readFileSync(out)));
     expect(pv.ok).toBe(false);
     if (!pv.ok) expect(pv.problems.some((x) => x.message.includes("isn't in the plugin"))).toBe(true);
+    if (!pv.ok) expect(pv.problems[0]).toEqual({ path: "", message: "prompts/inbox.md is too big (over 64 KB)" });
   });
 });
 

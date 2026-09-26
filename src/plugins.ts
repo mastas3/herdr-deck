@@ -29,8 +29,9 @@ export function hashFiles(files: Record<string, string>): string {
 }
 
 /** A plugin folder's plugin.json and the files it points to. Symlinks and oversized files are left out, so the
- *  validator reports them as missing instead of the deck reading something outside the folder. */
-export function readFolder(dir: string): Record<string, string> {
+ *  validator reports them as missing instead of the deck reading something outside the folder. Prompt files left
+ *  out for size are added to tooBig, so the author hears why. */
+export function readFolder(dir: string, tooBig?: string[]): Record<string, string> {
   const files: Record<string, string> = {};
   const read = (rel: string, max: number) => {
     try {
@@ -38,6 +39,7 @@ export function readFolder(dir: string): Record<string, string> {
       for (let i = 1; i < parts.length; i++) if (lstatSync(join(dir, ...parts.slice(0, i))).isSymbolicLink()) return;
       const st = lstatSync(join(dir, rel));
       if (st.isFile() && st.size <= max) files[rel] = readFileSync(join(dir, rel), "utf8");
+      else if (st.isFile() && rel !== "plugin.json") tooBig?.push(rel);
     } catch {}
   };
   read("plugin.json", MAX_JSON);
@@ -75,7 +77,7 @@ export async function runCapped(cmd: string[], maxOut: number, ms = 10_000): Pro
 }
 /** plugin.json and its files from a .zip, read entry by entry (nothing is extracted to disk). A GitHub
  *  "Download ZIP" puts everything under one folder, so the shallowest plugin.json marks the plugin's root. */
-export async function readZip(path: string): Promise<Record<string, string>> {
+export async function readZip(path: string, tooBig?: string[]): Promise<Record<string, string>> {
   if (!Bun.which("unzip")) throw new Error("Adding a .zip needs the unzip command on this machine. Install unzip, or drop the plugin.json instead.");
   const listing = await runCapped(["unzip", "-Z1", path], 1024 * 1024);
   if (listing.over) throw new Error("That .zip lists too many files.");
@@ -90,6 +92,7 @@ export async function readZip(path: string): Promise<Record<string, string>> {
   const take = async (rel: string, max: number) => {
     if (!entries.includes(base + rel)) return;
     const r = await runCapped(["unzip", "-p", path, base + rel], max);
+    if (r.over && rel !== "plugin.json") tooBig?.push(rel);
     if (r.code !== 0 || r.over) return;
     total += r.out.length;
     files[rel] = new TextDecoder().decode(r.out);
@@ -138,9 +141,10 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
       }
     } catch {}
   }
-  function stage(files: Record<string, string>, from: From, compare = true): Preview {
+  function stage(files: Record<string, string>, from: From, compare = true, tooBig: string[] = []): Preview {
     const r = parseBundle(files);
-    if (!r.ok) return { ok: false, problems: r.problems };
+    const big = tooBig.map((f) => ({ path: "", message: `${f} is too big (over ${MAX_FILE / 1024} KB)` }));
+    if (!r.ok || big.length) return { ok: false, problems: [...big, ...(r.ok ? [] : r.problems)] };
     sweep(stageDir);
     mkdirSync(stageDir, { recursive: true });
     const staged = randomUUID();
@@ -157,7 +161,8 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
   }
   function stageCatalog(id: string): Preview {
     if (!PLUGIN_ID.test(id) || !existsSync(join(o.catalogDir, id, "plugin.json"))) throw new Error("There's no catalog plugin by that name.");
-    const pv = stage(readFolder(join(o.catalogDir, id)), { catalog: id });
+    const tooBig: string[] = [];
+    const pv = stage(readFolder(join(o.catalogDir, id), tooBig), { catalog: id }, true, tooBig);
     if (pv.ok && pv.trust.id !== id) throw new Error("That catalog entry's id doesn't match its folder.");
     return pv;
   }
@@ -168,7 +173,8 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
       mkdirSync(stageDir, { recursive: true });
       const tmp = join(stageDir, `${randomUUID()}.zip`);
       writeFileSync(tmp, bytes);
-      try { return stage(await readZip(tmp), { file }); } finally { rmSync(tmp, { force: true }); }
+      const tooBig: string[] = [];
+      try { return stage(await readZip(tmp, tooBig), { file }, true, tooBig); } finally { rmSync(tmp, { force: true }); }
     }
     if (bytes.length > MAX_JSON) throw new Error("That plugin.json is over 256 KB.");
     const pv = stage({ "plugin.json": new TextDecoder().decode(bytes) }, { file });
@@ -178,8 +184,8 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
   }
   /** Stage an installed plugin's current files again, to re-approve it after they changed on disk. */
   function review(id: string): Preview {
-    const rec = find(id);
-    return stage(readFolder(dirOf(id)), rec.from, false);
+    const rec = find(id), tooBig: string[] = [];
+    return stage(readFolder(dirOf(id), tooBig), rec.from, false, tooBig);
   }
 
   function install(body: { staged?: unknown; approve?: unknown; bash?: unknown }): Installed {

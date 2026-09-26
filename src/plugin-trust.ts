@@ -89,7 +89,8 @@ export function trustSummary(b: Bundle): Trust {
 const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /** What an update changes. Grants, repos, roles and schedules need approval again: grants box in every agent run,
- *  and role and schedule prompts reach full sessions. Source and draft prompts don't: their grants box them in. */
+ *  and role and schedule prompts reach full sessions. So do recipes and session actions: they open a prefilled
+ *  session with your own permissions. Source and draft prompts don't: their grants box them in. */
 export function diffBundles(old: Bundle, next: Bundle): Diff {
   const a = old.manifest, b = next.manifest, out: Change[] = [];
   const push = (text: string, approve: boolean) => out.push({ text, approve });
@@ -128,7 +129,7 @@ export function diffBundles(old: Bundle, next: Bundle): Diff {
     return pa(x.prompt) !== pb(y.prompt) ? { text: `Action "${y.label}": prompt changed`, approve: y.mode === "session" } : null;
   });
   walk(a.views, b.views, (v) => `view ${v.title}`, () => false, () => null);
-  walk(a.recipes, b.recipes, (r) => `recipe ${r.title}`, () => false, (x, y) => (pa(x.prompt) !== pb(y.prompt) ? { text: `Recipe ${y.title}: prompt changed`, approve: false } : null));
+  walk(a.recipes, b.recipes, (r) => `recipe ${r.title}`, () => true, (x, y) => (pa(x.prompt) !== pb(y.prompt) ? { text: `Recipe ${y.title}: prompt changed`, approve: true } : null));
   if (!same(a.requires, b.requires)) push("Needs different plugins or connections", false);
   return { from: a.version, to: b.version, changes: out, needsApproval: out.some((c) => c.approve) };
 }

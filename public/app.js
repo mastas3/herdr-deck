@@ -2920,7 +2920,7 @@ function recipeCard(r, inv, n) {
   const st = rd.state === "ready" ? `Ready on ${mname}` : rd.state === "almost" ? "Needs a sign-in" : `Missing ${rd.missing}`;
   const chip = (x, opt) => `<span class="rneed ${x.state}${opt ? " opt" : ""}" title="${esc(x.state === "missing" ? `${x.label}: not found on ${mname}` : `${x.label}: ${x.name ?? ""}${x.state === "partial" ? " (signed out / not running)" : ""}`)}">${x.state === "ready" ? ICON.check : x.state === "partial" ? "!" : "–"} ${esc(x.label)}</span>`;
   return `<article class="rcard r-${rd.state}${open ? " open" : ""}" data-rid="${esc(r.id)}" style="--i:${Math.min(n, 14)}">
-    <div class="rtop" data-ropen><span class="cti">${CICON[r.cat] ?? CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.plugin ? ` · from ${esc(r.plugin)}` : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
+    <div class="rtop" data-ropen><span class="cti">${Object.hasOwn(CICON, r.cat) ? CICON[r.cat] : CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.plugin ? ` · from ${esc(r.plugin)}` : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
     <p class="rpitch" data-ropen>${esc(r.pitch)}</p>
     <div class="rneeds">${rd.needs.map((x) => chip(x)).join("")}${rd.optional.map((x) => chip(x, true)).join("")}</div>
     ${open ? `<div class="rmore"><ol class="rsteps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
@@ -3307,8 +3307,9 @@ function plugReview(r) {
     ${sec("Repos it will clone", t.repos.map((x) => `<li>${esc(x.project)}: <code>${esc(x.url)}</code> at <code>${esc(x.ref.slice(0, 12))}</code></li>`))}
     ${sec("Agents it can start (only when you press Start)", t.roles.map((x) => `<li><b>${esc(x.title)}</b> · ${esc(x.agent)}${x.model ? ` ${esc(x.model)}` : ""} · in ${esc(x.project)}${x.machine === "other" ? " · on your other machine" : ""}</li>`))}
     ${sec("Schedules", t.schedules.map((x) => `<li>${esc(x.role)} gets a prompt ${esc(x.when)}</li>`))}
+    ${sec("Plugins it needs", t.requires.plugins.map((x) => `<li>${esc(x)}</li>`))}
     ${sec("Connections it needs", t.requires.connections.map((x) => `<li>${esc(x)}</li>`))}
-    ${sec("What it adds", [...t.adds.views.map((x) => `<li>View: ${esc(x)}</li>`), ...t.adds.actions.map((x) => `<li>Action: ${esc(x)}</li>`), ...t.adds.recipes.map((x) => `<li>Recipe: ${esc(x)}</li>`), ...t.adds.projects.map((x) => `<li>Project: ${esc(x)}</li>`)])}
+    ${sec("What it adds", [...t.adds.sources.map((x) => `<li>Data source: ${esc(x)}</li>`), ...t.adds.views.map((x) => `<li>View: ${esc(x)}</li>`), ...t.adds.actions.map((x) => `<li>Action: ${esc(x)}</li>`), ...t.adds.recipes.map((x) => `<li>Recipe: ${esc(x)}</li>`), ...t.adds.projects.map((x) => `<li>Project: ${esc(x)}</li>`)])}
     ${t.prompts.length ? `<details class="pprompts"><summary>Read every prompt (${t.prompts.length})</summary>${t.prompts.map((x) => `<h5>${esc(x.where)}</h5><pre>${esc(x.text)}</pre>`).join("")}</details>` : ""}
     ${blocked}
     ${t.needsTick ? `<label class="ptick"><input type="checkbox" data-ptick ${S.plug.tick ? "checked" : ""}> Let it run the commands listed above on this machine</label>` : ""}
@@ -3359,7 +3360,11 @@ $("dbody").addEventListener("click", async (e) => {
 $("dbody").addEventListener("change", (e) => {
   if (S.mode !== "plugins") return;
   if (e.target.matches("[data-ptick]")) { S.plug.tick = e.target.checked; renderPlugins(); }
-  if (e.target.matches("[data-pfile]")) plugUpload(e.target.files?.[0]);
+  if (e.target.matches("[data-pfile]")) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // so picking the same file again (after fixing it) still fires change
+    plugUpload(file);
+  }
 });
 $("dbody").addEventListener("dragover", (e) => { if (S.mode === "plugins" && e.target.closest("[data-pdrop]")) { e.preventDefault(); e.target.closest("[data-pdrop]").classList.add("over"); } });
 $("dbody").addEventListener("dragleave", (e) => { e.target.closest?.("[data-pdrop]")?.classList.remove("over"); });
