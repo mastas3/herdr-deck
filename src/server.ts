@@ -10,6 +10,7 @@ import { detailFor as detailOf, imageFor as imageOf, subDetailFor, subagentsFor 
 import type { Detail, Msg } from "./transcript";
 import { cachedBrief, writeBrief } from "./brief";
 import { agentArgs } from "./args";
+import { codexAppInstalled, codexAppRunning } from "./codexapp";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -76,10 +77,13 @@ const remotes = new Map<string, RemoteHost>();
 });
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => { for (const h of remotes.values()) h.stop(); process.exit(0); });
 
-const tagLocal = (r: Row): Row => ({ ...r, machine: SELF.id });
+const tagLocal = (r: Row): Row => ({ ...r, machine: r.app ? "codex-app" : SELF.id });
 function machines(): Machine[] {
-  return [{ id: SELF.id, label: SELF.label, local: true, online: true, herdr: deck.summary().herdr }, ...[...remotes.values()].map((h) => h.machine())];
+  const app: Machine[] = codexAppInstalled() ? [{ id: "codex-app", label: "Codex app", local: true, online: codexAppRunning(), kind: "app" } as Machine] : [];
+  return [{ id: SELF.id, label: SELF.label, local: true, online: true, herdr: deck.summary().herdr }, ...[...remotes.values()].map((h) => h.machine()), ...app];
 }
+/** Any local row, pane or Codex app thread (deck.find only knows panes). */
+const localRow = (key: string) => deck.rows.get(key);
 function summary() {
   return { ...deck.summary(), machines: machines() };
 }
@@ -99,8 +103,9 @@ const enc = new TextEncoder();
 const clients = new Set<ReadableStreamDefaultController<Uint8Array>>();
 const sse = (event: string, data: unknown) => enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 
+const PUBLIC_URL = (process.env.DECK_PUBLIC_URL ?? "").replace(/\/$/, "");
 function fullState() {
-  return { token: TOKEN, self: SELF.id, rows: allRows(), summary: summary(), graveyard: allGraves(), recipes: loadRecipes() };
+  return { token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(), recipes: loadRecipes() };
 }
 
 function broadcast(event: string, data: unknown) {
@@ -542,7 +547,8 @@ async function handle(req: Request): Promise<Response> {
     const url = new URL(req.url);
 
     if (req.method === "GET") {
-      if (url.pathname === "/") return send(req, page(), "text/html; charset=utf-8");
+      // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
+      if (url.pathname === "/" || url.pathname.startsWith("/s/")) return send(req, page(), "text/html; charset=utf-8");
       if (url.pathname === "/app.js") {
         const a = appAsset();
         const cache = url.searchParams.get("v") === a.hash ? "public, max-age=31536000, immutable" : "no-cache";
@@ -581,8 +587,8 @@ async function handle(req: Request): Promise<Response> {
           if (!res?.ok) return new Response("image not found", { status: 404 });
           return new Response(res.body, { headers: { "content-type": res.headers.get("content-type") ?? "image/png", "cache-control": "private, max-age=86400" } });
         }
-        const f = deck.find(route.key);
-        const img = f && (await imageFor(f.row, url.searchParams.get("id") ?? "", url.searchParams.get("sub") || undefined).catch(() => undefined));
+        const lr = localRow(route.key);
+        const img = lr && (await imageFor(lr, url.searchParams.get("id") ?? "", url.searchParams.get("sub") || undefined).catch(() => undefined));
         if (!img) return new Response("image not found", { status: 404 });
         return new Response(img.data, { headers: { "content-type": img.type, "cache-control": "private, max-age=86400" } });
       }
@@ -619,7 +625,27 @@ async function handle(req: Request): Promise<Response> {
           }
           return json({ results });
         }
+        case "/api/codex-open": {
+          // Opens the thread in the Codex app on this machine.
+          const lr = localRow(body.key);
+          if (!lr?.app || !lr.sessionId) return json({ error: "not a Codex app thread" }, 400);
+          Bun.spawn(["open", `codex://threads/${lr.sessionId}`]);
+          return json({ ok: true });
+        }
+        case "/api/codex-resume": {
+          // Continues an app thread in a new herdr tab with the Codex CLI.
+          const lr = localRow(body.key);
+          if (!lr?.app || !lr.sessionId) return json({ error: "not a Codex app thread" }, 400);
+          return json(await startSession({ kind: "codex", cwd: lr.cwd, args: ["resume", lr.sessionId], label: lr.title.slice(0, 40), focus: !!body.focus }));
+        }
+        case "/api/codex-hide": {
+          const lr = localRow(body.key);
+          if (!lr?.app || !lr.sessionId) return json({ error: "not a Codex app thread" }, 400);
+          deck.hideAppThread(lr.sessionId);
+          return json({ ok: true });
+        }
         case "/api/read": {
+          if (localRow(body.key)?.app) return json({ text: "", hash: "app" });
           const f = deck.find(body.key);
           if (!f) return json({ error: "gone" }, 404);
           const r = await call(f.sess.socket, "pane.read", {
@@ -638,20 +664,23 @@ async function handle(req: Request): Promise<Response> {
         case "/api/new":
           return json(await startSession(body));
         case "/api/detail": {
-          const f = deck.find(body.key);
-          if (!f) return json({ error: "gone" }, 404);
+          const lr = localRow(body.key);
+          if (!lr) return json({ error: "gone" }, 404);
+          const f = { row: lr };
           const d = await detailFor(f.row);
           const subagents = await subagentsFor(who(f.row), d).catch(() => []);
           return json({ ...detailPayload(f.row, d), subagents, chat: d ? chatSlice(d, { limit: body.limit }) : undefined });
         }
         case "/api/chat": {
-          const f = deck.find(body.key);
-          if (!f) return json({ error: "gone" }, 404);
+          const lr = localRow(body.key);
+          if (!lr) return json({ error: "gone" }, 404);
+          const f = { row: lr };
           return json(await chatFor(f.row, body));
         }
         case "/api/brief": {
-          const f = deck.find(body.key);
-          if (!f) return json({ error: "gone" }, 404);
+          const lr = localRow(body.key);
+          if (!lr) return json({ error: "gone" }, 404);
+          const f = { row: lr };
           const d = await detailFor(f.row);
           if (!d || !f.row.sessionId || !d.turns.length) return json({ error: "This pane has no conversation to summarise" }, 400);
           return json({ brief: await writeBrief(briefKey(f.row), f.row.title, f.row.project, d) });

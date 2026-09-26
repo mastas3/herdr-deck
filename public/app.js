@@ -55,6 +55,7 @@ const statusVar = (s) => `var(--${s in STATUS_NAME ? s : "unknown"})`;
 const machineOf = (id) => S.summary.machines?.find((m) => m.id === id);
 const machineLabel = (id) => machineOf(id)?.label ?? id ?? "";
 const multiMachine = () => (S.summary.machines?.length ?? 0) > 1;
+const realMachines = () => (S.summary.machines ?? []).filter((m) => m.kind !== "app");
 const plain = (t) => String(t ?? "").replace(/^\s*\[\d{4}-\d\d-\d\d[^\]]*\]\s*/, "").replace(/[*_`#>]+/g, "").replace(/^\s*[-•]\s+/, "").replace(/\s+/g, " ").trim();
 const home = (p) => String(p ?? "").replace(/^\/(Users|home)\/[^/]+/, "~");
 const isAgent = (r) => ["claude", "codex", "opencode"].includes(r?.agent);
@@ -65,11 +66,15 @@ const ICON = {
   jump: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3H3v10h10v-3M9 2h5v5M14 2 7.5 8.5"/></svg>',
   star: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 1.8 9.5 6l4.3.2-3.4 2.7 1.2 4.2L8 10.7l-3.6 2.4 1.2-4.2L2.2 6.2 6.5 6z"/></svg>',
   bot: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="10" height="8" rx="2"/><path d="M8 2.5V5M6 9h.01M10 9h.01"/></svg>',
+  link: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2.3-2.3a3 3 0 0 0-4.2-4.2l-.9.9M9.5 6.5a3 3 0 0 0-4.2 0L3 8.8a3 3 0 0 0 4.2 4.2l.9-.9"/></svg>',
   term: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="m5 7 2 1.5L5 10M8.5 10.5H11"/></svg>',
 };
 
 /** Tab/pane as herdr names it: "(24 · chat-with-chart)", or "(tab 24)" when the label just repeats the title. */
+/** "(24 · chat-with-chart)", or nothing for Codex app threads (their badge already says where they are). */
+const paneTag = (r) => (r.app ? "" : `(${esc(paneName(r))})`);
 function paneName(r) {
+  if (r.app) return "Codex app";
   const lbl = String(r.tab ?? "").trim();
   const bare = lbl.replace(/^\d+\s+/, "");
   const t = String(r.title ?? "").toLowerCase();
@@ -194,7 +199,7 @@ function rowHTML(r, byProject) {
   const live = r.status === "working";
   const mach = multiMachine() && S.machine === "all" ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : "";
   const agoEl = `<span class="ago${live ? " going" : ""}" ${live ? "" : `data-t="${r.lastActiveAt ?? ""}"`} title="Last active ${esc(abs(r.lastActiveAt))}">${live ? "working" : ago(r.lastActiveAt)}</span>`;
-  const title = `<span class="tl"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">(${esc(paneName(r))})</span></span>`;
+  const title = `<span class="tl"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span></span>`;
   let line = "";
   const tail = r.tail?.length ? plain(r.tail[r.tail.length - 1]) : "";
   if (r.status === "blocked") line = `<span class="ln ask">${esc(tail || "waiting for you")}</span>`;
@@ -204,7 +209,7 @@ function rowHTML(r, byProject) {
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs">${running.slice(0, 3).map((x) => `<div><span class="spin"></span>${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` <span class="mono">${esc(x.now)}</span>` : ""}</div>`).join("")}${running.length > 3 ? `<div>+${running.length - 3} more</div>` : ""}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">(${esc(paneName(r))})</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""} ${mach}</span>${agoEl}${line}${subs}`;
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""} ${mach}</span>${agoEl}${line}${subs}`;
   return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${mach}</span>${agoEl}${title}${line}${subs}`;
 }
 let lastOrder = "", queued = false;
@@ -226,7 +231,7 @@ function renderMachines() {
   const ms = S.summary.machines ?? [];
   const count = (id) => [...S.rows.values()].filter((r) => id === "all" || r.machine === id).length;
   const html = ms.length > 1 ? [["all", "All"], ...ms.map((m) => [m.id, m.label, m])].map(([id, label, m]) =>
-    `<button role="tab" data-machine="${esc(id)}" aria-selected="${S.machine === id}" title="${m && !m.online ? esc("Offline: " + (m.error ?? "")) : ""}">${esc(label)} <span class="n">${count(id)}</span>${m && !m.online ? '<span class="off"></span>' : ""}</button>`).join("") : "";
+    `<button role="tab" data-machine="${esc(id)}" aria-selected="${S.machine === id}" title="${m && !m.online ? esc(m.kind === "app" ? "The Codex app isn’t running" : "Offline: " + (m.error ?? "")) : ""}">${esc(label)} <span class="n">${count(id)}</span>${m && !m.online ? '<span class="off"></span>' : ""}</button>`).join("") : "";
   setHTML($("machines"), html);
   for (const b of $("groupSeg").children) b.setAttribute("aria-selected", b.dataset.group === S.group);
 }
@@ -354,6 +359,29 @@ setInterval(() => {
 }, 20000);
 setInterval(() => { for (const el of document.querySelectorAll("[data-since]")) el.textContent = clock(Date.now() - Number(el.dataset.since)); }, 1000);
 
+// ── session links ────────────────────────────────────────────────────────
+// /s/<machine>/<agent>/<session id> follows the conversation even if its pane moves; shells link to their pane.
+function linkPath(r) {
+  if (!r) return "/";
+  return r.sessionId ? `/s/${encodeURIComponent(r.machine)}/${encodeURIComponent(r.agent)}/${encodeURIComponent(r.sessionId)}` : `/s/${encodeURIComponent(r.machine)}/pane/${encodeURIComponent(r.key)}`;
+}
+const linkUrl = (r) => (S.publicUrl || location.origin) + linkPath(r);
+function resolveLink(path) {
+  const m = path.match(/^\/s\/([^/]+)\/([^/]+)\/(.+)$/);
+  if (!m) return null;
+  const [machine, agent, id] = m.slice(1).map(decodeURIComponent);
+  if (agent === "pane") return S.rows.has(id) ? { key: id } : { missing: true };
+  const r = [...S.rows.values()].find((x) => x.sessionId === id && (x.machine === machine || !machine)) ?? [...S.rows.values()].find((x) => x.sessionId === id);
+  if (r) return { key: r.key };
+  const g = S.graveyard.find((x) => x.resume && x.resume.includes(id));
+  return { missing: true, grave: g };
+}
+function syncUrl() {
+  const r = S.rows.get(S.sel);
+  const path = S.board || !r ? "/" : linkPath(r);
+  if (location.pathname !== path) history.replaceState(history.state, "", path);
+}
+
 // ── selection & detail data ──────────────────────────────────────────────
 let briefTimer = null;
 function select(key, opts = {}) {
@@ -375,6 +403,7 @@ function select(key, opts = {}) {
   prefetchNeighbours(key);
   if (opts.scroll) requestAnimationFrame(() => rowCache.get(key)?.el.scrollIntoView({ block: "nearest" }));
   if (opts.open && isPhone()) setMView("detail", true);
+  syncUrl();
 }
 S.drafts = new Map();
 const inflight = new Map();
@@ -600,7 +629,9 @@ function renderDetail() {
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
   renderNowbar(r, d);
   renderAsk(r);
-  $("composer").hidden = !r || S.sub != null;
+  $("composer").hidden = !r || S.sub != null || !!r.app;
+  $("appbar").hidden = !r.app || S.sub != null;
+  if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
   $("cStop").hidden = !(r.status === "working" && isAgent(r));
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
@@ -631,7 +662,7 @@ function renderHead(r, d, tab) {
     `<span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>`,
     r.launch ? `<span title="Started in ${esc(home(r.cwd))}">via ${esc(r.launch)}</span>` : "",
     multiMachine() ? `<span>${esc(machineLabel(r.machine))}</span>` : "",
-    `<span>(${esc(paneName(r))})</span>`,
+    `<span>${paneTag(r)}</span>`,
     r.branch ? `<span>${esc(r.branch)}${r.dirty ? ` · ${r.dirty} uncommitted` : ""}</span>` : "",
     r.duplicate ? `<span class="warn">another pane has this conversation</span>` : "",
   ].join("");
@@ -650,7 +681,7 @@ function renderHead(r, d, tab) {
   const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
   setHTML($("dh"), `<div class="dh-where">${where}</div>
     <div class="dh-top"><h1 class="dh-title">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts">${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="recipes" title="Recipes (.)">${ICON.star}Recipes</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
+      <div class="dh-acts">${r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${S.tpos === "none" ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="recipes" title="Recipes (.)">${ICON.star}Recipes</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
     <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
 }
@@ -681,6 +712,22 @@ async function renderAsk(r) {
     askTimer = setTimeout(tick, 1200);
   };
   askTimer = setTimeout(tick, 0);
+}
+$("appbar").addEventListener("click", (e) => {
+  const act = e.target.closest("[data-dact]")?.dataset.dact;
+  const r = S.rows.get(S.sel);
+  if (!r || !act) return;
+  e.stopPropagation();
+  if (act === "codexopen") codexAct("codex-open", r);
+  if (act === "codexresume") codexAct("codex-resume", r);
+  if (act === "codexhide") codexAct("codex-hide", r);
+});
+async function codexAct(what, r) {
+  try {
+    if (what === "codex-open") { await api("/api/codex-open", { key: r.key }); toast("Opened in the Codex app"); }
+    if (what === "codex-resume") { const { key } = await api("/api/codex-resume", { key: r.key }); pendingSelect = key; toast("Resuming it in a new herdr tab…"); }
+    if (what === "codex-hide") { await api("/api/codex-hide", { key: r.key }); toast("Hidden from the deck. It’s still in the Codex app."); }
+  } catch (e) { toast(e.message, true); }
 }
 $("askbox").addEventListener("click", (e) => {
   const k = e.target.closest("[data-akey]")?.dataset.akey;
@@ -742,7 +789,7 @@ function renderBoard() {
     const subs = (r.subagents ?? []).filter((x) => x.running);
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
     return `<div class="card" data-card="${esc(r.key)}" data-status="${r.status}"><div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
-      <div class="ti">${esc(r.title || r.agent)} <span class="hint">(${esc(paneName(r))})</span></div>
+      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>
       ${r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.now ? `<div class="now">${esc(r.now)}</div>` : ""}
       ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
       <pre>${ansi((r.tail ?? []).slice(-4).join("\n"))}</pre></div>`;
@@ -821,6 +868,11 @@ async function pollTerm(first) {
   const key = S.sel;
   if (!key || !S.rows.has(key)) return;
   const r = S.rows.get(key);
+  if (r.app) {
+    $("screen").textContent = "This thread runs in the Codex app, so it has no terminal here.\nUse “Continue in herdr” to resume it in a terminal tab.";
+    termText = ""; termHash = "";
+    return;
+  }
   if (!document.hidden && termVisible()) {
     try {
       const res = await api("/api/read", { key, lines: 400, hash: first === true ? "" : termHash });
@@ -1019,7 +1071,10 @@ async function copy(text, what) { try { await navigator.clipboard.writeText(text
 const targets = () => (S.picked.size ? [...S.picked] : S.sel ? [S.sel] : []);
 
 function askClose(keys) {
-  const rows = keys.map((k) => S.rows.get(k)).filter(Boolean);
+  const all = keys.map((k) => S.rows.get(k)).filter(Boolean);
+  const apps = all.filter((r) => r.app);
+  if (apps.length && apps.length === all.length) return toast(apps.length === 1 ? "Codex app threads can’t be closed from here. Use Hide in its ⋯ menu." : "Codex app threads can’t be closed from here; use Hide on each.");
+  const rows = all.filter((r) => !r.app);
   if (!rows.length) return toast("Nothing to close");
   const d = $("confirm");
   const busy = rows.filter((r) => r.status === "working" || r.status === "blocked");
@@ -1032,7 +1087,7 @@ function askClose(keys) {
     subs ? `<span class="warn">${subs} subagent${subs === 1 ? " is" : "s are"} still running.</span>` : "",
     dirty.length ? `<span class="warn">${dirty.length === 1 && rows.length === 1 ? "Its folder has" : dirty.length + " have folders with"} uncommitted changes (they stay on disk).</span>` : "",
   ].filter(Boolean).join(" ");
-  $("cList").innerHTML = rows.map((r) => `<div><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.title || r.agent)}</span><span class="m">${esc(r.project)} · (${esc(paneName(r))})${multiMachine() ? " · " + esc(machineLabel(r.machine)) : ""} · ${r.lastActiveAt ? agoText(r.lastActiveAt) : "no activity"} · ${mem(r.rssKB)}</span></div>`).join("");
+  $("cList").innerHTML = rows.map((r) => `<div><span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.title || r.agent)}</span><span class="m">${esc(r.project)} · ${paneTag(r)}${multiMachine() ? " · " + esc(machineLabel(r.machine)) : ""} · ${r.lastActiveAt ? agoText(r.lastActiveAt) : "no activity"} · ${mem(r.rssKB)}</span></div>`).join("");
   $("cNote").innerHTML = `Frees about <b>${mem(rows.reduce((s, r) => s + r.rssKB, 0))}</b>. ` + (noResume.length ? `<span class="warn">${noResume.length} can’t be resumed.</span> ` : "") + `Closed agent sessions can be reopened from Closed.`;
   $("cWholeWrap").hidden = !rows.some((r) => r.tabPanes > 1);
   $("cWhole").checked = false;
@@ -1066,10 +1121,10 @@ function openSub(id) {
   renderDetail();
   chatTick(true);
 }
-function setBoard(on) { S.board = on; headSig = ""; bodySig = ""; if (on && isPhone()) setMView("detail", true); render(); if (!on) chatTick(true); }
+function setBoard(on) { S.board = on; headSig = ""; bodySig = ""; if (on && isPhone()) setMView("detail", true); render(); syncUrl(); if (!on) chatTick(true); }
 
 async function sendRecipe(recipe, keys = targets()) {
-  const rows = keys.map((k) => S.rows.get(k)).filter((r) => r && r.agent !== "shell" && (!recipe.agents || recipe.agents.includes(r.agent)));
+  const rows = keys.map((k) => S.rows.get(k)).filter((r) => r && !r.app && r.agent !== "shell" && (!recipe.agents || recipe.agents.includes(r.agent)));
   if (!rows.length) return toast("No agent session to send that to", true);
   if (rows.length > 1 && !confirm(`Send “${recipe.label}” to ${rows.length} sessions?`)) return;
   try {
@@ -1132,8 +1187,18 @@ addEventListener("pointerdown", (e) => { if (menuEl && !menuEl.contains(e.target
 function moreMenu(anchor) {
   const r = S.rows.get(S.sel);
   if (!r) return;
+  if (r.app) return openMenu(anchor, [
+    { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
+    { html: "Continue in herdr<small>Resume with the Codex CLI in a new tab</small>", run: () => codexAct("codex-resume", r) },
+    { html: "Copy link", run: () => copy(linkUrl(r), "link") },
+    { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
+    { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
+    "-",
+    { html: "Hide from the deck", run: () => codexAct("codex-hide", r) },
+  ]);
   openMenu(anchor, [
     isPhone() && { html: "Switch herdr to this pane", run: () => focusPane(r.key) },
+    { html: "Copy link", run: () => copy(linkUrl(r), "link") },
     r.resume && { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
     { html: "Copy folder path", run: () => copy(r.cwd, "path") },
     { html: "Rename tab…", run: () => { const label = prompt("New tab name", r.tab || r.title); if (label != null) api("/api/rename", { key: r.key, label }).then(() => toast("Renamed")).catch((x) => toast(x.message, true)); } },
@@ -1169,7 +1234,7 @@ async function toggleAlerts() {
 function suggestClose() {
   const WEEK = 7 * 86400000;
   const old = (r) => r.lastActiveAt && Date.now() - r.lastActiveAt > WEEK;
-  const c = [...S.rows.values()].filter(inScope).filter((r) => (r.empty || r.duplicate || old(r)) && r.status !== "working" && r.status !== "blocked");
+  const c = [...S.rows.values()].filter(inScope).filter((r) => !r.app && (r.empty || r.duplicate || old(r)) && r.status !== "working" && r.status !== "blocked");
   const seen = new Set(), pick = [];
   for (const r of c.sort((a, b) => (b.lastActiveAt ?? 0) - (a.lastActiveAt ?? 0))) {
     const id = r.duplicate && `${r.machine}:${r.agent}:${r.sessionId}`;
@@ -1183,7 +1248,7 @@ function suggestClose() {
   render();
 }
 async function standup() {
-  const rows = [...S.rows.values()].filter(inScope).filter((r) => isAgent(r) && (r.status === "idle" || r.status === "done") && !r.empty && !r.stale);
+  const rows = [...S.rows.values()].filter(inScope).filter((r) => isAgent(r) && !r.app && (r.status === "idle" || r.status === "done") && !r.empty && !r.stale);
   if (!rows.length) return toast("No idle agents to ask");
   const rc = S.recipes.find((x) => x.id === "status") ?? { label: "Status", prompt: "In one line: what are you working on, and what's left?" };
   await sendRecipe(rc, rows.map((r) => r.key));
@@ -1223,7 +1288,7 @@ function paletteItems(q) {
   const sessions = [...S.rows.values()].map((r) => ({ r, s: fuzzy(`${r.title} ${r.project} ${r.launch ?? ""} ${paneName(r)} ${machineLabel(r.machine)} ${r.agent} ${r.branch ?? ""}`, q) }))
     .filter((x) => x.s).sort((a, b) => b.s - a.s || (b.r.lastActiveAt ?? 0) - (a.r.lastActiveAt ?? 0)).slice(0, q ? 8 : 5);
   if (sessions.length) out.push({ head: q ? "Sessions" : "Recent sessions" }, ...sessions.map(({ r }) => ({
-    html: `<span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.title || r.agent)} <span class="hint">(${esc(paneName(r))})</span></span><small>${esc(r.project)}${multiMachine() ? " · " + esc(machineLabel(r.machine)) : ""} · ${esc(ago(r.lastActiveAt) || STATUS_NAME[r.status])}</small>`,
+    html: `<span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></span><small>${esc(r.project)}${multiMachine() ? " · " + esc(machineLabel(r.machine)) : ""} · ${esc(ago(r.lastActiveAt) || STATUS_NAME[r.status])}</small>`,
     run: () => { if (!inScope(r)) setMachine("all"); S.view = "inbox"; select(r.key, { scroll: true, open: true }); },
   })));
   if (n) {
@@ -1234,7 +1299,10 @@ function paletteItems(q) {
     { t: "New session", k: "n", run: openNew },
     { t: "Live board: everything working right now", k: "l", run: () => setBoard(true) },
     cur && { t: "Message this session", k: "r", run: focusReply },
-    cur && { t: "Jump to this pane in herdr", k: "f", run: () => focusPane(cur.key) },
+    cur && !cur.app && { t: "Jump to this pane in herdr", k: "f", run: () => focusPane(cur.key) },
+    cur?.app && { t: "Open this thread in the Codex app", run: () => codexAct("codex-open", cur) },
+    cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
+    cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
     cur && { t: "Write or rewrite the brief", k: "b", run: () => writeBrief(cur.key) },
     cur && { t: "Close this session…", k: "x", run: () => askClose([cur.key]) },
     n > 1 && { t: `Close ${n} selected sessions…`, run: () => askClose(targets()) },
@@ -1297,7 +1365,8 @@ async function loadNewOptions() {
 async function openNew() {
   const cur = S.rows.get(S.sel);
   newMachine = (S.machine !== "all" ? S.machine : cur?.machine) ?? S.self;
-  const ms = S.summary.machines ?? [];
+  const ms = realMachines();
+  if (!ms.some((m) => m.id === newMachine)) newMachine = S.self;
   $("nMachineWrap").hidden = ms.length <= 1;
   $("nMachine").innerHTML = ms.map((m) => `<button type="button" data-m="${esc(m.id)}" aria-pressed="${m.id === newMachine}" ${m.online ? "" : "disabled"}>${esc(m.label)}</button>`).join("");
   $("nPrompt").value = ""; $("nLabel").value = "";
@@ -1417,6 +1486,7 @@ $("mini").addEventListener("click", (e) => {
   if (b) select(b.dataset.key);
 });
 $("detail").addEventListener("click", (e) => {
+  if (e.target.closest("#appbar")) return;
   const fold = e.target.closest("[data-fold]");
   if (fold) { const k = fold.dataset.fold; expanded.has(k) ? expanded.delete(k) : expanded.add(k); chatDom.v = -1; return renderChat(); }
   const t = e.target.closest("[data-toggle]");
@@ -1446,6 +1516,10 @@ $("detail").addEventListener("click", (e) => {
   if (!r) return;
   if (act === "recipes") openRecipeMenu(b);
   if (act === "showterm") showTerminal();
+  if (act === "link") copy(linkUrl(r), "link");
+  if (act === "codexopen") codexAct("codex-open", r);
+  if (act === "codexresume") codexAct("codex-resume", r);
+  if (act === "codexhide") codexAct("codex-hide", r);
   if (act === "focus") focusPane(r.key);
   if (act === "more") moreMenu(b);
   if (act === "brief") writeBrief(r.key);
@@ -1534,7 +1608,8 @@ document.addEventListener("keydown", (e) => {
   else if (k === "g") setGroup(S.group === "project" ? "inbox" : "project");
   else if (k === "l") setBoard(!S.board);
   else if (k === "n") { e.preventDefault(); openNew(); }
-  else if (k === "f" && cur) focusPane(cur);
+  else if (k === "f" && cur) S.rows.get(cur)?.app ? codexAct("codex-open", S.rows.get(cur)) : focusPane(cur);
+  else if (k === "y" && cur) copy(linkUrl(S.rows.get(cur)), "link");
   else if (k === "x" && (S.picked.size || cur)) askClose(targets());
   else if (k === "s" && cur) togglePick(cur);
   else if (k === "b" && cur) writeBrief(cur);
@@ -1610,6 +1685,16 @@ function applyFull(data) {
   S.summary = data.summary;
   S.graveyard = data.graveyard ?? [];
   S.recipes = data.recipes ?? [];
+  S.publicUrl = data.publicUrl ?? "";
+  if (!S.linkDone && location.pathname.startsWith("/s/")) {
+    S.linkDone = true;
+    const hit = resolveLink(location.pathname);
+    if (hit?.key) { S.sel = null; S.machine = "all"; lastOrder = ""; render(); select(hit.key, { scroll: true, open: true }); return; }
+    toast(hit?.grave ? `“${hit.grave.title}” was closed. Reopen it from Closed.` : "That session isn’t open anymore.", true);
+    if (hit?.grave) S.view = "closed";
+    history.replaceState(history.state, "", "/");
+  }
+  S.linkDone = true;
   if (S.machine !== "all" && !S.summary.machines?.some((m) => m.id === S.machine)) S.machine = "all";
   lastOrder = "";
   if (!S.sel || !S.rows.has(S.sel)) {

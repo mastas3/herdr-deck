@@ -5,7 +5,7 @@ import type { Subprocess } from "bun";
 import type { Row } from "./deck";
 
 export type RemoteConf = { id: string; label: string; ssh: string; remotePort?: number; localPort?: number };
-export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[] };
+export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app" };
 
 type Listener = {
   patch: (upsert: Row[], remove: string[]) => void;

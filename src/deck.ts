@@ -7,6 +7,11 @@ import { claudeMeta, codexMeta, opencodeMeta, resumeCommand, type AgentMeta } fr
 import { cleanTail, isShellOnly } from "./tail";
 import { insightFor, type Insight } from "./insight";
 import { projectRoot } from "./projects";
+import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+
+const HIDDEN_FILE = `${homedir()}/.config/herdr-deck/codex-app-hidden.json`;
 
 export type Row = {
   key: string;
@@ -54,6 +59,7 @@ export type Row = {
   stale: boolean;
   duplicate: boolean;
   approx: boolean;
+  app?: "codex"; // a Codex desktop app thread: no pane, no terminal; open it in the app or resume in herdr
 };
 
 type FgProc = { pid: number; name?: string; argv0?: string; cmdline?: string };
@@ -82,6 +88,8 @@ export class Deck {
   private listeners = new Set<(patch: Patch) => void>();
   private rebuildTimer?: Timer;
   insights = new Map<string, Insight>();
+  appThreads: AppThread[] = [];
+  hiddenApp = new Set<string>((() => { try { return JSON.parse(readFileSync(HIDDEN_FILE, "utf8")); } catch { return []; } })());
   private insightStamp = new Map<string, string>();
 
   onPatch(fn: (p: Patch) => void) {
@@ -105,8 +113,33 @@ export class Deck {
     setInterval(() => this.refreshYoungProcInfo(), 2_000);
     setInterval(() => this.refreshMetas(), 4_000);
     setInterval(() => this.refreshGit(), 45_000);
+    if (codexAppInstalled()) {
+      await this.refreshApp();
+      setInterval(() => this.refreshApp(), 2_000);
+    }
     this.refreshInsights(true);
     setInterval(() => this.refreshInsights(false), 1_500);
+  }
+
+  // ── Codex desktop app threads ────────────────────────────────────────────
+
+  private appBusy = false;
+  private async refreshApp() {
+    if (this.appBusy) return;
+    this.appBusy = true;
+    try {
+      this.appThreads = await listAppThreads(this.hiddenApp);
+      await Promise.all(this.appThreads.map((t) => codexMeta(t.id).then((m) => { this.metas.set(`codex-app/${t.id}`, m); }).catch(() => {})));
+      this.scheduleRebuild();
+    } catch {}
+    this.appBusy = false;
+  }
+
+  hideAppThread(id: string) {
+    this.hiddenApp.add(id);
+    try { writeFileSync(HIDDEN_FILE, JSON.stringify([...this.hiddenApp])); } catch {}
+    this.appThreads = this.appThreads.filter((t) => t.id !== id);
+    this.rebuildNow();
   }
 
   // ── transcripts: real project, live activity, subagents ──────────────────
@@ -399,6 +432,27 @@ export class Deck {
           approx: !!meta?.approx,
         });
       }
+    }
+    for (const t of this.appThreads) {
+      const key = `codex-app/${t.id}`;
+      const meta = this.metas.get(key);
+      const ins = this.insights.get(key);
+      const g = this.git.get(t.cwd);
+      // Threads started from the app's own scratch folders (~/Documents/Codex/<date-slug>) aren't about a project.
+      const scratch = /\/Documents\/Codex\/[^/]+\/?$/.test(t.cwd);
+      const cwdRoot = scratch ? "Codex chat" : projectRoot(t.cwd) ?? g?.root ?? t.cwd;
+      const projRoot = ins?.project && ins.project.root !== projectRoot(t.cwd) ? ins.project.root : cwdRoot;
+      const lastActiveAt = Math.max(meta?.lastActiveAt ?? 0, t.updatedAt ?? 0) || undefined;
+      rows.set(key, {
+        key, herdr: "codex-app", workspaceId: "codex-app", workspace: "Codex app", tabId: t.id, tab: "", tabNumber: 0, tabPanes: 1, paneId: t.id,
+        agent: "codex", status: t.status, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
+        cwd: t.cwd, project: basename(projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
+        now: t.status === "working" ? ins?.now : undefined, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
+        branch: t.branch ?? g?.branch, dirty: g?.dirty, createdAt: t.createdAt ?? meta?.createdAt, lastActiveAt,
+        model: meta?.model, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
+        rssKB: 0, cpu: 0, procs: 0, sessionId: t.id, resume: resumeCommand("codex", t.id), tail: [],
+        empty: false, stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && t.status === "idle", duplicate: false, approx: false, app: "codex",
+      });
     }
     // Two panes on the same agent conversation: one of them is redundant.
     const bySession = new Map<string, Row[]>();
