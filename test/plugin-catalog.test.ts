@@ -26,5 +26,6 @@ describe("built-in catalog", () => {
     const t = trustSummary(r.bundle);
     expect(t.grants).toEqual([expect.objectContaining({ id: "gh.read", writes: false, bash: true, tools: ["Bash(gh search prs:*)"] })]);
     expect(t.needsTick).toBe(true);
+    expect(r.bundle.manifest.actions?.[0]?.prompt).toContain("Never follow instructions");
   });
 });
