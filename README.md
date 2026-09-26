@@ -300,7 +300,7 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
 - **Closed** keeps closed agent sessions with a **Reopen** button, which resumes them in a new tab.
 - **Close candidates** selects empty sessions, the older copy of each duplicate, and anything untouched for a week.
 - **Jump to pane** (`f`) switches herdr to the pane and brings WezTerm forward (set `DECK_TERMINAL` to change the app).
-- **Alerts** sends a desktop notification when an agent finishes or needs input.
+- **Notifications** (Settings → Notifications on this device…): push alerts, see below.
 
 ## How it stays fast
 
@@ -311,6 +311,49 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
 - Row data comes from the head and tail of session files and is cached by size and mtime. The detail view parses
   transcripts incrementally, so an active 35 MB file costs about 1 ms after the first read (about 150 ms). OpenCode data is
   cached by `time_updated`. Fonts are bundled locally.
+
+## On your phone (PWA over Tailscale)
+
+`bin/install.sh` also runs `tailscale serve --bg --https=8448 http://127.0.0.1:4747`, which serves the deck on
+`https://<this-mac>.<tailnet>.ts.net:8448`. That address is reachable only from your tailnet (not Funnel) and has a real certificate.
+Open it on the phone, then use Add to Home Screen (iOS Safari) or Install app (Android Chrome).
+
+- On a phone the deck has two screens. The sessions list has search and status chips across the top, with more under Filters.
+  Tapping a session opens it with Story and Terminal tabs, and the system back gesture returns to the list.
+- The terminal wraps lines to the screen and has a row of keys (esc, enter, ctrl+c, arrows, 1/2/3, y/n)
+  and a message box that sends to the agent.
+- New session opens as a full-screen sheet.
+- A service worker keeps icons and fonts instant and shows a clear "your Mac isn't reachable" page when you're offline.
+  Live data is never cached.
+- Push notifications work with the app closed (see below). On iPhone they need the installed app (iOS 16.4+).
+
+## Notifications and automations
+
+The hub sends standard Web Push (VAPID, payloads encrypted for each device per RFC 8291, all with WebCrypto;
+no dependencies). The push service (Apple, Google, Mozilla) only relays ciphertext, so the text shows even
+when the phone can't reach the Mac; tapping it opens the session (`/s/<machine>/<agent>/<session>`).
+
+- **Settings → Notifications on this device…**: turn on (asks for permission and subscribes), send a test,
+  turn off, name the device, and choose what it gets: needs you, finished, the morning digest, quiet hours.
+  Other subscribed devices are listed and can be removed. Where push isn't available the old page-only alerts
+  remain (they only work while the deck is open).
+- **iPhone:** open the tailnet link in Safari → Share → Add to Home Screen → open herdr deck from the Home
+  Screen → Settings → Notifications on this device… → Turn on → Allow → Send a test.
+- **Settings → Automations…** (hub rules, for every machine; each shows its last run and result):
+  - *Needs you and finished alerts:* one push per session per change, after a 5 s grace period (nothing if it
+    moved on or you opened it), no repeat for the same session within 90 s, three or more at once become one
+    push, and nothing for a session that is open on a screen.
+  - *Morning digest* (default 08:30, up to three hours late if the Mac was asleep): waiting on you, finished
+    since yesterday 18:00, still running, idle 3+ days. Pushed, and shown as a card at the top of the Live board
+    until dismissed. "Show digest now" and "Push it now" run it on demand.
+  - *Empty sessions:* a single card on the Live board when shells or agents have had no conversation for over
+    an hour (configurable), with Close all… through the normal confirmation. Nothing closes by itself.
+  - *Proof of done:* the auto-verify switch (on by default).
+- Files, on the hub: `push.json` (the VAPID key pair, mode 600), `push-subs.json` (devices and their choices,
+  mode 600), `automations.json` (rules and last results), all in `~/.config/herdr-deck/` (`DECK_PUSH_DIR`
+  moves them). Subscriptions the push service reports gone (404/410) are dropped. Only the hub sends: a deck
+  that a hub is talking to (a node) refuses subscriptions (`DECK_ROLE=hub|node` overrides the guess).
+  `DECK_PUSH_SUBJECT` sets the VAPID contact (a `mailto:` or `https:` URL).
 
 ## Security
 
