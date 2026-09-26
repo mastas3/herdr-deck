@@ -1,0 +1,774 @@
+{
+ "ideaId": "T-hot:4:agentsessionarchive:g4a",
+ "slug": "agent-session-archive",
+ "at": 1790435566099,
+ "version": "k1",
+ "spec": {
+  "problem": "I run Claude Code, Codex, and Gemini simultaneously on different features and the context-switching is overwhelming me. Git worktrees are super frustrating to manage across multiple agent sessions, and two weeks later I can't find that decision the agent made or replay why it chose that architecture. Logs get lost across machines and terminals.",
+  "buyer": "Developers running 5+ AI coding agent sessions daily, active in r/ClaudeAI and r/ChatGPTCoding.",
+  "jobs": [
+   "Find a specific decision an agent made days or weeks ago without grepping raw logs",
+   "See a diff and the reasoning behind it in one view",
+   "Compare what Claude Code vs Codex vs Cursor decided on the same task",
+   "Get a weekly digest of what my agents actually did, across all machines"
+  ],
+  "scopeIn": [
+   "stasclaw daemon watches Claude Code log files and Codex session output on one machine",
+   "Ingest into SQLite: timestamps, project tag, tool calls, code diffs, LLM decision text",
+   "Web dashboard (Vercel) with full-text search and session replay (chronological step-through)",
+   "Export a session as JSON or Markdown",
+   "Weekly digest email via Resend"
+  ],
+  "scopeOut": [
+   "Cursor log ingestion (different log format, defer to v1.1)",
+   "Multi-machine sync (v1 is single-machine, local-first)",
+   "Team/shared accounts",
+   "Real-time streaming view of an in-progress session"
+  ],
+  "metrics": [
+   {
+    "metric": "Landing page live on Netlify with working signup form",
+    "target": "1 URL, form submits to Resend/DB",
+    "milestone": "landing live"
+   },
+   {
+    "metric": "DM + reply conversations with active r/ClaudeAI posters",
+    "target": "10 replies",
+    "milestone": "10 conversations"
+   },
+   {
+    "metric": "Paid subscription at $19/month",
+    "target": "1 customer",
+    "milestone": "first paying customer"
+   }
+  ]
+ },
+ "architecture": {
+  "summary": "stasclaw (already running as a macOS daemon) gets a new watcher module that tails Claude Code's log directory and Codex's session output files, normalizes each event into a SQLite row, and exposes them over a local HTTP API. A Next.js dashboard deployed on Netlify reads from that API (or a synced read-only SQLite copy) for search and replay. Resend sends a weekly digest built from a SQL query over the same database.",
+  "components": [
+   {
+    "name": "stasclaw watcher",
+    "does": "Tails ~/.claude/logs (Claude Code) and Codex CLI session JSONL output, parses each line into an Event, writes to SQLite",
+    "uses": "stasclaw (owned), SQLite"
+   },
+   {
+    "name": "archive.db",
+    "does": "Single SQLite file storing sessions, events, and decisions with FTS5 virtual table for full-text search",
+    "uses": "SQLite"
+   },
+   {
+    "name": "local API server",
+    "does": "Small Express/Fastify server inside stasclaw exposing /sessions, /sessions/:id/replay, /search?q=",
+    "uses": "stasclaw (owned)"
+   },
+   {
+    "name": "web dashboard",
+    "does": "Search UI, session replay timeline, diff viewer, export-to-JSON/Markdown button",
+    "uses": "Vercel is not used; deployed to Netlify instead, calls local API via a tunnel or reads a nightly-exported static JSON…"
+   },
+   {
+    "name": "digest job",
+    "does": "Cron inside stasclaw runs weekly, queries top decisions by session count and diff size, sends email",
+    "uses": "Resend"
+   }
+  ],
+  "dataModel": [
+   {
+    "entity": "Session",
+    "fields": [
+     "id",
+     "tool (claude_code|codex|cursor)",
+     "project_tag",
+     "started_at",
+     "ended_at",
+     "machine_id"
+    ]
+   },
+   {
+    "entity": "Event",
+    "fields": [
+     "id",
+     "session_id",
+     "type (tool_call|decision|diff|error)",
+     "timestamp",
+     "raw_text",
+     "summary"
+    ]
+   },
+   {
+    "entity": "Decision",
+    "fields": [
+     "id",
+     "event_id",
+     "title",
+     "rationale_text",
+     "alternatives_considered"
+    ]
+   },
+   {
+    "entity": "Diff",
+    "fields": [
+     "id",
+     "event_id",
+     "file_path",
+     "before_snippet",
+     "after_snippet"
+    ]
+   }
+  ],
+  "flows": [
+   {
+    "name": "Ingest a Claude Code session",
+    "steps": [
+     "stasclaw watcher detects new file in ~/.claude/logs",
+     "Parser splits JSONL into Event rows tagged by session_id",
+     "Decision-type events get rationale_text extracted via regex on 'because'/'decided to' markers",
+     "Rows inserted into archive.db, FTS index updated"
+    ]
+   },
+   {
+    "name": "Search and replay",
+    "steps": [
+     "User types query in dashboard search box",
+     "API runs SQLite FTS5 MATCH query, returns ranked events",
+     "User clicks a session, dashboard fetches all events for session_id ordered by timestamp",
+     "Timeline renders tool calls, decisions, and diffs in sequence"
+    ]
+   },
+   {
+    "name": "Weekly digest",
+    "steps": [
+     "Cron fires every Monday 8am",
+     "Query top 5 decisions and total sessions per project from last 7 days",
+     "Render Markdown summary",
+     "Send via Resend to rpsm90@gmail.com"
+    ]
+   }
+  ]
+ },
+ "buildPlan": [
+  {
+   "id": "T1",
+   "title": "Inspect real Claude Code and Codex log formats",
+   "size": "S",
+   "prompt": "Run `ls -la ~/.claude/logs | head -20` and `cat ~/.claude/logs/$(ls -t ~/.claude/logs | head -1)` to see one real Claude Code log file's structure. Also run `find ~ -iname '*.jsonl' -path '*codex*' 2>/dev/null | head -5` and cat the first result if any exists. Write findings to ~/Documents/Projects/agent-session-archive/docs/log-formats.md documenting: exact field names, timestamp format, and how a 'decision' vs a 'tool_call' is distinguishable in the raw text. If no Codex logs exist locally, note that explicitly and stub the format from Codex CLI's own --help output.",
+   "accept": [
+    "docs/log-formats.md exists and quotes at least one real raw line from an actual log file on this machine",
+    "Document states explicitly whether Codex logs were found or not"
+   ],
+   "dependsOn": []
+  },
+  {
+   "id": "T2",
+   "title": "Create SQLite schema and FTS index",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/agent-session-archive create db/schema.sql defining tables sessions, events, decisions, diffs matching this data model: Session(id, tool, project_tag, started_at, ended_at, machine_id), Event(id, session_id, type, timestamp, raw_text, summary), Decision(id, event_id, title, rationale_text, alternatives_considered), Diff(id, event_id, file_path, before_snippet, after_snippet). Add a virtual table events_fts USING fts5(summary, raw_text, content='events', content_rowid='id') with triggers to keep it in sync on insert/update/delete. Run `sqlite3 db/archive.db < db/schema.sql` and verify with `sqlite3 db/archive.db '.tables'`.",
+   "accept": [
+    "db/archive.db created, .tables shows sessions, events, decisions, diffs, events_fts",
+    "Inserting a test row and running a MATCH query against events_fts returns it"
+   ],
+   "dependsOn": [
+    "T1"
+   ]
+  },
+  {
+   "id": "T3",
+   "title": "Build the watcher/parser inside stasclaw",
+   "size": "M",
+   "prompt": "In ~/Documents/Projects/stasclaw add a new module watchers/claude-code-watcher.ts that tails ~/.claude/logs using chokidar, parses each new line per the format documented in ~/Documents/Projects/agent-session-archive/docs/log-formats.md, and inserts rows into ~/Documents/Projects/agent-session-archive/db/archive.db via better-sqlite3. Classify events as 'tool_call' or 'decision' based on the markers found in T1. Add a CLI command `stasclaw archive-watch` that starts this watcher as a foreground process for testing. Test by opening a new Claude Code session in another terminal, running a couple of prompts, then running `sqlite3 ~/Documents/Projects/agent-session-archive/db/archive.db 'select type, summary from events order by id desc limit 5;'`.",
+   "accept": [
+    "stasclaw archive-watch runs without crashing for 2 minutes while a real Claude Code session is active",
+    "New rows appear in the events table matching the session's actual actions"
+   ],
+   "dependsOn": [
+    "T2"
+   ]
+  },
+  {
+   "id": "T4",
+   "title": "Build local API server for search and replay",
+   "size": "M",
+   "prompt": "In ~/Documents/Projects/stasclaw add server/archive-api.ts using Express, exposing GET /sessions (list with project_tag, tool, started_at), GET /sessions/:id/replay (all events ordered by timestamp), GET /search?q=TERM (FTS5 MATCH query joined back to events and sessions). Bind to localhost:4177. Add a stasclaw subcommand `stasclaw archive-serve` to start it. Test with `curl 'http://localhost:4177/search?q=architecture'` after T3 has populated some real decision events and confirm JSON results come back with non-empty summary fields.",
+   "accept": [
+    "curl http://localhost:4177/sessions returns a JSON array with at least one real session from T3's test run",
+    "curl to /search?q=<a word known to appear in a real decision> returns that event"
+   ],
+   "dependsOn": [
+    "T3"
+   ]
+  },
+  {
+   "id": "T5",
+   "title": "Build the dashboard and deploy to Netlify",
+   "size": "M",
+   "prompt": "In ~/Documents/Projects/agent-session-archive create a Next.js app (npx create-next-app@latest . --ts --app) with pages: / (search box + session list calling the local API at http://localhost:4177), /session/[id] (replay timeline rendering event type icons, decision rationale text, and diff before/after in a two-column view), and an 'Export' button that calls a local /api/export route producing JSON or Markdown. For the public demo (no local API access), add a fallback that reads from a static export.json checked into public/demo-data.json generated by running `sqlite3 db/archive.db -json 'select * from sessions limit 5;' > public/demo-data.json` from the archive repo. Deploy with `npx netlify-cli deploy --prod`. Verify the deployed URL loads the session list from demo-data.json.",
+   "accept": [
+    "npx netlify-cli deploy --prod completes and prints a live URL",
+    "Live URL shows at least one demo session and clicking it opens a replay view without errors"
+   ],
+   "dependsOn": [
+    "T4"
+   ]
+  },
+  {
+   "id": "T6",
+   "title": "Add weekly digest via Resend",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/stasclaw add jobs/weekly-digest.ts that queries ~/Documents/Projects/agent-session-archive/db/archive.db for the top 5 decisions and total session count per project_tag from the last 7 days, renders a Markdown summary, and sends it via the Resend API to rpsm90@gmail.com using the RESEND_API_KEY env var. Add a node-cron schedule for Monday 8am and a manual `stasclaw archive-digest --now` command for testing. Run `stasclaw archive-digest --now` and confirm an email arrives.",
+   "accept": [
+    "Running --now sends a real email to rpsm90@gmail.com within 60 seconds",
+    "Email body lists at least one real decision title pulled from the actual database, not a placeholder"
+   ],
+   "dependsOn": [
+    "T3"
+   ]
+  },
+  {
+   "id": "T7",
+   "title": "Build landing page and signup capture on Netlify",
+   "size": "S",
+   "prompt": "In ~/Documents/Projects/agent-session-archive create site/index.html (or a Next.js /landing route) implementing the headline, subhead, 3 benefits, and CTA for Agent Session Archive, in Hebrew as specified in the landing kit. Wire the email signup form to POST to a Netlify Function functions/signup.ts that stores the email in a `signups` table in db/archive.db (or a Netlify Blob if simpler) and sends a confirmation via Resend. Deploy with `npx netlify-cli deploy --prod`. Test by submitting the form with rpsm90@gmail.com and confirming a row appears via `sqlite3 db/archive.db 'select * from signups;'`.",
+   "accept": [
+    "Form submission on the live Netlify URL creates a real row in the signups table",
+    "A confirmation email is received at the submitted address"
+   ],
+   "dependsOn": [
+    "T5"
+   ]
+  }
+ ],
+ "connectors": {
+  "repos": [
+   {
+    "name": "PostHog/posthog-js",
+    "url": "https://github.com/PostHog/posthog-js",
+    "why": "Send usage data from your web app or site to PostHog, with autocapture. (613★)",
+    "verified": true
+   },
+   {
+    "name": "remotion-dev/remotion",
+    "url": "https://github.com/remotion-dev/remotion",
+    "why": "🎥      Make videos programmatically with React (60533★)",
+    "verified": true
+   },
+   {
+    "name": "puppeteer/puppeteer",
+    "url": "https://github.com/puppeteer/puppeteer",
+    "why": "JavaScript API for Chrome and Firefox (95623★)",
+    "verified": true
+   }
+  ],
+  "services": [
+   {
+    "name": "SQLite",
+    "url": "",
+    "why": "Accounts & database",
+    "have": true
+   },
+   {
+    "name": "Firebase",
+    "url": "",
+    "why": "Accounts & database",
+    "have": true
+   },
+   {
+    "name": "Auth0",
+    "url": "",
+    "why": "Accounts & database",
+    "have": true
+   },
+   {
+    "name": "Vercel",
+    "url": "",
+    "why": "Host a web app",
+    "have": true
+   },
+   {
+    "name": "Netlify",
+    "url": "",
+    "why": "Host a web app",
+    "have": true
+   },
+   {
+    "name": "Cloudflare",
+    "url": "",
+    "why": "Host a web app",
+    "have": true
+   },
+   {
+    "name": "PostHog",
+    "url": "https://posthog.com",
+    "why": "Product analytics, funnels, session replay, feature flags",
+    "free": "Free tier",
+    "have": false
+   },
+   {
+    "name": "Plausible",
+    "url": "https://plausible.io",
+    "why": "Privacy-friendly web analytics",
+    "free": "No free tier (30-day trial; free if self-hosted)",
+    "have": false
+   },
+   {
+    "name": "Resend",
+    "url": "",
+    "why": "Send email",
+    "have": true
+   },
+   {
+    "name": "Gmail",
+    "url": "",
+    "why": "Send email",
+    "have": true
+   },
+   {
+    "name": "Mail",
+    "url": "",
+    "why": "Send email",
+    "have": true
+   },
+   {
+    "name": "Repomix",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "LLM Wiki",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "Claude Docs",
+    "url": "",
+    "why": "LLM calls",
+    "have": true
+   },
+   {
+    "name": "Telegram",
+    "url": "",
+    "why": "Telegram bot",
+    "have": true
+   },
+   {
+    "name": "Adobe",
+    "url": "",
+    "why": "PDF / document reports",
+    "have": true
+   },
+   {
+    "name": "Pandoc",
+    "url": "",
+    "why": "PDF / document reports",
+    "have": true
+   },
+   {
+    "name": "Gumroad",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Shopify",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "TON",
+    "url": "",
+    "why": "Take payments",
+    "have": true
+   },
+   {
+    "name": "Wix",
+    "url": "",
+    "why": "Landing page / site",
+    "have": true
+   }
+  ],
+  "keys": [
+   {
+    "name": "SUPABASE_URL",
+    "purpose": "db-auth",
+    "have": false
+   },
+   {
+    "name": "SUPABASE_ANON_KEY",
+    "purpose": "db-auth",
+    "have": false
+   },
+   {
+    "name": "DATABASE_URL",
+    "purpose": "db-auth",
+    "have": false
+   },
+   {
+    "name": "NETLIFY_AUTH_TOKEN",
+    "purpose": "hosting",
+    "have": true,
+    "where": "set in ~/.stasclaw/.env"
+   },
+   {
+    "name": "CLOUDFLARE_API_KEY",
+    "purpose": "hosting",
+    "have": true,
+    "where": "in 1 project: astra-apple"
+   },
+   {
+    "name": "RESEND_API_KEY",
+    "purpose": "email",
+    "have": true,
+    "where": "in 1 project: xxx-quiz"
+   },
+   {
+    "name": "ANTHROPIC_API_KEY",
+    "purpose": "llm",
+    "have": true,
+    "where": "in 2 projects: omni-claude, stasclaw"
+   },
+   {
+    "name": "OPENROUTER_API_KEY",
+    "purpose": "llm",
+    "have": true,
+    "where": "set in ~/.hermes/.env"
+   },
+   {
+    "name": "TELEGRAM_BOT_TOKEN",
+    "purpose": "telegram-bot",
+    "have": true,
+    "where": "set in ~/.zshrc"
+   },
+   {
+    "name": "GUMROAD_ACCESS_TOKEN",
+    "purpose": "payments",
+    "have": false
+   },
+   {
+    "name": "STRIPE_SECRET_KEY",
+    "purpose": "payments",
+    "have": false
+   }
+  ],
+  "mcpAndSkills": [
+   {
+    "name": "gumroad (MCP)",
+    "use": "create the product and read sales"
+   },
+   {
+    "name": "vercel (MCP)",
+    "use": "deploy previews and read logs"
+   },
+   {
+    "name": "supabase (MCP)",
+    "use": "migrations and typed queries"
+   },
+   {
+    "name": "codex-image (skill)",
+    "use": "logo, OG image and app icon"
+   },
+   {
+    "name": "hyperframes (skill)",
+    "use": "promo and product videos"
+   },
+   {
+    "name": "playwright (MCP)",
+    "use": "check the landing page and checkout end to end"
+   },
+   {
+    "name": "context7 (MCP)",
+    "use": "current SDK docs while coding"
+   }
+  ],
+  "missing": [
+   {
+    "cap": "analytics",
+    "label": "Analytics & funnels",
+    "have": [],
+    "missing": true,
+    "suggestions": [
+     {
+      "type": "service",
+      "name": "PostHog",
+      "url": "https://posthog.com",
+      "free": "Free tier",
+      "why": "Product analytics, funnels, session replay, feature flags",
+      "how": "Sign up at https://posthog.com; put its key in .env (name only in .env.example)"
+     },
+     {
+      "type": "service",
+      "name": "Plausible",
+      "url": "https://plausible.io",
+      "free": "No free tier (30-day trial; free if self-hosted)",
+      "why": "Privacy-friendly web analytics",
+      "how": "Sign up at https://plausible.io; put its key in .env (name only in .env.example)"
+     },
+     {
+      "type": "repo",
+      "name": "PostHog/posthog-js",
+      "url": "https://github.com/PostHog/posthog-js",
+      "verified": true,
+      "why": "Send usage data from your web app or site to PostHog, with autocapture. (613★)",
+      "how": "git clone https://github.com/PostHog/posthog-js.git and wire its smallest example into the MVP"
+     }
+    ]
+   }
+  ]
+ },
+ "scaffold": {
+  "folder": "~/Documents/Projects/agent-session-archive",
+  "base": "copy the patterns (not the code wholesale) from ~/Documents/Projects/stasclaw",
+  "deploy": "Netlify (npx netlify-cli deploy; the CLI is signed in)",
+  "files": [
+   {
+    "path": "README.md",
+    "purpose": "what it is, who it's for, how to run it"
+   },
+   {
+    "path": "CLAUDE.md",
+    "purpose": "agent instructions: stack, commands, rules, where the owned projects live"
+   },
+   {
+    "path": "AGENTS.md",
+    "purpose": "same instructions for Codex and other agents"
+   },
+   {
+    "path": ".env.example",
+    "purpose": "the key names the project needs (no values)"
+   },
+   {
+    "path": "TASKS.md",
+    "purpose": "the build plan with paste-ready agent prompts and acceptance checks"
+   },
+   {
+    "path": "SPEC.md",
+    "purpose": "the PRD"
+   },
+   {
+    "path": "ARCHITECTURE.md",
+    "purpose": "components, data model, flows"
+   },
+   {
+    "path": "CONNECTORS.md",
+    "purpose": "repos, services, keys, MCP/skills, what's missing"
+   },
+   {
+    "path": "GTM.md",
+    "purpose": "landing copy, pricing, launch posts, outreach"
+   },
+   {
+    "path": "QUESTS.md",
+    "purpose": "the play loop and how each quest is verified"
+   },
+   {
+    "path": "graphics/PROMPTS.md",
+    "purpose": "codex-image prompts for logo, OG image and icon"
+   }
+  ]
+ },
+ "gtm": {
+  "landing": {
+   "headline": "כל ההיסטוריה של הסוכנים שלך, במקום אחד שאפשר לחפש בו",
+   "subhead": "מריץ Claude Code, Codex ו-Cursor במקביל על פיצ'רים שונים? Agent Session Archive שומר כל קריאת כלי, החלטה וקוד שהם כתבו, ומאפשר לך לחפש ולשחזר כל סשן — גם אם היה לפני שבועיים על מכונה אחרת.",
+   "benefits": [
+    "חיפוש טקסט חופשי על כל ההחלטות וההסבר מאחוריהן — לא צריך לגרוף לוגים גולמיים",
+    "שחזור סשן שלם צעד-אחר-צעד: קריאות כלים, דיפים וקוד, בסדר הכרונולוגי הנכון",
+    "דוח שבועי במייל עם ההחלטות המרכזיות של כל הסוכנים שלך, בפרויקט-פרויקט"
+   ],
+   "cta": "נסה עכשיו — הרשמה חינם, $19 לחודש אחרי תקופת ניסיון"
+  },
+  "pricing": [
+   {
+    "tier": "Solo",
+    "price": "$19/month",
+    "includes": [
+     "1 machine watched",
+     "Unlimited Claude Code + Codex sessions archived",
+     "Full-text search and replay",
+     "Weekly digest email"
+    ]
+   },
+   {
+    "tier": "Multi-machine",
+    "price": "$39/month",
+    "includes": [
+     "Up to 3 machines watched with unified search",
+     "Everything in Solo",
+     "Export sessions as JSON or Markdown, unlimited"
+    ]
+   },
+   {
+    "tier": "Team",
+    "price": "$89/month",
+    "includes": [
+     "Up to 10 machines / 5 developers",
+     "Shared searchable archive across the team",
+     "Priority support for adding new agent log formats (e.g. Cursor)"
+    ]
+   }
+  ],
+  "launchPosts": [
+   {
+    "channel": "Show HN",
+    "text": "I run Claude Code, Codex, and sometimes Gemini in parallel on different features, and two weeks later I could never find the decision an agent made or why it picked a specific architecture. Built a small daemon (stasclaw-based) that tails Claude Code's logs and Codex's session output, dumps everything into SQLite with full-text search, and gives you a replay view of any past session — tool calls, decisions, diffs, in order. Local-first, single machine for now, $19/month if you want the hosted dashboard + weekly digest, but the core watcher is something you can run yourself. Would love feedback on what log formats to support next (Cursor is on the list)."
+   },
+   {
+    "channel": "r/ClaudeAI",
+    "text": "Anyone else lose track of what their agent actually decided a week ago? I run Claude Code and Codex on separate worktrees for different features and kept losing the thread on why a specific approach was chosen. Ended up building a tool that watches the logs, stores everything in SQLite, and lets me search/replay any old session. Sharing here because a few threads this month mentioned the exact same pain with worktrees getting unmanageable. Happy to give early access to a couple of people who are hitting this daily — just comment or DM."
+   },
+   {
+    "channel": "r/ChatGPTCoding",
+    "text": "If you're running multiple coding agents at once (Claude Code + Codex here), you know the logs pile up fast and finding a specific decision from last week is basically impossible. I built a local daemon that archives every tool call and decision into a searchable SQLite database with a replay UI. Still early, single machine only for now, but it's already saved me from re-deriving a decision I made 10 days ago. If this is a pain for you too, I'm looking for a few people to try it before I open it up more broadly."
+   }
+  ],
+  "outreach": "היי, ראיתי את הפוסט שלך על ניהול Claude Code / Codex / Gemini במקביל עם worktrees ו-tmux — ממש הזדהיתי, יש לי בדיוק את אותה בעיה. בניתי כלי קטן שסורק את הלוגים של הסוכנים ושומר כל החלטה, diff וקריאת כלי במסד SQLite שאפשר לחפש בו ולשחזר סשנים ישנים. עדיין בשלב מוקדם (מכונה אחת בינתיים), אבל זה כבר חוסך לי חיפוש בלוגים גולמיים. אם זה כאב שאתה מכיר, אשמח לתת לך גישה מוקדמת בחינם בתמורה לפידבק — פשוט תגיד לי ואני שולח לינק.",
+  "graphics": [
+   {
+    "asset": "logo",
+    "prompt": "Flat vector logo mark for \"Agent Session Archive\": one simple symbol tied to rag, two colours, no text, readable at 32 px, on white"
+   },
+   {
+    "asset": "og-image",
+    "prompt": "1200×630 social preview for \"Agent Session Archive\": the headline \"כל ההיסטוריה של הסוכנים שלך, במקום אחד שאפשר לחפש בו\" in large clean type on a plain background, one small product screenshot, no stock people"
+   },
+   {
+    "asset": "app-icon",
+    "prompt": "512×512 app icon for \"Agent Session Archive\": the logo mark centred on a solid colour square, rounded corners, no text"
+   }
+  ]
+ },
+ "quests": [
+  {
+   "title": "Landing page live with a $19/month checkout",
+   "verify": "the page returns 200 and a test purchase (or a published Gumroad product) goes through",
+   "done": false
+  },
+  {
+   "title": "10 conversations with buyers via Show HN post + direct DM to 15 active posters in r/ClaudeAI threads from the last 2 weeks",
+   "verify": "10 replies logged in QUESTS.md with each person's words about the pain",
+   "done": false
+  },
+  {
+   "title": "First paying customer",
+   "verify": "a real payment in Gumroad/Stripe from someone you don't know",
+   "done": false
+  }
+ ],
+ "readiness": {
+  "score": 0.5,
+  "items": [
+   {
+    "label": "Spec, architecture and build plan",
+    "status": "ready"
+   },
+   {
+    "label": "Repo PostHog/posthog-js",
+    "status": "ready"
+   },
+   {
+    "label": "Repo remotion-dev/remotion",
+    "status": "ready"
+   },
+   {
+    "label": "Repo puppeteer/puppeteer",
+    "status": "ready"
+   },
+   {
+    "label": "Key SUPABASE_URL",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key SUPABASE_ANON_KEY",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key DATABASE_URL",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key NETLIFY_AUTH_TOKEN",
+    "status": "ready",
+    "how": "already set (set in ~/.stasclaw/.env)"
+   },
+   {
+    "label": "Key CLOUDFLARE_API_KEY",
+    "status": "ready",
+    "how": "already set (in 1 project: astra-apple)"
+   },
+   {
+    "label": "Key RESEND_API_KEY",
+    "status": "ready",
+    "how": "already set (in 1 project: xxx-quiz)"
+   },
+   {
+    "label": "Key ANTHROPIC_API_KEY",
+    "status": "ready",
+    "how": "already set (in 2 projects: omni-claude, stasclaw)"
+   },
+   {
+    "label": "Key OPENROUTER_API_KEY",
+    "status": "ready",
+    "how": "already set (set in ~/.hermes/.env)"
+   },
+   {
+    "label": "Key TELEGRAM_BOT_TOKEN",
+    "status": "ready",
+    "how": "already set (set in ~/.zshrc)"
+   },
+   {
+    "label": "Key GUMROAD_ACCESS_TOKEN",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Key STRIPE_SECRET_KEY",
+    "status": "needs-user",
+    "how": "create it and add it to .env"
+   },
+   {
+    "label": "Sign up: PostHog",
+    "status": "needs-user",
+    "how": "https://posthog.com"
+   },
+   {
+    "label": "Sign up: Plausible",
+    "status": "needs-user",
+    "how": "https://plausible.io"
+   },
+   {
+    "label": "Missing: Analytics & funnels",
+    "status": "missing",
+    "how": "service: PostHog"
+   },
+   {
+    "label": "Graphics (logo, OG image, icon)",
+    "status": "needs-user",
+    "how": "run the prompts in graphics/PROMPTS.md with the codex-image skill"
+   },
+   {
+    "label": "Checkout product",
+    "status": "needs-user",
+    "how": "create the product at the price in GTM.md (the Gumroad MCP can do it on request)"
+   }
+  ]
+ },
+ "cost": {
+  "claudeCalls": 1,
+  "ms": 69103
+ },
+ "judge": {
+  "ready": 2,
+  "questions": [
+   "What is the exact JSONL/log format for Claude Code (~/.claude/logs) and Codex session output — does it even exist on this machine, since T1 requires inspecting real files that may not be present?",
+   "How should the dashboard authenticate/access the local API from a Netlify-hosted deployment (tunnel? nightly static export?) given no cross-machine sync exists in v1 scope?",
+   "How is 'decision' vs 'tool_call' reliably distinguished from raw log text — the plan assumes regex on 'because'/'decided to' markers with no validation this works on real data?",
+   "Where does payment/checkout (Gumroad/Stripe keys) come from since GUMROAD_ACCESS_TOKEN and STRIPE_SECRET_KEY are both marked needs-user but pricing/quests require a real purchase?",
+   "Should signups be stored in SQLite (single-machine, ephemeral on Netlify) or Netlify Blob — the spec contradicts itself in T7?"
+  ],
+  "notes": "Solid PRD/architecture/build plan, but T1's core premise (real log format) is unverified and several downstream tasks (watcher parsing, API-to-dashboard connectivity, payments) depend on unknowns that require human/environment confirmation before coding can safely proceed."
+ }
+}
