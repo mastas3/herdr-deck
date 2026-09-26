@@ -25,6 +25,8 @@ import { agentArgs } from "./args";
 import { codexAppInstalled, codexAppRunning } from "./codexapp";
 import { createDiscover } from "./discover";
 import { createLeads } from "./leads";
+import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
+import { HISTORY_DB } from "./history-schema";
 import { PushStore, endpointOk, type Message } from "./push";
 import { Automations } from "./automations";
 
@@ -98,6 +100,12 @@ const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
   saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
 });
+// Project pages (journeys): their own module; the server only routes to it.
+const journeyHist = localHistory(HISTORY_DB, SELF.id);
+const journeys = createJourneys(
+  { dataDir: DATA_DIR, cacheDir: process.env.DECK_JOURNEY_DIR || undefined, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
+  { sessions: (p) => projectSessions(p, historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
+);
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 let hubSeenAt = 0;
@@ -985,7 +993,7 @@ async function handle(req: Request): Promise<Response> {
 
     if (req.method === "GET") {
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
-      if (url.pathname === "/" || url.pathname.startsWith("/s/")) return send(req, page(), "text/html; charset=utf-8");
+      if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/")) return send(req, page(), "text/html; charset=utf-8");
       if (url.pathname === "/app.js") {
         const a = appAsset();
         const cache = url.searchParams.get("v") === a.hash ? "public, max-age=31536000, immutable" : "no-cache";
@@ -1081,6 +1089,7 @@ async function handle(req: Request): Promise<Response> {
       }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
+      if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
       switch (url.pathname) {
