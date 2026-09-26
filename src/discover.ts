@@ -643,7 +643,7 @@ type Cache = {
 };
 const TTL = 6 * 3600_000;
 const TREND_TTL = 12 * 3600_000;
-const SEARCH_GAP = 1500;
+const SEARCH_GAP = 350;
 
 export function createDiscover(paths: DiscoverPaths, deps: { connections?: () => Promise<string[]>; rows?: () => RowLite[]; gh?: (args: string[], timeoutMs?: number) => Promise<GhRes>; gap?: number } = {}) {
   const run = deps.gh ?? gh;
@@ -683,16 +683,20 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   // Search budget: GitHub allows 30 searches a minute. Background refresh keeps a reserve for the idea lab.
   let remaining = 30, resetAt = 0, lastSearch = 0;
   let refreshing: Promise<void> | undefined;
+  let progress = { done: 0, total: 0 };
   let lastError = "";
   async function search(kind: "repositories" | "topics", q: string, extra: string[] = [], reserve = 0): Promise<GhRes> {
     if (Date.now() > resetAt) remaining = Math.max(remaining, 30);
     if (remaining <= reserve) {
       const wait = resetAt - Date.now();
       if (wait > 65_000 || wait < 0) remaining = 30; // stale bookkeeping
+      // The idea lab never waits silently: it says when GitHub's search limit frees up.
+      else if (!reserve) return { ok: false, status: 429, error: `GitHub's search limit is used up for a moment. Try again in ${Math.ceil(wait / 1000) + 1}s.` } as GhRes;
       else await Bun.sleep(wait + 500);
     }
-    if (reserve) { const gap = lastSearch + GAP - Date.now(); if (gap > 0) await Bun.sleep(gap); }
-    lastSearch = Date.now();
+    // Each search books its own start slot, so parallel workers stay spaced out.
+    if (reserve) { const at = Math.max(Date.now(), lastSearch + GAP); lastSearch = at; if (at > Date.now()) await Bun.sleep(at - Date.now()); }
+    else lastSearch = Date.now();
     const r = await run(["-X", "GET", `search/${kind}`, "-f", `q=${q}`, ...extra.flatMap((x) => ["-f", x])]);
     if (r.remaining != null) { remaining = r.remaining; resetAt = r.reset ?? Date.now() + 60_000; }
     if (!r.ok && (r.status === 403 || r.status === 429)) { remaining = 0; resetAt = r.reset ?? Date.now() + 60_000; }
@@ -713,14 +717,22 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
       const due = (c: Cache["gems"][string] | undefined, it: Interest, ttl: number) => force || !c || c.q !== it.q || now - c.at > ttl || (!!c.error && now - c.at > 5 * 60_000);
       for (const it of p.interests) if (due(cache.gems[it.id], it, TTL)) jobs.push({ it, kind: "gems" });
       for (const it of p.interests.slice(0, 5)) if (due(cache.trend[it.id], it, TREND_TTL)) jobs.push({ it, kind: "trend" });
-      for (const { it, kind } of jobs) {
-        const q = kind === "gems" ? gemQuery(it) : trendQuery(it);
-        const r = await search("repositories", q, kind === "gems" ? ["per_page=40"] : ["sort=stars", "order=desc", "per_page=20"], 8);
-        const entry = { at: Date.now(), q: it.q, items: r.ok ? (r.data.items ?? []).map(toRepo) : (kind === "gems" ? cache.gems : cache.trend)[it.id]?.items ?? [], ...(r.ok ? {} : { error: r.error }) };
-        (kind === "gems" ? cache.gems : cache.trend)[it.id] = entry;
-        if (!r.ok) { lastError = r.error ?? "GitHub search failed"; if (r.status === 0 && /install|auth|login/i.test(lastError)) break; }
-        saveCache();
-      }
+      progress = { done: 0, total: jobs.length };
+      // Four searches at a time (spaced a little), well under GitHub's 30 a minute; the idea lab keeps a reserve.
+      let next = 0, stop = false;
+      const worker = async () => {
+        while (!stop && next < jobs.length) {
+          const { it, kind } = jobs[next++];
+          const q = kind === "gems" ? gemQuery(it) : trendQuery(it);
+          const r = await search("repositories", q, kind === "gems" ? ["per_page=40"] : ["sort=stars", "order=desc", "per_page=20"], 8);
+          const entry = { at: Date.now(), q: it.q, items: r.ok ? (r.data.items ?? []).map(toRepo) : (kind === "gems" ? cache.gems : cache.trend)[it.id]?.items ?? [], ...(r.ok ? {} : { error: r.error }) };
+          (kind === "gems" ? cache.gems : cache.trend)[it.id] = entry;
+          progress.done++;
+          if (!r.ok) { lastError = r.error ?? "GitHub search failed"; if (r.status === 0 && /install|auth|login/i.test(lastError)) stop = true; }
+          saveCache();
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, jobs.length) }, worker));
     })().catch((e) => { lastError = e?.message ?? String(e); }).finally(() => { refreshing = undefined; });
     return refreshing;
   }
@@ -750,7 +762,7 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
       profile: { interests: p.interests, removed: p.removed.map(({ id, label }) => ({ id, label })), languages: p.languages, connections: p.connections, recent: p.recent, counts: p.counts, projects: p.projects.slice(0, 40).map(({ name, status }) => ({ name, status })) },
       gems, trending, sparks: sparks(p, gems, day + (Number(body.shuffle) || 0)),
       saved: conf.saved, dismissed: conf.dismissed.length, ideas: listIdeas(IDEAS, deps.rows?.() ?? [], conf.ideas),
-      fetchedAt, stale, refreshing: !!refreshing, error: lastError || undefined, gh: !!deps.gh || ghAvailable(), login: cache.login,
+      fetchedAt, stale, refreshing: !!refreshing, progress: refreshing ? progress : undefined, error: lastError || undefined, gh: !!deps.gh || ghAvailable(), login: cache.login,
       perInterest: Object.fromEntries(p.interests.map((i) => [i.id, { at: cache.gems[i.id]?.at, n: cache.gems[i.id]?.items.length ?? 0, error: cache.gems[i.id]?.error }])),
     };
   }
@@ -770,10 +782,12 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
         b && `${a} ${b} stars:>=5`, c2 && `${a} ${c2} stars:>=5`, c2 && `${b} ${c2} stars:>=5`,
         `${a} stars:>=20`,
       ].filter((x): x is string => !!x).filter((x, i, arr) => arr.indexOf(x) === i).slice(0, 5);
-      const results = await Promise.all([
+      const all = Promise.all([
         ...queries.map((x) => search("repositories", `${x} archived:false fork:false`, ["per_page=15"])),
         ...keywords.slice(0, 2).map((k) => search("topics", k, ["per_page=6"])),
       ]);
+      const results = await Promise.race([all, Bun.sleep(20_000).then(() => null)]);
+      if (!results) throw new Error("GitHub is slow to answer right now. Try again in a moment.");
       const repoRes = results.slice(0, queries.length), topicRes = results.slice(queries.length);
       if (repoRes.every((r) => !r.ok)) throw new Error(repoRes[0]?.error ?? "GitHub search failed");
       const items = repoRes.flatMap((r) => (r.ok ? r.data.items ?? [] : [])).map(toRepo);

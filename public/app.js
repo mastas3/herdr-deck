@@ -1982,8 +1982,10 @@ $("tGrip").addEventListener("pointerdown", (e) => {
 });
 
 // ── actions ──────────────────────────────────────────────────────────────
-async function api(path, body) {
-  const res = await fetch(path, { method: "POST", headers: { "content-type": "application/json", "x-deck-token": S.token }, body: JSON.stringify(body) });
+async function api(path, body, timeoutMs) {
+  let res;
+  try { res = await fetch(path, { method: "POST", headers: { "content-type": "application/json", "x-deck-token": S.token }, body: JSON.stringify(body), signal: timeoutMs ? AbortSignal.timeout(timeoutMs) : undefined }); }
+  catch (e) { if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error("That took too long. Try again in a moment."); throw e; }
   if (res.status === 403) { reconnectSoon(200); throw new Error("Reconnecting to the deck…"); }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
@@ -3084,7 +3086,7 @@ function discStatus(d) {
   const n = d.profile.interests.length;
   if (!d.gh) return `<span class="derr">${ICON.warn}The GitHub CLI (<code>gh</code>) isn’t installed here, so there’s nothing to search with.</span>`;
   const when = d.fetchedAt ? `found ${esc(agoText(d.fetchedAt))}` : "";
-  return `${d.refreshing ? `<span class="spin"></span><span>Searching GitHub in ${n} areas… cached results stay up meanwhile</span>` : `<span>${d.stale && d.fetchedAt ? `<b class="dstale">Stale</b> · ` : ""}${when ? `Gems ${when}` : "No gems fetched yet"}</span>`}
+  return `${d.refreshing ? `<span class="spin"></span><span>Searching GitHub${d.progress?.total ? ` · ${Math.min(d.progress.done, d.progress.total)} of ${d.progress.total}` : ` in ${n} areas`}… cached results stay up meanwhile</span>` : `<span>${d.stale && d.fetchedAt ? `<b class="dstale">Stale</b> · ` : ""}${when ? `Gems ${when}` : "No gems fetched yet"}</span>`}
     ${d.error ? `<span class="derr" title="${esc(d.error)}">${ICON.warn}${esc(d.error.slice(0, 90))}</span>` : ""}<span class="spacer"></span><button class="btn ghost" data-drefresh ${d.refreshing ? "disabled" : ""}>Refresh</button>`;
 }
 function renderDiscover() {
@@ -3186,7 +3188,7 @@ async function ideaSearch(text) {
   S.disc.idea = text; store("discIdea", text);
   S.disc.ideaBusy = true; S.disc.tab = "lab"; store("discTab", "lab");
   renderDiscover();
-  try { S.disc.ideaRes = { ...(await api("/api/discover/idea", { text })), text }; }
+  try { S.disc.ideaRes = { ...(await api("/api/discover/idea", { text }, 25_000)), text }; }
   catch (e) { toast(e.message, true); }
   S.disc.ideaBusy = false;
   if (S.mode === "discover") renderDiscover();
@@ -3194,7 +3196,9 @@ async function ideaSearch(text) {
 }
 async function ideaResearch(text) {
   text = String(text ?? S.disc.idea).trim();
-  const r = S.disc.ideaRes?.text === text ? S.disc.ideaRes : await ideaSearch(text);
+  let r = S.disc.ideaRes?.text === text ? S.disc.ideaRes : await ideaSearch(text);
+  // GitHub slow or rate-limited: plan it anyway; the research agent does its own searching.
+  if (!r && text.length >= 4) { try { r = await api("/api/discover/prompt", { kind: "research", text }, 10_000); } catch (e) { toast(e.message, true); } }
   if (!r) return;
   S.disc.pending = { slug: r.slug, text };
   await openNew({ machine: S.self, cwd: r.cwd, project: "Idea lab", prompt: r.prompt, kind: "claude", label: `Plan: ${text.slice(0, 28)}`, title: "Research & plan this idea" });

@@ -346,3 +346,21 @@ describe("createDiscover (no network: gh is faked)", () => {
     expect(s.saved[0].full).toBe("x/hd-lib");
   });
 });
+
+describe("idea lab never waits silently on GitHub's search limit", () => {
+  test("once the limit is used up, an idea search fails fast and says when to retry", async () => {
+    let n = 0;
+    const limited = async (args: string[]): Promise<GhRes> => {
+      if (args[0] === "user") return { ok: true, status: 200, data: { login: "me" } };
+      n++;
+      return { ok: true, status: 200, remaining: 0, reset: Date.now() + 40_000, data: { items: [] } };
+    };
+    const d = createDiscover({ dataDir: `${root}/data-limit`, wikiDir: wiki, projectsDir: projects }, { gh: limited, gap: 0, rows: () => [] });
+    await d.handle("/api/discover/idea", { text: "a live map of drones over the city" });
+    const t0 = Date.now();
+    const err = await d.handle("/api/discover/idea", { text: "a voice that reads today's transits every morning" }).catch((e: Error) => e);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(String((err as Error).message)).toMatch(/search limit.*Try again in \d+s/);
+    expect(n).toBeGreaterThan(0);
+  });
+});
