@@ -7,6 +7,8 @@ import { BUILTIN, GROUPS, fillTool, loadTools, saveCustomTools, type Tool } from
 import { historyProjects, historySession, historyStats, rescanHistory, searchHistory, startHistory, stopHistory, type HistSession } from "./history";
 import { claimsDone, onCheck, resultFor, setApproval, verify, detectCheck, approvalFor, type CheckResult } from "./verify";
 import { inventory, inventoryText, loadConnConf, saveConnConf, usage, type Item as ConnItem } from "./connections";
+import { CATEGORIES, enrich } from "./store";
+import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCustom } from "./recipes";
 import { slashCommands, warmSlash } from "./slash";
 import { canShare, servedPorts, share, unshare } from "./share";
 import { buildDecision, choiceFromInput, judge, recordOutcome, needsYou, type Decision } from "./decisions";
@@ -1118,16 +1120,42 @@ async function handle(req: Request): Promise<Response> {
           if (body.machine && body.machine !== SELF.id) {
             const remote = remotes.get(body.machine);
             if (!remote) return json({ error: "unknown machine" }, 404);
-            return json((await remote.post("/api/connections", { refresh: body.refresh })).data);
+            const r = await remote.post("/api/connections", { refresh: body.refresh });
+            return json(r.data?.sections ? enrich(r.data) : r.data, r.status);
           }
-          return json(await inventory(!!body.refresh));
+          return json(enrich(await inventory(!!body.refresh)));
+        }
+        case "/api/recipes": {
+          // The store's recipes, ranked by what the chosen machine has. Yours live on the hub.
+          const m = body.machine && body.machine !== SELF.id ? String(body.machine) : SELF.id;
+          const inv = await (async () => {
+            if (m === SELF.id) return inventory();
+            const remote = remotes.get(m);
+            if (!remote?.online) return undefined;
+            try { const r = await remote.post("/api/connections", {}); return r.data?.sections ? r.data : undefined; } catch { return undefined; }
+          })();
+          try {
+            if (body.op === "save") saveCustom(body.recipe);
+            else if (body.op === "delete") deleteCustom(String(body.id ?? ""));
+            else if (body.op === "prompt") {
+              const r = allRecipes().find((x) => x.id === body.id);
+              if (!r) return json({ error: "No such recipe" }, 404);
+              const picked = (Array.isArray(body.picked) ? body.picked : []).map(String).slice(0, 200);
+              const own = recipeIds(r, inv);
+              const extra = picked.filter((x: string) => !own.includes(x));
+              const connections = inv ? inventoryText(inv, new Set(own)) : "";
+              const selected = inv && extra.length ? inventoryText(inv, new Set(extra)).split("\n").slice(3).join("\n").trim() : "";
+              return json({ prompt: fillPrompt(r, { connections, machine: inv?.machine ?? m, selected }), folder: r.folder ?? "", agent: r.agent ?? "claude", machine: r.machine ?? "hub", title: r.title });
+            }
+          } catch (e: any) { return json({ error: e?.message ?? String(e) }, 400); }
+          return json({ machine: m, reachable: !!inv, recipes: rankRecipes(allRecipes(), inv) });
         }
         case "/api/connections-conf": {
           if (body.machine && body.machine !== SELF.id) {
             const remote = remotes.get(body.machine);
             if (!remote) return json({ error: "unknown machine" }, 404);
             const r = await remote.post("/api/connections-conf", { ...body, machine: undefined });
-            return json(r.data, r.status);
+            return json(r.data?.sections ? enrich(r.data) : r.data, r.status);
           }
           const c = loadConnConf();
           const id = String(body.id ?? "");
@@ -1138,12 +1166,12 @@ async function handle(req: Request): Promise<Response> {
             const it = body.item ?? {};
             const name = String(it.name ?? "").trim().slice(0, 80);
             if (!name) return json({ error: "A name is required" }, 400);
-            const item: ConnItem = { id: `custom:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name, kind: "custom", status: "ready", detail: String(it.detail ?? "").slice(0, 200), use: String(it.use ?? "").slice(0, 1000), via: String(it.via ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6) };
+            const item: ConnItem = { id: `custom:${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, name, kind: "custom", status: "ready", detail: String(it.detail ?? "").slice(0, 200), use: String(it.use ?? "").slice(0, 1000), via: String(it.via ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 6), ...(CATEGORIES.some((x) => x.id === it.cat) ? { cat: it.cat } : {}) };
             c.custom = [...c.custom.filter((x) => x.id !== item.id), item];
           } else if (body.op === "remove") c.custom = c.custom.filter((x) => x.id !== id);
           else return json({ error: "unknown op" }, 400);
           saveConnConf(c);
-          return json(await inventory(true));
+          return json(enrich(await inventory(true)));
         }
         case "/api/connections-text": {
           const inv = body.machine && body.machine !== SELF.id

@@ -203,13 +203,26 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   process that re-scans every minute.
 - Every view has a ✕ (and Esc) to get back to the session.
 - **Tools** (Tools menu → Manage tools): what every tool does and exactly what it sends; add, edit and delete your own.
-- **Connections** (Tools menu → Connections, or ⌘K): what each machine can reach, as cards: services
-  (GitHub, Vercel, Netlify, Cloudflare, Supabase… however they're reached: a CLI, `npx`, an app, an MCP
-  server or an API key name), AI agents and plans, MCP servers from every agent app, SSH hosts, API key names
-  (never values), dev tools, browsers, skills, and your own additions. Each card says what it's for and how
-  agents should use it (editable). Pick some and **Add to** the session: the agent gets them as context.
-  Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`. Hide what you don't need;
-  your notes and additions live in `~/.config/herdr-deck/connections.json`.
+- **Connections** (Tools menu → Connections, or ⌘K): an app store of what each machine can reach. Categories down the
+  side (chips on a phone): AI models & agents, Code & Git, Cloud & deploy, Data & databases, Communication, Media &
+  creative, Knowledge & notes, Commerce & payments, Automation, Search & OSINT, Devices & network, Browsers, MCP
+  servers, Skills, Keys & secrets, Yours, and Not set up. Every card has a category, a colored badge, what it's for,
+  a state (ready, signed out, installed only, offline) and which machines have it. **Featured** shows what's ready
+  and what's new (first seen in the last two weeks); search spans everything. The scan finds CLIs and apps (with
+  sign-in checks), npx packages, MCP servers from every agent app (Claude Code and plugins, claude.ai connectors,
+  Codex, OpenCode, Gemini, Antigravity, Cursor, Windsurf, Zed, Cline, Hermes, Goose, Claude Desktop, VS Code), API
+  key NAMES from shell files, agent env files (`~/.hermes/.env`…), `~/.config/*/.env` and project `.env` files (never
+  values), local Postgres databases, Redis, Docker, rclone remotes, Shortcuts, Obsidian vaults, the wiki, tailnet
+  devices, SSH hosts, launchd/systemd user services, browser profiles and skills. macOS-only probes are skipped on Linux.
+  **Select** cards one by one, or all in the category or search in view, then **Add to** a session (the agent gets
+  them as context) or **Use in a recipe**.
+- **Recipes** (a tab in Connections): about thirty workflows that combine your connections: ship-and-show, YouTube
+  channel → RAG → wiki digest, morning revenue brief, nightly repo health, render on the Linux box, and more. Each
+  shows which connections it needs and whether this machine has them; ready ones sort first. **Run** opens the New
+  session dialog with the prompt, folder and agent filled in (nothing starts until you press Start). **Copy prompt**,
+  or **Customize** to save your own copy in the hub's `~/.config/herdr-deck/recipes.json`. Built-ins live in
+  `src/recipes.ts`. Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`; your notes, hidden
+  cards and additions live in `~/.config/herdr-deck/connections.json`.
 - **Discover** (`d`, or ⌘K): repos worth forking and ideas worth building.
   - **For you:** your interests, read from the wiki (project tags, status and recency, concepts, the last month
     of `log.md`), your local repos (languages, keywords, dependencies) and your connections, as chips you can

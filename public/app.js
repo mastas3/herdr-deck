@@ -2610,21 +2610,81 @@ async function saveTools(custom) {
   try { S.tools = (await api("/api/tools", { tools: custom })).tools; renderTools(); toast("Saved"); } catch (e) { toast(e.message, true); }
 }
 
-// Connections ───────────────────────────────────────────────────────────────
-S.conn = { machine: null, data: new Map(), mcp: null };
 // Connections ─────────────────────────────────────────────────────────────
-// A tool, not a page you get lost in: open it from a session, pick what the agent should know about,
-// and add it to that session's context. Each machine has its own list.
+// An app store for what each machine can reach: categories, featured rows, search, select-all, and recipes
+// that combine connections into workflows. Open it from a session to add picks to that session's context.
+// Each machine keeps its own inventory; the hub gives every card a category and a state (src/store.ts).
 ICON.bolt = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg>';
 ICON.x = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
-S.conn.pick = new Set();
-S.conn.cat = load("connCat", "services");
-S.conn.q = "";
-function openConnections(key) {
+
+// <conn-store> pure helpers (tested in test/store.test.ts)
+function connState(i) { return i.state ?? (i.status === "off" ? "off" : i.status === "partial" ? "signed-out" : "ready"); }
+function connSelectable(i) { return connState(i) !== "off"; }
+/** Every card once, in section order. */
+function connItems(inv) { const seen = new Map(); for (const s of inv?.sections ?? []) for (const i of s.items) if (!seen.has(i.id)) seen.set(i.id, i); return [...seen.values()]; }
+/** Every word of the query appears in the name, what it's for, how it's reached, its group or its category. */
+function connMatch(i, q, catLabel) {
+  const words = String(q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = `${i.name} ${i.detail ?? ""} ${i.note ?? ""} ${(i.via ?? []).join(" ")} ${i.group ?? ""} ${catLabel ?? ""}`.toLowerCase();
+  return words.every((w) => hay.includes(w));
+}
+/** The cards in view: a search spans every category; otherwise one category ("off" = not set up). */
+function connView(items, { cat, q, showHidden, labels }) {
+  const inCat = (i) => (cat === "off" ? connState(i) === "off" : i.cat === cat && connState(i) !== "off");
+  return items.filter((i) => (q ? true : inCat(i)) && (showHidden || q || !i.hidden) && connMatch(i, q, labels?.[i.cat]));
+}
+/** Select every selectable card in `items` (the category or search in view). Returns a new set. */
+function connSelectAll(pick, items) { const s = new Set(pick); for (const i of items) if (connSelectable(i)) s.add(i.id); return s; }
+/** Unselect the cards in `items`; with no items, unselect everything. Returns a new set. */
+function connSelectNone(pick, items) { if (!items) return new Set(); const s = new Set(pick); for (const i of items) s.delete(i.id); return s; }
+function connAllPicked(pick, items) { const sel = items.filter(connSelectable); return sel.length > 0 && sel.every((i) => pick.has(i.id)); }
+/** Recipes that use any picked connection, most overlap first. */
+function recipesFor(recipes, pick) {
+  return recipes.map((r) => ({ r, n: [...r.ready.needs, ...r.ready.optional].filter((x) => x.id && pick.has(x.id)).length })).filter((x) => x.n).sort((a, b) => b.n - a.n).map((x) => x.r);
+}
+/** "Ready to use": ready services, agents and plans, at most two per category, up to `max`. */
+function connFeatured(items, order, max = 14) {
+  const per = new Map(), out = [];
+  const pool = items.filter((i) => connState(i) === "ready" && !i.hidden && ["service", "agent", "sub"].includes(i.kind)).sort((a, b) => order.indexOf(a.cat) - order.indexOf(b.cat) || Number(!b.color) - Number(!a.color));
+  for (const i of pool) { const n = per.get(i.cat) ?? 0; if (n >= 2) continue; per.set(i.cat, n + 1); out.push(i); if (out.length >= max) break; }
+  return out;
+}
+function connRecent(items, now, days = 14) { return items.filter((i) => i.since && now - i.since < days * 864e5 && !i.hidden && connState(i) !== "off").sort((a, b) => b.since - a.since).slice(0, 12); }
+// </conn-store>
+
+const CICON = {
+  home: TI2('<path d="M2.5 7.2 8 2.8l5.5 4.4M4 6v7h8V6"/>'),
+  ai: TI2('<rect x="3" y="5" width="10" height="8" rx="2"/><path d="M8 2.5V5M6 9h.01M10 9h.01"/>'),
+  code: TI2('<path d="m5.5 4.5-3 3.5 3 3.5M10.5 4.5l3 3.5-3 3.5M9 3 7 13"/>'),
+  cloud: TI2('<path d="M4.5 12.5h7a2.8 2.8 0 0 0 .4-5.6A4 4 0 0 0 4.2 7.5a2.5 2.5 0 0 0 .3 5z"/>'),
+  data: TI2('<ellipse cx="8" cy="4" rx="5" ry="1.8"/><path d="M3 4v8c0 1 2.2 1.8 5 1.8s5-.8 5-1.8V4M3 8c0 1 2.2 1.8 5 1.8S13 9 13 8"/>'),
+  comms: TI2('<path d="M2.5 4a1.5 1.5 0 0 1 1.5-1.5h8A1.5 1.5 0 0 1 13.5 4v5.5A1.5 1.5 0 0 1 12 11H7l-3 2.5V11a1.5 1.5 0 0 1-1.5-1.5z"/>'),
+  media: TI2('<rect x="2" y="3" width="12" height="10" rx="1.6"/><path d="m2.5 11 3.5-3.5 2.5 2.5 1.5-1.5 3.5 3.5"/><circle cx="10.5" cy="6" r="1"/>'),
+  knowledge: TI2('<path d="M3 2.8h6.5A2.5 2.5 0 0 1 12 5.3v8H5.5A2.5 2.5 0 0 1 3 10.8z"/><path d="M3 10.8a2.5 2.5 0 0 1 2.5-2.5H12"/>'),
+  commerce: TI2('<path d="M2 3h2l1.6 7.2h6.9L14 5H4.6"/><circle cx="6.2" cy="12.8" r=".9"/><circle cx="11.4" cy="12.8" r=".9"/>'),
+  automation: TI2('<circle cx="8" cy="8" r="2.2"/><path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2M3.6 3.6l1.4 1.4M11 11l1.4 1.4M3.6 12.4 5 11M11 5l1.4-1.4"/>'),
+  research: TI2('<circle cx="7" cy="7" r="4.3"/><path d="m10.2 10.2 3.6 3.6"/>'),
+  devices: TI2('<rect x="2" y="3" width="9" height="7" rx="1"/><path d="M4.5 12.5h4M12 6h2v7.5h-3"/>'),
+  browsers: TI2('<circle cx="8" cy="8" r="5.8"/><path d="M2.3 8h11.4M8 2.2c1.7 1.7 2.4 3.6 2.4 5.8S9.7 12.1 8 13.8C6.3 12.1 5.6 10.2 5.6 8S6.3 3.9 8 2.2"/>'),
+  mcp: TI2('<path d="M6 2v3.5M10 2v3.5M4.5 5.5h7v2.5a3.5 3.5 0 0 1-7 0zM8 11.5V14"/>'),
+  skills: TI2('<path d="M8 1.8 9.5 6l4.3.2-3.4 2.7 1.2 4.2L8 10.7l-3.6 2.4 1.2-4.2L2.2 6.2 6.5 6z"/>'),
+  keys: TI2('<circle cx="5.5" cy="10.5" r="2.8"/><path d="m7.5 8.5 6-6M11.5 4.5l1.5 1.5M10 6l1.2 1.2"/>'),
+  yours: TI2('<path d="M8 3v10M3 8h10"/>'),
+  off: TI2('<circle cx="8" cy="8" r="5.5"/><path d="M5.5 8h5"/>'),
+  recipe: TI2('<path d="M3.5 2.5h6l3 3v8h-9z"/><path d="M9.5 2.5v3h3M5.5 8.5h5M5.5 11h3"/>'),
+  sliders: TI2('<path d="M3 4.5h10M3 11.5h10"/><circle cx="6" cy="4.5" r="1.5"/><circle cx="10.5" cy="11.5" r="1.5"/>'),
+};
+const CST = { ready: ["ok", "Ready"], "signed-out": ["warn", "Signed out"], installed: ["mid", "Installed only"], offline: ["mid", "Offline"], off: ["off", "Not set up"] };
+S.conn = { machine: null, data: new Map(), mcp: null, pick: new Set(), cat: load("connCat2", "home"), q: "", tab: load("connTab", "store"), recipes: new Map(), rcat: "all", ropen: null, rfor: null, open: null };
+
+function openConnections(key, tab) {
   const r = key ? rowOf(key) : rowOf(S.sel);
   S.conn.target = r && !r.app && !r.hist && isAgent(r) ? r.key : null;
   if (r && r.machine && r.machine !== "codex-app") S.conn.machine = r.machine;
   S.conn.pick.clear();
+  S.conn.rfor = null;
+  if (tab) S.conn.tab = tab;
   setMode("connections");
 }
 async function loadConnections(refresh) {
@@ -2635,60 +2695,166 @@ async function loadConnections(refresh) {
     const [inv, mcp] = await Promise.all([api("/api/connections", { machine: m, refresh }), S.conn.mcp ? null : api("/api/mcp-info", {}).catch(() => null)]);
     S.conn.data.set(m, inv);
     if (mcp) { S.conn.mcp = mcp; S.audit = mcp.audit; }
+    if (refresh || S.conn.tab === "recipes") loadRecipes(true);
   } catch (e) { toast(e.message, true); }
   S.conn.loading = false;
   if (S.mode === "connections") renderConnections();
+  // The other machines load quietly, so each card can say which machines have it.
+  for (const x of realMachines()) if (x.online && x.id !== m && !S.conn.data.has(x.id)) api("/api/connections", { machine: x.id }).then((inv) => { S.conn.data.set(x.id, inv); if (S.mode === "connections") renderConnections(); }).catch(() => {});
 }
-const CAT = [["services", "Services"], ["ai", "AI"], ["mcp", "MCP"], ["machines", "Machines"], ["keys", "Keys"], ["dev", "Dev tools"], ["browser", "Browsers"], ["skills", "Skills"], ["custom", "Yours"], ["missing", "Not set up"]];
-const ST = { ready: ["ok", "Ready"], partial: ["warn", "Needs sign-in"], off: ["off", "Not set up"] };
+async function loadRecipes(force) {
+  const m = S.conn.machine ?? S.self;
+  if (S.conn.rloading || (!force && S.conn.recipes.has(m))) return;
+  S.conn.rloading = true;
+  try { S.conn.recipes.set(m, await api("/api/recipes", { op: "list", machine: m })); } catch (e) { toast(e.message, true); }
+  S.conn.rloading = false;
+  if (S.mode === "connections") renderConnections();
+}
+
+const hexLight = (hex) => { const h = String(hex).replace("#", ""); if (h.length !== 6) return false; const [r, g, b] = [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16) / 255); return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.6; };
 function connHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
-function connCard(i, secId) {
-  const [cls, label] = ST[i.status ?? "ready"] ?? ST.ready;
-  const picked = S.conn.pick.has(i.id);
-  const open = S.conn.open === i.id;
+const KGLYPH = { key: "keys", skill: "skills", mcp: "mcp", background: "automation", ssh: "devices", device: "devices", browser: "browsers" };
+function connBadge(i, big) {
+  const style = i.color ? `--bg:${i.color};--fg:${hexLight(i.color) ? "#141414" : "#fff"}` : `--bg:oklch(0.8 0.09 ${connHue(i.name)});--fg:oklch(0.26 0.06 ${connHue(i.name)})`;
+  const g = KGLYPH[i.kind] ? CICON[KGLYPH[i.kind]] : esc(initials(String(i.name).replace(/[^\p{L}\p{N}\s._-]/gu, " ").trim() || "?"));
+  return `<span class="cbadge${big ? " big" : ""}" style="${style}" aria-hidden="true">${g}</span>`;
+}
+function connWhere(id) {
+  if (S.conn.data.size < 2) return null;
+  const out = [];
+  for (const [mid, inv] of S.conn.data) { const i = connItems(inv).find((x) => x.id === id); if (i && connState(i) !== "off") out.push(machineLabel(mid)); }
+  return out;
+}
+const catLabel = (inv, id) => (id === "off" ? "Not set up" : id === "home" ? "Featured" : inv?.categories?.find((c) => c.id === id)?.label ?? id ?? "");
+function connCard(i, n, inv, showCat) {
+  const st = connState(i);
+  const [cls, label] = CST[st] ?? CST.ready;
+  const picked = S.conn.pick.has(i.id), open = S.conn.open === i.id;
+  const where = connWhere(i.id);
+  const fresh = i.since && Date.now() - i.since < 14 * 864e5;
   const via = i.via ?? [];
-  return `<article class="ccard${picked ? " picked" : ""}${open ? " open" : ""}${i.hidden ? " hid" : ""}" data-cid="${esc(i.id)}" style="--h:${connHue(i.name)}">
-    <button class="cpick" data-cpick aria-pressed="${picked}" aria-label="Select ${esc(i.name)}" ${i.status === "off" ? "disabled" : ""}>${ICON.check}</button>
-    <div class="ctop" data-copen><span class="cbadge">${esc(initials(i.name.replace(/^[a-z]+:/, "")))}</span><span class="cname">${esc(i.name)}</span><span class="cst ${cls}">${label}</span></div>
-    ${i.detail ? `<div class="cwhat" data-copen>${esc(i.detail)}</div>` : ""}
-    ${via.length && !open ? `<div class="cvia" data-copen>${via.slice(0, 3).map((v) => `<span>${esc(v)}</span>`).join("")}${via.length > 3 ? `<span>+${via.length - 3}</span>` : ""}</div>` : ""}
+  const uses = open ? recipesFor(S.conn.recipes.get(S.conn.machine ?? S.self)?.recipes ?? [], new Set([i.id])).slice(0, 6) : [];
+  return `<article class="ccard${picked ? " picked" : ""}${open ? " open" : ""}${i.hidden ? " hid" : ""}${st === "off" ? " isoff" : ""}" data-cid="${esc(i.id)}" style="--i:${Math.min(n, 14)}">
+    <button class="cpick" data-cpick aria-pressed="${picked}" aria-label="Select ${esc(i.name)}" ${st === "off" ? "disabled" : ""}>${ICON.check}</button>
+    <div class="ctop" data-copen>${connBadge(i)}<span class="ctt"><span class="cname">${esc(i.name)}</span>${showCat ? `<span class="ccat">${esc(catLabel(inv, i.cat))}</span>` : ""}</span></div>
+    <div class="cwhat" data-copen>${esc(i.detail || i.note || " ")}</div>
+    <div class="cfoot" data-copen><span class="cst ${cls}">${label}</span>${fresh ? '<span class="cnew">New</span>' : ""}${i.note && i.detail && !open && i.note !== "installed" ? `<span class="cnote2">${esc(i.note)}</span>` : ""}${where?.length ? `<span class="cmach" title="On ${esc(where.join(", "))}">${where.map((w) => `<i>${esc(w)}</i>`).join("")}</span>` : ""}</div>
     ${open ? `<div class="cmore">
-      ${via.length ? `<div class="cvia all">${via.map((v) => `<span>${esc(v)}</span>`).join("")}</div>` : ""}
+      ${via.length ? `<div class="cvia">${via.map((v) => `<span>${esc(v)}</span>`).join("")}</div>` : ""}
       ${i.note ? `<div class="hint">${esc(i.note)}</div>` : ""}
       <label class="clab">How agents should use it</label>
       <textarea class="cuse" data-cnote rows="3" placeholder="e.g. Deploy with npx netlify-cli deploy --prod">${esc(i.use ?? "")}</textarea>
-      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button>${i.custom ? `<button class="btn ghost danger" data-cremove>Remove</button>` : ""}<span class="spacer"></span><button class="btn" data-cone>Add just this</button></div>
+      ${uses.length ? `<label class="clab">Recipes that use it</label><div class="cuses">${uses.map((r) => `<button class="chip" data-cgorecipe="${esc(r.id)}">${CICON.recipe}${esc(r.title)}</button>`).join("")}</div>` : ""}
+      <div class="cacts"><button class="btn ghost" data-chide>${i.hidden ? "Show again" : "Hide"}</button>${i.custom ? `<button class="btn ghost danger" data-cremove>Remove</button>` : ""}<span class="spacer"></span>${st === "off" ? "" : `<button class="btn" data-cone>Add just this</button>`}</div>
     </div>` : ""}
   </article>`;
+}
+function connMini(i, inv) {
+  const st = connState(i);
+  return `<button class="cmini" data-cjump="${esc(i.id)}" data-cjcat="${esc(i.cat)}" title="${esc(i.detail ?? "")}">${connBadge(i, true)}<span class="cmn">${esc(i.name)}</span><span class="cms">${esc(catLabel(inv, i.cat))}</span>${st !== "ready" ? `<span class="cst ${CST[st]?.[0] ?? "off"}">${CST[st]?.[1] ?? ""}</span>` : ""}</button>`;
+}
+function selBar(items, what) {
+  const sel = items.filter(connSelectable);
+  if (!sel.length) return "";
+  const all = connAllPicked(S.conn.pick, items);
+  return `<div class="csel"><span class="hint">${items.length} ${items.length === 1 ? "card" : "cards"}${sel.length < items.length ? ` · ${sel.length} selectable` : ""}</span><span class="spacer"></span>
+    ${all ? `<button class="btn ghost" data-csnone>Unselect ${esc(what)}</button>` : `<button class="btn ghost" data-csall>${ICON.check}Select all ${sel.length} ${esc(what)}</button>`}</div>`;
+}
+function renderStore(inv, items, labels, q) {
+  const order = (inv?.categories ?? []).map((c) => c.id);
+  const cat = S.conn.cat;
+  if (!inv) return `<div class="cgrid2">${Array.from({ length: 8 }, (_, n) => `<div class="ccard skel" style="--i:${n}"></div>`).join("")}</div><p class="hint">Looking around ${esc(machineLabel(S.conn.machine ?? S.self))}…</p>`;
+  if (q) {
+    const hits = connView(items, { q, labels }).sort((a, b) => Number(connState(a) === "off") - Number(connState(b) === "off") || order.indexOf(a.cat) - order.indexOf(b.cat));
+    const shown = hits.slice(0, S.conn.more ? 600 : 120);
+    return `${selBar(hits, "matches")}${hits.length ? `<div class="cgrid2">${shown.map((i, n) => connCard(i, n, inv, true)).join("")}</div>${hits.length > shown.length ? `<button class="link" data-cmore>Show all ${hits.length}</button>` : ""}` : `<p class="hint cempty">Nothing on ${esc(inv.machine)} matches “${esc(q)}”. <button class="link" data-cadd>Add it by hand</button></p>`}`;
+  }
+  if (cat === "home") {
+    const feat = connFeatured(items, order), recent = connRecent(items, Date.now());
+    const readyAll = items.filter((i) => connState(i) === "ready" && !i.hidden);
+    const tiles = order.map((id) => ({ id, label: labels[id], n: items.filter((i) => i.cat === id && connState(i) !== "off" && !i.hidden) })).filter((t) => t.n.length || t.id === "yours");
+    return `<section class="cfeat"><div class="cfh"><h3>Ready to use</h3><span class="hint">${readyAll.length} ready on ${esc(machineLabel(S.conn.machine ?? S.self))}</span><span class="spacer"></span><button class="btn ghost" data-cseverything>${ICON.check}Select all ${readyAll.length} ready</button></div>
+        <div class="cstrip">${feat.map((i) => connMini(i, inv)).join("")}</div></section>
+      ${recent.length ? `<section class="cfeat"><div class="cfh"><h3>Recently added</h3><span class="hint">new on ${esc(machineLabel(S.conn.machine ?? S.self))} in the last two weeks</span></div><div class="cstrip">${recent.map((i) => connMini(i, inv)).join("")}</div></section>` : ""}
+      <section class="cfeat"><div class="cfh"><h3>Browse</h3></div><div class="ctiles">${tiles.map((t, n) => `<button class="ctile" data-ccat="${esc(t.id)}" style="--i:${Math.min(n, 14)}"><span class="cti">${CICON[t.id] ?? ""}</span><span class="ctl">${esc(t.label)}</span><span class="ctn">${t.n.length}</span><span class="ctg">${t.n.slice(0, 4).map((i) => connBadge(i)).join("")}</span></button>`).join("")}</div></section>`;
+  }
+  const SR = { ready: 0, "signed-out": 1, installed: 2, offline: 3, off: 4 };
+  const view = connView(items, { cat, showHidden: S.conn.showHidden, labels }).sort((a, b) => SR[connState(a)] - SR[connState(b)]);
+  const hid = cat === "off" ? 0 : items.filter((i) => i.cat === cat && i.hidden && connState(i) !== "off").length;
+  const off = cat === "off" ? [] : items.filter((i) => i.cat === cat && connState(i) === "off" && !i.hidden);
+  const hint = cat === "off" ? "Common services this machine can’t reach yet" : inv.categories?.find((c) => c.id === cat)?.hint ?? "";
+  return `<div class="cch"><span class="cti big">${CICON[cat] ?? ""}</span><div><h3>${esc(catLabel(inv, cat))}</h3><p class="hint">${esc(hint)}</p></div></div>
+    ${selBar(view, "here")}
+    ${view.length ? `<div class="cgrid2">${view.map((i, n) => connCard(i, n, inv, false)).join("")}</div>` : `<p class="hint cempty">${cat === "yours" ? "Nothing here yet. “Add your own” for anything the scan can’t see: a staging server, a team API, a login in your password manager…" : "Nothing here on this machine."}</p>`}
+    ${hid ? `<button class="link" data-cshowhid>${S.conn.showHidden ? "Hide" : "Show"} ${hid} hidden</button>` : ""}
+    ${off.length ? `<h4 class="csub">Not set up here</h4><div class="cgrid2">${off.map((i, n) => connCard(i, n, inv, false)).join("")}</div>` : ""}`;
+}
+const RST = { ready: "ok", almost: "warn", missing: "off" };
+function recipeCard(r, inv, n) {
+  const rd = r.ready, open = S.conn.ropen === r.id;
+  const mname = machineLabel(S.conn.machine ?? S.self);
+  const st = rd.state === "ready" ? `Ready on ${mname}` : rd.state === "almost" ? "Needs a sign-in" : `Missing ${rd.missing}`;
+  const chip = (x, opt) => `<span class="rneed ${x.state}${opt ? " opt" : ""}" title="${esc(x.state === "missing" ? `${x.label}: not found on ${mname}` : `${x.label}: ${x.name ?? ""}${x.state === "partial" ? " (signed out / not running)" : ""}`)}">${x.state === "ready" ? ICON.check : x.state === "partial" ? "!" : "–"} ${esc(x.label)}</span>`;
+  return `<article class="rcard r-${rd.state}${open ? " open" : ""}" data-rid="${esc(r.id)}" style="--i:${Math.min(n, 14)}">
+    <div class="rtop" data-ropen><span class="cti">${CICON[r.cat] ?? CICON.recipe}</span><span class="rtt"><span class="rname">${esc(r.title)}</span><span class="ccat">${esc(catLabel(inv, r.cat))}${r.custom ? " · yours" : ""}${r.machine === "other" ? " · runs on your other machine" : ""}</span></span><span class="cst ${RST[rd.state]}">${esc(st)}</span></div>
+    <p class="rpitch" data-ropen>${esc(r.pitch)}</p>
+    <div class="rneeds">${rd.needs.map((x) => chip(x)).join("")}${rd.optional.map((x) => chip(x, true)).join("")}</div>
+    ${open ? `<div class="rmore"><ol class="rsteps">${r.steps.map((s) => `<li>${esc(s)}</li>`).join("")}</ol>
+      <div class="rmeta"><span>${ICON.bot} ${esc(KINDS.find(([k]) => k === (r.agent ?? "claude"))?.[1] ?? r.agent)}</span>${r.folder ? `<span><code>${esc(r.folder)}</code></span>` : ""}</div>
+      <details class="rprompt"><summary>The prompt</summary><pre>${esc(r.prompt)}</pre></details></div>` : ""}
+    <div class="racts"><button class="btn primary" data-rrun>${ICON.bolt}Run</button><button class="btn ghost" data-rcopy>Copy prompt</button><button class="btn ghost" data-rcustom>${CICON.sliders}Customize</button>${r.custom ? `<button class="btn ghost danger" data-rdel>Delete</button>` : ""}<span class="spacer"></span><button class="link" data-ropen>${open ? "Less" : "Steps"}</button></div>
+  </article>`;
+}
+function renderRecipes(inv, labels, q) {
+  const m = S.conn.machine ?? S.self;
+  const rec = S.conn.recipes.get(m);
+  if (!rec) return `<div class="rgrid">${Array.from({ length: 6 }, (_, n) => `<div class="rcard skel" style="--i:${n}"></div>`).join("")}</div>`;
+  let list = rec.recipes;
+  if (S.conn.rfor?.size) list = recipesFor(list, S.conn.rfor);
+  const cats = [...new Set(rec.recipes.map((r) => r.cat))];
+  const rc = S.conn.rcat;
+  if (rc === "ready") list = list.filter((r) => r.ready.state === "ready");
+  else if (rc === "mine") list = list.filter((r) => r.custom);
+  else if (rc !== "all") list = list.filter((r) => r.cat === rc);
+  if (q) list = list.filter((r) => connMatch({ name: r.title, detail: r.pitch, via: [...r.ready.needs, ...r.ready.optional].map((x) => x.label), group: r.steps.join(" ") }, q, labels[r.cat]));
+  const nReady = rec.recipes.filter((r) => r.ready.state === "ready").length;
+  const forNames = S.conn.rfor?.size ? [...S.conn.rfor].map((id) => connItems(inv).find((i) => i.id === id)?.name ?? id) : [];
+  return `${forNames.length ? `<div class="rfor">${CICON.recipe}<span>Recipes that use <b>${esc(forNames.slice(0, 4).join(", "))}${forNames.length > 4 ? ` +${forNames.length - 4}` : ""}</b>. Run adds your picks to the prompt.</span><span class="spacer"></span><button class="btn ghost" data-rforclear>Show all recipes</button></div>` : ""}
+    <nav class="rchips"><button data-rcat="all" aria-pressed="${rc === "all"}">All <span class="n">${rec.recipes.length}</span></button><button data-rcat="ready" aria-pressed="${rc === "ready"}">Ready now <span class="n">${nReady}</span></button>${rec.recipes.some((r) => r.custom) ? `<button data-rcat="mine" aria-pressed="${rc === "mine"}">Yours</button>` : ""}${cats.map((c) => `<button data-rcat="${esc(c)}" aria-pressed="${rc === c}">${esc(labels[c] ?? c)}</button>`).join("")}</nav>
+    ${!rec.reachable ? `<p class="hint">${esc(machineLabel(m))} isn’t reachable, so readiness can’t be checked right now.</p>` : ""}
+    ${list.length ? `<div class="rgrid">${list.map((r, n) => recipeCard(r, inv, n)).join("")}</div>` : `<p class="hint cempty">No recipes match.</p>`}
+    <p class="hint" style="margin-top:18px">Ready recipes come first. <b>Run</b> opens the New session dialog with the prompt, folder and agent filled in; nothing starts until you press Start there. Your own recipes are saved on the hub in <code>~/.config/herdr-deck/recipes.json</code>.</p>`;
 }
 function renderConnections() {
   const m = S.conn.machine ?? S.self;
   const inv = S.conn.data.get(m);
-  if (!inv && !S.conn.loading) { loadConnections(); }
+  if (!inv && !S.conn.loading) loadConnections();
+  if (S.conn.tab === "recipes" && !S.conn.recipes.has(m)) loadRecipes();
   const mach = realMachines();
   const target = rowOf(S.conn.target);
-  const q = S.conn.q.trim().toLowerCase();
-  const secs = inv?.sections ?? [];
-  const count = (id) => secs.find((s) => s.id === id)?.items.filter((i) => !i.hidden).length ?? 0;
-  const cats = CAT.filter(([id]) => count(id) || id === "custom");
-  const inCat = (s) => (q ? s.id !== "missing" || true : s.id === S.conn.cat);
-  const match = (i) => !q || `${i.name} ${i.detail ?? ""} ${(i.via ?? []).join(" ")} ${i.group ?? ""}`.toLowerCase().includes(q);
-  const shown = secs.filter(inCat).map((s) => ({ ...s, items: s.items.filter(match).filter((i) => q || S.conn.showHidden || !i.hidden) })).filter((s) => s.items.length);
-  const hiddenN = secs.find((s) => s.id === S.conn.cat)?.items.filter((i) => i.hidden).length ?? 0;
+  const q = S.conn.q.trim();
+  const items = connItems(inv);
+  const labels = Object.fromEntries((inv?.categories ?? []).map((c) => [c.id, c.label]));
+  const order = (inv?.categories ?? []).map((c) => c.id);
+  const count = (id) => items.filter((i) => (id === "off" ? connState(i) === "off" : i.cat === id && connState(i) !== "off") && !i.hidden).length;
+  const cats = ["home", ...order.filter((id) => count(id) || id === "yours"), ...(count("off") ? ["off"] : [])];
+  if (!cats.includes(S.conn.cat) && inv) S.conn.cat = "home";
   const n = S.conn.pick.size;
-  modeHTML(`<header class="vh"><h2>${ICON.plug}Connections</h2>
-      <p>${target ? `Pick what <b>${esc(target.title)}</b> should know about, then add it to its context.` : "What each machine can reach, and how agents should use it."}</p>
-      <div class="chips">${mach.length > 1 ? `<span class="seg">${mach.map((x) => `<button data-cmach="${esc(x.id)}" aria-pressed="${x.id === m}">${esc(x.label)}</button>`).join("")}</span>` : ""}
-        <input class="inp csearch" data-csearch placeholder="Search ${esc(inv?.machine ?? "")}" value="${esc(S.conn.q)}" autocomplete="off">
+  const tab = S.conn.tab;
+  const nRec = S.conn.recipes.get(m)?.recipes.length;
+  modeHTML(`<header class="vh cvh"><h2>${ICON.plug}Connections</h2>
+      <p>${target ? `Pick what <b>${esc(target.title)}</b> should know about, then add it to its context.` : "What each machine can reach, how agents should use it, and recipes that put it all to work."}</p>
+      <div class="ctoolbar"><span class="seg ctabs" role="tablist"><button role="tab" data-ctab="store" aria-pressed="${tab === "store"}">Store${inv ? ` <span class="n">${items.filter((i) => connState(i) !== "off").length}</span>` : ""}</button><button role="tab" data-ctab="recipes" aria-pressed="${tab === "recipes"}">Recipes${nRec ? ` <span class="n">${nRec}</span>` : ""}</button></span>
+        ${mach.length > 1 ? `<span class="seg">${mach.map((x) => `<button data-cmach="${esc(x.id)}" aria-pressed="${x.id === m}" ${x.online ? "" : "disabled"}>${esc(x.label)}</button>`).join("")}</span>` : ""}
+        <input class="inp csearch" data-csearch type="search" placeholder="${tab === "recipes" ? "Search recipes" : `Search ${esc(machineLabel(m))}`}" value="${esc(S.conn.q)}" autocomplete="off" aria-label="Search">
         <span class="spacer"></span><button class="btn ghost" data-cadd>${ICON.plus}Add your own</button><button class="btn ghost" data-crefresh title="Scan again">${S.conn.loading ? '<span class="spin"></span>' : "Rescan"}</button></div>
-      ${q ? "" : `<nav class="ccats">${cats.map(([id, label]) => `<button data-ccat="${id}" aria-pressed="${id === S.conn.cat}">${label} <span class="n">${count(id)}</span></button>`).join("")}</nav>`}
     </header>
-    ${!inv ? `<div class="cgrid2">${Array.from({ length: 6 }, () => '<div class="ccard skel"></div>').join("")}</div><p class="hint">Looking around ${esc(machineLabel(m))}…</p>`
-      : shown.length ? shown.map((s) => `${q || s.id !== S.conn.cat ? `<h3 class="csub">${esc(s.title)}</h3>` : `<p class="hint csh">${esc(s.hint)}</p>`}<div class="cgrid2">${s.items.map((i) => connCard(i, s.id)).join("")}</div>`).join("")
-      : `<p class="hint">${q ? "Nothing matches." : S.conn.cat === "custom" ? "Nothing here yet. “Add your own” for anything the scan can’t see: a staging server, a team API, a login in your password manager…" : "Nothing found."}</p>`}
-    ${hiddenN && !q ? `<button class="link" data-cshowhid>${S.conn.showHidden ? "Hide" : "Show"} ${hiddenN} hidden</button>` : ""}
-    ${inv?.file ? `<p class="hint" style="margin-top:22px">Agents on ${esc(inv.machine)} can also read the whole list at <code>${esc(inv.file.replace(/^\/(Users|home)\/[^/]+/, "~"))}</code>, or ask the deck’s MCP server.</p>` : ""}
-    <div class="cbar${n ? " on" : ""}"><b>${n}</b> selected<span class="spacer"></span><button class="btn ghost" data-cclear>Clear</button><button class="btn" data-ccopy2>Copy</button>${target ? `<button class="btn primary" data-csend>Add to “${esc(target.title.slice(0, 28))}${target.title.length > 28 ? "…" : ""}”</button>` : `<button class="btn primary" data-csendpick>Add to a session…</button>`}</div>`);
+    <div class="cstore${tab === "recipes" ? " rtab" : ""}">
+      ${tab === "store" ? `<nav class="crail" aria-label="Categories">${cats.map((id) => `<button data-ccat="${esc(id)}" aria-pressed="${!q && id === S.conn.cat}">${CICON[id] ?? ""}<span class="crl">${esc(catLabel(inv, id))}</span>${id === "home" ? "" : `<span class="n">${count(id)}</span>`}</button>`).join("")}</nav>` : ""}
+      <div class="cmain">${tab === "store" ? renderStore(inv, items, labels, q) : renderRecipes(inv, labels, q)}</div>
+    </div>
+    ${inv?.file && tab === "store" ? `<p class="hint cfile">Agents on ${esc(inv.machine)} can also read the whole list at <code>${esc(inv.file.replace(/^\/(Users|home)\/[^/]+/, "~"))}</code>, or ask the deck’s MCP server.</p>` : ""}
+    <div class="cbar${n ? " on" : ""}"><b>${n}</b>&nbsp;selected<button class="btn ghost" data-cclear>Clear</button><span class="spacer"></span><button class="btn ghost" data-ccopy2>Copy</button><button class="btn" data-cuse>${CICON.recipe}Use in a recipe</button>${target ? `<button class="btn primary" data-csend>Add to “${esc(target.title.slice(0, 28))}${target.title.length > 28 ? "…" : ""}”</button>` : `<button class="btn primary" data-csendpick>Add to a session…</button>`}</div>`);
 }
 async function connText(ids) {
   const m = S.conn.machine ?? S.self;
@@ -2713,38 +2879,124 @@ function pickSessionFor(anchor, run) {
   const rows = [...S.rows.values()].filter((r) => isAgent(r) && !r.app && inScope(r)).sort((a, b) => act(b) - act(a)).slice(0, 14);
   openMenu(anchor, rows.map((r) => ({ html: `<span class="dot" style="--c:${statusVar(r.status)}"></span> ${esc(r.title)}<small>${esc(r.project)}</small>`, run: () => run(r.key) })), "Add to which session?");
 }
-function connItem(id) { for (const s of S.conn.data.get(S.conn.machine ?? S.self)?.sections ?? []) { const i = s.items.find((x) => x.id === id); if (i) return i; } }
+function connItem(id) { return connItems(S.conn.data.get(S.conn.machine ?? S.self)).find((x) => x.id === id); }
 async function connConf(body) {
   try { const inv = await api("/api/connections-conf", { machine: S.conn.machine ?? S.self, ...body }); S.conn.data.set(S.conn.machine ?? S.self, inv); renderConnections(); }
   catch (e) { toast(e.message, true); }
 }
+function recipeOf(id) { return S.conn.recipes.get(S.conn.machine ?? S.self)?.recipes.find((r) => r.id === id); }
+async function recipePrompt(id) { return api("/api/recipes", { op: "prompt", id, machine: S.conn.machine ?? S.self, picked: S.conn.rfor ? [...S.conn.rfor] : [] }); }
+/** Run = the New session dialog, prefilled. Nothing starts until the user presses Start there. */
+async function runRecipe(id) {
+  const r = recipeOf(id);
+  if (!r) return;
+  let p;
+  try { p = await recipePrompt(id); } catch (e) { return toast(e.message, true); }
+  let m = S.conn.machine ?? S.self;
+  if (p.machine === "other") m = realMachines().find((x) => x.id !== S.self && x.online)?.id ?? m;
+  const tgt = rowOf(S.conn.target);
+  const cwd = p.folder || (tgt && tgt.machine === m ? tgt.projectRoot ?? tgt.cwd : "") || "";
+  await openNew(cwd ? { machine: m, cwd, project: r.title } : undefined);
+  if (newMachine !== m && realMachines().some((x) => x.id === m && x.online)) {
+    newMachine = m;
+    for (const b of $("nMachine").children) b.setAttribute("aria-pressed", b.dataset.m === m);
+    await loadNewOptions();
+  }
+  if (KINDS.some(([k]) => k === p.agent) && newKind !== p.agent) { newKind = p.agent; renderKinds(); }
+  $("newDlg").querySelector("h3").textContent = `Run recipe: ${r.title}`;
+  $("nPrompt").value = p.prompt;
+  $("nLabel").value = r.title.slice(0, 40);
+  renderCmd();
+}
+async function customizeRecipe(id) {
+  const r = recipeOf(id);
+  if (!r) return;
+  const inv = S.conn.data.get(S.conn.machine ?? S.self);
+  const picked = [...S.conn.pick].map((x) => connItems(inv).find((i) => i.id === x)).filter(Boolean);
+  const d = document.createElement("dialog");
+  d.className = "ask rdlg";
+  const cats = (inv?.categories ?? []).filter((c) => !["keys", "skills", "yours"].includes(c.id));
+  d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${r.custom ? "Edit your recipe" : `Customize “${esc(r.title)}”`}</h3><p class="hint">${r.custom ? "" : "Saved as your own copy; the built-in stays as it is. "}Stored on the hub in ~/.config/herdr-deck/recipes.json.</p>
+    <label class="lab">Title</label><input class="inp" name="title" required maxlength="80" value="${esc(r.custom ? r.title : `${r.title} (mine)`)}">
+    <label class="lab">One-line pitch</label><input class="inp" name="pitch" maxlength="240" value="${esc(r.pitch)}">
+    <div class="rrow"><div><label class="lab">Category</label><select class="inp" name="cat">${cats.map((c) => `<option value="${esc(c.id)}"${c.id === r.cat ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select></div>
+      <div><label class="lab">Agent</label><select class="inp" name="agent">${KINDS.filter(([k]) => k !== "shell").map(([k, l]) => `<option value="${k}"${k === (r.agent ?? "claude") ? " selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div><label class="lab">Runs on</label><select class="inp" name="machine"><option value="hub">The machine you pick</option><option value="other"${r.machine === "other" ? " selected" : ""}>Your other machine</option></select></div></div>
+    <label class="lab">Folder <span class="hint">(optional, e.g. ~/wiki)</span></label><input class="inp" name="folder" value="${esc(r.folder ?? "")}">
+    <label class="lab">Steps <span class="hint">(one per line)</span></label><textarea class="inp" name="steps" rows="4">${esc(r.steps.join("\n"))}</textarea>
+    <label class="lab">Prompt <span class="hint">({connections}, {machine}, {date} are filled in)</span></label><textarea class="inp rpt" name="prompt" rows="9" required>${esc(r.prompt)}</textarea>
+    ${picked.length ? `<label class="chk-l"><input type="checkbox" name="addpicked"> Also require my ${picked.length} selected connection${picked.length === 1 ? "" : "s"} (${esc(picked.slice(0, 3).map((i) => i.name).join(", "))}${picked.length > 3 ? "…" : ""})</label>` : ""}</div>
+    <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Save recipe</button></div></form>`;
+  document.body.append(d);
+  d.addEventListener("close", async () => {
+    if (d.returnValue === "ok") {
+      const f = Object.fromEntries(new FormData(d.querySelector("form")));
+      const needs = [...r.needs, ...(f.addpicked ? picked.map((i) => ({ label: i.name, any: [i.id] })) : [])];
+      try {
+        await api("/api/recipes", { op: "save", machine: S.conn.machine ?? S.self, recipe: { ...f, id: r.custom ? r.id : undefined, from: r.custom ? r.from : r.id, needs, optional: r.optional ?? [] } });
+        S.conn.rcat = "mine"; await loadRecipes(true); toast("Saved your recipe");
+      } catch (e) { toast(e.message, true); }
+    }
+    d.remove();
+  });
+  d.showModal();
+}
+function connRerender(fn) { fn(); renderConnections(); }
 $("dbody").addEventListener("click", async (e) => {
   if (S.mode !== "connections") return;
   const t = e.target;
+  const tab = t.closest("[data-ctab]")?.dataset.ctab;
+  if (tab) { S.conn.tab = tab; store("connTab", tab); if (tab === "recipes") loadRecipes(); $("dbody").scrollTop = 0; return renderConnections(); }
   const cm = t.closest("[data-cmach]")?.dataset.cmach;
-  if (cm) { S.conn.machine = cm; S.conn.pick.clear(); renderConnections(); return loadConnections(); }
+  if (cm) { S.conn.machine = cm; S.conn.pick.clear(); S.conn.rfor = null; renderConnections(); loadConnections(); if (S.conn.tab === "recipes") loadRecipes(); return; }
   const cat = t.closest("[data-ccat]")?.dataset.ccat;
-  if (cat) { S.conn.cat = cat; store("connCat", cat); S.conn.open = null; return renderConnections(); }
+  if (cat) { S.conn.cat = cat; store("connCat2", cat); S.conn.open = null; S.conn.q = ""; S.conn.more = false; $("dbody").scrollTop = 0; return renderConnections(); }
+  const jump = t.closest("[data-cjump]");
+  if (jump) { S.conn.cat = jump.dataset.cjcat; store("connCat2", S.conn.cat); S.conn.open = jump.dataset.cjump; renderConnections(); $("dbody").querySelector(`[data-cid="${CSS.escape(jump.dataset.cjump)}"]`)?.scrollIntoView({ block: "center", behavior: reduceMotion.matches ? "auto" : "smooth" }); return; }
+  const rcat = t.closest("[data-rcat]")?.dataset.rcat;
+  if (rcat) return connRerender(() => { S.conn.rcat = rcat; S.conn.ropen = null; });
+  const go = t.closest("[data-cgorecipe]")?.dataset.cgorecipe;
+  if (go) return connRerender(() => { S.conn.tab = "recipes"; S.conn.rcat = "all"; S.conn.q = ""; S.conn.rfor = null; S.conn.ropen = go; });
+  if (t.closest("[data-rforclear]")) return connRerender(() => { S.conn.rfor = null; });
   if (t.closest("[data-crefresh]")) return loadConnections(true);
-  if (t.closest("[data-cshowhid]")) { S.conn.showHidden = !S.conn.showHidden; return renderConnections(); }
-  if (t.closest("[data-cclear]")) { S.conn.pick.clear(); return renderConnections(); }
+  if (t.closest("[data-cshowhid]")) return connRerender(() => { S.conn.showHidden = !S.conn.showHidden; });
+  if (t.closest("[data-cmore]")) return connRerender(() => { S.conn.more = true; });
+  const inv = S.conn.data.get(S.conn.machine ?? S.self);
+  const labels = Object.fromEntries((inv?.categories ?? []).map((c) => [c.id, c.label]));
+  const inView = () => connView(connItems(inv), { cat: S.conn.cat, q: S.conn.q.trim(), showHidden: S.conn.showHidden, labels });
+  if (t.closest("[data-csall]")) return connRerender(() => { S.conn.pick = connSelectAll(S.conn.pick, inView()); });
+  if (t.closest("[data-csnone]")) return connRerender(() => { S.conn.pick = connSelectNone(S.conn.pick, inView()); });
+  if (t.closest("[data-cseverything]")) return connRerender(() => { S.conn.pick = connSelectAll(S.conn.pick, connItems(inv).filter((i) => connState(i) === "ready" && !i.hidden)); });
+  if (t.closest("[data-cclear]")) return connRerender(() => { S.conn.pick = connSelectNone(S.conn.pick); });
   if (t.closest("[data-ccopy2]")) return copy(await connText([...S.conn.pick]), "connections");
+  if (t.closest("[data-cuse]")) { S.conn.rfor = new Set(S.conn.pick); S.conn.tab = "recipes"; S.conn.rcat = "all"; S.conn.q = ""; $("dbody").scrollTop = 0; loadRecipes(); return renderConnections(); }
   if (t.closest("[data-csend]")) return sendConnections([...S.conn.pick], S.conn.target);
   if (t.closest("[data-csendpick]")) return pickSessionFor(t.closest("[data-csendpick]"), (k) => sendConnections([...S.conn.pick], k));
   if (t.closest("[data-cadd]")) return addConnection();
   if (t.closest("[data-csuggest]")) return suggestProjects();
+  const rc = t.closest("[data-rid]");
+  if (rc) {
+    const id = rc.dataset.rid;
+    if (t.closest("[data-rrun]")) return runRecipe(id);
+    if (t.closest("[data-rcopy]")) { try { copy((await recipePrompt(id)).prompt, "the recipe prompt"); } catch (err) { toast(err.message, true); } return; }
+    if (t.closest("[data-rcustom]")) return customizeRecipe(id);
+    if (t.closest("[data-rdel]")) { if (await askDialog({ title: `Delete “${recipeOf(id)?.title}”?`, ok: "Delete", danger: true })) { try { await api("/api/recipes", { op: "delete", id }); await loadRecipes(true); } catch (err) { toast(err.message, true); } } return; }
+    if (t.closest("[data-ropen]") && !t.closest("details")) return connRerender(() => { S.conn.ropen = S.conn.ropen === id ? null : id; });
+    return;
+  }
   const card = t.closest("[data-cid]");
   if (!card) return;
   const id = card.dataset.cid;
-  if (t.closest("[data-cpick]")) { S.conn.pick.has(id) ? S.conn.pick.delete(id) : S.conn.pick.add(id); return renderConnections(); }
+  if (t.closest("[data-cpick]")) return connRerender(() => { S.conn.pick.has(id) ? S.conn.pick.delete(id) : S.conn.pick.add(id); });
   if (t.closest("[data-chide]")) return connConf({ op: connItem(id)?.hidden ? "unhide" : "hide", id });
   if (t.closest("[data-cremove]")) { if (await askDialog({ title: `Remove “${connItem(id)?.name}”?`, ok: "Remove", danger: true })) connConf({ op: "remove", id }); return; }
   if (t.closest("[data-cone]")) return S.conn.target ? sendConnections([id], S.conn.target) : pickSessionFor(t.closest("[data-cone]"), (k) => sendConnections([id], k));
-  if (t.closest("[data-copen]")) { S.conn.open = S.conn.open === id ? null : id; renderConnections(); card.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  if (t.closest("[data-copen]")) { S.conn.open = S.conn.open === id ? null : id; if (S.conn.open) loadRecipes(); renderConnections(); $("dbody").querySelector(`[data-cid="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", behavior: reduceMotion.matches ? "auto" : "smooth" }); }
 });
 $("dbody").addEventListener("input", (e) => {
   if (S.mode !== "connections" || !e.target.matches("[data-csearch]")) return;
   S.conn.q = e.target.value;
+  S.conn.more = false;
   clearTimeout(renderConnections.t);
   renderConnections.t = setTimeout(() => { const pos = e.target.selectionStart; renderConnections(); const el = $("dbody").querySelector("[data-csearch]"); el?.focus(); el?.setSelectionRange(pos, pos); }, 80);
 });
@@ -2757,15 +3009,18 @@ $("dbody").addEventListener("focusout", (e) => {
 async function addConnection() {
   const d = document.createElement("dialog");
   d.className = "ask";
+  const inv = S.conn.data.get(S.conn.machine ?? S.self);
+  const cats = (inv?.categories ?? []).filter((c) => !["skills", "keys", "mcp"].includes(c.id));
   d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>Add a connection</h3><p class="hint">Something agents on ${esc(machineLabel(S.conn.machine ?? S.self))} can use that the scan can’t see.</p>
     <label class="lab">Name</label><input class="inp" name="name" placeholder="Staging server" required>
     <label class="lab">What it’s for</label><input class="inp" name="detail" placeholder="Pre-production copy of the funnel">
+    <label class="lab">Category</label><select class="inp" name="cat">${cats.map((c) => `<option value="${esc(c.id)}"${c.id === "yours" ? " selected" : ""}>${esc(c.label)}</option>`).join("")}</select>
     <label class="lab">How agents should use it</label><textarea class="inp" name="use" rows="3" placeholder="ssh staging, app in /srv/app, restart with pm2 restart app"></textarea>
     <label class="lab">Reached via <span class="hint">(comma separated, optional)</span></label><input class="inp" name="via" placeholder="ssh staging, key STAGING_TOKEN"></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Add</button></div></form>`;
   document.body.append(d);
   d.addEventListener("close", () => {
-    if (d.returnValue === "ok") { const f = new FormData(d.querySelector("form")); S.conn.cat = "custom"; connConf({ op: "add", item: Object.fromEntries(f) }); }
+    if (d.returnValue === "ok") { const f = Object.fromEntries(new FormData(d.querySelector("form"))); S.conn.cat = f.cat || "yours"; S.conn.q = ""; connConf({ op: "add", item: f }); }
     d.remove();
   });
   d.showModal();
