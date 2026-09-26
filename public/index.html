@@ -940,6 +940,14 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
 .chat.noconv .dterm.live { width: 100%; box-sizing: border-box; max-height: 60vh; overflow: auto; margin: 0; font-size: 13px; }
 .file-in { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; clip-path: inset(50%); }
 label.ib { display: inline-grid; place-items: center; cursor: pointer; }
+.row .src { grid-column: 2 / -1; display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ink-3); min-width: 0; white-space: nowrap; overflow: hidden; }
+.row .src svg { width: 13px; height: 13px; flex: none; opacity: .8; }
+.row .src span { overflow: hidden; text-overflow: ellipsis; }
+[data-simple] .row .src { font-size: 14px; }
+[data-simple] .dh { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+[data-simple] .row .src svg { width: 15px; height: 15px; }
+[data-simple] #cAttach { width: 52px; height: 52px; border-radius: 16px; border: 1px solid var(--line-2); background: var(--raise); }
+[data-simple] #cAttach svg { width: 20px; height: 20px; }
 /* ── views: a way out ── */
 .vclose { position: sticky; top: 12px; float: right; margin: 12px 14px -46px 0; z-index: 4; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; border: 1px solid var(--line); background: color-mix(in srgb, var(--raise) 88%, transparent); color: var(--ink-2); backdrop-filter: blur(6px); transition: background .12s, color .12s, transform .12s var(--ease); }
 .vclose:hover { background: var(--hover); color: var(--ink); transform: rotate(90deg); }
@@ -1070,7 +1078,7 @@ dialog[open]::backdrop { animation: fade .18s ease; }
 [data-simple] #machines, [data-simple] #groupSeg, [data-simple] #live, [data-simple] #mini, [data-simple] #selbar, [data-simple] #statusline,
 [data-simple] #term, [data-simple] #splitH, [data-simple] .tabsbar, [data-simple] .dh-meta, [data-simple] .dh-where, [data-simple] .tools.msg,
 [data-simple] .views button[data-view="history"], [data-simple] #paletteBtn, [data-simple] #termToggle, [data-simple] .dh-acts .desk,
-[data-simple] .dh-acts [data-dact="link"], [data-simple] .msg .mt, [data-simple] #cAttach, [data-simple] .sec-h .padd, [data-simple] .brand .conn { display: none !important; }
+[data-simple] .dh-acts [data-dact="link"], [data-simple] .msg .mt, [data-simple] .sec-h .padd, [data-simple] .brand .conn { display: none !important; }
 [data-simple] .brand { font-size: 20px; }
 [data-simple] .row { padding: 12px 12px 13px; border-radius: 16px; margin-bottom: 4px; gap: 4px 10px; grid-template-columns: 18px minmax(0, 1fr) auto; }
 [data-simple] .row > .dot { width: 14px; height: 14px; margin-top: 4px; }

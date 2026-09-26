@@ -372,14 +372,26 @@ function visibleRows() {
 // ── list rendering (keyed; only changed rows touch the DOM) ──────────────
 const rowCache = new Map();
 const SIMPLE_STATUS = { working: ["Working on it", "✨"], blocked: ["Needs you", "👋"], done: ["Finished", "✅"], idle: ["Resting", "💤"], empty: ["Empty", "·"], unknown: ["", ""] };
+/** Where a session lives: which machine (and herdr workspace), shown under every row in both modes. */
+const SRC_ICON = {
+  mac: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3" width="11" height="7.5" rx="1"/><path d="M1 13h14"/></svg>',
+  remote: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.7h.01M4.5 11.2h.01"/></svg>',
+  app: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11" rx="3"/><path d="M6 8h4"/></svg>',
+};
+function srcLine(r) {
+  const m = (S.summary.machines ?? []).find((x) => x.id === r.machine);
+  const icon = r.app ? SRC_ICON.app : m && !m.local ? SRC_ICON.remote : SRC_ICON.mac;
+  const where = r.app ? "Codex app" : r.hist ? `${machineLabel(r.machine)} · history` : `${machineLabel(r.machine)}${r.workspace && !S.simple ? ` · ${r.workspace}` : ""}`;
+  return `<span class="src" title="Runs on ${esc(machineLabel(r.machine))}">${icon}<span>${esc(where)}</span></span>`;
+}
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span></span>${srcLine(r)}`;
 }
 function rowHTML(r, byProject) {
   if (S.simple) return simpleRow(r);
   const live = r.status === "working";
-  const mach = multiMachine() && S.machine === "all" ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : "";
+  const mach = "";
   const agoEl = `<span class="ago${live ? " going" : ""}" ${live ? "" : `data-t="${r.lastActiveAt ?? ""}"`} title="Last active ${esc(abs(r.lastActiveAt))}">${live ? "working" : ago(r.lastActiveAt)}</span>`;
   const title = `<span class="tl"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span></span>`;
   let line = "";
@@ -397,8 +409,8 @@ function rowHTML(r, byProject) {
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs">${running.slice(0, 3).map((x) => `<div><span class="spin"></span>${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` <span class="mono">${esc(x.now)}</span>` : ""}</div>`).join("")}${running.length > 3 ? `<div>+${running.length - 3} more</div>` : ""}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""} ${mach}</span>${agoEl}${line}${subs}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${mach}</span>${agoEl}${title}${line}${subs}`;
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto"><b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${title}${srcLine(r)}${line}${subs}`;
 }
 let lastOrder = "", queued = false;
 function render() {
@@ -2990,6 +3002,47 @@ document.addEventListener("keydown", (e) => {
   else if (k === "Escape" && S.mode) setMode(null);
   else if (k === "Escape") { if (S.sub) { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); } else if (S.board) setBoard(false); else if (S.q) { S.q = ""; $("q").value = ""; } else if (S.picked.size) S.picked.clear(); render(); }
 });
+
+// ── right-click (or long-press) a session ────────────────────────────────
+function rowMenu(r, x, y) {
+  const anchor = { getBoundingClientRect: () => ({ left: x, right: x, top: y, bottom: y, width: 0, height: 0 }), focus() {} };
+  const live = !r.app && !r.hist;
+  const items = [
+    { html: `Open`, run: () => { select(r.key, { scroll: true, open: true }); } },
+    live && { html: "Rename…<small>The pane, the tab and the agent’s own name</small>", run: () => renameSession(r) },
+    live && isAgent(r) && { html: "Message it…", run: () => { select(r.key, { open: true }); focusReply(); } },
+    live && !isPhone() && { html: "Jump to it in herdr", run: () => focusPane(r.key) },
+    r.app && { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
+    r.app && { html: "Continue in herdr", run: () => codexAct("codex-resume", r) },
+    projectHome(r.project) && { html: `New session in ${esc(r.project)}`, run: () => openNew(projectHome(r.project)) },
+    { html: "Copy link", run: () => copy(linkUrl(r), "link") },
+    live && { html: S.picked.has(r.key) ? "Unselect" : "Select<small>To act on several at once</small>", run: () => togglePick(r.key) },
+    "-",
+    live && { html: "Close session…", danger: true, run: () => askClose([r.key]) },
+    r.app && { html: "Hide from the deck", danger: true, run: () => codexAct("codex-hide", r) },
+  ].filter(Boolean);
+  openMenu(anchor, items, r.title || r.agent);
+}
+$("rows").addEventListener("contextmenu", (e) => {
+  const el = e.target.closest(".row[data-key]");
+  const r = el && rowOf(el.dataset.key);
+  if (!r) return;
+  e.preventDefault();
+  rowMenu(r, e.clientX, e.clientY);
+});
+// Touch: hold a row for half a second (iOS has no contextmenu event).
+{
+  let t = 0, sx = 0, sy = 0, fired = false;
+  $("rows").addEventListener("touchstart", (e) => {
+    const el = e.target.closest(".row[data-key]");
+    if (!el || e.touches.length > 1) return;
+    fired = false; sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+    clearTimeout(t);
+    t = setTimeout(() => { const r = rowOf(el.dataset.key); if (r) { fired = true; navigator.vibrate?.(8); rowMenu(r, sx, sy); } }, 480);
+  }, { passive: true });
+  $("rows").addEventListener("touchmove", (e) => { if (Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 8) clearTimeout(t); }, { passive: true });
+  $("rows").addEventListener("touchend", (e) => { clearTimeout(t); if (fired) { e.preventDefault(); fired = false; } });
+}
 
 // ── phone navigation: a native-feeling stack (list → chat ⇄ terminal) ─────
 function setMView(v, push) {

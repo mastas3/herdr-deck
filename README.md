@@ -63,6 +63,7 @@ collapses (`]`) and resizes by dragging the bar above it. Sizes are remembered.
 - **`/` commands:** type `/` for the session's own commands: Claude Code's built-ins (read from the installed
   binary, so they match your version), your commands, project commands, plugin commands and skills; Codex and
   OpenCode built-ins and custom prompts. Arrows to move, Tab to insert, Enter to run. Deck tools are listed too.
+- **Right-click** a session (or hold it on a phone): open, rename, message, jump, new session in its project, copy link, select, close.
 - **Rename** (`e`, or ⋯ → Rename): renames the herdr pane (and the tab when the pane has it to itself), the
   herdr agent name, and runs `/rename` in Claude Code or Codex so their own history shows it (queued if busy).
 - **Status line** above the message box: project, context used, and the plan limits for that agent

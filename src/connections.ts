@@ -36,14 +36,19 @@ const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
 function which(bin: string): string | undefined {
   for (const dir of PATH.split(":")) if (dir && existsSync(`${dir}/${bin}`)) return `${dir}/${bin}`;
 }
+/** A tool's version, never waiting more than 2.5s: a probe that hangs (or leaves a child holding its pipe) is abandoned. */
 async function version(path: string, arg = "--version"): Promise<string | undefined> {
+  let p: ReturnType<typeof Bun.spawn> | undefined;
   try {
-    const p = Bun.spawn([path, arg], { stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH, NO_COLOR: "1" } });
-    const t = setTimeout(() => p.kill(9), 2500);
-    const out = (await new Response(p.stdout).text()) || (await new Response(p.stderr).text());
-    clearTimeout(t);
+    p = Bun.spawn([path, arg], { stdin: "ignore", stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH, NO_COLOR: "1", CI: "1", NO_UPDATE_NOTIFIER: "1" } });
+    const read = (async () => (await new Response(p!.stdout as ReadableStream).text()) || (await new Response(p!.stderr as ReadableStream).text()))();
+    const out = await Promise.race([read, Bun.sleep(2500).then(() => "")]);
     return out.match(/\bv?(\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?)\b/)?.[1]?.slice(0, 30);
-  } catch {}
+  } catch {
+    return undefined;
+  } finally {
+    try { p?.kill(9); } catch {}
+  }
 }
 
 /** CLIs you run with npx: what's in npm's npx cache, newest version per package. */
@@ -200,14 +205,13 @@ async function services(keys: { name: string; where: string }[], mcps: McpEntry[
 }
 
 async function agents(): Promise<Item[]> {
-  const out: Item[] = [];
-  for (const [name, bin, what] of AGENTS) {
+  const found = await Promise.all(AGENTS.map(async ([name, bin, what]) => {
     const path = which(bin);
-    if (!path) continue;
+    if (!path) return;
     const v = await version(path);
-    out.push({ id: `agent:${bin}`, name, kind: "agent", status: "ready", detail: what, note: v ? `v${v}` : "installed", via: [bin] });
-  }
-  return out;
+    return { id: `agent:${bin}`, name, kind: "agent", status: "ready" as const, detail: what, note: v ? `v${v}` : "installed", via: [bin] };
+  }));
+  return found.filter(Boolean) as Item[];
 }
 async function devTools(): Promise<Item[]> {
   const found = await Promise.all(DEV.map(async ([name, bin, what]) => {
@@ -323,13 +327,35 @@ export function usage() {
 
 let cached: Inventory | undefined;
 let building: Promise<Inventory> | undefined;
+
+/**
+ * The scan runs in its own short-lived process: it reads big config files and probes ~50 CLIs, which would
+ * stall the server's event loop, and a probe that hangs can't take the server with it.
+ */
 export async function inventory(force = false): Promise<Inventory> {
   if (cached && !force && Date.now() - cached.at < 10 * 60_000) return cached;
   if (building) return building;
   building = (async () => {
+    const p = Bun.spawn([process.execPath, import.meta.path, "--scan"], { stdin: "ignore", stdout: "pipe", stderr: "inherit", env: process.env });
+    const timer = setTimeout(() => p.kill(9), 45_000);
+    const out = await new Response(p.stdout).text();
+    await p.exited;
+    clearTimeout(timer);
+    try { cached = JSON.parse(out) as Inventory; }
+    catch { if (!cached) throw new Error("The connections scan didn’t finish; try Rescan"); }
+    return cached!;
+  })().finally(() => { building = undefined; });
+  return building;
+}
+
+async function scan(): Promise<Inventory> {
+  return (async () => {
     const t0 = Date.now();
     const keys = keyNames(), mcps = mcpEntries(), npx = npxCache();
-    const [svc, ag, dev] = await Promise.all([services(keys, mcps, npx), agents(), devTools()]);
+    const t1 = Date.now();
+    const cap = <T,>(p: Promise<T>, fallback: T, what: string) => Promise.race([p, Bun.sleep(20_000).then(() => { console.warn(`connections: ${what} took over 20s; showing without it`); return fallback; })]);
+    const [svc, ag, dev] = await Promise.all([cap(services(keys, mcps, npx), [] as Item[], "services"), cap(agents(), [] as Item[], "agents"), cap(devTools(), [] as Item[], "dev tools")]);
+    console.error(`connections: scanned in ${Date.now() - t0}ms (files ${t1 - t0}ms, probes ${Date.now() - t1}ms)`);
     const conf = loadConnConf();
     const hid = new Set(conf.hidden);
     const dress = (it: Item): Item => ({ ...it, use: conf.notes[it.id] ?? it.use, hidden: hid.has(it.id) });
@@ -353,10 +379,14 @@ export async function inventory(force = false): Promise<Inventory> {
     ].map((sec) => ({ ...sec, items: sec.items.map(dress) }));
     const inv: Inventory = { machine: hostname().replace(/\.local$/, ""), at: Date.now(), ms: Date.now() - t0, sections };
     inv.file = writeConnectionsMd(inv);
-    cached = inv;
     return inv;
-  })().finally(() => { building = undefined; });
-  return building;
+  })();
+}
+
+if (import.meta.main && process.argv.includes("--scan")) {
+  const inv = await scan();
+  process.stdout.write(JSON.stringify(inv));
+  process.exit(0);
 }
 
 const itemLine = (i: Item) => `- **${i.name}**${i.status === "partial" ? " (needs sign-in)" : ""}${i.detail ? ` — ${i.detail}` : ""}${i.via?.length ? `. Via: ${i.via.join(", ")}` : ""}${i.use ? `\n  How: ${i.use}` : ""}`;
