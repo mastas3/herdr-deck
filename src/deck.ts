@@ -5,6 +5,8 @@ import { call, discoverSessions, subscribe, type HerdrSession } from "./herdr";
 import { childrenIndex, readProcs, treeUsage, type Proc } from "./procs";
 import { claudeMeta, codexMeta, opencodeMeta, resumeCommand, type AgentMeta } from "./agents";
 import { cleanTail, isShellOnly } from "./tail";
+import { insightFor, type Insight } from "./insight";
+import { projectRoot } from "./projects";
 
 export type Row = {
   key: string;
@@ -24,7 +26,12 @@ export type Row = {
   firstPrompt?: string;
   lastMessage?: string;
   cwd: string;
-  project: string;
+  project: string; // what the session is really about (from the work it did), else its folder's project
+  projectRoot?: string;
+  launch?: string; // the folder's project, when it differs from `project` (sessions started from a hub)
+  now?: string; // the tool call in flight / todo in progress
+  turnStartedAt?: number;
+  subagents?: { id: string; type?: string; description?: string; model?: string; running: boolean; now?: string; startedAt?: number; lastActiveAt?: number; tools: number }[];
   branch?: string;
   dirty?: number;
   startedAt?: number;
@@ -74,6 +81,8 @@ export class Deck {
   private sent = new Map<string, string>();
   private listeners = new Set<(patch: Patch) => void>();
   private rebuildTimer?: Timer;
+  insights = new Map<string, Insight>();
+  private insightStamp = new Map<string, string>();
 
   onPatch(fn: (p: Patch) => void) {
     this.listeners.add(fn);
@@ -96,6 +105,36 @@ export class Deck {
     setInterval(() => this.refreshYoungProcInfo(), 2_000);
     setInterval(() => this.refreshMetas(), 4_000);
     setInterval(() => this.refreshGit(), 45_000);
+    this.refreshInsights(true);
+    setInterval(() => this.refreshInsights(false), 1_500);
+  }
+
+  // ── transcripts: real project, live activity, subagents ──────────────────
+
+  private insightBusy = false;
+  /** Working sessions refresh every tick; the rest only when their activity stamp moves. */
+  private async refreshInsights(all: boolean) {
+    if (this.insightBusy) return;
+    this.insightBusy = true;
+    try {
+      let changed = false;
+      for (const r of [...this.rows.values()]) {
+        if (!r.sessionId) continue;
+        const live = r.status === "working" || r.status === "blocked" || !!r.subagents?.some((x) => x.running);
+        const stamp = `${r.sessionId}:${r.lastActiveAt}:${r.status}`;
+        if (!all && !live && this.insightStamp.get(r.key) === stamp) continue;
+        this.insightStamp.set(r.key, stamp);
+        const ins = await insightFor({ agent: r.agent, sessionId: r.sessionId, cwd: r.cwd });
+        const before = JSON.stringify(this.insights.get(r.key) ?? null);
+        if (ins) this.insights.set(r.key, ins); else this.insights.delete(r.key);
+        if (JSON.stringify(ins ?? null) !== before) changed = true;
+        if (all) await Bun.sleep(0); // let requests through while warming every transcript
+      }
+      for (const k of this.insights.keys()) if (!this.rows.has(k)) { this.insights.delete(k); this.insightStamp.delete(k); }
+      if (changed) this.scheduleRebuild();
+    } finally {
+      this.insightBusy = false;
+    }
   }
 
   // ── discovery & event stream ─────────────────────────────────────────────
@@ -310,6 +349,9 @@ export class Deck {
           meta?.title && p.agent === "opencode" ? meta.title
           : termTitle || meta?.title || shortPrompt(meta?.firstPrompt) || p.label || (shellOnly ? "shell" : lead?.cmdline ?? "");
         const status = empty && p.agent_status !== "working" ? "empty" : p.agent_status ?? "unknown";
+        const ins = this.insights.get(key);
+        const cwdRoot = projectRoot(p.cwd) ?? g?.root ?? p.cwd;
+        const projRoot = ins?.project?.root ?? cwdRoot;
         rows.set(key, {
           key,
           herdr: s.name,
@@ -327,7 +369,12 @@ export class Deck {
           firstPrompt: meta?.firstPrompt,
           lastMessage: meta?.lastMessage,
           cwd: p.cwd,
-          project: basename(g?.root ?? p.cwd),
+          project: basename(projRoot),
+          projectRoot: projRoot,
+          launch: projRoot !== cwdRoot ? basename(cwdRoot) : undefined,
+          now: status === "working" || status === "blocked" ? ins?.now : undefined,
+          turnStartedAt: ins?.turnStartedAt,
+          subagents: ins?.subagents?.length ? ins.subagents.map((x) => ({ id: x.id, type: x.type, description: x.description, model: x.model, running: x.running, now: x.running ? x.now : undefined, startedAt: x.startedAt, lastActiveAt: x.lastActiveAt, tools: x.tools })) : undefined,
           branch: g?.branch,
           dirty: g?.dirty,
           startedAt: (agentProc && this.procs.get(agentProc.pid)?.startedAt) ?? shell?.startedAt,

@@ -1,43 +1,136 @@
-// Full-conversation readers for the detail view: how a session started, the turn-by-turn
-// history of asks and replies, recaps, and the images that passed through it.
+// Full-conversation readers: the chat (every ask, reply and tool call), how a session started,
+// recaps, images, which folders the agent actually worked in, what it's doing right now, and its subagents.
 // Transcripts are parsed incrementally: an active 35 MB file only costs the bytes appended since last time.
 import { Database } from "bun:sqlite";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+
+const HOME = homedir();
 
 export type Turn = { at?: number; ask: string; reply?: string; images: string[] };
 export type Img = { id: string; at?: number; source: "pasted" | "viewed"; name?: string };
+/** One chat entry. Tool calls carry a one-line summary, never their (often huge) output. */
+export type Msg = {
+  i: number;
+  role: "user" | "assistant" | "tool" | "note";
+  at?: number;
+  text?: string;
+  tool?: string;
+  summary?: string;
+  state?: "running" | "done" | "error";
+  images?: string[];
+  sub?: string; // subagent id, once known (Claude Agent/Task calls)
+  subType?: string;
+};
 export type Detail = {
+  gen: number; // bumps when a transcript is re-read from scratch, so cursors from before are void
   startedAt?: number;
-  started?: string; // the first ask, fuller than the row's clip
+  started?: string;
   recap?: { text: string; at?: number; source: string };
   aiTitle?: string;
   turns: Turn[];
   images: Img[];
+  messages: Msg[];
   compactions: number;
   asks: number;
-  workMs?: number; // total time the agent spent working, where the agent records it
+  workMs?: number;
+  turnStartedAt?: number; // when the current (or last) turn began
+  todo?: string; // the task the agent marked in progress, if it keeps a todo list
+  touch: Map<string, number>; // folder → how much work happened there (edits weigh most)
 };
 
+const TEXT_CAP = 24_000;
 const clean = (s: string, n: number) => {
   const t = s.replace(/<\/?[a-z_-]+(\s[^>]*)?>/gi, " ").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
   return t.length > n ? t.slice(0, n - 1) + "…" : t;
 };
+/** Chat text keeps its formatting (code blocks, lists); only length is capped. */
+const full = (s: string) => (s.length > TEXT_CAP ? s.slice(0, TEXT_CAP) + "\n\n… (truncated)" : s).trim();
+const home = (p: string) => p.replace(HOME, "~");
+const oneLine = (s: unknown, n = 160) => {
+  const t = String(s ?? "").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n - 1) + "…" : t;
+};
+
+let genCounter = 0;
+const emptyDetail = (): Detail => ({ gen: ++genCounter, turns: [], images: [], messages: [], compactions: 0, asks: 0, touch: new Map() });
+
+// ── where the work happened ─────────────────────────────────────────────────
+
+const PATH_RE = /(?:~|\/Users\/[\w.-]+|\/home\/[\w.-]+)\/[^\s"'`;|&<>()*?$\\,\]}]+/g;
+const IGNORE = /^~\/(\.claude|\.codex|\.config|\.local|\.cache|\.npm|\.bun|\.ollama|Library)(\/|$)|\/node_modules\//;
+
+/** Credits a path (collapsed below 7 levels) with some weight of work. */
+function touch(d: Detail, rawPath: string, weight: number) {
+  let p = rawPath.replace(/^~(?=\/)/, HOME).replace(/[.:]+$/, "");
+  if (!p.startsWith(HOME + "/")) return;
+  const rel = home(p);
+  if (IGNORE.test(rel)) return;
+  const parts = p.split("/");
+  const dir = parts.slice(0, Math.min(parts.length, 8)).join("/"); // deep paths collapse, bounding the map
+  if (dir === HOME) return;
+  d.touch.set(dir, (d.touch.get(dir) ?? 0) + weight);
+}
+function touchText(d: Detail, text: string, weight: number) {
+  const seen = new Set<string>();
+  for (const m of text.matchAll(PATH_RE)) if (!seen.has(m[0])) { seen.add(m[0]); touch(d, m[0], weight); }
+}
+
+const EDIT_TOOLS = /^(edit|write|multiedit|notebookedit|apply_patch|patch)$/i;
+const READ_TOOLS = /^(read|grep|glob|ls|view|list)$/i;
+
+/** "mcp__plugin_playwright_playwright__browser_click" → "playwright · browser_click". */
+export function prettyTool(name: string): string {
+  const m = name.match(/^mcp__(.+?)__(.+)$/);
+  if (!m) return name;
+  const server = m[1].replace(/^plugin_/, "").replace(/^claude_ai_/, "").split("_").filter(Boolean);
+  return `${server[server.length - 1] ?? m[1]} · ${m[2]}`;
+}
+
+/** One line saying what a tool call does, for the chat and the "now" line. */
+export function toolSummary(name: string, input: any): string {
+  const n = name.replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
+  const i = typeof input === "object" && input ? input : {};
+  const path = i.file_path ?? i.filePath ?? i.notebook_path ?? i.path;
+  switch (name.toLowerCase()) {
+    case "bash": return oneLine(i.description || i.command);
+    case "read": case "edit": case "write": case "multiedit": case "notebookedit": return home(String(path ?? ""));
+    case "grep": return oneLine(`${i.pattern ?? ""}${path ? " in " + home(String(path)) : ""}`);
+    case "glob": return oneLine(`${i.pattern ?? ""}${path ? " in " + home(String(path)) : ""}`);
+    case "agent": case "task": return oneLine(`${i.description ?? ""}${i.subagent_type ? ` (${i.subagent_type})` : ""}`);
+    case "webfetch": return oneLine(i.url);
+    case "websearch": return oneLine(i.query);
+    case "todowrite": {
+      const cur = (i.todos ?? []).find((t: any) => t?.status === "in_progress");
+      return cur ? oneLine(cur.activeForm ?? cur.content) : `${(i.todos ?? []).length} todos`;
+    }
+    case "skill": return oneLine(i.skill ?? i.command);
+  }
+  if (typeof input === "string") return oneLine(input);
+  const firstStr = Object.values(i).find((v) => typeof v === "string" && v.length < 400);
+  return oneLine(path ? home(String(path)) : firstStr ?? (n === name ? n : ""));
+}
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type ClaudeState = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string };
-const claudeStates = new Map<string, ClaudeState>();
+type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; mtime?: number; open: Map<string, Msg> };
+const claudeStates = new Map<string, State>();
 
 function claudeAsk(o: any): string | undefined {
   if (o.type !== "user" || o.isMeta || o.isCompactSummary) return;
   const c = o.message?.content;
   const text = typeof c === "string" ? c : Array.isArray(c) ? c.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n") : "";
-  if (!text || /^\s*</.test(text) || text.startsWith("Caveat:") || text.startsWith("[Request interrupted")) return;
+  if (!text || /^\s*</.test(text) || text.startsWith("Caveat:")) return;
   return text;
 }
 
-function feedClaude(st: ClaudeState, line: string, offset: number) {
+function push(d: Detail, m: Omit<Msg, "i">): Msg {
+  const msg = { i: d.messages.length, ...m } as Msg;
+  d.messages.push(msg);
+  return msg;
+}
+
+function feedClaude(st: State, line: string, offset: number) {
   let o: any;
   try { o = JSON.parse(line); } catch { return; }
   const d = st.detail;
@@ -45,35 +138,93 @@ function feedClaude(st: ClaudeState, line: string, offset: number) {
   if (d.startedAt === undefined && at) d.startedAt = at;
   if (o.type === "ai-title" && o.aiTitle) d.aiTitle = o.aiTitle;
   if (o.type === "system") {
-    if (o.subtype === "away_summary" && o.content) d.recap = { text: clean(o.content, 1200), at, source: "Claude’s recap" };
-    if (o.subtype === "compact_boundary") d.compactions++;
+    if (o.subtype === "away_summary" && o.content) {
+      d.recap = { text: clean(o.content, 1600), at, source: "Claude’s recap" };
+      push(d, { role: "note", at, text: "Recap: " + clean(o.content, 1600) });
+    }
+    if (o.subtype === "compact_boundary") { d.compactions++; push(d, { role: "note", at, text: "Conversation compacted" }); }
     if (o.subtype === "turn_duration" && o.durationMs) d.workMs = (d.workMs ?? 0) + o.durationMs;
     return;
   }
+  if (o.isSidechain) return;
   if (o.type === "user") {
     const content = Array.isArray(o.message?.content) ? o.message.content : [];
     const ask = claudeAsk(o);
+    const raw = typeof o.message?.content === "string" ? o.message.content : "";
+    if (ask?.startsWith("[Request interrupted")) { push(d, { role: "note", at, text: "Interrupted" }); return; }
+    let userMsg: Msg | undefined;
     if (ask) {
       st.cur = { at, ask: clean(ask, 900), images: [] };
       d.turns.push(st.cur);
       d.asks++;
       d.started ??= clean(ask, 2400);
+      d.turnStartedAt = at;
+      userMsg = push(d, { role: "user", at, text: full(ask) });
+    } else if (/^\s*<command-name>/.test(raw)) {
+      const cmd = raw.match(/<command-name>([^<]+)<\/command-name>/)?.[1];
+      const args = raw.match(/<command-args>([^<]*)<\/command-args>/)?.[1];
+      if (cmd) { userMsg = push(d, { role: "user", at, text: `${cmd}${args ? " " + args : ""}` }); d.turnStartedAt = at; }
     }
-    // Images the user pasted, and images the agent looked at (screenshots, renders) via tool results.
     content.forEach((p: any, i: number) => {
-      if (p?.type === "image") addImage(st, { id: `c:${offset}:${i}:-1`, at, source: "pasted" });
-      if (p?.type === "tool_result" && Array.isArray(p.content)) {
-        p.content.forEach((q: any, j: number) => {
-          if (q?.type === "image") addImage(st, { id: `c:${offset}:${i}:${j}`, at, source: "viewed" });
-        });
+      if (p?.type === "image") {
+        const id = `c:${offset}:${i}:-1`;
+        addImage(st, { id, at, source: "pasted" });
+        if (userMsg) (userMsg.images ??= []).push(id);
+      }
+      if (p?.type === "tool_result") {
+        const m = st.open.get(p.tool_use_id);
+        if (m) {
+          const async = o.toolUseResult?.isAsync || /async_launched|running in the background/i.test(String(o.toolUseResult?.status ?? ""));
+          m.state = p.is_error ? "error" : async && m.sub !== undefined ? "running" : "done";
+          if (o.toolUseResult?.agentId) m.sub = o.toolUseResult.agentId;
+          if (!async) st.open.delete(p.tool_use_id);
+        }
+        if (Array.isArray(p.content)) {
+          p.content.forEach((q: any, j: number) => {
+            if (q?.type !== "image") return;
+            const id = `c:${offset}:${i}:${j}`;
+            addImage(st, { id, at, source: "viewed" });
+            if (m) (m.images ??= []).push(id);
+          });
+        }
       }
     });
     return;
   }
-  if (o.type === "assistant" && st.cur && !o.isSidechain) {
-    const text = o.message?.content?.filter?.((p: any) => p?.type === "text").map((p: any) => p.text).join("\n");
-    if (text) st.cur.reply = clean(text, 1200);
+  if (o.type === "assistant") {
+    const parts = Array.isArray(o.message?.content) ? o.message.content : [];
+    for (const p of parts) {
+      if (p?.type === "text" && p.text?.trim()) {
+        const prev = d.messages[d.messages.length - 1];
+        // One reply is often streamed as several lines of one message id; merge them.
+        if (prev?.role === "assistant" && (prev as any)._mid === o.message?.id) prev.text = full(prev.text + "\n\n" + p.text);
+        else { const m = push(d, { role: "assistant", at, text: full(p.text) }); Object.defineProperty(m, "_mid", { value: o.message?.id, enumerable: false }); }
+        if (st.cur) st.cur.reply = clean(p.text, 1200);
+      } else if (p?.type === "tool_use") {
+        const name = String(p.name ?? "tool");
+        const isAgent = /^(agent|task)$/i.test(name);
+        const m = push(d, { role: "tool", at, tool: prettyTool(name), summary: toolSummary(name, p.input), state: "running", ...(isAgent ? { sub: "", subType: p.input?.subagent_type } : {}) });
+        if (p.id) { st.open.set(p.id, m); if (isAgent) Object.defineProperty(m, "_tid", { value: p.id, enumerable: false }); }
+        workFromInput(d, name, p.input);
+        if (name.toLowerCase() === "todowrite") {
+          const cur = (p.input?.todos ?? []).find((t: any) => t?.status === "in_progress");
+          d.todo = cur ? oneLine(cur.activeForm ?? cur.content) : undefined;
+        }
+      }
+    }
   }
+}
+
+function workFromInput(d: Detail, name: string, input: any) {
+  const i = typeof input === "object" && input ? input : {};
+  const w = EDIT_TOOLS.test(name) ? 4 : READ_TOOLS.test(name) ? 1 : 2;
+  const path = i.file_path ?? i.filePath ?? i.notebook_path ?? i.path;
+  if (typeof path === "string") touch(d, path, w);
+  const cmd = i.command ?? i.cmd;
+  if (typeof cmd === "string") touchText(d, cmd, 2);
+  else if (Array.isArray(cmd)) touchText(d, cmd.join(" "), 2);
+  if (typeof i.workdir === "string") touch(d, i.workdir + "/", 2);
+  if (typeof input === "string") touchText(d, input, /\*\*\* (Update|Add) File:/.test(input) ? 4 : 2);
 }
 
 function addImage(st: { detail: Detail; cur?: Turn }, img: Img) {
@@ -81,28 +232,28 @@ function addImage(st: { detail: Detail; cur?: Turn }, img: Img) {
   st.cur?.images.push(img.id);
 }
 
-const emptyDetail = (): Detail => ({ turns: [], images: [], compactions: 0, asks: 0 });
-
 /**
  * Feeds only the bytes appended since the last call. Agents sometimes rewrite a transcript in place
  * (Claude does on some compactions), so a changed inode, changed first bytes, or a last position that
  * no longer sits right after a newline all mean "start over": stale offsets would point into garbage.
  */
-async function readIncremental(states: Map<string, ClaudeState>, path: string, feed: (st: ClaudeState, line: string, offset: number) => void): Promise<Detail> {
+async function readIncremental(states: Map<string, State>, path: string, feed: (st: State, line: string, offset: number) => void): Promise<Detail> {
   const stat = statSync(path);
   const file = Bun.file(path);
-  const head = await file.slice(0, 64).text();
   let st = states.get(path);
+  const head = await file.slice(0, 64).text();
+  if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head) return st.detail; // untouched
   let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head;
   if (!fresh && st!.pos > 0) {
     const prev = new Uint8Array(await file.slice(st!.pos - 1, st!.pos).arrayBuffer());
     if (prev[0] !== 10) fresh = true;
   }
   if (fresh) {
-    st = { path, pos: 0, detail: emptyDetail(), ino: stat.ino, head };
+    st = { path, pos: 0, detail: emptyDetail(), ino: stat.ino, head, open: new Map() };
     states.set(path, st);
   }
   const s = st!;
+  s.mtime = stat.mtimeMs;
   if (stat.size > s.pos) {
     const bytes = new Uint8Array(await file.slice(s.pos, stat.size).arrayBuffer());
     const lastNl = bytes.lastIndexOf(10);
@@ -124,55 +275,180 @@ export function claudeDetail(path: string): Promise<Detail> {
   return readIncremental(claudeStates, path, feedClaude);
 }
 
+/** Subagent transcripts parse like any Claude transcript, minus the sidechain filter. */
+const subStates = new Map<string, State>();
+export function claudeSubDetail(path: string): Promise<Detail> {
+  return readIncremental(subStates, path, (st, line, off) => {
+    try { const o = JSON.parse(line); if (o.isSidechain) { o.isSidechain = false; return feedClaude(st, JSON.stringify(o), off); } } catch { return; }
+    feedClaude(st, line, off);
+  });
+}
+
 /** Re-reads one transcript line and returns the image block it points at. */
 export async function claudeImage(path: string, id: string): Promise<{ type: string; data: Uint8Array } | undefined> {
   const [, off, i, j] = id.split(":");
-  const offset = Number(off);
-  const file = Bun.file(path);
-  // Lines holding screenshots can be several MB; read until the newline.
-  let chunk = 4 * 1024 * 1024;
-  let text = "";
-  for (;;) {
-    text = await file.slice(offset, offset + chunk).text();
-    if (text.includes("\n") || offset + chunk >= file.size) break;
-    chunk *= 2;
-  }
-  const o = JSON.parse(text.split("\n")[0]);
+  const text = await lineAt(path, Number(off));
+  const o = JSON.parse(text);
   const part = o.message?.content?.[Number(i)];
   const block = Number(j) < 0 ? part : part?.content?.[Number(j)];
   if (block?.type !== "image" || block.source?.type !== "base64") return;
   return { type: block.source.media_type, data: Buffer.from(block.source.data, "base64") };
 }
 
+async function lineAt(path: string, offset: number) {
+  const file = Bun.file(path);
+  // Lines holding screenshots can be several MB; read until the newline.
+  let chunk = 4 * 1024 * 1024, text = "";
+  for (;;) {
+    text = await file.slice(offset, offset + chunk).text();
+    if (text.includes("\n") || offset + chunk >= file.size) break;
+    chunk *= 2;
+  }
+  return text.split("\n")[0];
+}
+
+// ── Claude subagents ─────────────────────────────────────────────────────────
+
+export type Sub = {
+  id: string;
+  type?: string;
+  description?: string;
+  model?: string;
+  startedAt?: number;
+  lastActiveAt?: number;
+  running: boolean;
+  now?: string; // its latest tool call
+  tools: number;
+};
+const subCache = new Map<string, { mtime: number; sub: Sub }>();
+
+/** Subagents live beside the transcript: <session>/subagents/agent-<id>.jsonl (+ .meta.json). */
+export async function claudeSubagents(sessionFile: string, parent?: Detail): Promise<Sub[]> {
+  const dir = sessionFile.replace(/\.jsonl$/, "") + "/subagents";
+  let names: string[];
+  try { names = readdirSync(dir).filter((n) => n.endsWith(".jsonl")); } catch { return []; }
+  const out: Sub[] = [];
+  for (const n of names) {
+    const path = `${dir}/${n}`;
+    let st;
+    try { st = statSync(path); } catch { continue; }
+    const hit = subCache.get(path);
+    if (hit && hit.mtime === st.mtimeMs) { out.push({ ...hit.sub, running: Date.now() - st.mtimeMs < 45_000 && hit.sub.running }); continue; }
+    const id = n.replace(/^agent-/, "").replace(/\.jsonl$/, "");
+    let meta: any = {};
+    try { meta = await Bun.file(`${dir}/agent-${id}.meta.json`).json(); } catch {}
+    const tail = await Bun.file(path).slice(Math.max(0, st.size - 48 * 1024), st.size).text();
+    let now: string | undefined, tools = 0, lastAt: number | undefined, ended = false;
+    for (const l of tail.split("\n").slice(1)) {
+      let o: any;
+      try { o = JSON.parse(l); } catch { continue; }
+      if (o.timestamp) lastAt = Date.parse(o.timestamp);
+      if (o.type === "assistant") {
+        const parts = o.message?.content ?? [];
+        const tu = parts.filter?.((p: any) => p?.type === "tool_use") ?? [];
+        tools += tu.length;
+        if (tu.length) { const t = tu[tu.length - 1]; now = `${prettyTool(t.name)}: ${toolSummary(t.name, t.input)}`; ended = false; }
+        else if (parts.some?.((p: any) => p?.type === "text") && o.message?.stop_reason === "end_turn") ended = true;
+      }
+    }
+    const firstLine = await Bun.file(path).slice(0, 4096).text();
+    let startedAt: number | undefined;
+    try { startedAt = Date.parse(JSON.parse(firstLine.split("\n")[0]).timestamp); } catch {}
+    // The parent's Agent call closes when a foreground subagent returns; background ones only go quiet.
+    const call = parent?.messages.find((m) => m.sub === id || (m.tool && /^(agent|task)$/i.test(m.tool) && meta.toolUseId && (m as any)._tid === meta.toolUseId));
+    const running = !ended && Date.now() - st.mtimeMs < 45_000 && call?.state !== "done";
+    const sub: Sub = { id, type: meta.agentType, description: meta.description, model: meta.model, startedAt, lastActiveAt: lastAt ?? st.mtimeMs, running, now, tools };
+    subCache.set(path, { mtime: st.mtimeMs, sub });
+    out.push(sub);
+  }
+  return out.sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
+}
+
+export function claudeSubFile(sessionFile: string, id: string) {
+  if (!/^[\w-]+$/.test(id)) return;
+  const p = sessionFile.replace(/\.jsonl$/, "") + `/subagents/agent-${id}.jsonl`;
+  return existsSync(p) ? p : undefined;
+}
+
 // ── Codex ────────────────────────────────────────────────────────────────────
 
-const codexStates = new Map<string, ClaudeState>();
+const codexStates = new Map<string, State>();
 
-function feedCodex(st: ClaudeState, line: string, offset: number) {
+/** Codex's `exec` tool takes JavaScript; the shell command inside is what's worth showing. */
+function codexToolSummary(name: string, raw: string): string {
+  let args: any = raw;
+  try { args = JSON.parse(raw); } catch {}
+  if (typeof args === "object" && args) {
+    const cmd = args.command ?? args.cmd;
+    if (cmd) return oneLine(Array.isArray(cmd) ? cmd.slice(-1)[0] : cmd);
+    if (args.title) return oneLine(args.title);
+    return toolSummary(name, args);
+  }
+  const s = String(raw);
+  const cmd = s.match(/\b(?:cmd|command)\s*:\s*(["'`])((?:\\.|(?!\1).)*)\1/s)?.[2];
+  if (cmd) return oneLine(cmd.replace(/\\n/g, " "));
+  const file = s.match(/\*\*\* (?:Update|Add|Delete) File: (.+)/)?.[1];
+  if (file) return home(file.trim());
+  return oneLine(s.split("\n").find((l) => l.trim() && !l.trim().startsWith("//")) ?? name);
+}
+
+function feedCodex(st: State, line: string, offset: number) {
   let o: any;
   try { o = JSON.parse(line); } catch { return; }
   const d = st.detail;
   const at = o.timestamp ? Date.parse(o.timestamp) : undefined;
   const p = o.payload;
   if (o.type === "session_meta") d.startedAt = Date.parse(p?.timestamp ?? o.timestamp);
-  if (o.type === "compacted") d.compactions++;
-  if (o.type !== "response_item" || p?.type !== "message") return;
+  if (o.type === "compacted") { d.compactions++; push(d, { role: "note", at, text: "Conversation compacted" }); }
+  if (o.type === "event_msg" && p?.type === "task_started") d.turnStartedAt = at;
+  if (o.type === "event_msg" && p?.type === "turn_aborted") push(d, { role: "note", at, text: "Interrupted" });
+  if (o.type !== "response_item") return;
+  if (p?.type === "function_call" || p?.type === "custom_tool_call" || p?.type === "local_shell_call") {
+    const raw = p.arguments ?? p.input ?? JSON.stringify(p.action ?? {});
+    const name = String(p.name ?? "shell");
+    const m = push(d, { role: "tool", at, tool: prettyTool(name), summary: codexToolSummary(name, String(raw)), state: "running" });
+    if (p.call_id) st.open.set(p.call_id, m);
+    let args: any = raw;
+    try { args = JSON.parse(raw); } catch {}
+    workFromInput(d, name === "apply_patch" ? "apply_patch" : name, args);
+    if (typeof args === "string") {
+      const wd = args.match(/workdir\s*:\s*["'`]([^"'`]+)/)?.[1];
+      if (wd) touch(d, wd + "/", 2);
+      for (const f of args.matchAll(/\*\*\* (?:Update|Add) File: (.+)/g)) touch(d, f[1].trim(), 4);
+    }
+    return;
+  }
+  if (p?.type === "function_call_output" || p?.type === "custom_tool_call_output") {
+    const m = st.open.get(p.call_id);
+    if (m) { m.state = /"exit_code":\s*[1-9]|Exit code: [1-9]/.test(String(p.output ?? "").slice(0, 400)) ? "error" : "done"; st.open.delete(p.call_id); }
+    return;
+  }
+  if (p?.type !== "message") return;
   if (p.role === "user") {
     const texts = (p.content ?? []).filter((c: any) => c?.type === "input_text").map((c: any) => c.text as string);
     // Codex injects AGENTS.md and environment context as user messages; they start with markup or a heading.
     const ask = texts.filter((t: string) => !/^\s*(<|# AGENTS\.md)/.test(t)).join("\n").trim();
+    let userMsg: Msg | undefined;
     if (ask) {
       st.cur = { at, ask: clean(ask, 900), images: [] };
       d.turns.push(st.cur);
       d.asks++;
       d.started ??= clean(ask, 2400);
+      d.turnStartedAt ??= at;
+      userMsg = push(d, { role: "user", at, text: full(ask) });
     }
     (p.content ?? []).forEach((c: any, i: number) => {
-      if (c?.type === "input_image") addImage(st, { id: `x:${offset}:${i}`, at, source: "pasted" });
+      if (c?.type !== "input_image") return;
+      const id = `x:${offset}:${i}`;
+      addImage(st, { id, at, source: "pasted" });
+      if (userMsg) (userMsg.images ??= []).push(id);
     });
-  } else if (p.role === "assistant" && st.cur) {
+  } else if (p.role === "assistant") {
     const text = (p.content ?? []).filter((c: any) => c?.type === "output_text").map((c: any) => c.text).join("\n");
-    if (text) st.cur.reply = clean(text, 1200);
+    if (text.trim()) {
+      push(d, { role: "assistant", at, text: full(text) });
+      if (st.cur) st.cur.reply = clean(text, 1200);
+    }
   }
 }
 
@@ -182,14 +458,7 @@ export function codexDetail(path: string): Promise<Detail> {
 
 export async function codexImage(path: string, id: string) {
   const [, off, i] = id.split(":");
-  const file = Bun.file(path);
-  let chunk = 4 * 1024 * 1024, text = "";
-  for (;;) {
-    text = await file.slice(Number(off), Number(off) + chunk).text();
-    if (text.includes("\n") || Number(off) + chunk >= file.size) break;
-    chunk *= 2;
-  }
-  const url: string | undefined = JSON.parse(text.split("\n")[0]).payload?.content?.[Number(i)]?.image_url;
+  const url: string | undefined = JSON.parse(await lineAt(path, Number(off))).payload?.content?.[Number(i)]?.image_url;
   return dataUrl(url);
 }
 
@@ -203,7 +472,7 @@ function dataUrl(url?: string) {
 let ocDb: Database | null | undefined;
 function oc() {
   if (ocDb !== undefined) return ocDb;
-  const p = `${homedir()}/.local/share/opencode/opencode.db`;
+  const p = `${HOME}/.local/share/opencode/opencode.db`;
   try { ocDb = existsSync(p) ? new Database(p, { readonly: true }) : null; } catch { ocDb = null; }
   return ocDb;
 }
@@ -224,29 +493,72 @@ export function opencodeDetail(sessionId: string): Detail | undefined {
       `select id, time_created, json_extract(data, '$.role') as role from message where session_id = ? order by time_created`,
     )
     .all(sessionId);
-  // Only text and file parts matter here; skip the (often huge) tool outputs without parsing them.
-  const partsOf = db.query<{ id: string; data: string }, [string]>(
-    `select id, data from part where message_id = ? and json_extract(data, '$.type') in ('text', 'file') order by id`,
+  // Tool parts: only name, input and status (outputs are often huge and never parsed).
+  const partsOf = db.query<{ id: string; type: string; data: string | null; tool: string | null; input: string | null; status: string | null }, [string]>(
+    `select id, json_extract(data, '$.type') as type,
+            case when json_extract(data, '$.type') in ('text', 'file') then data end as data,
+            json_extract(data, '$.tool') as tool, json_extract(data, '$.state.input') as input, json_extract(data, '$.state.status') as status
+       from part where message_id = ? and json_extract(data, '$.type') in ('text', 'file', 'tool') order by id`,
   );
   const st: { detail: Detail; cur?: Turn } = { detail: d };
   for (const m of msgs) {
-    const parts = partsOf.all(m.id).map((p) => ({ id: p.id, v: JSON.parse(p.data) }));
+    const parts = partsOf.all(m.id);
     if (m.role === "user") {
-      const ask = parts.filter((p) => p.v.type === "text" && !p.v.synthetic).map((p) => p.v.text).join("\n").trim();
+      const texts = parts.filter((p) => p.type === "text").map((p) => JSON.parse(p.data!)).filter((v) => !v.synthetic).map((v) => v.text);
+      const ask = texts.join("\n").trim();
+      let userMsg: Msg | undefined;
       if (ask) {
         st.cur = { at: m.time_created, ask: clean(ask, 900), images: [] };
         d.turns.push(st.cur);
         d.asks++;
         d.started ??= clean(ask, 2400);
+        d.turnStartedAt = m.time_created;
+        userMsg = push(d, { role: "user", at: m.time_created, text: full(ask) });
       }
-      for (const p of parts) if (p.v.type === "file" && /^image\//.test(p.v.mime ?? "")) addImage(st, { id: `o:${p.id}`, at: m.time_created, source: "pasted", name: p.v.filename });
-    } else if (st.cur) {
-      const text = parts.filter((p) => p.v.type === "text").map((p) => p.v.text).join("\n").trim();
-      if (text) st.cur.reply = clean(text, 1200);
+      for (const p of parts) {
+        if (p.type !== "file") continue;
+        const v = JSON.parse(p.data!);
+        if (!/^image\//.test(v.mime ?? "")) continue;
+        addImage(st, { id: `o:${p.id}`, at: m.time_created, source: "pasted", name: v.filename });
+        if (userMsg) (userMsg.images ??= []).push(`o:${p.id}`);
+      }
+    } else {
+      for (const p of parts) {
+        if (p.type === "text") {
+          const text = String(JSON.parse(p.data!).text ?? "").trim();
+          if (!text) continue;
+          push(d, { role: "assistant", at: m.time_created, text: full(text) });
+          if (st.cur) st.cur.reply = clean(text, 1200);
+        } else if (p.type === "tool") {
+          let input: any = {};
+          try { input = JSON.parse(p.input ?? "{}"); } catch {}
+          const tool = String(p.tool ?? "tool");
+          push(d, { role: "tool", at: m.time_created, tool: prettyTool(tool), summary: toolSummary(tool, input), state: p.status === "error" ? "error" : p.status === "completed" ? "done" : "running" });
+          workFromInput(d, tool, input);
+          if (tool === "todowrite") {
+            const cur = (input.todos ?? []).find((t: any) => t?.status === "in_progress");
+            d.todo = cur ? oneLine(cur.content) : undefined;
+          }
+        }
+      }
     }
   }
   ocCache.set(sessionId, { updated: s.time_updated, detail: d });
   return d;
+}
+
+/** OpenCode subagents are child sessions. */
+export function opencodeSubagents(sessionId: string): Sub[] {
+  const db = oc();
+  if (!db) return [];
+  try {
+    return db
+      .query<{ id: string; title: string; time_created: number; time_updated: number }, [string]>(
+        `select id, title, time_created, time_updated from session where parent_id = ? order by time_created`,
+      )
+      .all(sessionId)
+      .map((s) => ({ id: s.id, description: s.title, startedAt: s.time_created, lastActiveAt: s.time_updated, running: Date.now() - s.time_updated < 45_000, tools: 0 }));
+  } catch { return []; }
 }
 
 export function opencodeImage(id: string) {

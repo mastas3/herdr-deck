@@ -6,9 +6,10 @@ import { RemoteHost, splitKey, type Machine, type RemoteConf } from "./federatio
 import { fillRecipe, loadRecipes, saveRecipes } from "./recipes";
 import { Deck, type Row } from "./deck";
 import { call } from "./herdr";
-import { findClaudeFile, findCodexFile } from "./agents";
-import { claudeDetail, claudeImage, codexDetail, codexImage, opencodeDetail, opencodeImage, type Detail } from "./transcript";
+import { detailFor as detailOf, imageFor as imageOf, subDetailFor, subagentsFor } from "./insight";
+import type { Detail, Msg } from "./transcript";
 import { cachedBrief, writeBrief } from "./brief";
+import { agentArgs } from "./args";
 
 const PORT = Number(process.env.DECK_PORT ?? 4747);
 const HOST = process.env.DECK_HOST ?? "127.0.0.1";
@@ -117,11 +118,33 @@ setInterval(() => {
 }, 15_000);
 
 // ── HTML ─────────────────────────────────────────────────────────────────────
+// app.js is served under a content hash so browsers (and the service worker) keep it forever.
+const APP_PATH = new URL("../public/app.js", import.meta.url).pathname;
+let appJs = { mtime: 0, body: new Uint8Array(), gz: new Uint8Array(), hash: "" };
+function appAsset() {
+  const m = statSync(APP_PATH).mtimeMs;
+  if (m !== appJs.mtime) {
+    const body = new Uint8Array(readFileSync(APP_PATH));
+    appJs = { mtime: m, body, gz: Bun.gzipSync(body), hash: Bun.hash(body).toString(36) };
+  }
+  return appJs;
+}
 let htmlTemplate = readFileSync(HTML_PATH, "utf8");
 function page() {
   if (DEV) htmlTemplate = readFileSync(HTML_PATH, "utf8");
   const boot = JSON.stringify(fullState()).replace(/</g, "\\u003c");
-  return htmlTemplate.replace("/*__BOOT__*/", `window.__BOOT__=${boot};`);
+  return htmlTemplate.replace("/*__BOOT__*/", `window.__BOOT__=${boot};`).replace('src="/app.js"', `src="/app.js?v=${appAsset().hash}"`);
+}
+
+/** gzip for anything text-like and big enough to matter (the tailnet path is the slow one). */
+function send(req: Request, body: string | Uint8Array, type: string, cache = "no-store", status = 200) {
+  const bytes = typeof body === "string" ? new TextEncoder().encode(body) : body;
+  const headers: Record<string, string> = { "content-type": type, "cache-control": cache, vary: "accept-encoding" };
+  if (bytes.length > 1400 && /\bgzip\b/.test(req.headers.get("accept-encoding") ?? "")) {
+    headers["content-encoding"] = "gzip";
+    return new Response(Bun.gzipSync(bytes, { level: 4 }), { status, headers });
+  }
+  return new Response(bytes, { status, headers });
 }
 
 // ── actions ──────────────────────────────────────────────────────────────────
@@ -196,24 +219,29 @@ async function reopen(id: string) {
   return { ok: true, paneId };
 }
 
-async function detailFor(row: Row): Promise<Detail | undefined> {
-  if (!row.sessionId) return;
-  if (row.agent === "claude") {
-    const f = findClaudeFile(row.sessionId);
-    return f ? claudeDetail(f) : undefined;
-  }
-  if (row.agent === "codex") {
-    const f = findCodexFile(row.sessionId);
-    return f ? codexDetail(f) : undefined;
-  }
-  if (row.agent === "opencode") return opencodeDetail(row.sessionId);
+const who = (row: Row) => ({ agent: row.agent, sessionId: row.sessionId, cwd: row.cwd });
+const detailFor = (row: Row) => detailOf(who(row));
+const imageFor = (row: Row, id: string, sub?: string) => imageOf(who(row), id, sub);
+
+/** A window of the chat: the newest `limit` messages, those after a cursor (live updates) or before one (scrollback). */
+function chatSlice(d: Detail, q: { gen?: number; after?: number; before?: number; limit?: number }) {
+  const limit = Math.min(Math.max(Number(q.limit) || 120, 1), 400);
+  const all = d.messages;
+  let msgs: Msg[];
+  const sameGen = q.gen === d.gen;
+  if (sameGen && q.after != null) {
+    // Tool calls flip from running to done, so resend the tail window the client already has as well.
+    const from = Math.max(0, Math.min(Number(q.after) + 1, all.length) - 12);
+    msgs = all.slice(from);
+  } else if (sameGen && q.before != null) msgs = all.slice(Math.max(0, Number(q.before) - limit), Number(q.before));
+  else msgs = all.slice(-limit);
+  return { gen: d.gen, total: all.length, reset: !sameGen && (q.after != null || q.before != null), messages: msgs };
 }
 
-async function imageFor(row: Row, id: string) {
-  if (!row.sessionId) return;
-  if (id.startsWith("c:")) { const f = findClaudeFile(row.sessionId); return f ? claudeImage(f, id) : undefined; }
-  if (id.startsWith("x:")) { const f = findCodexFile(row.sessionId); return f ? codexImage(f, id) : undefined; }
-  if (id.startsWith("o:")) return opencodeImage(id);
+async function chatFor(row: Row, body: any) {
+  const d = body.sub ? await subDetailFor(who(row), String(body.sub)) : await detailFor(row);
+  if (!d) return { gen: 0, total: 0, messages: [] };
+  return chatSlice(d, body);
 }
 
 const briefKey = (row: Row) => (row.machine && row.machine !== SELF.id ? `${row.machine}-` : "") + `${row.agent}-${row.sessionId}`;
@@ -239,10 +267,66 @@ function detailPayload(row: Row, d: Detail | undefined) {
   };
 }
 
+// ── new-session choices ────────────────────────────────────────────────────
+
+type Opt = { v: string; l?: string; efforts?: string[] };
+let ocModels: { at: number; list: Opt[] } = { at: 0, list: [] };
+async function opencodeModels(): Promise<Opt[]> {
+  if (Date.now() - ocModels.at < 10 * 60_000 && ocModels.list.length) return ocModels.list;
+  try {
+    const p = Bun.spawn(["opencode", "models"], { stdout: "pipe", stderr: "ignore", env: { ...process.env, NO_COLOR: "1" } });
+    const t = setTimeout(() => p.kill(), 15_000);
+    const out = await new Response(p.stdout).text();
+    clearTimeout(t);
+    const list = out.split("\n").map((l) => l.trim()).filter((l) => /^[\w.-]+\/[\w.:/@-]+$/.test(l)).map((v) => ({ v }));
+    if (list.length) ocModels = { at: Date.now(), list };
+  } catch {}
+  return ocModels.list;
+}
+
+function codexChoices() {
+  let models: Opt[] = [], defModel = "", defEffort = "";
+  try {
+    const d = JSON.parse(readFileSync(`${homedir()}/.codex/models_cache.json`, "utf8"));
+    const arr = Array.isArray(d) ? d : d.models ?? [];
+    models = arr.map((m: any) => ({ v: m.slug ?? m.id, l: m.display_name ?? undefined, efforts: (m.supported_reasoning_levels ?? []).map((x: any) => x.effort ?? x).filter(Boolean) })).filter((m: Opt) => m.v);
+  } catch {}
+  try {
+    const cfg = readFileSync(`${homedir()}/.codex/config.toml`, "utf8");
+    defModel = cfg.match(/^model\s*=\s*"([^"]+)"/m)?.[1] ?? "";
+    defEffort = cfg.match(/^model_reasoning_effort\s*=\s*"([^"]+)"/m)?.[1] ?? "";
+  } catch {}
+  return { models, defModel, defEffort };
+}
+
+async function agentChoices() {
+  const cx = codexChoices();
+  return {
+    claude: {
+      models: [{ v: "", l: "Default" }, { v: "fable", l: "Fable" }, { v: "opus", l: "Opus" }, { v: "sonnet", l: "Sonnet" }, { v: "haiku", l: "Haiku" }],
+      efforts: ["low", "medium", "high", "xhigh", "max"],
+      modes: [{ v: "", l: "Ask first" }, { v: "acceptEdits", l: "Accept edits" }, { v: "auto", l: "Auto" }, { v: "plan", l: "Plan only" }, { v: "bypassPermissions", l: "Skip all checks" }],
+    },
+    codex: {
+      models: [{ v: "", l: `Default${cx.defModel ? ` (${cx.defModel})` : ""}` }, ...cx.models],
+      efforts: [...new Set(cx.models.flatMap((m) => m.efforts ?? []))],
+      defaultEffort: cx.defEffort,
+      modes: [{ v: "", l: "Default" }, { v: "read-only", l: "Read only" }, { v: "workspace-write", l: "Workspace write" }, { v: "yolo", l: "No sandbox, no approvals" }],
+    },
+    opencode: {
+      models: [{ v: "", l: "Default" }, ...(await opencodeModels())],
+      efforts: [],
+      modes: [{ v: "", l: "Build (default)" }, { v: "plan", l: "Plan" }],
+    },
+  };
+}
+
+
+
 const AGENT_KINDS = new Set(["claude", "codex", "opencode", "gemini", "cursor", "copilot", "amp", "grok", "hermes", "qwen", "kimi", "droid", "pi"]);
 
 /** Folder suggestions and the flags the user tends to start each agent with. */
-function newSessionOptions() {
+async function newSessionOptions() {
   const recent = new Map<string, number>();
   for (const r of deck.rows.values()) recent.set(r.cwd, Math.max(recent.get(r.cwd) ?? 0, r.lastActiveAt ?? r.startedAt ?? 0));
   for (const g of graveyard) recent.set(g.cwd, Math.max(recent.get(g.cwd) ?? 0, g.closedAt));
@@ -274,6 +358,7 @@ function newSessionOptions() {
   return {
     recent: [...recent.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p).slice(0, 30),
     projects: projects.map((p) => p.path).slice(0, 80),
+    choices: await agentChoices(),
     argHints: Object.fromEntries(Object.entries(argHints).map(([k, v]) => [k, Object.entries(v).sort((a, b) => b[1] - a[1]).map(([a]) => a).filter(Boolean).slice(0, 3)])),
     workspaces,
   };
@@ -305,7 +390,7 @@ async function startSession(body: any) {
         await waitForPrompt(sess.socket, paneId, 30_000);
         const base = label.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z]+/, "").slice(0, 24) || kind;
         const name = `${base}-${Math.random().toString(36).slice(2, 6)}`;
-        const args: string[] = Array.isArray(body.args) ? body.args.map(String) : String(body.args ?? "").split(/\s+/).filter(Boolean);
+        const args = agentArgs(kind, body);
         notice({ key, ok: true, message: `Starting ${kind}…` });
         await call(sess.socket, "agent.start", { name, kind, pane_id: paneId, args, timeout_ms: 90_000 }, 95_000);
         const prompt = String(body.prompt ?? "").trim();
@@ -369,7 +454,7 @@ async function forwardToMachine(path: string, body: any): Promise<Response | und
     const row = route.remote.rows.get(body.key);
     const d = (await route.remote.post("/api/detail", { key: route.key })).data;
     if (!row || !d?.turns?.length) return json({ error: "This pane has no conversation to summarise" }, 400);
-    const detail: Detail = { started: d.started, recap: d.recap, turns: d.turns, images: [], compactions: d.compactions ?? 0, asks: d.asks ?? d.turns.length, startedAt: d.startedAt };
+    const detail: Detail = { gen: 0, messages: [], touch: new Map(), started: d.started, recap: d.recap, turns: d.turns, images: [], compactions: d.compactions ?? 0, asks: d.asks ?? d.turns.length, startedAt: d.startedAt };
     return json({ brief: await writeBrief(briefKey(row), row.title, row.project, detail) });
   }
   if (path === "/api/detail") {
@@ -400,7 +485,6 @@ const STATIC: Record<string, [string, string]> = {
   "/icon-maskable-512.png": ["image/png", DAY],
   "/offline.html": ["text/html; charset=utf-8", "no-cache"],
   "/sw.js": ["text/javascript; charset=utf-8", "no-cache"],
-  "/app.js": ["text/javascript; charset=utf-8", "no-cache"],
 };
 
 const json = (data: unknown, status = 200) => Response.json(data, { status });
@@ -431,17 +515,40 @@ function allowedHost(req: Request) {
   return HOST !== "127.0.0.1" && !!process.env.DECK_ALLOW_ANY_HOST;
 }
 
+/** JSON replies (detail, chat, terminal reads) compress well; streams and binaries pass through. */
+async function gzipJson(req: Request, res: Response): Promise<Response> {
+  if (!(res.headers.get("content-type") ?? "").startsWith("application/json") || res.headers.get("content-encoding")) return res;
+  if (!/\bgzip\b/.test(req.headers.get("accept-encoding") ?? "")) return res;
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  if (bytes.length < 1400) return new Response(bytes, { status: res.status, headers: res.headers });
+  const headers = new Headers(res.headers);
+  headers.set("content-encoding", "gzip");
+  headers.set("vary", "accept-encoding");
+  return new Response(Bun.gzipSync(bytes, { level: 4 }), { status: res.status, headers });
+}
+
 const serveOptions = {
   hostname: HOST,
   port: PORT,
   idleTimeout: 0,
   async fetch(req: Request) {
+    return gzipJson(req, await handle(req));
+  },
+};
+
+async function handle(req: Request): Promise<Response> {
     // Host check blocks DNS-rebinding; the token blocks cross-site POSTs.
     if (!allowedHost(req)) return new Response("forbidden host", { status: 403 });
     const url = new URL(req.url);
 
     if (req.method === "GET") {
-      if (url.pathname === "/") return new Response(page(), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      if (url.pathname === "/") return send(req, page(), "text/html; charset=utf-8");
+      if (url.pathname === "/app.js") {
+        const a = appAsset();
+        const cache = url.searchParams.get("v") === a.hash ? "public, max-age=31536000, immutable" : "no-cache";
+        const gz = /\bgzip\b/.test(req.headers.get("accept-encoding") ?? "");
+        return new Response(gz ? a.gz : a.body, { headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": cache, vary: "accept-encoding", ...(gz ? { "content-encoding": "gzip" } : {}) } });
+      }
       if (url.pathname === "/events") {
         let ctrl: ReadableStreamDefaultController<Uint8Array>;
         const stream = new ReadableStream<Uint8Array>({
@@ -469,13 +576,13 @@ const serveOptions = {
         if (url.searchParams.get("t") !== TOKEN && !hasApiToken(req)) return new Response("forbidden", { status: 403 });
         const route = splitKey(url.searchParams.get("key") ?? "", remotes);
         if (route.remote) {
-          const q = new URLSearchParams({ key: route.key, id: url.searchParams.get("id") ?? "" });
+          const q = new URLSearchParams({ key: route.key, id: url.searchParams.get("id") ?? "", sub: url.searchParams.get("sub") ?? "" });
           const res = await route.remote.get(`/api/image?${q}`).catch(() => null);
           if (!res?.ok) return new Response("image not found", { status: 404 });
           return new Response(res.body, { headers: { "content-type": res.headers.get("content-type") ?? "image/png", "cache-control": "private, max-age=86400" } });
         }
         const f = deck.find(route.key);
-        const img = f && (await imageFor(f.row, url.searchParams.get("id") ?? "").catch(() => undefined));
+        const img = f && (await imageFor(f.row, url.searchParams.get("id") ?? "", url.searchParams.get("sub") || undefined).catch(() => undefined));
         if (!img) return new Response("image not found", { status: 404 });
         return new Response(img.data, { headers: { "content-type": img.type, "cache-control": "private, max-age=86400" } });
       }
@@ -522,16 +629,25 @@ const serveOptions = {
             format: "ansi",
             strip_ansi: false,
           });
-          return json({ text: r.read?.text ?? "" });
+          const text: string = r.read?.text ?? "";
+          const hash = Bun.hash(text).toString(36);
+          return json(body.hash === hash ? { same: true, hash } : { text, hash });
         }
         case "/api/new-options":
-          return json(newSessionOptions());
+          return json(await newSessionOptions());
         case "/api/new":
           return json(await startSession(body));
         case "/api/detail": {
           const f = deck.find(body.key);
           if (!f) return json({ error: "gone" }, 404);
-          return json(detailPayload(f.row, await detailFor(f.row)));
+          const d = await detailFor(f.row);
+          const subagents = await subagentsFor(who(f.row), d).catch(() => []);
+          return json({ ...detailPayload(f.row, d), subagents, chat: d ? chatSlice(d, { limit: body.limit }) : undefined });
+        }
+        case "/api/chat": {
+          const f = deck.find(body.key);
+          if (!f) return json({ error: "gone" }, 404);
+          return json(await chatFor(f.row, body));
         }
         case "/api/brief": {
           const f = deck.find(body.key);
@@ -588,8 +704,7 @@ const serveOptions = {
       return json({ error: e?.message ?? String(e), code: e?.code }, 500);
     }
     return new Response("not found", { status: 404 });
-  },
-};
+}
 
 // A restart can race the previous instance for the port. Retry briefly; if it never frees up, exit so
 // launchd/systemd restarts us, instead of lingering half-alive with tunnels open and nothing listening.
