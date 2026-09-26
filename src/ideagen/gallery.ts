@@ -13,12 +13,16 @@ import { terms } from "./evidence";
 import { jevPatterns, patternScore } from "./success";
 import { keepRevised, runPremortems } from "./premortem";
 import { libraryEvidence, researchEvidence, type LibrarySearch } from "./library";
+import type { Comparables, Target } from "../library-strategy";
 import type { IdeaArchive } from "../idea-archive";
 
 const GALLERY_VERSION = "g1";
 /** The recipe that won the experiment (docs/idea-lab/report.md): strategy → ideas per day. */
 const RECIPE: [StrategyId, number][] = [["C-audience", 12], ["B-pain", 10], ["G-constraint", 8], ["T-hot", 6], ["T-early", 6], ["H-boring", 6], ["F-gem", 6]];
 const dayOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/** An idea as a plan to compare with founder stories. */
+export const targetOf = (i: Pick<Idea, "name" | "hook" | "buyer" | "offer" | "price" | "channel">): Target => ({ name: i.name, hook: i.hook, buyer: i.buyer, offer: i.offer, price: i.price, channel: i.channel });
 
 // ── cards ─────────────────────────────────────────────────────────────────────────────
 /** The first three quests of playing an idea, each with how it's verified. */
@@ -91,6 +95,8 @@ export type GalleryDeps = {
   archive?: Pick<IdeaArchive, "put" | "score">;
   /** The founder-story library's search, when the deck has one (library.ts falls back to local files, then nothing). */
   library?: LibrarySearch;
+  /** Comparable founders for a plan (src/library-strategy.ts): pre-mortems cite what they did and where they stalled. */
+  comparables?: (t: Target) => Comparables | undefined;
   /** How many of the best ideas get a pre-mortem (one Claude call for all of them; 0 turns it off). */
   premortems?: number;
 };
@@ -126,6 +132,7 @@ export async function improve(judged: Judged[], d: GalleryDeps, n = d.premortems
   const items = await Promise.all(best.map(async ({ idea, s }) => ({
     idea, posts: s.evidenceMatches.map((m) => posts.get(m.postId)).filter((p): p is PainPost => !!p).slice(0, 3),
     outside: [...researchEvidence(`${idea.name} ${idea.buyer} ${idea.offer}`), ...(await libraryEvidence(`${idea.name} ${idea.offer}`, { search: d.library }))],
+    comparables: d.comparables?.(targetOf(idea)),
   })));
   const { results } = await runPremortems(items, d.inv, d.claude, "gallery-premortem").catch(() => ({ results: new Map() }));
   const revised = await judgeIdeas([...results.values()].map((r) => r.revised).filter((x): x is Idea => !!x), d);

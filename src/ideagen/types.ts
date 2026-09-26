@@ -1,6 +1,8 @@
 // Idea engine types: inventory, demand evidence, briefs, ideas, judging, connectors, the gallery and starter kits.
 // Everything here is plain data (JSON-safe), so the gallery can be cached per day and served as-is.
 
+import type { Comparable } from "../library-strategy";
+
 // ── inventory ───────────────────────────────────────────────────────────────────────
 /** What an ingredient can do inside an idea. A coherent idea fills roles, not random slots. */
 export type Role = "audience" | "channel" | "engine" | "data" | "monetization" | "distribution" | "build";
@@ -138,7 +140,11 @@ export type StarterKit = {
     launchPosts: { channel: string; text: string }[];
     outreach: string;
     graphics: { asset: string; prompt: string }[];
+    /** Grounded in comparable founders: why this price, the first ten customers, the launch weeks (each cites one or "none"). */
+    pricingWhy?: string; first10?: { step: string; cites: string }[]; launchPlan?: { when: string; what: string; cites: string }[];
   };
+  /** Comparable founders from the Founder Library, as found when the kit was written (src/library-strategy.ts). */
+  comparables?: { items: Comparable[]; summary: string[]; checks: string[] };
   quests: { title: string; verify: string; done: boolean }[];
   readiness: { score: number; items: KitReadiness[] };
   judge?: { ready: number; questions: string[]; notes: string };

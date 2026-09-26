@@ -10,7 +10,11 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { createIdeasRoutes, type IdeasDeps } from "./ideagen/routes";
-import { cachedGallery } from "./ideagen/gallery";
+import { cachedGallery, targetOf } from "./ideagen/gallery";
+import type { LibrarySearch } from "./ideagen/library";
+import { comparablesFor, shareLibrary, type Comparables, type Target } from "./library-strategy";
+import { cardLines } from "./library-search";
+import type { Library } from "./library";
 import { buildInventory } from "./ideagen/inventory";
 import { gatherPains } from "./ideagen/evidence";
 import { gatherTrends, type TrendSet } from "./ideagen/trends";
@@ -36,6 +40,10 @@ export type GalleryServerDeps = {
   leadsCache?: () => Record<string, any>;
   gh: (args: string[], t?: number) => Promise<GhRes>;
   claudeMax?: number; jevMax?: number; recipe?: [StrategyId, number][]; premortems?: number; rubric?: boolean;
+  /** The deck's Founder Library: evidence for pre-mortems, and comparable founders for pre-mortems, kits and the idea panel. */
+  library?: Pick<Library, "evidence" | "cards">;
+  /** Tests: comparables without a library. */
+  comparables?: (t: Target) => Comparables | undefined;
   /** Tests: the raw model calls (still budgeted and cached by prompt), inputs and the clock. */
   claudeRaw?: Parameters<typeof budgetedClaude>[1]; jevRaw?: Parameters<typeof budgetedJev>[1]; corpus?: () => Promise<PainCorpus>; trends?: () => Promise<TrendSet | undefined>;
   now?: () => number; log?: (s: string) => void;
@@ -54,6 +62,8 @@ export function liteCard(c: IdeaCard) {
   };
 }
 export const fullCard = (c: IdeaCard) => ({ ...c, coverId: coverIdOf(c.id), title: c.name, pitch: c.hook });
+/** What the idea panel's "What similar founders did" shows. */
+export const comparablesView = (r: Comparables | undefined) => (r ? { items: r.comparables, summary: r.summary, checks: r.checks } : undefined);
 
 export function createGalleryServer(d: GalleryServerDeps) {
   const now = d.now ?? Date.now;
@@ -150,8 +160,13 @@ export function createGalleryServer(d: GalleryServerDeps) {
     for (const c of Object.values(g.ideas)) if (c.quality > 0) { archive.put({ ...c, source: "gallery", row: c.strategy }); archive.score(c.id, c.quality, false); }
   }
 
+  // ── the Founder Library: founder cards as pre-mortem evidence, and comparables ──
+  const comparables = d.comparables ?? (d.library ? (t: Target) => comparablesFor(t) : undefined);
+  const library: LibrarySearch | undefined = d.library && (async (q, k) => (await d.library!.evidence(q, k, "ideas")).answers.filter((a) => a.card).slice(0, k)
+    .map((a) => ({ text: cardLines({ ...a.card!, date: a.card!.date ?? a.date }), source: "founder library", url: a.url, title: a.title })));
+
   const ideas = createIdeasRoutes({
-    cacheDir: d.dir, projectsDir: d.projectsDir, inventory, corpus, trends, claude, jev, gh: d.gh, archive,
+    cacheDir: d.dir, projectsDir: d.projectsDir, inventory, corpus, trends, claude, jev, gh: d.gh, archive, library, comparables,
     recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, now, card: (id) => cardAnywhere(id),
   } satisfies IdeasDeps);
 
@@ -239,7 +254,11 @@ export function createGalleryServer(d: GalleryServerDeps) {
     switch (path) {
       case "/api/ideas/state": if (body?.ensure) ensure(); return state();
       case "/api/ideas": run(!!body?.force); return state();
-      case "/api/ideas/card": { const c = cardAnywhere(String(body?.id ?? "")); if (!c) throw new Error("That idea isn't in the gallery any more"); return fullCard(c); }
+      case "/api/ideas/card": {
+        const c = cardAnywhere(String(body?.id ?? ""));
+        if (!c) throw new Error("That idea isn't in the gallery any more");
+        return { ...fullCard(c), comparables: comparablesView(comparables?.(targetOf(c))) };
+      }
       case "/api/ideas/save": {
         const c = cardAnywhere(String(body?.id ?? ""));
         const rest = saved().filter((x) => x.card.id !== body?.id);
@@ -269,8 +288,10 @@ export function parseRecipe(s?: string): [StrategyId, number][] | undefined {
   return r.length ? r : undefined;
 }
 /** The server's wiring: Discover's data folder, archive, profile and gems; the connections scan; settings from the env. */
-export function galleryForServer(s: { dataDir: string; discover: { archive: any; profile: () => Promise<{ projects: any[] }>; paths: { cache: string } }; connections: () => Promise<{ sections: { id: string; items: any[] }[] }>; gh: GalleryServerDeps["gh"]; recs: () => any[] }) {
+export function galleryForServer(s: { dataDir: string; discover: { archive: any; profile: () => Promise<{ projects: any[] }>; paths: { cache: string } }; connections: () => Promise<{ sections: { id: string; items: any[] }[] }>; gh: GalleryServerDeps["gh"]; recs: () => any[]; library?: Library }) {
   const env = process.env;
+  // The quest board, research, project pages and the Studio read comparables from the same library (library-strategy.ts).
+  shareLibrary(s.library);
   const num = (v?: string) => (v && Number(v) >= 0 ? Number(v) : undefined);
   return createGalleryServer({
     dir: env.DECK_GALLERY_DIR || `${s.dataDir}/gallery`,
@@ -285,6 +306,6 @@ export function galleryForServer(s: { dataDir: string; discover: { archive: any;
     leadsCache: () => readJson(`${s.dataDir}/leads-cache.json`)?.entries ?? {},
     gh: s.gh,
     claudeMax: num(env.DECK_GALLERY_CLAUDE_MAX), jevMax: num(env.DECK_GALLERY_JEV_MAX), recipe: parseRecipe(env.DECK_GALLERY_RECIPE),
-    premortems: num(env.DECK_GALLERY_PREMORTEMS), rubric: env.DECK_GALLERY_RUBRIC !== "0",
+    premortems: num(env.DECK_GALLERY_PREMORTEMS), rubric: env.DECK_GALLERY_RUBRIC !== "0", library: s.library,
   });
 }

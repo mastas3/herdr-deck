@@ -118,7 +118,7 @@ const discover = createDiscover(
 const COVERS_DIR = process.env.DECK_COVERS_DIR || `${process.env.DECK_DISCOVER_DIR || DATA_DIR}/covers`;
 const covers = createCovers({ dir: COVERS_DIR, confFile: process.env.DECK_COVERS_DIR ? `${COVERS_DIR}/covers.json` : `${DATA_DIR}/covers.json`, dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, enabled: () => !isNode() });
 // The gallery ("For you": today's idea lanes, starter kits, Play), from the idea engine (src/gallery-server.ts, src/ideagen/).
-const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS });
+const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS, library });
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
 const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),

@@ -3,7 +3,7 @@
 // build plan (each task with a prompt to paste into an agent), connectors, go-to-market copy (for you to send) and
 // quests. Building a kit writes nothing into your projects; only Play does, after you confirm.
 S.gal.kitTab = load("galKitTab", "plan");
-const GAL_TABS = [["spec", "Spec"], ["arch", "Architecture"], ["plan", "Build plan"], ["conn", "Connectors"], ["gtm", "Go-to-market"], ["quests", "Quests"]];
+const GAL_TABS = [["spec", "Spec"], ["arch", "Architecture"], ["plan", "Build plan"], ["conn", "Connectors"], ["comps", "Comparable founders"], ["gtm", "Go-to-market"], ["quests", "Quests"]];
 let galKitTimer;
 async function galKitLoad(id) {
   try { S.gal.kits.set(id, await api("/api/ideas/kit", { id }, 30_000)); } catch (e) { toast(e.message, true); }
@@ -73,15 +73,24 @@ function galKitTab(k, tab) {
       + sec("MCP servers & skills", c.mcpAndSkills.map((t) => `<li class="ok"><b>${esc(t.name)}</b> <span class="hint">${esc(t.use)}</span></li>`).join(""))
       + sec("Still missing", c.missing.map((m) => `<li class="no"><b>${esc(m.label)}</b>${m.suggestions[0] ? ` <span class="hint">${esc(m.suggestions[0].type)}: ${esc(m.suggestions[0].name)}</span>` : ""}</li>`).join(""));
   }
+  if (tab === "comps") return galKitCompHTML(k);
   if (tab === "gtm") {
     const g = k.gtm, l = g.landing;
+    const cite = (x) => (x && x !== "none" ? ` <span class="galcite">like ${galCiteHTML(x)}</span>` : "");
     return `<p class="hint">Copy for you to use and send yourself. Nothing is posted or sent from here.</p>
       <div class="gallanding" dir="auto"><p class="galkick">Landing page</p><h4 dir="auto">${esc(l.headline)}</h4><p dir="auto">${esc(l.subhead)}</p>${galList(l.benefits)}<span class="btn primary sm" aria-hidden="true">${esc(l.cta)}</span></div>
       ${g.pricing.length ? `<h4>Pricing</h4><div class="galtiers">${g.pricing.map((p) => `<div><b>${esc(p.tier)}</b><span>${esc(p.price)}</span>${galList(p.includes)}</div>`).join("")}</div>` : ""}
+      ${g.pricingWhy ? `<p class="galwhy">${galCiteHTML(g.pricingWhy)}</p>` : ""}
+      ${g.first10?.length ? `<h4>The first 10 customers</h4><ol class="galsteps">${g.first10.map((x) => `<li>${esc(x.step)}${cite(x.cites)}</li>`).join("")}</ol>` : ""}
+      ${g.launchPlan?.length ? `<h4>Launch plan</h4><ul class="galsteps">${g.launchPlan.map((x) => `<li><b>${esc(x.when)}</b> ${esc(x.what)}${cite(x.cites)}</li>`).join("")}</ul>` : ""}
       ${g.launchPosts.length ? `<h4>Launch posts</h4>${g.launchPosts.map((p, i) => `<article class="galpost"><header><b>${esc(p.channel)}</b><span class="spacer"></span><button class="btn ghost sm" data-galcopypost="${i}">${ICON.copy}Copy</button></header><p dir="auto">${esc(p.text)}</p></article>`).join("")}` : ""}
       ${g.outreach ? `<h4>First 10 people</h4><article class="galpost"><header><span class="hint">One message you send personally</span><span class="spacer"></span><button class="btn ghost sm" data-galcopyout>${ICON.copy}Copy</button></header><p dir="auto">${esc(g.outreach)}</p></article>` : ""}`;
   }
   return `<ol class="galquests">${k.quests.map((q) => `<li><b>${esc(q.title)}</b><span class="hint">Verified when ${esc(q.verify)}</span></li>`).join("")}</ol><p class="hint">Play puts this idea on your quest board with a milestone ladder: offer page live, first user, first paying customer, 10 paying, $100 and $1k a month.</p>`;
+}
+/** Text with links in it (a kit's citations of comparable founders): the links become short "watch" links. */
+function galCiteHTML(t) {
+  return String(t ?? "").split(/(https?:\/\/[^\s)]+)/g).map((x, i) => (i % 2 ? `<a class="ltime" href="${esc(x)}" target="_blank" rel="noopener">${ICON.play ?? ""}${esc(/[?&]t=(\d+)s/.test(x) ? lFmt(Number(x.match(/[?&]t=(\d+)s/)[1])) : "video")}</a>` : esc(x))).join("");
 }
 function galKitClick(e, id) {
   const t = e.target, k = S.gal.kits.get(id);

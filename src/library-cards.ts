@@ -5,7 +5,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import type { Card } from "./library-extract";
 
-export type CardFilter = { q?: string; source?: string; btype?: string; channel?: string; kind?: string; minRevenue?: number; sort?: "revenue" | "views" | "recent"; limit?: number; offset?: number };
+export type CardFilter = { q?: string; source?: string; btype?: string; channel?: string; kind?: string; minRevenue?: number; since?: string; sort?: "revenue" | "views" | "recent" | "published"; limit?: number; offset?: number };
 export type Page = { url: string; title: string; site: string; text: string; fetchedAt: number };
 
 /** Words of a question as an FTS5 query: stop words out, each word quoted (so FTS syntax in the input is inert), OR-joined. */
@@ -56,12 +56,15 @@ export function openCards(file: string) {
     if (f.kind) { where.push("c.kind = ?"); args.push(f.kind); }
     if (f.channel) { where.push("(' ' || c.channels || ' ') LIKE ?"); args.push(`% ${f.channel} %`); }
     if (f.minRevenue) { where.push("c.rev >= ?"); args.push(f.minRevenue); }
+    if (f.since && /^\d{4}-\d\d-\d\d$/.test(f.since)) { where.push("c.date >= ?"); args.push(f.since); }
     const fts = f.q ? ftsQuery(f.q) : "";
     const limit = Math.max(1, Math.min(200, f.limit ?? 30)), offset = Math.max(0, f.offset ?? 0);
-    const order = f.sort === "views" ? "c.views DESC" : f.sort === "recent" ? "c.at DESC" : f.sort === "revenue" ? "c.rev IS NULL, c.rev DESC" : "c.rev IS NULL, c.rev DESC";
+    const order = f.sort === "views" ? "c.views DESC" : f.sort === "recent" ? "c.at DESC" : f.sort === "published" ? "c.date IS NULL, c.date DESC" : f.sort === "revenue" ? "c.rev IS NULL, c.rev DESC" : "c.rev IS NULL, c.rev DESC";
     const w = where.length ? ` AND ${where.join(" AND ")}` : "";
     if (fts) {
-      const sql = `SELECT c.json, bm25(cards_fts, 0, 3.0, 2.0, 2.0, 1.5, 3.0, 1.0, 0.5) AS r FROM cards_fts JOIN cards c ON c.id = cards_fts.id WHERE cards_fts MATCH ?${w} ORDER BY r LIMIT ? OFFSET ?`;
+      // Newest first still keeps only the matches; otherwise the best match comes first.
+      const by = f.sort === "published" ? "c.date IS NULL, c.date DESC, r" : "r";
+      const sql = `SELECT c.json, bm25(cards_fts, 0, 3.0, 2.0, 2.0, 1.5, 3.0, 1.0, 0.5) AS r FROM cards_fts JOIN cards c ON c.id = cards_fts.id WHERE cards_fts MATCH ?${w} ORDER BY ${by} LIMIT ? OFFSET ?`;
       const rows = db.prepare(sql).all(fts, ...args, limit, offset) as any[];
       const total = (db.prepare(`SELECT count(*) n FROM cards_fts JOIN cards c ON c.id = cards_fts.id WHERE cards_fts MATCH ?${w}`).get(fts, ...args) as any).n;
       return { cards: rows.map((r) => ({ ...row(r), rank: r.r })), total };
@@ -82,6 +85,21 @@ export function openCards(file: string) {
     handled(): Set<string> { return new Set((q.done.all() as any[]).map((r) => r.id)); },
     /** The model's own answers for a card, kept so new claim checks can be re-applied without asking the model again. */
     raws(id: string): unknown[] | undefined { const r = db.prepare("SELECT json FROM raws WHERE id = ?").get(id) as any; return r ? JSON.parse(r.json) : undefined; },
+    /**
+     * A video's publish date, duration and views (from the date backfill) onto its card, without touching the rest.
+     * Returns whether anything changed. A date is only set, never cleared.
+     */
+    setMeta(id: string, m: { date?: string; duration?: number; views?: number }): boolean {
+      const r = db.prepare("SELECT json FROM cards WHERE id = ?").get(id) as any;
+      if (!r || !m.date) return false;
+      const c: Card = JSON.parse(r.json);
+      if (c.date === m.date && (c.duration || !m.duration) && (c.views || !m.views)) return false;
+      const next = { ...c, date: m.date, duration: c.duration ?? m.duration, views: c.views ?? m.views };
+      db.prepare("UPDATE cards SET date = ?, views = coalesce(views, ?), json = ? WHERE id = ?").run(m.date, m.views ?? null, JSON.stringify(next), id);
+      return true;
+    },
+    /** Card ids without a publish date yet (or with one in yt-dlp's 20240315 form, from before dates were ISO). */
+    undated(): string[] { return (db.prepare("SELECT id FROM cards WHERE date IS NULL OR date NOT LIKE '____-__-__'").all() as any[]).map((r) => r.id); },
     retryFailed() { db.run("DELETE FROM extract_state WHERE status = 'failed'"); },
     /** Cards written by an older prompt or older checks (re-extracted once nothing new is waiting). */
     outdated(v: number, limit = 1): string[] { return (db.prepare("SELECT id FROM cards WHERE coalesce(json_extract(json, '$.v'), 1) < ? ORDER BY views DESC LIMIT ?").all(v, limit) as any[]).map((r) => r.id); },

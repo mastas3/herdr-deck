@@ -38,6 +38,8 @@ export type QuestCtx = {
   urls?: string[]; product?: string;
   recent: string[]; leads: LeadPost[]; connections: string[]; done: string[];
   run?: { buyer?: string; offer?: string; price?: string | number };
+  /** What worked for comparable founders at this milestone (src/library-strategy.ts tacticsText), or absent. */
+  comparables?: string;
 };
 export type Rejected = { title: string; reason: string };
 
@@ -94,6 +96,7 @@ export function prompt(ctx: QuestCtx): string {
     ctx.leads.length ? `Fresh leads (public posts by people with the problem; index: where, title):\n${ctx.leads.slice(0, 6).map((l, i) => `${i}: ${l.where ?? "web"}, “${clip(l.title, 90)}”`).join("\n")}` : "No fresh leads.",
     ctx.connections.length ? `Accounts and tools the founder has: ${ctx.connections.slice(0, 16).map((c) => clip(c, 24)).join(", ")}` : "",
     ctx.done.length ? `Already done lately (don't repeat): ${ctx.done.slice(0, 6).map((d) => clip(d, 60)).join("; ")}` : "",
+    ctx.comparables ? `${ctx.comparables}\nPrefer these tactics when they fit this project's buyer: adapt one into a quest (in this project's own place, e.g. its subreddit or its leads) and name the founder in "why". Never copy their numbers as this project's.` : "",
   ].filter(Boolean);
   return `${lines.join("\n")}
 

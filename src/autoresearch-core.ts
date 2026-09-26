@@ -108,7 +108,8 @@ const TYPE_ALIASES: Record<string, QType> = {
 };
 export const typeOf = (x: unknown): QType | undefined => TYPE_ALIASES[String(x ?? "").toLowerCase().trim().replace(/[\s-]+/g, "_")];
 
-export function plannerPrompt(c: Campaign, assets: string[]) {
+/** `comparables`: founders most like the goal or the top niche (src/library-strategy.ts), as prompt text; "" when none. */
+export function plannerPrompt(c: Campaign, assets: string[], comparables = "") {
   const system = "You plan the next step of a market-research loop for a solo developer. You answer with strict JSON only: no prose, no Markdown, no code fences.";
   const asked = c.runs.map((r) => `- #${r.n} [${r.type}] ${r.question}${r.state === "failed" ? " (failed)" : r.verdict ? ` → ${clip(r.verdict, 80)}` : ""}`);
   const top = c.board.slice(0, 8).map((n) => `- ${n.name} (score ${n.score}; demand ${n.scores.demand ?? "?"}, pay ${n.scores.willingness_to_pay ?? "?"}, competition ${n.scores.competition ?? "?"}, fit ${n.scores.fit_with_user_assets ?? "?"}; researched in runs ${n.runs.join(", ")})`);
@@ -119,6 +120,7 @@ export function plannerPrompt(c: Campaign, assets: string[]) {
     `Runs so far (${c.runs.length} of ${c.budget}):`, asked.length ? asked.join("\n") : "- none yet",
     `Niche leaderboard:`, top.length ? top.join("\n") : "- empty",
     c.openQuestions.length ? `Open questions from the reports:\n${c.openQuestions.slice(-8).map((q) => `- ${clip(q, 160)}`).join("\n")}` : "",
+    comparables ? `\n${comparables}\nUse them: what worked for founders like these (their first-customer channels, prices, what failed) is a hypothesis to test for this niche, e.g. a channel test where they found first customers, or a teardown at their price points. Don't research what they already answer.` : "",
     "",
     "Pick the single next research question that most improves the answer to the goal. Explore first (a trend scan when little is known), then exploit: deep-dive the best niches, tear down their competitors, test the channels where their buyers gather, test combos (one of the builder's assets + a channel + an audience), and size the market of the top one. Never repeat or rephrase a question already asked. One question, answerable in about 20 minutes of web research.",
     "Make it sharp: name the buyer, the product or job, and the evidence that would answer it (e.g. \"What do Etsy sellers of HD charts charge, and what do 1–3★ reviews of the top 5 complain about?\"). Never a vague one like \"research the AI market\".",

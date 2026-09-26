@@ -68,6 +68,12 @@
 .lrm:hover { color: var(--danger); }
 .lbar { height: 4px; border-radius: 99px; background: var(--line); overflow: hidden; }
 .lbar i { display: block; height: 100%; background: var(--idle); border-radius: 99px; transition: width .4s var(--ease); }
+.lwhen { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; font: 12.5px var(--sans); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.lwhen i { font-style: normal; font-size: 11px; color: var(--working); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
+.lwhenchips { margin-top: 10px; }
+.lchip2 { border: 1px solid var(--line-2); background: transparent; color: var(--ink-2); border-radius: 99px; padding: 4px 11px; font: 13px var(--sans); cursor: pointer; min-height: 30px; }
+.lchip2[aria-pressed="true"] { border-color: var(--accent); color: var(--ink); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.lchip2:hover { border-color: var(--accent); }
 @media (max-width: 760px) {
   .lcards { grid-template-columns: 1fr; }
   .lfilters select { flex: 1 1 45%; }

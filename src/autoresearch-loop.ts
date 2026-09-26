@@ -17,6 +17,7 @@ import {
 } from "./autoresearch-core";
 import { KEEP_MIN, keepRun, mergeNiches, nicheProblems, parseReport, reportProblems, rubric, type ParsedNiche, type Report } from "./autoresearch-eval";
 import { fixtureReport, researchPrompt } from "./autoresearch-prompts";
+import { comparablesText, type Comparables, type Target } from "./library-strategy";
 
 export type StartOpts = { machine: string; kind: "claude"; cwd: string; prompt: string; label: string; model?: string };
 export type Deps = {
@@ -33,6 +34,8 @@ export type Deps = {
   assets?: () => Promise<string[]>;
   interests?: () => Promise<string[]>;
   machines?: () => { id: string; label: string; online: boolean; local?: boolean }[];
+  /** Comparable founders for a niche (src/library-strategy.ts): the planner and the evaluator account for what worked. */
+  comparables?: (t: Target) => Comparables | undefined;
   changed?: () => void;
 };
 export type Conf = {
@@ -127,7 +130,10 @@ export function createLoop(conf: Conf, deps: Deps) {
     const list = await assets();
     const useClaude = (conf.planner ?? "claude") === "claude" && !!deps.plan;
     if (useClaude) {
-      const { system, user } = plannerPrompt(c, list);
+      // Founders like the campaign's best niche so far (or its goal, before there is one).
+      const top = c.board[0];
+      const comps = safe(() => deps.comparables?.(top ? { name: top.name, offer: top.summary, buyer: top.audience, price: top.prices[0] } : { text: c.goal }), undefined);
+      const { system, user } = plannerPrompt(c, list, comparablesText(comps, 4));
       rollDay();
       store.stats.planner++; store.stats.dayPlanner++;
       try {
@@ -184,6 +190,11 @@ export function createLoop(conf: Conf, deps: Deps) {
     note(`#${run.n} failed: ${error}`);
   }
 
+  /** Comparables for Jev's state: the counts, and each founder in a line (claims marked as claims). */
+  function comparablesState(r: Comparables | undefined) {
+    if (!r) return undefined;
+    return { summary: r.summary, strategy_check: r.checks, founders: r.comparables.slice(0, 4).map((x) => `${x.name}${x.published ? ` (${x.published})` : ""}: ${x.sells ?? ""}${x.revenue ? `; claimed revenue "${x.revenue.text}"` : ""}${x.first[0] ? `; first customers via ${x.first[0].channel.replace(/_/g, " ")}` : ""}`) };
+  }
   // ── evaluate → keep / discard ──────────────────────────────────────────────────────────────
   async function jevFor(c: Campaign, n: ParsedNiche): Promise<number | undefined> {
     if (!deps.jev || (deps.jevReady && !deps.jevReady())) return undefined;
@@ -191,8 +202,9 @@ export function createLoop(conf: Conf, deps: Deps) {
       builder: { kind: "solo developer building with AI coding agents", assets: (await assets()).slice(0, 12).map((a) => clip(a, 60)) },
       niche: { name: n.name, summary: n.summary, why_now: n.whyNow, audience: n.audience, price_points: n.prices.slice(0, 3), competitors: n.competitors.length, pains_with_links: n.pains.filter((p) => p.url).length, evidence_links: n.evidence.length, scores_0_to_10: n.scores },
       campaign_goal: clip(c.goal, 200),
+      comparable_founders: comparablesState(safe(() => deps.comparables?.({ name: n.name, offer: n.summary, buyer: n.audience, price: n.prices[0] }), undefined)),
     };
-    const questions = { customers: { type: "noul", instructions: "Probability that this builder, starting today, gets at least 10 paying customers in this niche within 60 days, given the evidence." } };
+    const questions = { customers: { type: "noul", instructions: "Probability that this builder, starting today, gets at least 10 paying customers in this niche within 60 days, given the evidence and what comparable founders (their claims) managed." } };
     try {
       const r = await deps.jev(state, questions, `Niche: ${clip(n.name, 50)}`);
       if (!r.cached && r.fallback !== "unavailable" && r.fallback !== "deck_daily_cap") { rollDay(); store.stats.jev++; store.stats.dayJev++; }

@@ -15,10 +15,13 @@ const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catc
 
 export function ytTranscriberDir() { return process.env.DECK_YT_TRANSCRIBER || `${homedir()}/Documents/Projects/yt-transcriber`; }
 
+/** The Python the library runs: DECK_LIBRARY_PYTHON, else yt-transcriber's venv, else python3. */
+export function libraryPython(yt = ytTranscriberDir()) { return process.env.DECK_LIBRARY_PYTHON ?? (existsSync(`${yt}/venv/bin/python`) ? `${yt}/venv/bin/python` : "python3"); }
+
 export function createBridge(o: BridgeOpts): Bridge {
   const yt = o.ytDir ?? ytTranscriberDir();
   const script = new URL("../bin/library-bridge.py", import.meta.url).pathname;
-  const python = o.python ?? process.env.DECK_LIBRARY_PYTHON ?? (existsSync(`${yt}/venv/bin/python`) ? `${yt}/venv/bin/python` : "python3");
+  const python = o.python ?? libraryPython(yt);
   let starting: Promise<BridgeInfo> | undefined;
 
   const readInfo = (): BridgeInfo | undefined => {

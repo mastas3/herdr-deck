@@ -47,7 +47,7 @@ function galSheetHTML(c, partial) {
   const stack = (c.stack ?? []).map((s) => `<li><span class="galo${s.owned ? "" : " new"}">${esc(s.name)}</span><span>${esc(s.role)}</span>${s.owned ? "" : '<span class="hint">to add</span>'}</li>`).join("");
   const pm = c.premortem;
   const pmHTML = pm ? `${pm.pivotedFrom ? `<p class="galpiv">Rewritten from <b>${esc(pm.pivotedFrom.name)}</b>: ${esc(pm.pivotedFrom.hook)}</p>` : ""}
-    <ol class="galfail">${pm.failures.map((f) => `<li><p>${esc(f.reason)}</p>${f.pattern ? `<span class="galpat">${esc(f.pattern)}</span>` : ""}</li>`).join("")}</ol>
+    <ol class="galfail">${pm.failures.map((f) => `<li><p>${esc(f.reason)}</p>${f.pattern ? `<span class="galpat">${esc(f.pattern)}</span>` : ""}${galEvLink(f.evidence)}</li>`).join("")}</ol>
     <p class="galfix"><b>How this version fixes it</b> ${esc(pm.fix)}</p>` : "";
   const tr = c.trend ? `<p><b>${esc(c.trend.label)}</b>${c.trend.whyNow ? ` · ${esc(c.trend.whyNow)}` : ""}</p><ul class="galsig">${c.trend.signals.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> <span class="hint">${esc(s.source)}</span></li>`).join("")}</ul>` : "";
   const r = c.rubric;
@@ -56,12 +56,18 @@ function galSheetHTML(c, partial) {
     ${galSec("Who buys it", `<p>${esc(c.buyer)}</p>${c.channel ? `<p class="galwhere"><b>First customers</b> ${esc(c.channel)}</p>` : ""}`)}
     ${galSec("In their words", `${c.pain ? `<p>${esc(c.pain.replace(/\s*\((?:[a-z]+:[^)]*)\)/gi, ""))}</p>` : ""}${ev ? `<ul class="galevs">${ev}</ul>` : ""}`)}
     ${galSec("The offer", `<p>${esc(c.offer)}</p><dl class="galkv"><div><dt>Price</dt><dd>${esc(c.price)}</dd></div><div><dt>MVP</dt><dd>${esc(c.mvp)}</dd></div></dl>`)}
+    ${galSec("What similar founders did", galCompHTML(c), "galcompsec")}
     ${galSec("Built on what you have", stack ? `<ul class="galstack">${stack}</ul>` : "")}
     ${galSec("Why this could fail → how this version fixes it", pmHTML)}
     ${galSec("Why now", tr)}
     ${galSec("Connectors", galConnHTML(c))}
     ${galSec("Scores", scores, "galsc2")}
     <section class="galsec galkit" id="galkit">${galKitHTML(c)}</section>`;
+}
+/** A pre-mortem's source: a comparable founder's moment ("Acme: https://…") becomes a link. */
+function galEvLink(ev) {
+  const m = String(ev ?? "").match(/^(.*?):?\s*(https?:\/\/\S+)$/);
+  return m ? ` <a class="galevl" href="${esc(m[2])}" target="_blank" rel="noopener">${esc(m[1] || galHost(m[2]))}</a>` : "";
 }
 /** Each capability: what you have, or what's missing with one-tap actions. */
 function galConnHTML(c) {

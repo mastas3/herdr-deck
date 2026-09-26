@@ -5,7 +5,7 @@
 // Every claim on screen links to the moment in the video where it was said; numbers are marked as claims.
 ICON.book = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.2c1.8-.8 3.8-.8 5.5.5v9.6c-1.7-1.3-3.7-1.3-5.5-.5zM13.5 3.2c-1.8-.8-3.8-.8-5.5.5v9.6c1.7-1.3 3.7-1.3 5.5-.5z"/></svg>';
 ICON.play = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5v9l7-4.5z"/></svg>';
-S.lib = { view: load("libView", "ask"), q: load("libQ", ""), res: null, busy: false, st: null, stAt: 0, cards: null, cardsBusy: false, f: load("libF", {}), pbs: null, pb: null, pbMd: "", adding: false, tok: 0, err: "" };
+S.lib = { view: load("libView", "ask"), ask: load("libAsk", {}), q: load("libQ", ""), res: null, busy: false, st: null, stAt: 0, cards: null, cardsBusy: false, f: load("libF", {}), pbs: null, pb: null, pbMd: "", adding: false, tok: 0, err: "" };
 const LVIEWS = [["ask", "Ask"], ["founders", "Founders"], ["playbooks", "Playbooks"], ["sources", "Sources"]];
 const LEXAMPLES = ["How did people get first customers for a Telegram bot?", "Pricing for a mobile app subscription", "Cold email that got the first clients", "What do founders regret building?", "Selling software to local businesses", "Getting users from Reddit without getting banned"];
 const LCH = { reddit: "Reddit", x_twitter: "X", tiktok: "TikTok", youtube: "YouTube", instagram: "Instagram", linkedin: "LinkedIn", facebook_groups: "Facebook groups", product_hunt: "Product Hunt", hacker_news: "Hacker News", seo: "SEO", content_blog: "Blog", newsletter: "Newsletter", cold_email: "Cold email", cold_calls: "Cold calls", door_to_door: "Door to door", in_person: "In person", friends_network: "Network", existing_audience: "Own audience", communities: "Communities", paid_ads: "Paid ads", partnerships: "Partners", affiliates: "Affiliates", app_store: "App store", marketplace: "Marketplace", word_of_mouth: "Word of mouth", press: "Press", influencers: "Influencers", cold_dms: "Cold DMs", other: "Other" };
@@ -13,6 +13,13 @@ const LBT = { saas: "SaaS", mobile_app: "Mobile app", ecommerce: "E-commerce", s
 const lOn = () => S.mode === "discover" && S.disc.tab === "lib" && !!$("dbody").querySelector(":scope > .view #libroot");
 const lFmt = (t) => { t = Math.floor(t || 0); const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60; return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`; };
 const lAt = (url, t) => (t ? `${url}${url.includes("?") ? "&" : "?"}t=${Math.floor(t)}s` : url);
+// When each video came out: "Published Mar 2024 · 18 min", and "older (2021)" past three years (src/library-dates.ts).
+const LMON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const lPub = (d) => { const m = String(d ?? "").match(/^(\d{4})-(\d\d)/); return m ? `${LMON[Number(m[2]) - 1]} ${m[1]}` : ""; };
+const lDur = (s) => (!s ? "" : s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : `${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, "0")} min`);
+const lOld = (d) => { const t = Date.parse(d ?? ""); return Number.isFinite(t) && Date.now() - t > 3 * 365.25 * 864e5 ? `older (${String(d).slice(0, 4)})` : ""; };
+const lWhen = (d, dur) => { const p = lPub(d), old = lOld(d), bits = [p && `Published ${p}`, lDur(dur)].filter(Boolean); return bits.length ? `<span class="lwhen${old ? " old" : ""}" title="${esc(d ?? "")}">${esc(bits.join(" · "))}${old ? ` <i>${esc(old)}</i>` : ""}</span>` : ""; };
+const lSince = () => new Date(Date.now() - 365 * 864e5).toISOString().slice(0, 10);
 const lTime = (url, t, label) => `<a class="ltime" href="${esc(lAt(url, t))}" target="_blank" rel="noopener" title="Watch from ${t ? lFmt(t) : "the start"}">${ICON.play}${esc(label ?? (t ? lFmt(t) : "video"))}</a>`;
 
 function libSetView(v) { S.lib.view = v; store("libView", v); if (lOn()) libRender(true); else renderDiscover(); libLoadFor(v); }
@@ -42,7 +49,8 @@ function libPatch() { if (lOn()) libRender(false); }
 function libHead() {
   const L = S.lib, v = L.view;
   if (v === "ask") return `<div class="lx"><textarea class="dbig" data-libq rows="2" placeholder="Ask the library. “How did people get first customers for a Telegram bot?”" aria-label="Your question">${esc(L.q)}</textarea>
-    <div class="dlabacts"><button class="btn primary" data-libgo>${ICON.book}Search the library</button><span class="hint">Searches what founders said in the videos (by meaning) and the founder cards (by words). Runs on this Mac.</span></div></div>`;
+    <div class="dlabacts"><button class="btn primary" data-libgo>${ICON.book}Search the library</button><span class="hint">Searches what founders said in the videos (by meaning) and the founder cards (by words). Runs on this Mac.</span></div>
+    <div class="lchips lwhenchips">${libChip("recent", "Last 12 months", L.ask?.recent)}${libChip("newest", "Newest first", L.ask?.newest)}</div></div>`;
   if (v === "founders") {
     const f = L.f;
     const opt = (map, cur, any) => `<option value="">${any}</option>` + Object.entries(map).map(([k, l]) => `<option value="${esc(k)}"${cur === k ? " selected" : ""}>${esc(l)}</option>`).join("");
@@ -53,13 +61,15 @@ function libHead() {
       <select data-libf="channel" aria-label="First-customer or growth channel">${opt(LCH, f.channel, "Any channel")}</select>
       <select data-libf="minRevenue" aria-label="Claimed revenue">${[["", "Any revenue"], ["1000", "≥ $1K / month"], ["10000", "≥ $10K / month"], ["50000", "≥ $50K / month"], ["100000", "≥ $100K / month"]].map(([k, l]) => `<option value="${k}"${String(f.minRevenue ?? "") === k ? " selected" : ""}>${l}</option>`).join("")}</select>
       <select data-libf="source" aria-label="Source">${`<option value="">All sources</option>` + srcs.map((s) => `<option value="${esc(s.id)}"${f.source === s.id ? " selected" : ""}>${esc(s.title)}</option>`).join("")}</select>
-      <select data-libf="sort" aria-label="Sort">${[["revenue", "Highest claimed revenue"], ["views", "Most viewed"], ["recent", "Newest cards"]].map(([k, l]) => `<option value="${k}"${(f.sort ?? "revenue") === k ? " selected" : ""}>${l}</option>`).join("")}</select>
+      ${libChip("frecent", "Last 12 months", !!f.since)}
+      <select data-libf="sort" aria-label="Sort">${[["revenue", "Highest claimed revenue"], ["published", "Newest videos"], ["views", "Most viewed"], ["recent", "Newest cards"]].map(([k, l]) => `<option value="${k}"${(f.sort ?? "revenue") === k ? " selected" : ""}>${l}</option>`).join("")}</select>
     </div>`;
   }
   if (v === "sources") return `<div class="lx"><div class="laddrow"><input type="url" data-liburl placeholder="Research any channel or page: paste a YouTube channel, playlist or video, or a web page" aria-label="Link to add"><button class="btn primary" data-libadd>${ICON.plus}Add</button></div>
     <p class="hint">YouTube: captions are fetched and indexed in the background. Web pages: fetched once, only if the site's robots.txt allows it; nothing behind a login.</p></div>`;
   return "";
 }
+const libChip = (k, label, on) => `<button class="lchip2" data-libchip="${k}" aria-pressed="${!!on}">${esc(label)}</button>`;
 function libRes() {
   const v = S.lib.view;
   if (v === "ask") return libAsk();
@@ -76,7 +86,9 @@ async function libSearch(q) {
   L.q = q; store("libQ", q); L.busy = true; L.err = "";
   const ta = $("dbody").querySelector("[data-libq]"); if (ta && ta.value.trim() !== q) ta.value = q;
   libPatch();
-  try { const r = await api("/api/library/search", { q, k: 8 }, 20_000); if (tok === L.tok) L.res = { ...r, q }; }
+  const a = L.ask ?? {};
+  const filter = { ...(a.recent ? { since: lSince() } : {}), ...(a.newest ? { sort: "published" } : {}) };
+  try { const r = await api("/api/library/search", { q, k: 8, filter }, 20_000); if (tok === L.tok) L.res = { ...r, q }; }
   catch (e) { if (tok === L.tok) L.err = e.message; }
   if (tok === L.tok) { L.busy = false; libPatch(); }
 }
@@ -87,7 +99,7 @@ function libAsk() {
   if (L.busy && !r) return `<div class="lanswers">${Array.from({ length: 3 }, () => '<div class="gcard skel lskel"></div>').join("")}</div>`;
   if (L.err) return `<p class="derr">${ICON.warn}${esc(L.err)}</p>${ex}`;
   if (!r) return `${empty ? `<p class="hint lnote">The library is empty so far. Open <button class="link" data-lview="sources">Sources</button> and start the worker: Starter Story comes first.</p>` : ""}${ex}`;
-  if (!r.answers.length) return `<p class="hint lnote">Nothing in the library answers “${esc(r.q)}” yet.</p>${ex}`;
+  if (!r.answers.length) return `<p class="hint lnote">Nothing in the library answers “${esc(r.q)}”${L.ask?.recent ? " from the last 12 months" : ""} yet.</p>${ex}`;
   return `<p class="hint lmeta">${r.answers.length} videos and pages · ${r.passages} passages searched · ${r.ms} ms${r.error ? ` · <span class="derr">${esc(r.error)}</span>` : ""}${L.busy ? ' · <span class="spin"></span>' : ""}</p>
     <div class="lanswers">${r.answers.map((a, i) => libAnswer(a, i)).join("")}</div>`;
 }
@@ -96,6 +108,7 @@ function libAnswer(a, i) {
   const clips = a.clips.map((x) => `<blockquote class="lq"><p>“${esc(x.text)}”</p><footer>${a.kind === "web" ? `<a href="${esc(x.link)}" target="_blank" rel="noopener">${esc(a.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 60))}</a>` : lTime(a.url, x.t)}</footer></blockquote>`).join("");
   return `<article class="gcard lans" style="--i:${Math.min(i, 10)}">
     <div class="lanshead"><a class="gname" href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a><span class="hint">${a.kind === "web" ? "web page" : esc(libSourceTitle(a.source ?? c?.source))}</span></div>
+    ${a.kind === "web" ? "" : lWhen(a.date ?? c?.date, a.duration ?? c?.duration)}
     ${c ? libCardSummary(c) : ""}
     ${clips}
   </article>`;
@@ -127,7 +140,7 @@ async function libCards(more) {
   L.cardsBusy = true; libPatch();
   const f = L.f, offset = more && L.cards ? L.cards.cards.length : 0;
   try {
-    const r = await api("/api/library/cards", { q: f.q || undefined, btype: f.btype || undefined, channel: f.channel || undefined, source: f.source || undefined, minRevenue: Number(f.minRevenue) || undefined, sort: f.sort || "revenue", limit: 30, offset });
+    const r = await api("/api/library/cards", { q: f.q || undefined, btype: f.btype || undefined, channel: f.channel || undefined, source: f.source || undefined, minRevenue: Number(f.minRevenue) || undefined, since: f.since ? lSince() : undefined, sort: f.sort || "revenue", limit: 30, offset });
     L.cards = more && L.cards ? { ...r, cards: [...L.cards.cards, ...r.cards] } : r;
   } catch (e) { toast(e.message, true); }
   L.cardsBusy = false; libPatch();
@@ -135,10 +148,10 @@ async function libCards(more) {
 function libFounders() {
   const L = S.lib, r = L.cards;
   if (!r) return `<div class="dgrid">${Array.from({ length: 4 }, () => '<div class="gcard skel"></div>').join("")}</div>`;
-  if (!r.cards.length) return `<p class="hint lnote">${L.st?.cards?.cards ? "No founder cards match these filters." : "No founder cards yet: they are written by a local model as videos are ingested."}</p>`;
+  if (!r.cards.length) return `<p class="hint lnote">${L.st?.cards?.cards ? `No founder cards match these filters${L.f.since ? " (only videos with a known date from the last 12 months count)" : ""}.` : "No founder cards yet: they are written by a local model as videos are ingested."}</p>`;
   return `<p class="hint lmeta">${r.total} founder card${r.total === 1 ? "" : "s"}${L.cardsBusy ? ' · <span class="spin"></span>' : ""}</p>
     <div class="dgrid lcards">${r.cards.map((c, i) => `<article class="gcard lfc" style="--i:${Math.min(i, 10)}"><a class="gname" href="${esc(c.url)}" target="_blank" rel="noopener" title="${esc(c.title)}">${esc(c.title)}</a>
-      <p class="gmeta">${esc(libSourceTitle(c.source))}${c.views ? ` · ${kfmt(c.views)} views` : ""}</p>${libCardSummary(c, true)}</article>`).join("")}</div>
+      <p class="gmeta">${esc(libSourceTitle(c.source))}${c.views ? ` · ${kfmt(c.views)} views` : ""}</p>${lWhen(c.date, c.duration)}${libCardSummary(c, true)}</article>`).join("")}</div>
     ${r.cards.length < r.total ? `<div class="lmore"><button class="btn" data-libmore>Show more</button></div>` : ""}`;
 }
 
@@ -211,6 +224,8 @@ $("dbody").addEventListener("click", async (e) => {
   const ex = t.closest("[data-libex]")?.dataset.libex;
   if (ex) return libSearch(ex);
   if (t.closest("[data-libmore]")) return libCards(true);
+  const chip = t.closest("[data-libchip]")?.dataset.libchip;
+  if (chip) return libChipToggle(chip);
   const pb = t.closest("[data-libpb]")?.dataset.libpb;
   if (pb) return libOpenPlaybook(pb);
   if (t.closest("[data-libpbback]")) { S.lib.pb = null; return libPatch(); }
@@ -226,6 +241,13 @@ $("dbody").addEventListener("click", async (e) => {
     if (c) mixOpenWith([], { text: libStudioText(c), toastText: "Opened the Studio with this founder's story" });
   }
 });
+function libChipToggle(k) {
+  const L = S.lib;
+  if (k === "frecent") { L.f = { ...L.f, since: L.f.since ? undefined : "12m" }; store("libF", L.f); setHTML($("dbody").querySelector("#libhead"), libHead()); return libCards(); }
+  L.ask = { ...L.ask, [k]: !L.ask?.[k] }; store("libAsk", L.ask);
+  setHTML($("dbody").querySelector("#libhead"), libHead());
+  if (L.res?.q) libSearch(L.res.q);
+}
 /** A Studio message from a founder card: what worked for them, to adapt (the Studio adds library evidence itself). */
 function libStudioText(c) {
   const how = c.first.slice(0, 2).map((x) => x.text).join("; ");

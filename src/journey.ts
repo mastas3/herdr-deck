@@ -10,6 +10,7 @@
 // reaches its target (and says where the number came from) or you marked it yourself with a note.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { journeyComparables } from "./journey-comparables";
 import { aiSig, analyze, guardLadder, guessNature, slug, SOURCES, templateLadder, type AiResult, type DigestInput, type LadderItem, type Nature, type Runner } from "./journey-ai";
 import {
   agentMs, clip, collectGit, collectGitHub, collectGumroad, collectNotes, collectWiki, dayKey, gitSig, hash, nameRe, sessionEvents, worktreeOf,
@@ -522,6 +523,7 @@ export function createJourneys(paths: JourneyPaths, deps: JourneyDeps) {
       case "/api/journey/regenerate": if (!p) throw new Error("Which project?"); await rebuild(p); startAi(p, true); return get(p, { noAi: true });
       case "/api/journey/metric": logMetric(p, body); return rebuild(p, { quick: true }).then(() => get(p, { noAi: true }));
       case "/api/journey/unlock": markUnlocked(p, body); return rebuild(p, { quick: true }).then(() => get(p, { noAi: true }));
+      case "/api/journey/comparables": if (!p) throw new Error("Which project?"); return journeyComparables(load(p).journey ?? (await get(p, { noAi: true })));
     }
     return undefined;
   }

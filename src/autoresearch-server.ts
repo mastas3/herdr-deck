@@ -8,6 +8,7 @@ import { call } from "./herdr";
 import { jevAskOnce, jevAvailable, jevUsage } from "./jev";
 import { runClaude } from "./mix";
 import type { PushStore } from "./push";
+import { comparablesFor } from "./library-strategy";
 
 type Handles = {
   self: string; dataDir: string; deck: Deck; rows: () => Row[];
@@ -46,6 +47,7 @@ export function researchForServer(h: Handles) {
       assets: async () => (await h.discover.profile()).projects.filter((x) => x.weight > 0 && !["dead", "archived"].includes(x.status)).slice(0, 16).map((x) => `${x.name}${x.tldr ? `: ${x.tldr.slice(0, 80)}` : ""}`),
       interests: async () => (await h.discover.profile()).interests.map((i) => i.label),
       machines: () => h.machines().filter((m) => m.kind !== "app").map(({ id, label, online, local }) => ({ id, label, online, local })),
+      comparables: (t) => comparablesFor(t),
     },
   );
   return { ...ar, handle: (path: string, body: any) => ar.handle(path, body, { ideasDir: h.discover.paths.ideas, projectsDir }) };

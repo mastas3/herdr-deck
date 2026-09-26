@@ -2,13 +2,14 @@
 // cards and web pages from SQLite full-text (words). Results are grouped per video and ranked by reciprocal rank
 // fusion, so a video that both a passage and its card match rises to the top, and either one alone still counts.
 import { cleanCaption, fmtT, linkAt, type Card } from "./library-extract";
+import { fmtPublished, oldLabel, recencyWeight, type MetaMap } from "./library-dates";
 
 export type Passage = {
   id: string; score: number | null; text: string; video_id: string; video_title: string; video_url: string;
   start_time_s: number; channel_id?: string; chunk_type?: string; source_url_with_timestamp?: string;
 };
 export type Clip = { t: number; at: string; link: string; text: string; score: number | null };
-export type Answer = { kind: "video" | "web"; id: string; title: string; url: string; source?: string; card?: Card; clips: Clip[]; score: number; why: ("passage" | "card" | "page")[] };
+export type Answer = { kind: "video" | "web"; id: string; title: string; url: string; source?: string; card?: Card; clips: Clip[]; score: number; why: ("passage" | "card" | "page")[]; date?: string; duration?: number };
 export type WebHit = { url: string; title: string; snippet: string; rank: number };
 
 const K = 60; // the usual RRF constant: rank 1 and rank 5 differ, rank 40 and 45 hardly do
@@ -44,14 +45,29 @@ export function mergeResults(passages: Passage[], cards: Card[], pages: WebHit[]
   return [...by.values()].sort((x, y) => y.score - x.score).slice(0, k);
 }
 
+/** Each video answer's publish date and length, from its card or else the date backfill (web pages have none). */
+export function withDates(answers: Answer[], meta: MetaMap = {}): Answer[] {
+  return answers.map((a) => (a.kind === "web" ? a : { ...a, date: a.card?.date ?? meta[a.id]?.date, duration: a.card?.duration ?? meta[a.id]?.duration }));
+}
+/** Evidence leans on recent stories: each answer's score is scaled by its recency weight, then re-sorted. */
+export function byRecency(answers: Answer[], now = Date.now()): Answer[] {
+  return answers.map((a) => ({ ...a, score: a.score * (a.kind === "web" ? 0.85 : recencyWeight(a.date, now)) })).sort((x, y) => y.score - x.score);
+}
+/** " [Mar 2024]" or " [Jun 2020, older (2020)]" after a card's name in prompts: the model sees how fresh a tactic is. */
+export function whenTag(date: string | undefined, now = Date.now()): string {
+  if (!date) return "";
+  const old = oldLabel(date, now);
+  return ` [${fmtPublished(date)}${old ? `, ${old}: check it still works` : ""}]`;
+}
+
 /** The channel's own ads and sponsor reads ("link in the description", "use code…") are never an answer. */
 export const isPlug = (s: string) => /link in the description|links? (is |are )?(down )?below|use (my |the )?code\b|this (video|episode) is (brought to you|sponsored)|today's sponsor|sign up (for free )?at /i.test(s);
 export const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s);
 
 /** A card as a few prompt lines: what it is, the claimed revenue and how the first customers came, each with its link. */
-export function cardLines(c: Card): string {
+export function cardLines(c: Card, now = Date.now()): string {
   const at = (t: number | null) => (t != null ? ` (${linkAt(c.url, t)})` : "");
-  const head = `${c.business ?? c.title}${c.sells ? ` — ${c.sells}` : ""}${c.customer ? `; customers: ${c.customer}` : ""}`;
+  const head = `${c.business ?? c.title}${whenTag(c.date, now)}${c.sells ? ` — ${c.sells}` : ""}${c.customer ? `; customers: ${c.customer}` : ""}`;
   const lines = [head];
   if (c.revenue) lines.push(`claimed revenue: "${c.revenue.quote ?? c.revenue.text}"${c.revenue.src === "title" ? " (video title)" : ""}${at(c.revenue.t)}`);
   if (c.price) lines.push(`price: "${c.price.quote ?? c.price.text}"${at(c.price.t)}`);
@@ -61,15 +77,15 @@ export function cardLines(c: Card): string {
 }
 
 /** The evidence block other prompts get: numbered cards, then the best quotes. Empty when the library has nothing. */
-export function evidenceText(answers: Answer[], maxCards = 5, maxQuotes = 4): string {
+export function evidenceText(answers: Answer[], maxCards = 5, maxQuotes = 4, now = Date.now()): string {
   const withCard = answers.filter((a) => a.card).slice(0, maxCards);
   const quotes = answers.flatMap((a) => a.clips.slice(0, 1).map((c) => ({ a, c }))).slice(0, maxQuotes);
   if (!withCard.length && !quotes.length) return "";
-  const out = ["Founder Library: what real builders said on camera (YouTube interviews and talks). Numbers are their own claims, unverified; cite the link when you use one, and never invent figures beyond these."];
-  withCard.forEach((a, i) => out.push(`${i + 1}. ${cardLines(a.card!)}`));
+  const out = ["Founder Library: what real builders said on camera (YouTube interviews and talks), with when each video came out. Numbers are their own claims, unverified; cite the link when you use one, and never invent figures beyond these. Prefer recent stories; a tactic marked older may no longer work."];
+  withCard.forEach((a, i) => out.push(`${i + 1}. ${cardLines({ ...a.card!, date: a.card!.date ?? a.date }, now)}`));
   if (quotes.length) {
     out.push("Quotes:");
-    for (const { a, c } of quotes) out.push(`- "${clip(c.text, 280)}" — ${a.title}${c.at ? ` at ${c.at}` : ""} (${c.link})`);
+    for (const { a, c } of quotes) out.push(`- "${clip(c.text, 280)}" — ${a.title}${whenTag(a.date, now)}${c.at ? ` at ${c.at}` : ""} (${c.link})`);
   }
   return out.join("\n");
 }

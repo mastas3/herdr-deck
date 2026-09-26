@@ -81,8 +81,31 @@ def transcriber():
                 return getattr(self._m, name)
 
         T.WhisperModel = LazyWhisper
+        remember_meta(T.yt_dlp.YoutubeDL)
         state["transcriber"] = T.YouTubeTranscriber(cache_dir=str(LIB / "cache"), skip_speakers=True, use_local_llm=True)
     return state["transcriber"]
+
+
+seen_meta: dict[str, dict] = {}
+
+
+def remember_meta(cls) -> None:
+    """Keep the publish date, length and views yt-transcriber's caption lookup already fetched (no extra request)."""
+    real = cls.extract_info
+    if getattr(real, "_remembers", False):
+        return
+
+    def extract_info(self, url, *a, **k):
+        info = real(self, url, *a, **k)
+        if isinstance(info, dict) and info.get("id") and (info.get("upload_date") or info.get("release_timestamp")):
+            ts = info.get("release_timestamp") or info.get("timestamp")
+            up = str(info.get("upload_date") or "")
+            date = f"{up[:4]}-{up[4:6]}-{up[6:8]}" if len(up) == 8 else time.strftime("%Y-%m-%d", time.gmtime(ts)) if ts else None
+            seen_meta[info["id"]] = {"date": date, "duration": info.get("duration"), "views": info.get("view_count")}
+        return info
+
+    extract_info._remembers = True
+    cls.extract_info = extract_info
 
 
 # ── YouTube: enumerate ────────────────────────────────────────────────────────────
@@ -164,7 +187,7 @@ def ingest_video(body: dict) -> dict:
             return {"status": "failed", "error": st.get("error") or "ingest failed"}
         n = st.get("chunks") or corpus(cid).count_video(vid)
         segs = len(segments) if segments else None
-        return {"status": "ingested", "chunks": n, "segments": segs, "transcript": str(tjson), "skipped": bool(s["skipped"])}
+        return {"status": "ingested", "chunks": n, "segments": segs, "transcript": str(tjson), "skipped": bool(s["skipped"]), "meta": seen_meta.pop(vid, None)}
 
 
 # ── web pages (fetched politely by the deck; only their text arrives here) ───────

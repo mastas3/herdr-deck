@@ -94,11 +94,13 @@ export function nextVideo(queues: Queue[], order: string[], now = Date.now(), wh
   return undefined;
 }
 
-export type IngestResult = { status: "ingested" | "no_captions" | "failed"; chunks?: number; error?: string };
+export type IngestResult = { status: "ingested" | "no_captions" | "failed"; chunks?: number; error?: string; meta?: { date?: string; duration?: number; views?: number } };
 /** A video's record after an ingest attempt. A failure is retried later, up to three attempts in all. */
 export function applyResult(v: QVideo, r: IngestResult, now = Date.now()): QVideo {
   const attempts = v.attempts + 1;
-  if (r.status === "ingested") return { ...v, status: "ingested", attempts, chunks: r.chunks, at: now, error: undefined, retryAt: undefined };
+  // The bridge reports the publish date it saw while fetching captions: new videos are dated from the start.
+  const m = r.meta ?? {};
+  if (r.status === "ingested") return { ...v, status: "ingested", attempts, chunks: r.chunks, at: now, error: undefined, retryAt: undefined, date: v.date ?? m.date, duration: v.duration ?? m.duration, views: v.views ?? m.views };
   if (r.status === "no_captions") return { ...v, status: "no_captions", attempts, at: now, error: undefined };
   const err = String(r.error ?? "failed").slice(0, 300);
   // YouTube's bot check doesn't go away by retrying soon: those wait an hour.

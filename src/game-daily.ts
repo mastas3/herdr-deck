@@ -5,6 +5,7 @@ import { addDays, currentBoss, dayOf, hash, revokedIds, XP, type Boss, type Jour
 import { generateQuests, type Quest, type QuestCtx } from "./game-quests";
 import { isUrl, leadsFor, normUrl, projectTerms } from "./game-runs";
 import { questKey, type DayQuests, type Store } from "./game-store";
+import { comparablesFor, tacticsText, type Comparables, type Target } from "./library-strategy";
 
 export const REROLLS_PER_DAY = 2;
 export const GENERATIONS_PER_DAY = 2;
@@ -14,6 +15,8 @@ export type DailyDeps = {
   store: Store; now: () => number; stats: { claude: number };
   journeys: Map<string, JourneyLike & Record<string, any>>; loadJourney: (p: string) => Promise<unknown>; bossesOf: (p: string) => Boss[];
   runner?: Runner; discoverDir: string; leadsSaved?: () => any[]; connections?: () => Promise<string[]>;
+  /** Comparable founders (src/library-strategy.ts); the deck's shared library when not given. */
+  comparables?: (t: Target) => Comparables | undefined;
   changed: () => void;
 };
 
@@ -33,6 +36,9 @@ export function createDaily(d: DailyDeps) {
     const ms: JourneyLike["milestones"] = j?.milestones ?? [];
     const next = [...(j?.next ?? []).map((id: string) => ms.find((m) => m.id === id)), ...ms].filter((m, i, a): m is (typeof ms)[number] => !!m && m.state !== "unlocked" && a.indexOf(m) === i).slice(0, 4);
     const gum = j?.sources?.gumroad;
+    // Tactics that worked for founders most like this project, for the milestone it's working toward.
+    let comparables = "";
+    try { comparables = tacticsText((d.comparables ?? comparablesFor)({ name: p, offer: run?.offer || j?.pitch, buyer: run?.buyer, price: run?.price != null ? String(run.price) : undefined, text: j?.pitch }), b?.title ?? next[0]?.title ?? "first paying customer"); } catch {}
     return {
       project: p, root: j?.root, pitch: j?.pitch || run?.pitch, heading: j?.heading?.direction, stage: j?.stage?.title, nature: j?.nature, day,
       next: next.map((m) => ({ id: m.id, title: m.title, metric: m.metric, target: m.target, value: m.value, unit: m.unit })),
@@ -41,6 +47,7 @@ export function createDaily(d: DailyDeps) {
       recent: store.ledger.filter((l) => l.project === p && l.kind !== "revoke").slice(-5).map((l) => l.title),
       leads, connections: conns, run: run ? { buyer: run.buyer, offer: run.offer, price: run.price } : undefined,
       done: Object.values(quests).filter((q) => q.project === p && q.day >= addDays(day, -7)).flatMap((q) => q.items.filter((x) => x.state === "done").map((x) => x.title)),
+      comparables: comparables || undefined,
     };
   }
   /** Today's quests for the main quest: written once a day, with spares for Reroll. */

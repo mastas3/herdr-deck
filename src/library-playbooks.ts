@@ -3,6 +3,7 @@
 // Numbers are the founders' own claims; the playbooks say so. Files: <library>/playbooks/<name>.md.
 import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { fmtT, linkAt, type Card, type Channel, type Item } from "./library-extract";
+import { fmtPublished, oldLabel } from "./library-dates";
 
 export type PlaybookInfo = { name: string; file: string; title: string; cards: number; at: number };
 type Playbook = { name: string; title: string; cards: number; md: string };
@@ -17,6 +18,8 @@ const CH_LABEL: Record<string, string> = {
 const BT_LABEL: Record<string, string> = { saas: "SaaS", mobile_app: "Mobile apps", ecommerce: "E-commerce", service_agency: "Services and agencies", info_product: "Courses and info products", marketplace: "Marketplaces", content_media: "Content and media", local_business: "Local businesses", newsletter: "Newsletters", community: "Communities", hardware: "Hardware", other: "Other" };
 const pct = (n: number, d: number) => (d ? `${Math.round((100 * n) / d)}%` : "0%");
 const name = (c: Card) => c.business ?? c.title;
+/** " (Mar 2024)" or " (Jun 2020, older)": when the video came out, so a stale tactic reads as one. */
+const when = (c: Card) => (c.date ? ` (${fmtPublished(c.date)}${oldLabel(c.date) ? ", older" : ""})` : "");
 const at = (c: Card, t: number | null | undefined) => `[${t ? fmtT(t) : "video"}](${linkAt(c.url, t)})`;
 const rev = (c: Card) => (c.revenue ? ` · claimed revenue “${c.revenue.quote ?? c.revenue.text}”${c.revenue.src === "title" ? " (title)" : ""} ${at(c, c.revenue.t)}` : "");
 const one = (s: string, n = 160) => (s.length > n ? s.slice(0, n - 1).replace(/\s+\S*$/, "") + "…" : s).replace(/\n/g, " ");
@@ -39,7 +42,7 @@ function firstCustomers(cards: Card[]): Playbook {
     out.push(`## ${CH_LABEL[ch] ?? ch} (${xs.length})\n`);
     for (const c of [...xs].sort(byRevenue).slice(0, 5)) {
       const it = c.first.find((x) => x.channel === ch)!;
-      out.push(`- **${name(c)}**${c.sells ? ` (${one(c.sells, 80)})` : ""}: ${one(it.text)} ${at(c, it.t)}${rev(c)}`);
+      out.push(`- **${name(c)}**${when(c)}${c.sells ? ` (${one(c.sells, 80)})` : ""}: ${one(it.text)} ${at(c, it.t)}${rev(c)}`);
     }
     out.push("");
   }
@@ -61,7 +64,7 @@ function pricing(cards: Card[]): Playbook {
   out.push("## Pricing models\n", "| Model | Cards | Share |", "|---|---:|---:|", ...models.map(([m, xs]) => `| ${m} | ${xs.length} | ${pct(xs.length, ps.length)} |`), "");
   for (const [bt, xs] of tally(ps, (c) => [c.btype])) {
     out.push(`## ${BT_LABEL[bt] ?? bt} (${xs.length})\n`);
-    for (const c of [...xs].sort(byRevenue).slice(0, 8)) out.push(`- **${name(c)}**: “${c.price!.quote ?? c.price!.text}” ${at(c, c.price!.t)}${rev(c)}`);
+    for (const c of [...xs].sort(byRevenue).slice(0, 8)) out.push(`- **${name(c)}**${when(c)}: “${c.price!.quote ?? c.price!.text}” ${at(c, c.price!.t)}${rev(c)}`);
     out.push("");
   }
   const both = ps.filter((c) => /month/i.test(c.price!.text) && /year/i.test(c.price!.text)).length;
@@ -108,7 +111,7 @@ function failures(cards: Card[]): Playbook {
   out.push("## Themes\n", "| Theme | Mentions |", "|---|---:|", ...themed.map(([l, xs]) => `| ${l} | ${xs.length} |`), `| (no theme matched) | ${items.filter(({ f }) => !FAIL_THEMES.some(([, re]) => re.test(f.text))).length} |`, "");
   for (const [label, xs] of themed) {
     out.push(`## ${label} (${xs.length})\n`);
-    for (const { c, f } of xs.slice(0, 6)) out.push(`- **${name(c)}**: ${one(f.text)} ${at(c, f.t)}`);
+    for (const { c, f } of xs.slice(0, 6)) out.push(`- **${name(c)}**${when(c)}: ${one(f.text)} ${at(c, f.t)}`);
     out.push("");
   }
   return { name: "failures-and-regrets", title: "Why businesses failed / what founders regret", cards: new Set(items.map((x) => x.c.id)).size, md: out.join("\n") + "\n" };
@@ -131,7 +134,7 @@ function traits(cards: Card[]): Playbook {
     ...tally(top, (c) => c.first.map((x) => x.channel ?? "other")).filter(([ch]) => ch !== "other").slice(0, 4).map(([ch]) => row(`First customers via ${CH_LABEL[ch]}`, (c) => c.first.some((x) => x.channel === ch))), "");
   out.push("## Business types among them\n", ...tally(top, (c) => [c.btype]).map(([bt, ys]) => `- ${BT_LABEL[bt] ?? bt}: ${ys.length}`), "");
   out.push("## Lessons they repeat\n");
-  for (const c of [...top].sort(byRevenue).slice(0, 12)) if (c.lessons[0]) out.push(`- **${name(c)}**${rev(c)}: ${one(c.lessons[0].text)} ${at(c, c.lessons[0].t)}`);
+  for (const c of [...top].sort(byRevenue).slice(0, 12)) if (c.lessons[0]) out.push(`- **${name(c)}**${when(c)}${rev(c)}: ${one(c.lessons[0].text)} ${at(c, c.lessons[0].t)}`);
   return { name: "traits-of-successful-founders", title: "Common traits of the successful ones", cards: fs.length, md: out.join("\n") + "\n" };
 }
 
@@ -140,7 +143,7 @@ function boring(cards: Card[]): Playbook {
   const bs = cards.filter((c) => c.btype === "local_business" || c.source === "CodieSanchezCT" || BORING.test(`${c.sells ?? ""} ${c.customer ?? ""} ${c.business ?? ""}`));
   const out = [header("Boring businesses that print money", bs.length, "cards about unglamorous businesses (local services, trades, physical products and the software sold to them)")];
   for (const c of [...bs].sort(byRevenue).slice(0, 25)) {
-    out.push(`### ${name(c)}${c.sells ? ` — ${one(c.sells, 100)}` : ""}\n`);
+    out.push(`### ${name(c)}${when(c)}${c.sells ? ` — ${one(c.sells, 100)}` : ""}\n`);
     const lines = [c.customer ? `- Customer: ${c.customer}` : "", c.revenue ? `- Claimed revenue: “${c.revenue.quote ?? c.revenue.text}” ${at(c, c.revenue.t)}` : "", c.price ? `- Price: “${c.price.quote ?? c.price.text}” ${at(c, c.price.t)}` : "",
       ...c.first.slice(0, 2).map((x: Item) => `- First customers (${CH_LABEL[x.channel as Channel] ?? "other"}): ${one(x.text)} ${at(c, x.t)}`), c.lessons[0] ? `- Lesson: ${one(c.lessons[0].text)} ${at(c, c.lessons[0].t)}` : "", `- Source: [${one(c.title, 90)}](${c.url})`];
     out.push(...lines.filter(Boolean), "");

@@ -9,6 +9,7 @@ import type { ClaudeRunner, JevRunner } from "./llm";
 import type { GhRes } from "../discover";
 import type { IdeaArchive } from "../idea-archive";
 import type { LibrarySearch } from "./library";
+import type { Comparables, Target } from "../library-strategy";
 import { cachedGallery, generateGallery, moreInLane, type GalleryDeps } from "./gallery";
 import { buildStarterKit, judgeKit, slugOf } from "./kit";
 import { materializeKit, KIT_FILES } from "./kit-files";
@@ -20,7 +21,7 @@ export type IdeasDeps = {
   claude: ClaudeRunner; jev: JevRunner; gh: (args: string[], t?: number) => Promise<GhRes>;
   /** A card the page is showing that isn't in today's gallery (yesterday's, the lab's seed, a saved one). */
   card?: (id: string) => IdeaCard | undefined;
-  archive?: Pick<IdeaArchive, "put" | "score">; library?: LibrarySearch;
+  archive?: Pick<IdeaArchive, "put" | "score">; library?: LibrarySearch; comparables?: (t: Target) => Comparables | undefined;
   recipe?: [StrategyId, number][]; premortems?: number; rubric?: boolean;
   now?: () => number;
 };
@@ -52,11 +53,11 @@ export function createIdeasRoutes(d: IdeasDeps) {
   let running: Promise<Gallery> | undefined;
   const deps = async (): Promise<GalleryDeps> => ({
     cacheDir: d.cacheDir, inv: await d.inventory(), corpus: await d.corpus(), trends: await d.trends(), claude: d.claude, jev: d.jev, findRepos: createRepoFinder(d.gh),
-    archive: d.archive, library: d.library, recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, now: d.now,
+    archive: d.archive, library: d.library, comparables: d.comparables, recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, now: d.now,
   });
   const today = () => { const t = new Date(d.now?.() ?? Date.now()); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
   const cardOf = (id: string) => cachedGallery(d.cacheDir, today())?.ideas[id] ?? d.card?.(id);
-  const kitDeps = async () => ({ inv: await d.inventory(), claude: d.claude, gh: d.gh, cacheDir: d.cacheDir, card: cardOf });
+  const kitDeps = async () => ({ inv: await d.inventory(), claude: d.claude, gh: d.gh, cacheDir: d.cacheDir, card: cardOf, comparables: d.comparables });
   /** Today's gallery, generated once; everyone asking meanwhile shares the one run. */
   const generate = (force = false) => (running ??= deps().then((x) => generateGallery(x, { force })).finally(() => { running = undefined; }));
   async function handle(path: string, body: any): Promise<unknown> {

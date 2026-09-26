@@ -4,6 +4,7 @@
 //   bun src/library-cli.ts search "q"   what the Library tab would answer
 //   bun src/library-cli.ts playbooks    write the playbooks from the cards
 //   bun src/library-cli.ts spotcheck N  compare N local cards with Claude's reading of the same transcript
+//   bun src/library-cli.ts dates        fill in publish dates and lengths with yt-dlp (resumable; never touches Chroma)
 import { createLibrary } from "./library";
 
 const lib = createLibrary();
@@ -28,11 +29,16 @@ if (cmd === "run") {
 } else if (cmd === "spotcheck") {
   const { spotCheck } = await import("./library-spotcheck");
   await spotCheck(lib, Number(rest[0]) || 3, rest.slice(1));
+} else if (cmd === "dates") {
+  console.log("before:", JSON.stringify(lib.dateCoverage()));
+  const r = await lib.backfill({ parallel: Math.min(3, Number(rest[0]) || 2), log: (s) => console.log(s) });
+  console.log(`asked ${r.asked}: ${r.found} dated, ${r.failed} without; ${r.cards} cards dated now`);
+  console.log("after:", JSON.stringify(lib.dateCoverage()));
 } else if (cmd === "recheck") {
   console.log(`${lib.recheck()} cards re-checked`);
 } else if (cmd === "reextract") {
   await lib.reextract(rest);
   for (const id of rest) console.log(JSON.stringify(lib.cards().get(id)));
 } else {
-  console.log("usage: bun src/library-cli.ts run | status | search <q> | playbooks | spotcheck <n>");
+  console.log("usage: bun src/library-cli.ts run | status | search <q> | playbooks | spotcheck <n> | dates [parallel]");
 }

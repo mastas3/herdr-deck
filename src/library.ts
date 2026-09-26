@@ -4,20 +4,22 @@
 // Pieces: library-config (channels.json), library-queue (what to ingest next), library-bridge (+ bin/library-bridge.py,
 // which reuses yt-transcriber for captions, chunking and Chroma), library-runner (the background worker),
 // library-extract + library-cards (founder cards, checked against the transcript), library-search (hybrid answers),
-// library-web (polite page fetching) and library-playbooks. The server only routes /api/library/* here.
+// library-web (polite page fetching), library-playbooks, library-dates (when each video came out) and library-strategy
+// (comparable founders for a product plan). The server only routes /api/library/* here.
 //
 // Privacy: everything runs on this machine. YouTube is asked for captions and public listings; pages are fetched only
 // when you add them, honouring robots.txt; cards are written by a local Ollama model.
 import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { createBridge, type Bridge } from "./library-bridge";
+import { createBridge, libraryPython, ytTranscriberDir, type Bridge } from "./library-bridge";
 import { openCards, type CardFilter, type Cards } from "./library-cards";
 import { addSource, loadConfig, parseSource, removeSource, saveConfig, setEnabled, type LibConfig } from "./library-config";
 import { buildCard, EXTRACT_SYSTEM, EXTRACT_VERSION, extractUser, LISTS_USER, needsLists, parseCardJson, toLines, transcriptParts, type Segment } from "./library-extract";
 import { listPlaybooks, readPlaybook, writePlaybooks } from "./library-playbooks";
 import { applyRules, countQueue, queueStore, type Queue } from "./library-queue";
 import { createRunner, sourceChannelId } from "./library-runner";
-import { evidenceText, mergeResults, type Answer, type Passage } from "./library-search";
+import { byRecency, evidenceText, mergeResults, withDates, type Answer, type Passage } from "./library-search";
+import { backfillDates, isoDate, metaStore, pendingIds, ytdlpFetcher, type Fetcher } from "./library-dates";
 import { fetchPage } from "./library-web";
 
 const OLLAMA_URL = process.env.OLLAMA_HOST ? (process.env.OLLAMA_HOST.startsWith("http") ? process.env.OLLAMA_HOST : `http://${process.env.OLLAMA_HOST}`) : "http://127.0.0.1:11434";
@@ -33,7 +35,7 @@ export async function ollamaJson(model: string, system: string, user: string, ti
   return String(((await r.json()) as any).message?.content ?? "");
 }
 
-export type LibraryDeps = { dir?: string; bridge?: Bridge; ask?: typeof ollamaJson; fetchPage?: typeof fetchPage };
+export type LibraryDeps = { dir?: string; bridge?: Bridge; ask?: typeof ollamaJson; fetchPage?: typeof fetchPage; fetchDates?: Fetcher };
 export function createLibrary(deps: LibraryDeps = {}) {
   const dir = deps.dir ?? libraryDir();
   const cfgFile = `${dir}/channels.json`;
@@ -42,6 +44,7 @@ export function createLibrary(deps: LibraryDeps = {}) {
   const ask = deps.ask ?? ollamaJson;
   let cards: Cards | undefined;
   const db = () => (cards ??= openCards(`${dir}/cards.db`));
+  const meta = metaStore(`${dir}/video-meta.json`);
   let cfg: { at: number; c: LibConfig } | undefined;
   const config = () => {
     if (!cfg || Date.now() - cfg.at > 2000) {
@@ -103,7 +106,8 @@ export function createLibrary(deps: LibraryDeps = {}) {
       } catch (e: any) { lastErr = String(e?.message ?? e); }
     }
     if (!raws.length) { db().mark(vid, "failed", lastErr || "no answer", model, Date.now() - started); return; }
-    const card = buildCard(raws, lines, { id: vid, source: sourceId, channelTitle: q.title, title: v.title, url: v.url, views: v.views, date: v.date, duration: v.duration }, model);
+    const m = meta.get(vid);
+    const card = buildCard(raws, lines, { id: vid, source: sourceId, channelTitle: q.title, title: v.title, url: v.url, views: v.views ?? m?.views, date: isoDate(v.date) ?? m?.date, duration: v.duration ?? m?.duration }, model);
     db().put(card, Date.now() - started, raws);
   }
   /** Re-apply the current claim checks to every card from the model's stored answers (no model calls). */
@@ -115,14 +119,45 @@ export function createLibrary(deps: LibraryDeps = {}) {
       const q = queues.read(c.source);
       let segs: Segment[] = [];
       try { segs = JSON.parse(readFileSync(transcriptPath(q, c.source, c.id), "utf8")).segments ?? []; } catch { continue; }
-      const { id, source, channelTitle, title, url, views, date, duration } = c;
+      const { id, source, channelTitle, title, url, views, duration } = c;
+      const date = isoDate(c.date) ?? meta.get(id)?.date;
       db().put({ ...buildCard(raws, toLines(segs), { id, source, channelTitle, title, url, views, date, duration }, c.model, c.at) }, 0, raws);
       n++;
     }
     return n;
   }
 
-  const runner = createRunner({ dir, bridge, queues, config, extractNext });
+  const runner = createRunner({ dir, bridge, queues, config, extractNext, onMeta: (id, m) => { meta.merge({ [id]: { ...m, at: Date.now() } }); syncDates(); } });
+
+  // ── dates: when each video came out (library-dates.ts) ──
+  /** Every ingested video id, across sources, plus every card (a card's video may be in a removed source). */
+  const videoIds = () => [...new Set([...config().sources.flatMap((s) => queues.read(s.id).videos.filter((v) => v.status === "ingested").map((v) => v.id)), ...db().all().map((c) => c.id)])];
+  /** Put known dates on the cards that lack one (from the backfill's file, else the queue). Cheap; no network. */
+  function syncDates(): number {
+    const m = meta.read();
+    const fromQueue = new Map(config().sources.flatMap((s) => queues.read(s.id).videos.filter((v) => v.date).map((v) => [v.id, v] as const)));
+    let n = 0;
+    for (const id of db().undated()) {
+      const q = fromQueue.get(id);
+      const x = m[id]?.date ? m[id] : q?.date ? { date: isoDate(q.date), duration: q.duration, views: q.views } : undefined;
+      if (x && db().setMeta(id, x)) n++;
+    }
+    return n;
+  }
+  let dating: Promise<any> | undefined;
+  /** Ask yt-dlp for the dates still missing (resumable; saved after every batch), then date the cards. */
+  function backfill(o: { parallel?: number; log?: (s: string) => void } = {}) {
+    dating ??= (async () => {
+      const fetch = deps.fetchDates ?? ytdlpFetcher({ python: libraryPython(ytTranscriberDir()), pydeps: `${dir}/pydeps` });
+      const r = await backfillDates(videoIds(), meta, fetch, { parallel: o.parallel ?? 1, log: o.log });
+      return { ...r, cards: syncDates() };
+    })().finally(() => { dating = undefined; statusMemo = undefined; });
+    return dating;
+  }
+  function dateCoverage() {
+    const ids = videoIds(), m = meta.read(), all = db().all();
+    return { videos: ids.length, dated: ids.filter((id) => m[id]?.date || all.find((c) => c.id === id)?.date).length, cards: all.length, cardsDated: all.filter((c) => c.date).length, pending: pendingIds(ids, m).length, running: !!dating };
+  }
 
   let statusMemo: { at: number; v: any } | undefined;
   async function status() {
@@ -133,7 +168,7 @@ export function createLibrary(deps: LibraryDeps = {}) {
       const q = queues.read(s.id);
       return { ...s, title: s.title ?? q.title?.replace(/ - (Videos|Shorts|Live)$/, "") ?? (s.kind === "channel" ? `@${s.id}` : s.id), channelId: q.channelId, enumeratedAt: q.enumeratedAt, error: q.error, counts: countQueue(q), cards: st.bySource[s.id] ?? 0 };
     });
-    const v = { available: bridge.available(), dir, ingest: c.ingest, extract: c.extract, use: c.use, sources, cards: st };
+    const v = { available: bridge.available(), dir, ingest: c.ingest, extract: c.extract, use: c.use, sources, cards: st, dates: dateCoverage() };
     statusMemo = { at: Date.now(), v };
     return { ...v, runner: runner.status() };
   }
@@ -152,7 +187,11 @@ export function createLibrary(deps: LibraryDeps = {}) {
     passages = await semantic;
     // Cards for videos that only a passage found, so every video answer can show its card.
     const extra = db().many([...new Set(passages.map((p) => p.video_id))].filter((id) => !found.some((c) => c.id === id)));
-    return { answers: mergeResults(passages, found, pages, k, extra), ms: Date.now() - t0, passages: passages.length, error };
+    let answers = withDates(mergeResults(passages, found, pages, f.since || f.sort === "published" ? k * 3 : k, extra), meta.read());
+    // "Last 12 months" keeps what is known to be that recent; "newest first" orders by publish date, undated last.
+    if (f.since) answers = answers.filter((a) => a.date && a.date >= f.since!);
+    if (f.sort === "published") answers = [...answers].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+    return { answers: answers.slice(0, k), ms: Date.now() - t0, passages: passages.length, error };
   }
 
   /**
@@ -163,9 +202,11 @@ export function createLibrary(deps: LibraryDeps = {}) {
   async function evidence(q: string, k = 5, use?: keyof LibConfig["use"]): Promise<{ text: string; answers: Answer[] }> {
     if (use && !config().use[use]) return { text: "", answers: [] };
     try {
-      const r = await Promise.race([search(q, Math.max(k, 6)), Bun.sleep(4000).then(() => undefined)]);
+      const r = await Promise.race([search(q, Math.max(k, 6) + 2), Bun.sleep(4000).then(() => undefined)]);
       if (!r) return { text: "", answers: [] };
-      return { text: evidenceText(r.answers, k), answers: r.answers };
+      // Recent stories first: an older one has to match better to make the cut.
+      const answers = byRecency(r.answers);
+      return { text: evidenceText(answers, k), answers };
     } catch { return { text: "", answers: [] }; }
   }
 
@@ -237,6 +278,7 @@ export function createLibrary(deps: LibraryDeps = {}) {
         if (body?.name) return { name: body.name, markdown: readPlaybook(dir, String(body.name)) };
         return { playbooks: listPlaybooks(dir) };
       }
+      case "/api/library/dates": if (body?.op === "run") backfill().catch((e) => console.warn(`library dates: ${e?.message ?? e}`)); return dateCoverage();
       case "/api/library/evidence": { const r = await evidence(String(body?.q ?? ""), Math.min(8, Number(body?.k) || 5), "research"); return { text: r.text, answers: r.answers }; }
       default: return undefined;
     }
@@ -244,10 +286,19 @@ export function createLibrary(deps: LibraryDeps = {}) {
 
   return {
     dir, config, handle, status, search, evidence, setRunning, runner, extractNext, reextract, recheck, add,
-    cards: db, queues,
+    cards: db, queues, meta, backfill, syncDates, dateCoverage,
     writePlaybooks: () => writePlaybooks(dir, db().all()),
     /** Resume the worker if it was running when the deck last stopped (and this machine has yt-transcriber). */
-    autostart() { if (config().ingest.running && bridge.available().ok) runner.run().catch(() => {}); },
+    autostart() {
+      if (config().ingest.running && bridge.available().ok) runner.run().catch(() => {});
+      syncDates();
+      // Dates for videos ingested before the bridge reported them: a few minutes after start, then every six hours.
+      if (bridge.available().ok) {
+        const tick = () => { if (pendingIds(videoIds(), meta.read()).length) backfill().catch(() => {}); };
+        setTimeout(tick, 5 * 60_000).unref?.();
+        setInterval(tick, 6 * 3600_000).unref?.();
+      }
+    },
     transcriptPath,
   };
 }

@@ -9,8 +9,10 @@ import type { ClaudeRunner } from "./llm";
 import { CAP } from "./inventory";
 import { builderSummary } from "./judge";
 import { parseLoose, list, str } from "./json";
+import { comparablesText, type Comparables, type Target } from "../library-strategy";
+import { targetOf } from "./gallery";
 
-const KIT_VERSION = "k1";
+const KIT_VERSION = "k2";
 const HOME = homedir();
 export const slugOf = (name: string) => name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "idea";
 
@@ -100,7 +102,7 @@ const DEPLOY_NOTES: [RegExp, string][] = [
 ];
 
 // ── the model half ───────────────────────────────────────────────────────────────────────────
-function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string, facts: string[] = []) {
+function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string, facts: string[] = [], comps?: Comparables) {
   const system = "You are a senior engineer and a plain-spoken founder writing a starter kit a coding agent will build from. Everything must be specific to this product and this builder: real file names, real commands, real numbers. No placeholders (no TBD, Lorem, 'your product'), no hype words, no invented statistics. Strict JSON only: no prose, no Markdown fences.";
   const card = { name: c.name, hook: c.hook, buyer: c.buyer, pain: c.pain, evidence: c.evidence.map((e) => e.snippet), offer: c.offer, price: c.price, channel: c.channel, mvp: c.mvp,
     stack: c.stack.map((s) => ({ name: s.name, role: s.role, owned: s.owned, path: s.owned && inv.assets.find((a) => a.id === s.assetId)?.kind === "project" ? `~/Documents/Projects/${s.name}` : undefined })),
@@ -109,12 +111,15 @@ function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string, facts: string[] 
     "THE BUILDER", builderSummary(inv), `Deploy target: ${deploy}. ${DEPLOY_NOTES.find(([re]) => re.test(deploy))?.[1] ?? ""} Project folder: ~/Documents/Projects/${slugOf(c.name)}.`,
     ...(facts.length ? ["Facts about the builder's own projects in the stack (checked on disk):", ...facts.map((f) => `- ${f}`)] : []), "",
     "THE IDEA", JSON.stringify(card), "",
+    ...(comps?.comparables.length ? ["COMPARABLE FOUNDERS", comparablesText(comps, 5), ""] : ["COMPARABLE FOUNDERS", "None in the Founder Library for this kind of product: ground pricing and the launch in the idea's own evidence, and cite \"none\".", ""]),
     "Write the kit. Rules:",
     "- spec: the problem in the buyer's words (use the evidence), jobs, what is in and out of v1, metrics tied to milestones (landing live, 10 conversations, first paying customer).",
     "- architecture: components naming which of the builder's projects/services does what (exact names), a data model, and the key flows as steps.",
     "- tasks: 5 to 8 ordered tasks, each small enough for one agent session, each with a prompt the builder can paste into Claude Code as-is (name files, commands and acceptance checks inside the prompt) and 2–3 acceptance checks.",
     "- landing: headline, subhead, 3 benefits, CTA — written for this buyer, in their language (Hebrew if the buyer is Hebrew-speaking).",
-    "- pricing: 2–3 tiers with numbers consistent with the idea's price.",
+    "- pricing: 2–3 tiers with numbers consistent with the idea's price. pricing_why: one or two sentences on why these numbers, citing the comparable founders' stated prices by name and link (or saying none are comparable). Never quote a price or revenue a comparable's line doesn't state.",
+    "- first_10: 4–6 concrete steps to the first 10 paying customers, each built on a tactic that got a comparable founder their first customers when one fits this buyer (cites: the founder's name and the link from their line), else cites \"none\".",
+    "- launch_plan: 3–4 steps by week (when: \"week 1\"…), each saying what ships or goes out and where; cite a comparable's link when the step copies what they did, else \"none\". Prefer comparables' recent tactics; one marked older may no longer work.",
     "- launch_posts: 3 posts, one per channel the builder has access to for this buyer; each reads like a person wrote it, no hashtags soup.",
     "- outreach: one message the builder sends personally to the first 10 prospects (it is never sent automatically).",
     "- Language: spec, architecture and tasks in English; landing, launch posts and outreach in the buyer's language.",
@@ -122,11 +127,28 @@ function kitPrompt(c: IdeaCard, inv: Inventory, deploy: string, facts: string[] 
     `- Deploy only to ${deploy.split(" (")[0]}; don't mention other hosts.`,
     "- When a task reads an external format (log files, an API, a scraped page), its prompt starts by inspecting a real sample (the exact command) before writing the parser.",
     "",
-    'JSON shape: {"spec":{"problem":"","buyer":"","jobs":[],"scope_in":[],"scope_out":[],"metrics":[{"metric":"","target":"","milestone":""}]},"architecture":{"summary":"","components":[{"name":"","does":"","uses":""}],"data_model":[{"entity":"","fields":[]}],"flows":[{"name":"","steps":[]}]},"tasks":[{"id":"T1","title":"","size":"S","prompt":"","accept":[],"depends_on":[]}],"landing":{"headline":"","subhead":"","benefits":[],"cta":""},"pricing":[{"tier":"","price":"","includes":[]}],"launch_posts":[{"channel":"","text":""}],"outreach":""}',
+    'JSON shape: {"spec":{"problem":"","buyer":"","jobs":[],"scope_in":[],"scope_out":[],"metrics":[{"metric":"","target":"","milestone":""}]},"architecture":{"summary":"","components":[{"name":"","does":"","uses":""}],"data_model":[{"entity":"","fields":[]}],"flows":[{"name":"","steps":[]}]},"tasks":[{"id":"T1","title":"","size":"S","prompt":"","accept":[],"depends_on":[]}],"landing":{"headline":"","subhead":"","benefits":[],"cta":""},"pricing":[{"tier":"","price":"","includes":[]}],"pricing_why":"","first_10":[{"step":"","cites":""}],"launch_plan":[{"when":"week 1","what":"","cites":""}],"launch_posts":[{"channel":"","text":""}],"outreach":""}',
   ].join("\n");
   return { system, user };
 }
-export function parseKitReply(text: string) {
+/** A citation the model gave, kept only when it names a comparable or carries one of their links; else "none". */
+export function vetCite(cite: unknown, comps?: Comparables): string {
+  const s = str(cite, 240);
+  if (!s || !comps?.comparables.length) return "none";
+  const links = linksOf(comps);
+  const known = comps.comparables.some((c) => s.toLowerCase().includes(c.name.toLowerCase().slice(0, 24))) || links.some((l) => s.includes(l.replace(/&t=\d+s$/, "")));
+  const urls = s.match(/https?:\/\/\S+/g) ?? [];
+  // A link that isn't one of the comparables' is dropped: an invented source is worse than none.
+  if (urls.some((u) => !links.some((l) => l.replace(/&t=\d+s$/, "") === u.replace(/[).,]+$/, "").replace(/&t=\d+s$/, "")))) return known ? s.replace(/https?:\/\/\S+/g, "").trim() : "none";
+  return known ? s : "none";
+}
+const linksOf = (comps?: Comparables) => (comps?.comparables ?? []).flatMap((c) => [c.url, c.price?.link, c.revenue?.link, c.ttfr?.link, ...c.first.map((x) => x.link), ...c.growth.map((x) => x.link), ...c.failed.map((x) => x.link)].filter(Boolean) as string[]);
+/** Free text with links: a link that isn't one of the comparables' moments is taken out (the words stay). */
+export function onlyKnownLinks(s: string, comps?: Comparables): string {
+  const known = new Set(linksOf(comps));
+  return s.replace(/\s*\(?(https?:\/\/[^\s)]+)\)?/g, (m, u) => (known.has(u.replace(/[.,;]+$/, "")) ? m : "")).trim();
+}
+export function parseKitReply(text: string, comps?: Comparables) {
   const j = parseLoose(text) ?? {};
   const tasks: KitTask[] = (Array.isArray(j.tasks) ? j.tasks : []).slice(0, 10).map((t: any, i: number) => ({
     id: str(t?.id, 8) || `T${i + 1}`, title: str(t?.title, 120), size: (["S", "M", "L"].includes(t?.size) ? t.size : "M") as KitTask["size"],
@@ -141,11 +163,14 @@ export function parseKitReply(text: string) {
     pricing: (Array.isArray(j.pricing) ? j.pricing : []).slice(0, 3).map((p: any) => ({ tier: str(p?.tier, 40), price: str(p?.price, 40), includes: list(p?.includes, 6, 120) })),
     launchPosts: (Array.isArray(j.launch_posts) ? j.launch_posts : []).slice(0, 3).map((p: any) => ({ channel: str(p?.channel, 80), text: str(p?.text, 1200) })),
     outreach: str(j.outreach, 1200),
+    pricingWhy: onlyKnownLinks(str(j.pricing_why, 500), comps),
+    first10: (Array.isArray(j.first_10) ? j.first_10 : []).slice(0, 6).map((x: any) => ({ step: str(x?.step, 300), cites: vetCite(x?.cites, comps) })).filter((x: any) => x.step),
+    launchPlan: (Array.isArray(j.launch_plan) ? j.launch_plan : []).slice(0, 5).map((x: any) => ({ when: str(x?.when, 30), what: str(x?.what, 300), cites: vetCite(x?.cites, comps) })).filter((x: any) => x.what),
   };
 }
 
 // ── building, caching, judging ───────────────────────────────────────────────────────────────
-type KitDeps = { inv: Inventory; claude: ClaudeRunner; gh: (args: string[], t?: number) => Promise<GhRes>; cacheDir: string; card: (id: string) => IdeaCard | undefined };
+type KitDeps = { inv: Inventory; claude: ClaudeRunner; gh: (args: string[], t?: number) => Promise<GhRes>; cacheDir: string; card: (id: string) => IdeaCard | undefined; comparables?: (t: Target) => Comparables | undefined };
 const kitFile = (d: KitDeps, id: string) => `${d.cacheDir}/kits/${id.replace(/[^\w.-]+/g, "_")}.json`;
 /** The kit for an idea: cached, or built now (one Claude call plus a gh check per repo). */
 export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<StarterKit> {
@@ -155,9 +180,10 @@ export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<Start
   const t0 = Date.now();
   const deploy = deployTarget(d.inv);
   const ownedNames = c.stack.filter((s) => s.owned && d.inv.assets.find((a) => a.id === s.assetId)?.kind === "project").map((s) => s.name);
-  const p = kitPrompt(c, d.inv, deploy, localFacts(ownedNames));
+  const comps = d.comparables?.(targetOf(c));
+  const p = kitPrompt(c, d.inv, deploy, localFacts(ownedNames), comps);
   const r = await d.claude({ system: p.system, user: p.user, model: "sonnet", tag: `kit:${c.id}` });
-  const m = parseKitReply(r.text);
+  const m = parseKitReply(r.text, comps);
   const repoSugs = c.connectors.flatMap((x) => x.suggestions).filter((s) => s.type === "repo" && s.url);
   const repos = await Promise.all(repoSugs.slice(0, 4).map(async (s) => ({ name: s.name, url: s.url!, why: s.why, verified: await repoExists(s.url!, d.gh) })));
   const slug = slugOf(c.name);
@@ -180,7 +206,7 @@ export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<Start
       ],
     },
     gtm: {
-      landing: m.landing, pricing: m.pricing, launchPosts: m.launchPosts, outreach: m.outreach,
+      landing: m.landing, pricing: m.pricing, launchPosts: m.launchPosts, outreach: m.outreach, pricingWhy: m.pricingWhy || undefined, first10: m.first10, launchPlan: m.launchPlan,
       graphics: [
         { asset: "logo", prompt: `Flat vector logo mark for "${c.name}": one simple symbol tied to ${c.topics[0] ?? "the product"}, two colours, no text, readable at 32 px, on white` },
         { asset: "og-image", prompt: `1200×630 social preview for "${c.name}": the headline "${m.landing.headline || c.hook}" in large clean type on a plain background, one small product screenshot, no stock people` },
@@ -188,6 +214,7 @@ export async function buildStarterKit(ideaId: string, d: KitDeps): Promise<Start
       ],
     },
     quests: c.play.quests.map((q) => ({ ...q, done: false })),
+    comparables: comps ? { items: comps.comparables, summary: comps.summary, checks: comps.checks } : undefined,
   };
   const full = refreshKit({ ...kit, readiness: { score: 0, items: [] }, cost: { claudeCalls: 1, ms: Date.now() - t0 } }, c, d.inv);
   mkdirSync(`${d.cacheDir}/kits`, { recursive: true });

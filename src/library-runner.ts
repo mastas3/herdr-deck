@@ -13,6 +13,8 @@ export type RunnerDeps = {
   config: () => LibConfig;
   /** Extract the next pending card; false when there is nothing to do. */
   extractNext?: (cfg: LibConfig) => Promise<boolean>;
+  /** A video's publish date and length, when an ingest reported them. */
+  onMeta?: (id: string, meta: NonNullable<IngestResult["meta"]>) => void;
   now?: () => number; sleep?: (ms: number) => Promise<void>; log?: (s: string) => void;
 };
 export type RunnerStatus = {
@@ -104,6 +106,7 @@ export function createRunner(d: RunnerDeps) {
     const after = d.queues.read(s.id);
     const j = after.videos.findIndex((x) => x.id === v.id);
     if (j >= 0) { after.videos[j] = applyResult(after.videos[j], r, now()); d.queues.write(after); }
+    if (r.meta?.date) d.onMeta?.(v.id, r.meta);
     st.current = undefined;
     if (r.status === "ingested") st.run.ingested++;
     else if (r.status === "no_captions") st.run.noCaptions++;

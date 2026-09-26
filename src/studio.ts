@@ -10,6 +10,7 @@ import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync
 import { homedir } from "node:os";
 import { hash, KIND_LABEL, runClaude, runOllama, sanitizeIngredient, templateMixes, type Ingredient, type IngKind, type Mix } from "./mix";
 import { composeDice, fillStarters, INTENTS, RIFFS, SYSTEM } from "./studio-prompts";
+import { CH_LABEL, comparablesFor, comparablesLine, type Comparables, type Target } from "./library-strategy";
 
 const HOME = homedir();
 
@@ -67,7 +68,17 @@ export function buildCatalog(ings: Ingredient[], maxChars = 18_000): string {
 export type IngRef = { id: string; kind: IngKind; name: string };
 /** The plan that makes a build ready to execute (all optional: the chat keeps a thinner build, the feed doesn't). */
 export type Plan = { customer?: string; problem?: string; offer?: string; price?: string; model?: string; mvp?: string[]; launch?: string[]; week?: string[]; cost?: string; first_dollar?: string; risks?: string[] };
-export type Build = Mix & Plan & { extra: string[]; project?: string; money?: string; row?: string };
+/** A build's comparable founders, compact: one line, the top three with a link to their moment, and the strategy check. */
+export type BuildComps = { line: string; items: { name: string; link: string; revenue?: string; published?: string; old?: string; channel?: string; tactic?: string }[]; checks: string[] };
+export type Build = Mix & Plan & { extra: string[]; project?: string; money?: string; row?: string; comps?: BuildComps };
+export function buildComps(b: Partial<Build>, find: (t: Target) => Comparables | undefined = comparablesFor): BuildComps | undefined {
+  const r = find({ name: b.title, offer: b.offer ?? b.pitch, buyer: b.customer, price: b.price, channel: b.launch?.join("; ") });
+  if (!r) return undefined;
+  return {
+    line: comparablesLine(r), checks: r.checks,
+    items: r.comparables.slice(0, 3).map((c) => { const f = c.first.find((x) => x.channel !== "other") ?? c.first[0]; return { name: c.name, link: f?.link ?? c.url, revenue: c.revenue?.text, published: c.published || undefined, old: c.old || undefined, channel: f ? CH_LABEL[f.channel] : undefined, tactic: f?.text }; }),
+  };
+}
 export type Block =
   | { t: "text"; md: string }
   | { t: "build"; b: Build }
@@ -365,6 +376,8 @@ export type StudioDeps = {
   archive?: { put: (idea: any) => void };
   /** Founder Library evidence for a message (3–5 real founder cards with links), or "" (src/library.ts). */
   evidence?: (text: string) => Promise<string>;
+  /** Comparable founders for a build (src/library-strategy.ts); the deck's shared library when not given. */
+  comparables?: (t: Target) => Comparables | undefined;
 };
 export type Engine = "claude" | "ollama" | "template";
 type Job = { id: string; convo: string; engine: Engine; model?: string; started: number; firstAt?: number; finished?: number; status: "running" | "done" | "error" | "cancelled"; stage: string; text: string; msg?: BotMsg; err?: string; abort: AbortController; ings: Ingredient[] };
@@ -476,6 +489,8 @@ export function createStudio(deps: StudioDeps) {
         if (!msg.blocks.some((b) => b.t === "next")) msg.blocks.push({ t: "next", items: RIFFS.slice(0, 3) });
       }
     }
+    // Each build shows what the founders most like it did (instant: word matching over the founder cards).
+    msg.blocks = msg.blocks.map((b) => (b.t === "build" && !b.b.comps ? { ...b, b: { ...b.b, comps: buildComps(b.b, deps.comparables) } } : b));
     job.finished = Date.now();
     msg.ms = job.finished - job.started;
     if (job.firstAt) msg.firstMs = job.firstAt - job.started;
