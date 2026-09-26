@@ -160,7 +160,7 @@ export async function writePlaybooks(dir: string, cards: Card[]): Promise<Playbo
 export function listPlaybooks(dir: string): PlaybookInfo[] {
   const d = `${dir}/playbooks`;
   let files: string[] = [];
-  try { files = readdirSync(d).filter((f) => /^[\w-]+\.md$/.test(f)); } catch { return []; }
+  try { files = readdirSync(d).filter((f) => ORDER.includes(f.slice(0, -3))); } catch { return []; } // notes kept alongside aren't playbooks
   return files.map((f) => {
     const md = readFileSync(`${d}/${f}`, "utf8");
     return { name: f.slice(0, -3), file: `${d}/${f}`, title: md.match(/^# (.+)$/m)?.[1] ?? f, cards: Number(md.match(/from (\d+) /)?.[1] ?? 0), at: statSync(`${d}/${f}`).mtimeMs };

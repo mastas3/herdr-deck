@@ -13,7 +13,7 @@ import { homedir } from "node:os";
 import { createBridge, type Bridge } from "./library-bridge";
 import { openCards, type CardFilter, type Cards } from "./library-cards";
 import { addSource, loadConfig, parseSource, removeSource, saveConfig, setEnabled, type LibConfig } from "./library-config";
-import { buildCard, EXTRACT_SYSTEM, EXTRACT_VERSION, extractUser, parseCardJson, toLines, transcriptParts, type Segment } from "./library-extract";
+import { buildCard, EXTRACT_SYSTEM, EXTRACT_VERSION, extractUser, LISTS_USER, needsLists, parseCardJson, toLines, transcriptParts, type Segment } from "./library-extract";
 import { listPlaybooks, readPlaybook, writePlaybooks } from "./library-playbooks";
 import { applyRules, countQueue, queueStore, type Queue } from "./library-queue";
 import { createRunner, sourceChannelId } from "./library-runner";
@@ -95,8 +95,11 @@ export function createLibrary(deps: LibraryDeps = {}) {
     let lastErr = "";
     for (let i = 0; i < parts.length; i++) {
       try {
-        const got = parseCardJson(await ask(model, EXTRACT_SYSTEM, extractUser(v.title, q.title ?? sourceId, parts[i], i, parts.length)));
+        const user = extractUser(v.title, q.title ?? sourceId, parts[i], i, parts.length);
+        const got = parseCardJson(await ask(model, EXTRACT_SYSTEM, user));
         if (got) raws.push(got); else lastErr = "the model's answer wasn't JSON";
+        // Stopped before the lists: ask once more for just those.
+        if (needsLists(got)) { const more = parseCardJson(await ask(model, EXTRACT_SYSTEM, `${user}\n\n${LISTS_USER}`)); if (more) raws.push(more); }
       } catch (e: any) { lastErr = String(e?.message ?? e); }
     }
     if (!raws.length) { db().mark(vid, "failed", lastErr || "no answer", model, Date.now() - started); return; }

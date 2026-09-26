@@ -465,6 +465,8 @@ export function forkPrompt(g: Repo & { why?: Why[] }, ctx: PromptCtx) {
     "4. Suggest one small first experiment (under an hour) and wait for me before doing it. Don't push, publish or open issues/PRs.",
   ].join("\n");
 }
+/** Research agents are told about the Founder Library (src/library.ts), which they reach through the deck's MCP tool. */
+export const LIBRARY_STEP = "Also ask the Founder Library, if the herdr-deck MCP tool `deck_library` is available: how real founders priced, launched and got the first customers for something similar. Quote what fits in Costs and risks and Build order with its YouTube timestamp link, and treat their numbers as claims.";
 export function researchPrompt(idea: string, slug: string, ctx: PromptCtx & { repos?: Repo[]; projects?: string[]; keywords?: string[] }) {
   const file = `${tilde(ctx.ideasDir)}/${slug}.md`;
   return [
@@ -479,6 +481,7 @@ export function researchPrompt(idea: string, slug: string, ctx: PromptCtx & { re
     `3. Check which of my existing connections can be used: read ${tilde(ctx.connectionsFile)} (services, CLIs, MCP servers, API key names; never print key values). Say exactly which ones the idea uses and what's missing.`,
     ctx.projects?.length ? `4. My related projects (context in ~/wiki/projects/<name>.md): ${ctx.projects.join(", ")}. Reuse what I already have.` : "4. Check ~/wiki/index.md for my own projects that could be reused.",
     "5. Think beyond the obvious: propose at least two novel ways to connect these pieces, or outside-world data sources, that would make this better than anything that exists.",
+    LIBRARY_STEP,
     "6. Write the plan as Markdown with this front matter and these sections:",
     "---",
     `idea: <the idea in one line>`,

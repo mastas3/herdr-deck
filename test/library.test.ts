@@ -83,7 +83,24 @@ describe("card extraction: every claim is checked against the transcript", () =>
     expect(c.stack).toEqual(["Twilio"]);
     expect(c.lessons).toHaveLength(1);
   });
-  test("parts of a long video merge: first answer wins for facts, lists are joined", () => {
+  test("items given as plain strings or [text, time] pairs are read, not dropped", () => {
+    const c = buildCard([{ kind: "advice", lessons: ["Sell before you build: ten paying shops first", ["Door-to-door sales with an iPad demo", "t:6:21"]] }], LINES, META, "m");
+    expect(c.lessons.map((x) => x.t)).toEqual([640, 381]);
+  });
+  test("an answer that stopped before the lists is asked for them once more", async () => {
+    const asks: string[] = [];
+    const lib = createLibrary({ dir: `${dir}/lists`, bridge: { available: () => ({ ok: false }), call: async () => ({}) } as any,
+      ask: async (_m, _s, user) => { asks.push(user); return user.includes("stopped before the lists") ? '{"lessons":[{"text":"Sell before you build","t":"10:40"}]}' : '{"kind":"founder_story","business":"Avenue"}'; } });
+    const q = { source: "starterstory", videos: [{ id: "vid00000001", title: META.title, url: META.url, order: 0, status: "ingested" as const, attempts: 1 }] };
+    lib.queues.write(q);
+    const tp = lib.transcriptPath(q, "starterstory", "vid00000001");
+    mkdirSync(tp.replace(/\/[^/]+$/, ""), { recursive: true });
+    writeFileSync(tp, JSON.stringify({ segments: [...LINES, ...LINES.map((l) => ({ ...l, t: l.t + 1000 }))].map((l) => ({ start: l.t, text: l.text })) }));
+    expect(await lib.extractNext(lib.config())).toBe(true);
+    expect(asks).toHaveLength(2);
+    expect(lib.cards().get("vid00000001")).toMatchObject({ business: "Avenue", lessons: [{ text: "Sell before you build", t: 640 }] });
+  });
+    test("parts of a long video merge: first answer wins for facts, lists are joined", () => {
     const c = buildCard([{ kind: "advice", business: null, lessons: [{ text: "Sell before you build", t: "10:40" }] }, { kind: "founder_story", business: "Avenue", lessons: [{ text: "Door-to-door sales work for mechanics", t: "6:21" }] }], LINES, META, "m");
     expect(c.kind).toBe("founder_story");
     expect(c.business).toBe("Avenue");

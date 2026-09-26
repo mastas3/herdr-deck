@@ -44,7 +44,7 @@ export function toLines(segs: Segment[], every = 20): Line[] {
 }
 export const fmtT = (t: number) => { const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = Math.floor(t % 60); return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`; };
 export function parseT(x: unknown): number | null {
-  const m = String(x ?? "").trim().replace(/^\[|\]$/g, "").match(/^(?:(\d+):)?(\d{1,3}):(\d{2})$/);
+  const m = String(x ?? "").trim().replace(/^\[|\]$/g, "").replace(/^t\s*[:=]\s*/i, "").match(/^(?:(\d+):)?(\d{1,3}):(\d{2})$/);
   if (!m) return null;
   return (Number(m[1] ?? 0) * 3600) + Number(m[2]) * 60 + Number(m[3]);
 }
@@ -91,6 +91,10 @@ kind: founder_story when a founder tells how their own business was built; advic
 Give up to 4 first_customers, 4 growth, 5 failed_before and 6 lessons. Answer with the JSON only.`;
 export const extractUser = (title: string, channel: string, part: string, i = 0, n = 1) =>
   `Video title: ${title}\nChannel: ${channel}${n > 1 ? `\nThis is part ${i + 1} of ${n} of the transcript: fill in only what this part says.` : ""}\n\nTranscript:\n${part}`;
+
+/** Asked when an answer stopped before the lists (it happens with small models): the same transcript, lists only. */
+export const LISTS_USER = "Your card stopped before the lists. For the same transcript, answer with JSON containing only these keys, filled as the rules say: first_customers, growth, stack, failed_before, lessons.";
+export const needsLists = (raw: any) => !!raw && ["first_customers", "growth", "failed_before", "lessons"].every((k) => !Array.isArray(raw[k]));
 
 // ── JSON repair ─────────────────────────────────────────────────────────────────
 /** The model's JSON, tolerating code fences, chatter around it, trailing commas and a cut-off end. */
@@ -262,7 +266,8 @@ export function buildCard(raws: any[], lines: Line[], v: VideoMeta, model: strin
     return undefined;
   };
   const items = (k: string, textKey: string, max: number, withChannel = false): Item[] => dedupe(raws.flatMap((r) => (Array.isArray(r?.[k]) ? r[k] : [])).flatMap((x: any) => {
-    // Small models sometimes give plain strings instead of {text, t}: the text is kept and its time looked up.
+    // Small models sometimes give "text" or ["text", "t:1:23"] instead of {text, t}: both are read; a missing time is looked up.
+    if (Array.isArray(x)) x = { [textKey]: x[0], t: x[1] };
     const c = typeof x === "string" ? checkItem(str(x), null, lines, v.duration) : checkItem(str(x?.[textKey] ?? x?.text ?? x?.lesson), x?.t, lines, v.duration);
     if (!c) { if (x) dropped.push(`${k}: ${str(typeof x === "string" ? x : x?.[textKey] ?? x?.text) ?? "?"}`); return []; }
     if (c.moved) moved++;

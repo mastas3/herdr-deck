@@ -111,11 +111,12 @@ function libCardSummary(c, full) {
     c.lessons.length ? `<h4>Lessons</h4><ul>${c.lessons.map((x) => `<li>${esc(x.text)} ${lTime(c.url, x.t)}</li>`).join("")}</ul>` : "",
     c.stack.length ? `<p class="lstack">${c.stack.map((s) => `<span>${esc(s)}</span>`).join("")}</p>` : "",
   ].join("") : (c.lessons[0] ? `<p class="llesson">${esc(c.lessons[0].text)} ${lTime(c.url, c.lessons[0].t)}</p>` : "");
-  return `<div class="lcard">
+  return `<div class="lcard" data-libcard="${esc(c.id)}">
     <p class="lbiz"><b>${esc(c.business ?? "Unnamed business")}</b>${c.sells ? ` — ${esc(c.sells)}` : ""}</p>
     <p class="gmeta">${esc(LBT[c.btype] ?? c.btype)}${c.customer ? ` · for ${esc(c.customer)}` : ""}${c.founder ? ` · ${esc(c.founder)}` : ""}${c.team ? ` · team: ${esc(c.team.text)}` : ""}</p>
     <div class="lclaims">${claim("Claimed revenue", c.revenue)}${claim("Price", c.price)}${claim("First revenue", c.ttfr)}</div>
     ${first ? `<h4>First customers</h4><ul>${first}</ul>` : ""}${more}
+    <div class="gacts"><button class="btn ghost" data-libstudio title="Open the Studio with this founder's story as the starting point">Build on this in Studio</button></div>
   </div>`;
 }
 
@@ -219,7 +220,17 @@ $("dbody").addEventListener("click", async (e) => {
   const rm = t.closest("[data-librm]")?.dataset.librm;
   if (rm) { if (confirm(`Remove ${rm} from the list? What was already ingested stays searchable.`)) libChannels({ op: "remove", id: rm }); return; }
   if (t.closest("[data-libadd]")) return libAdd();
+  if (t.closest("[data-libstudio]")) {
+    const id = t.closest("[data-libcard]")?.dataset.libcard;
+    const c = [...(S.lib.res?.answers ?? []).map((a) => a.card), ...(S.lib.cards?.cards ?? [])].find((x) => x?.id === id);
+    if (c) mixOpenWith([], { text: libStudioText(c), toastText: "Opened the Studio with this founder's story" });
+  }
 });
+/** A Studio message from a founder card: what worked for them, to adapt (the Studio adds library evidence itself). */
+function libStudioText(c) {
+  const how = c.first.slice(0, 2).map((x) => x.text).join("; ");
+  return `Something that worked for a real founder: ${c.business ?? c.title}${c.sells ? `, ${c.sells}` : ""}${c.customer ? ` for ${c.customer}` : ""}.${how ? ` First customers: ${how}.` : ""}${c.revenue ? ` They claim ${c.revenue.quote || c.revenue.text}.` : ""} Give me builds in the same spirit that fit what I have, with a different customer or angle.`;
+}
 async function libAdd() {
   const inp = $("dbody").querySelector("[data-liburl]");
   const url = inp?.value.trim();

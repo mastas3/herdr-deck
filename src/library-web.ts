@@ -3,6 +3,7 @@
 // a 401/403 or a login form stops it), one request per site every few seconds, and only the page's text is kept,
 // with its link.
 import type { Page } from "./library-cards";
+import { parseSource } from "./library-config";
 
 export const UA = "herdr-deck-library/1.0 (personal research; fetches single pages you add)";
 const MAX_BYTES = 3_000_000;
@@ -71,6 +72,8 @@ export async function fetchPage(url: string, f: FetchImpl = fetch, now = Date.no
   if (!rb || rb.status >= 500) throw new Error(`Couldn't read ${host}/robots.txt, so the page wasn't fetched`);
   if (rb.ok && !robotsAllows(robotsRules(await rb.text()), u.pathname + u.search)) throw new Error(`${host} asks bots not to fetch that page (robots.txt)`);
   const r = await f(url, { headers, redirect: "follow", credentials: "omit", signal: AbortSignal.timeout(20_000) } as RequestInit);
+  // A redirect to a private or local address is refused like a link to one.
+  if (r.url && parseSource(r.url).type === "invalid") throw new Error("That page redirects to a private address");
   if (r.status === 401 || r.status === 403) throw new Error("That page needs a login or blocks bots, so it wasn't fetched");
   if (!r.ok) throw new Error(`${host} answered ${r.status}`);
   const type = r.headers.get("content-type") ?? "";
