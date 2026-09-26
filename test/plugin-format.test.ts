@@ -33,6 +33,39 @@ describe("toolClass", () => {
     expect(grantClass({ tools: ["mcp__claude_ai_Gmail__search_threads", "mcp__claude_ai_Gmail__reply"] }).writes).toBe(true);
     expect(grantClass({ tools: ["Bash(gh search prs:*)"] })).toEqual({ writes: false, web: false, machine: true, bash: true });
   });
+  test("unknown or oddly named tools count as changing things (default-deny)", () => {
+    // MCP tools without clear read verbs default to writes: true
+    expect(toolClass("mcp__claude_ai_Google_Drive__copy_file").writes).toBe(true);
+    expect(toolClass("mcp__claude_ai_Gmail__untrash_message").writes).toBe(true);
+    expect(toolClass("mcp__claude_ai_Gmail__unmark_message_spam").writes).toBe(true);
+    expect(toolClass("mcp__claude_ai_Claude_Docs__batch").writes).toBe(true);
+    expect(toolClass("mcp__x__do_thing").writes).toBe(true);
+    // Browser/web tools are always dangerous
+    expect(toolClass("mcp__plugin_playwright_playwright__browser_snapshot")).toEqual({
+      ok: true, writes: true, web: true, machine: false, bash: false,
+    });
+    expect(toolClass("mcp__plugin_playwright_playwright__browser_click")).toEqual({
+      ok: true, writes: true, web: true, machine: false, bash: false,
+    });
+    expect(toolClass("mcp__fetch__fetch")).toEqual({ ok: true, writes: true, web: true, machine: false, bash: false });
+    // Safe read-only operations
+    expect(toolClass("mcp__claude_ai_Google_Drive__search_files").writes).toBe(false);
+    expect(toolClass("mcp__claude_ai_Google_Drive__read_file_content").writes).toBe(false);
+    expect(toolClass("mcp__x__searchThreads").writes).toBe(false);
+    // Scoped Bash with write operations
+    expect(toolClass("Bash(git clone:*)").writes).toBe(true);
+    expect(toolClass("Bash(npm install:*)").writes).toBe(true);
+    expect(toolClass("Bash(docker run:*)").writes).toBe(true);
+    expect(toolClass("Bash(aws s3 rm:*)").writes).toBe(true);
+    expect(toolClass("Bash(find . -delete:*)").writes).toBe(true);
+    expect(toolClass("Bash(gh api:*)").writes).toBe(true);
+    // Scoped Bash with read-only operations
+    expect(toolClass("Bash(aws s3 ls:*)").writes).toBe(false);
+    expect(toolClass("Bash(git log:*)").writes).toBe(false);
+    expect(toolClass("Bash(gh pr list:*)").writes).toBe(false);
+    // Extended OPEN_BIN
+    expect(toolClass("Bash(npx foo:*)")).toMatchObject({ writes: true, web: true });
+  });
 });
 
 describe("parsers", () => {

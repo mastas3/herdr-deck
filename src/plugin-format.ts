@@ -41,11 +41,43 @@ const BUILTIN = ["Read", "Glob", "Grep", "WebFetch", "WebSearch", "Write", "Edit
 const MCP_TOOL = /^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$/;
 const SCOPED_BASH = /^Bash\(([A-Za-z0-9_][\w .\/-]{0,60}):\*\)$/;
 /** Programs that reach the network or run arbitrary code: scoping Bash to them is no scope at all. */
-const OPEN_BIN = /^(curl|wget|nc|ncat|ssh|scp|rsync|sftp|ftp|telnet|http|https|python|python3|node|bun|deno|ruby|perl|php|sh|bash|zsh|fish|env|xargs|eval|exec|sudo|osascript|open)$/;
-const WRITE_VERB = /(^|_)(send|reply|forward|create|delete|remove|trash|update|edit|write|post|publish|upload|share|move|archive|label|unlabel|mark|apply|set|add|merge|close|reopen|comment|push|commit|approve|assign|invite|pay|refund|cancel|disable|enable|rename|star|unstar)(_|$)/i;
+const OPEN_BIN = /^(curl|wget|nc|ncat|ssh|scp|rsync|sftp|ftp|telnet|http|https|python|python3|node|bun|deno|ruby|perl|php|sh|bash|zsh|fish|env|xargs|eval|exec|sudo|osascript|open|npx|pnpx|bunx|uvx|pipx)$/;
+
+const READ_WORDS = new Set([
+  "search", "get", "list", "read", "query", "find", "lookup", "view", "show", "describe",
+  "count", "stats", "status", "log", "diff", "ls", "cat", "resolve", "inspect", "preview",
+  "check", "info", "whoami", "history",
+]);
+
+const WRITE_WORDS = new Set([
+  // Original WRITE_VERB verbs
+  "send", "reply", "forward", "create", "delete", "remove", "trash", "update", "edit", "write",
+  "post", "publish", "upload", "share", "move", "archive", "label", "unlabel", "mark", "apply",
+  "set", "add", "merge", "close", "reopen", "comment", "push", "commit", "approve", "assign",
+  "invite", "pay", "refund", "cancel", "disable", "enable", "rename", "star", "unstar",
+  // Extended verbs
+  "untrash", "unmark", "copy", "cp", "mv", "rm", "rmdir", "run", "exec", "execute", "eval",
+  "evaluate", "install", "uninstall", "click", "type", "fill", "press", "drag", "drop", "hover",
+  "navigate", "select", "download", "batch", "clone", "pull", "fetch", "save", "import", "restore",
+  "kill", "stop", "start", "restart", "deploy", "build", "init", "submit", "sync", "put", "patch",
+  "tag", "fork", "transfer", "charge", "schedule", "book", "order", "buy", "grant", "revoke",
+  "block", "unblock", "ban", "mute", "unmute", "follow", "unfollow", "like", "subscribe",
+  "unsubscribe", "trigger", "output", "api",
+]);
+
+/** Tokenize a tool name: split camelCase, lowercase, split on non-alphanumeric, drop empties. */
+function tokenize(s: string): string[] {
+  return s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+/** A name is read-only when it contains at least one READ_WORD and no WRITE_WORDS. */
+function readOnly(tokens: string[]): boolean {
+  return tokens.some((t) => READ_WORDS.has(t)) && !tokens.some((t) => WRITE_WORDS.has(t));
+}
 
 export type ToolClass = { ok: boolean; writes: boolean; web: boolean; machine: boolean; bash: boolean };
-/** What a tool can do, judged by the deck from its name, never from the plugin's own say-so. */
+/** What a tool can do, judged by the deck from its name, never from the plugin's own say-so.
+ * Default-deny: a tool reads only when its name clearly says so. */
 export function toolClass(t: string): ToolClass {
   const no: ToolClass = { ok: false, writes: false, web: false, machine: false, bash: false };
   if (typeof t !== "string") return no;
@@ -59,10 +91,19 @@ export function toolClass(t: string): ToolClass {
     const words = b[1].trim().split(/\s+/);
     const open = OPEN_BIN.test(words[0]);
     // One program with any subcommand ("gh") can do anything that program can, including change things.
-    const writes = open || words.length < 2 || WRITE_VERB.test(words.join("_").replace(/[./-]/g, "_"));
+    const writes = open || words.length < 2 || !readOnly(tokenize(words.slice(1).join(" ")));
     return { ok: true, writes, web: open, machine: true, bash: true };
   }
-  if (MCP_TOOL.test(t)) return { ok: true, writes: WRITE_VERB.test(t.slice(t.lastIndexOf("__") + 2)), web: false, machine: false, bash: false };
+  if (MCP_TOOL.test(t)) {
+    const server = t.slice("mcp__".length, t.lastIndexOf("__"));
+    const tool = t.slice(t.lastIndexOf("__") + 2);
+    // Browser/web tools are always considered dangerous.
+    if (/browser|playwright|puppeteer|selenium|chrome|fetch|http|scrape|crawl|navigate|url|web/i.test(server + " " + tool)) {
+      return { ok: true, writes: true, web: true, machine: false, bash: false };
+    }
+    // Otherwise default-deny: writes only if tool name clearly says read.
+    return { ok: true, writes: !readOnly(tokenize(tool)), web: false, machine: false, bash: false };
+  }
   return no;
 }
 export function grantClass(g: GrantDef) {
