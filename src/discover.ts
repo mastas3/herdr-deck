@@ -5,6 +5,7 @@
 // Privacy: the profile is built locally from the wiki, your repos and the connections scan. Only interest
 // keywords (and the words of an idea you type) ever leave the machine, as GitHub search queries through `gh`.
 // Network work never blocks a request for long: cached data is returned at once and refreshed in the background.
+import { openIdeaArchive } from "./idea-archive";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { collectIngredients, createMixer, KIND_LABEL, sanitizeIngredient, type ConnLite, type Engine, type Ingredient, type Mix, type MixerDeps } from "./mix";
@@ -773,8 +774,11 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   const byId = (xs: Ingredient[]) => new Map(xs.map((x) => [x.id, x]));
   // Studio: the chat that assembles builds out of all of it (src/studio.ts). Conversations in <dataDir>/studio/.
   // "Ideas for you": the feed of ready-to-execute ideas on For you (src/feed.ts), cached for the day in <dataDir>/feed.json.
-  const feed = createFeed({ file: `${paths.dataDir}/feed.json`, ingredients: async (w) => (await ingredients(w)).list, ...deps.feed });
-  const studio = createStudio({ dir: `${paths.dataDir}/studio`, projectsDir: paths.projectsDir, ingredients: async (w) => (await ingredients(w)).list, engines: () => mixer.engines(), ...deps.studio });
+  const archive = openIdeaArchive(`${paths.dataDir}/ideas.db`);
+  // Today's feed from before the archive existed goes in once (put keeps first-seen times, so repeats are harmless).
+  try { for (const x of JSON.parse(readFileSync(`${paths.dataDir}/feed.json`, "utf8")).ideas ?? []) { archive.put({ ...x, source: x.source ?? "feed" }); if (x.score != null) archive.score(x.id, x.score, false); } } catch {}
+  const feed = createFeed({ file: `${paths.dataDir}/feed.json`, ingredients: async (w) => (await ingredients(w)).list, archive, ...deps.feed });
+  const studio = createStudio({ dir: `${paths.dataDir}/studio`, projectsDir: paths.projectsDir, ingredients: async (w) => (await ingredients(w)).list, engines: () => mixer.engines(), archive, ...deps.studio });
 
   async function state(body: { refresh?: boolean; shuffle?: number } = {}) {
     const p = await profile(!!body.refresh);
@@ -904,6 +908,7 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
         saveConf();
         return { ideas: listIdeas(IDEAS, deps.rows?.() ?? [], conf.ideas) };
       }
+      case "/api/discover/archive": return { ideas: archive.list({ limit: Number(body.limit) || 100, offset: Number(body.offset) || 0, all: !!body.all }), ...archive.count() };
       case "/api/discover/mix-ingredients": {
         const [r, engines] = await Promise.all([ingredients(Number(body.wait) || 2500), mixer.engines()]);
         return { ingredients: r.list, connLoading: r.connLoading, engines, kinds: KIND_LABEL };

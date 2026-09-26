@@ -362,6 +362,7 @@ export type StudioDeps = {
   engines: () => Promise<{ claude: boolean; ollama: string[] }>;
   runClaude?: typeof runClaude; runOllama?: typeof runOllama;
   timeouts?: { haiku: number; sonnet: number; ollama: number };
+  archive?: { put: (idea: any) => void };
 };
 export type Engine = "claude" | "ollama" | "template";
 type Job = { id: string; convo: string; engine: Engine; model?: string; started: number; firstAt?: number; finished?: number; status: "running" | "done" | "error" | "cancelled"; stage: string; text: string; msg?: BotMsg; err?: string; abort: AbortController; ings: Ingredient[] };
@@ -451,6 +452,7 @@ export function createStudio(deps: StudioDeps) {
         if (reason === "error") job.err = e?.message ?? String(e);
       } finally { clearTimeout(timer); }
       const got = parseReply(job.text, all, { final: true, source });
+      for (const b of got.blocks) if (b.t === "build") deps.archive?.put({ ...b.b, source: "studio" });
       const hasBody = got.blocks.some((b) => b.t === "build" || (b.t === "text" && b.md.length > 40));
       const who = job.engine === "ollama" ? "Ollama" : "Claude";
       if (reason === "cancelled") msg = { role: "assistant", ...got, engine: job.engine, model: job.model, at: Date.now(), stopped: true, note: got.blocks.length ? "Stopped: this is what arrived before you pressed Stop." : "Stopped." };

@@ -50,6 +50,8 @@ export type FeedDeps = {
   ingredients: (wait?: number) => Promise<Ingredient[]>;
   runClaude?: typeof runClaude; claudeAvailable?: () => boolean;
   timeoutMs?: number; now?: () => number;
+  /** Where every idea is kept for good (the feed itself only holds today). */
+  archive?: { put: (idea: any) => void; score: (id: string, score: number, dropped: boolean) => void };
 };
 
 export function createFeed(deps: FeedDeps) {
@@ -76,6 +78,7 @@ export function createFeed(deps: FeedDeps) {
       const count = (row: string) => store.ideas.filter((y) => y.row === row).length;
       const row = x.row && b.rows.includes(x.row) ? x.row : [...b.rows].sort((p, q) => count(p) - count(q))[0];
       store.ideas.push({ ...x, row, at: now() });
+      deps.archive?.put({ ...x, row, source: x.source ?? "feed" });
       b.kept++;
     }
     if (store.ideas.length > MAX_IDEAS) store.ideas = store.ideas.slice(-MAX_IDEAS);
@@ -129,6 +132,7 @@ export function createFeed(deps: FeedDeps) {
       if (!scores.size) return;
       todo.forEach((x, i) => { const s = scores.get(i + 1); if (s != null) x.score = s; });
       const weak = new Set(todo.filter((x) => (x.score ?? 10) < MIN_SCORE).map((x) => x.id));
+      for (const x of todo) if (x.score != null) deps.archive?.score(x.id, x.score, weak.has(x.id));
       store.ideas = store.ideas.filter((x) => !weak.has(x.id));
       store.dropped += weak.size;
       store.judged = (store.judged ?? 0) + scores.size;
