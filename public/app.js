@@ -2190,8 +2190,15 @@ function jevLine(d) {
     const cls = p >= 70 ? "ok" : p >= 40 ? "mid" : "bad";
     return `<div class="jev ${cls}"><span class="jb">Jev</span> ${p}% really done${j.next ? ` · suggests <b>${j.next === "accept" ? "accept" : j.next === "send_back" ? "send it back" : "ask a question"}</b>` : ""}</div>`;
   }
-  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}</div>`;
+  if (j.pick != null) return `<div class="jev"><span class="jb">Jev</span> would pick <b>${esc(String(j.pick).toUpperCase())}</b>${j.pickP != null ? ` (${Math.round(j.pickP * 100)}%)` : ""}${j.low != null ? ` · ${j.low >= 0.7 ? "low stakes" : j.low < 0.35 ? "<b>high stakes</b>" : "medium stakes"}` : ""}${riskChip(j)}</div>`;
   return "";
+}
+/** How reversible Jev thinks the terminal prompt is, as a small chip (deck-prompt only; nothing when the risk feature is off or Jev skipped). */
+function riskChip(j) {
+  if (j.risk == null) return "";
+  if (j.riskP != null && j.riskP < 0.5) return ` <span class="risk unclear">risk unclear</span>`;
+  const label = j.risk === "read_only" ? "read-only" : j.risk === "reversible" ? "reversible" : "irreversible";
+  return ` <span class="risk${j.risk === "irreversible" ? " irr" : ""}">${esc(label)}</span>`;
 }
 // <inbox-keys> Pure: what a triage key means on a decision. No DOM, no globals (test/inbox-keys.test.ts runs this block).
 const YES_RE = /^\W*(yes|y|allow|approve|accept|ok|okay|confirm|proceed|continue|go ahead|trust|sure)\b/i;

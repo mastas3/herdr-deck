@@ -580,6 +580,8 @@ body.moving { cursor: grabbing; user-select: none; }
 .jev { display: flex; align-items: center; gap: 7px; font-size: 13.5px; color: var(--ink-2); margin: 6px 0; }
 .jev .jb { font: 700 11px/1 var(--sans, system-ui); padding: 3px 6px; border-radius: 5px; background: color-mix(in oklch, var(--accent) 20%, transparent); color: var(--accent); }
 .jev.ok b, .jev.ok { color: var(--working); } .jev.bad { color: var(--blocked); } .jev.mid { color: var(--ink); }
+.jev .risk { font: 600 11px var(--sans, system-ui); border: 1px solid color-mix(in oklch, var(--ink-3) 45%, transparent); border-radius: 99px; padding: 1px 7px; color: var(--ink-2); }
+.jev .risk.irr { color: var(--blocked); border-color: color-mix(in oklch, var(--blocked) 45%, transparent); background: color-mix(in oklch, var(--blocked) 12%, transparent); }
 .dcheck { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; padding: 8px 10px; border-radius: 9px; background: var(--raise); font-size: 13.5px; }
 .dcheck.pass { color: var(--working); } .dcheck.fail { color: var(--blocked); }
 .dcheck details { flex-basis: 100%; } .dcheck pre { max-height: 220px; overflow: auto; font: 12px/1.4 var(--mono); color: var(--ink-2); }
