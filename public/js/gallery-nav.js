@@ -2,9 +2,11 @@
 // the desktop lane arrows, and lanes that render their first cards and add more as you scroll toward the end
 // (so a hundred-card day stays light). Swiping is the strips' own scrolling, snapped to cards.
 function galWire(n) {
+  n.addEventListener("toggle", e => { if (e.target.matches?.("[data-galarchive]")) S.gal.archiveOpen = e.target.open; }, true);
   n.addEventListener("click", (e) => {
     const t = e.target;
-    if (t.closest("[data-galretry]")) return api("/api/ideas", {}).then(() => galLoad()).catch((x) => toast(x.message, true));
+    if (t.closest("[data-galretry]")) return galLoad();
+    if (t.closest("[data-galfind]")) return galFindProblems(t.closest("[data-galsearch]"));
     const more = t.closest("[data-galmore]");
     if (more) return galMore(more.dataset.galmore);
     const sc = t.closest("[data-galscroll]");

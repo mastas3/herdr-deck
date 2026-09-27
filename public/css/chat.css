@@ -109,3 +109,12 @@ mark { background: color-mix(in srgb, var(--working) 38%, transparent); color: i
 .reply { display: none; gap: 6px; align-items: flex-end; padding: 8px 10px; background: var(--side); border-top: 1px solid var(--line); }
 .reply textarea { flex: 1; resize: none; min-height: 38px; max-height: 30vh; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px; font: 15px/1.4 var(--read); color: var(--ink); outline: none; }
 @media (min-width: 761px) { .app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) :is(.screen, .keys) { display: none; } }
+/* Code blocks: Copy, and Run for a "!" command in a live Claude Code session (public/js/code-actions.js). */
+.cb { position: relative; }
+.cb > pre { padding-right: 96px; }
+.cbt { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; align-items: center; opacity: 0; transition: opacity .15s var(--ease); }
+.cb:hover .cbt, .cb:focus-within .cbt { opacity: 1; }
+@media (hover: none) { .cbt { opacity: 1; } }
+.cbt .ib { background: var(--raise); }
+.cbrun { display: none; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 7px; padding: 3px 10px; font-size: 13px; font-weight: 600; }
+#detail.can-run .cbrun { display: inline-flex; }

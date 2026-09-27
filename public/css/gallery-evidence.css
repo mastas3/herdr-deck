@@ -1,0 +1,29 @@
+/* Evidence leads the page. Existing art and kits stay available inside each idea. */
+.galevidencehead { padding: clamp(18px, 4vw, 42px) 0 24px; max-width: 780px; }
+.galevidencehead h2 { font-size: clamp(24px, 3.7vw, 38px); line-height: 1.14; letter-spacing: -.035em; max-width: 680px; margin: 10px 0 16px; }
+.galevidencehead > p { color: var(--ink-2); max-width: 640px; line-height: 1.6; }
+.galsearch, .galcoverage { margin-top: 20px; }
+.galsearch summary, .galcoverage summary, .galarchive > summary { cursor: pointer; font-weight: 600; padding: 10px 0; }
+.galsearch > p, .galsearch label { display: block; line-height: 1.6; max-width: 650px; }
+.galsearch label { margin: 12px 0; }
+.galsearch input { margin-right: 6px; }
+.galarchive { border-top: 1px solid var(--line); margin-top: 28px; }
+.galarchive > summary span { font-weight: 400; color: var(--ink-3); margin-left: 8px; }
+.galrecord { background: transparent; box-shadow: none; border: 1px solid var(--line); border-radius: 6px; }
+.galrecord .galtxt { padding: 19px; }
+.galrecord h4 { margin: 13px 0 10px; }
+.galrecord .galfor { font-size: 12px; line-height: 1.5; margin: 14px 0; color: var(--ink-2); }
+.galexcerpt { line-height: 1.55; font-size: 14px; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.galstage { display: inline-block; font-size: 11px; font-weight: 600; padding: 4px 7px; border: 1px solid var(--line); border-radius: 3px; color: var(--ink-2); }
+.galstage[data-stage="paid-pilot"], .galstage[data-stage="repeat-use"] { color: var(--green, #28854b); }
+.galproof { color: var(--ink-2); font-size: 12px; line-height: 1.5; }
+.galread { display: block; padding-top: 14px; margin-top: 16px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 550; }
+.galrecord:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.galtest { padding: 16px 0; border-block: 1px solid var(--line); margin: 16px 0; }
+.galevs small { display: block; font-size: 11px; color: var(--ink-3); margin: 6px 0 14px; }
+.galsec > summary { cursor: pointer; font-weight: 600; padding: 12px 0; }
+@media (max-width: 600px) {
+  .galevidencehead { padding-top: 12px; }
+  .galsearch .btn { width: 100%; }
+  .galrecord .galtxt { padding: 15px; }
+}

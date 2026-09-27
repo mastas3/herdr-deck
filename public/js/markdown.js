@@ -75,13 +75,18 @@ function choicesHTML(opts, question) {
 function diffHTML(code) {
   return `<pre class="diff"><code>${code.replace(/\n$/, "").split("\n").map((l) => `<span class="${/^\+(?!\+\+)/.test(l) ? "add" : /^-(?!--)/.test(l) ? "del" : /^@@/.test(l) ? "hunk" : ""}">${esc(l)}</span>`).join("\n")}</code></pre>`;
 }
+/** A code block with Copy, and Run when it is one "!" command (Claude Code runs "!" messages as shell commands). */
+function codeBlockHTML(code) {
+  const bang = /^\s*!\s*\S/.test(code) && !/\n(?![ \t])/.test(code.replace(/\\\n/g, " "));
+  return `<div class="cb"><pre><code>${esc(code)}</code></pre><span class="cbt"><button class="ib" data-cbcopy title="Copy" aria-label="Copy"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/></svg></button>${bang ? `<button class="cbrun" data-cbrun title="Run it in this session">Run</button>` : ""}</span></div>`;
+}
 function md(text) {
   const out = [];
   const src = String(text ?? "");
   const langs = [...src.matchAll(/^```([^\n]*)\n/gm)].map((m) => m[1].trim().toLowerCase());
   const parts = src.split(/^```[^\n]*\n([\s\S]*?)^```[ \t]*$/m);
   for (let p = 0; p < parts.length; p++) {
-    if (p % 2 === 1) { const lang = langs[(p - 1) / 2] ?? ""; out.push(lang === "diff" || lang === "patch" ? diffHTML(parts[p]) : `<pre><code>${esc(parts[p].replace(/\n$/, ""))}</code></pre>`); continue; }
+    if (p % 2 === 1) { const lang = langs[(p - 1) / 2] ?? ""; out.push(lang === "diff" || lang === "patch" ? diffHTML(parts[p]) : codeBlockHTML(parts[p].replace(/\n$/, ""))); continue; }
     const lines = parts[p].split("\n");
     let i = 0;
     while (i < lines.length) {

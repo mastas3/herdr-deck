@@ -1,6 +1,7 @@
 "use strict";
 // ── Opportunities: a hypothesis, its evidence and the next buyer test ─────────
 S.opp = { loaded: false, loading: false, items: [], industries: [], filters: { mode: '', industry: '', stage: '' }, selected: null, section: 'summary', create: false, busy: false, error: '', jobs: [], timer: null, calcTimer: null, calcSeq: 0 };
+const oOnScreen = () => S.mode === "opportunities" || (S.mode === "discover" && S.disc?.tab === "evidence");
 const OMODES = [['assets', 'Use my advantages'], ['markets', 'Explore new markets'], ['novel', 'Novel solutions']];
 const OSTAGES = [['concept', 'Concept'], ['research-ready', 'Research-ready'], ['buying-signal', 'Buying signal'], ['paid-pilot', 'Paid pilot'], ['repeat-use', 'Repeat use / renewal']];
 const OSECTIONS = [['summary', 'Overview'], ['demand', 'Demand & sources'], ['alternatives', 'Alternatives'], ['economics', 'Economics'], ['revenue', 'Revenue streams'], ['experiments', 'Experiments']];
@@ -21,24 +22,24 @@ function oField(name, label, value = '', opts = {}) {
   return `<label class="opfield${opts.wide ? ' wide' : ''}" for="${id}"><span>${esc(label)}</span>${opts.options ? `<select ${attrs}>${oOptions(opts.options, value, opts.empty)}</select>` : opts.rows ? `<textarea ${attrs} rows="${opts.rows}" maxlength="${opts.maxlength || 6000}">${esc(value)}</textarea>` : `<input ${attrs} type="${opts.type || 'text'}" value="${esc(value ?? '')}"${opts.type === 'number' ? ` step="${opts.step || 'any'}"${opts.min != null ? ` min="${opts.min}"` : ''}${opts.max != null ? ` max="${opts.max}"` : ''}` : ` maxlength="${opts.maxlength || 1000}"`}>`}${opts.hint ? `<small>${esc(opts.hint)}</small>` : ''}</label>`;
 }
 function oForm(kind, html, submit = 'Save changes') { return `<form data-opform="${kind}" class="opform"><div class="opfields">${html}</div><p data-opformerror class="operror" role="alert" hidden></p><div class="opactions"><button class="btn primary" type="submit">${esc(submit)}</button><span class="hint" data-opformstatus role="status"></span></div></form>`; }
-function oAccept(item) { if (!item) return; const i = S.opp.items.findIndex((x) => x.id === item.id); if (i < 0) S.opp.items.unshift(item); else S.opp.items[i] = item; }
+function oAccept(item) { if (!item) return; if (typeof galEvidenceChanged === "function") galEvidenceChanged(); const i = S.opp.items.findIndex((x) => x.id === item.id); if (i < 0) S.opp.items.unshift(item); else S.opp.items[i] = item; }
 async function opportunitiesLoad() {
   const o = S.opp;
   if (o.loading) return;
   o.loading = true; o.error = '';
-  try { const r = await api('/api/opportunities', {}); o.items = r.items || []; o.industries = r.industries || []; o.jobs = r.jobs || []; o.loaded = true; }
+  try { const r = await api('/api/opportunities', {}); o.items = r.items || []; o.industries = r.industries || []; o.jobs = r.jobs || []; o.loaded = true; if (typeof galEvidenceChanged === 'function') galEvidenceChanged(); }
   catch (e) { o.error = e.message; }
   finally { o.loading = false; opportunitiesPatch(); opportunitiesPoll(); }
 }
 function opportunitiesPoll() {
   clearTimeout(S.opp.timer);
-  if (S.mode !== 'opportunities') return;
+  if (!oOnScreen()) return;
   const running = (S.opp.jobs || []).some((j) => ['queued', 'running'].includes(j.state)) || S.opp.items.some((x) => ['queued', 'running'].includes(x.researchJob?.state));
   if (running) S.opp.timer = setTimeout(opportunitiesLoad, 2500);
 }
 function opportunitiesPatch(force = false) {
   const root = $('opportunities');
-  if (!root || S.mode !== 'opportunities') return;
+  if (!root || !oOnScreen()) return;
   // Background jobs may refresh results, but never replace unfinished input.
   if (!force && root.querySelector('form[data-dirty="true"]')) {
     const status = root.querySelector('[data-opbackground]');
@@ -75,7 +76,7 @@ function opportunitiesBody() {
     ${jobs.map(opportunityJob).join('')}
     ${o.create ? opportunityCreateForm() : ''}
     <details class="opdiscover" data-opdetails="generate"><summary>Explore with an agent <span>Choose a market and a direction</span></summary>${opportunityGenerateForm()}</details>
-    <div class="oplisthead"><h4>${matches.length ? `Your shortlist <span>${visible.length} of ${matches.length}</span>` : 'Your opportunity notebook'}</h4><button class="link" data-opaction="import"${o.busy ? ' disabled' : ''}>Import from Discover</button></div>
+    <div class="oplisthead"><h4>${matches.length ? `Your notebook <span>${visible.length} of ${matches.length}</span>` : 'Your opportunity notebook'}</h4><button class="link" data-opaction="import"${o.busy ? ' disabled' : ''}>Import from Discover</button></div>
     ${!o.loaded && !o.error ? '<p class="opempty" role="status"><span class="spin"></span> Opening your opportunity notebook…</p>' : !matches.length ? `<div class="opempty"><h4>${o.items.length ? 'No opportunities match these filters.' : 'Start with a problem worth solving.'}</h4><p>${o.items.length ? 'Try another industry, exploration mode or evidence stage.' : 'Add your own concept, explore a new market with an agent, or bring in saved ideas. Each starts as an unverified hypothesis.'}</p>${o.items.length ? '<button class="btn" data-opaction="clearfilters">Clear filters</button>' : '<button class="btn" data-opaction="create">Add your first concept</button>'}</div>` : `<div class="oplist">${visible.map(opportunityCard).join('')}</div>`}
     ${matches.length > visible.length ? `<button class="btn opmore" data-opaction="more">Explore all ${matches.length} opportunities</button>` : ''}
     <p class="opfootnote">Research-ready means the homework is documented. Purchase and renewal evidence have their own stages.</p>`;
@@ -99,7 +100,7 @@ function opportunityJob(job) {
 function opportunityDossier(x) {
   const section = S.opp.section;
   const job = x.researchJob || S.opp.jobs.find((j) => j.itemId === x.id && j.kind === 'research');
-  return `<div class="opback"><button class="link" data-opaction="back">← Opportunities</button><span>Saved ${esc(oDate(x.updatedAt))} · version ${Number(x.version) || 1}</span></div><header class="opdossierhead"><div class="opcardmeta">${oStage(x.stage)}<span>${esc(oLabel(oIndustries(), x.industry))}</span><span>${esc(oLabel(OMODES, x.mode))}</span></div><h3 tabindex="-1" id="op-dossier-title">${esc(x.title)}</h3><p>${esc(x.summary || x.problem)}</p></header>
+  return `<div class="opback"><button class="link" data-opaction="back">← Evidence notebook</button><span>Saved ${esc(oDate(x.updatedAt))} · version ${Number(x.version) || 1}</span></div><header class="opdossierhead"><div class="opcardmeta">${oStage(x.stage)}<span>${esc(oLabel(oIndustries(), x.industry))}</span><span>${esc(oLabel(OMODES, x.mode))}</span></div><h3 tabindex="-1" id="op-dossier-title">${esc(x.title)}</h3><p>${esc(x.summary || x.problem)}</p></header>
     ${job ? opportunityJob(job) : ''}
     <p class="hint" data-opbackground role="status"></p><nav class="opsections" aria-label="Dossier sections">${OSECTIONS.map(([k, l]) => `<button data-opsection="${k}" aria-pressed="${section === k}">${l}</button>`).join('')}</nav>
     <div class="opsection" id="op-section">${section === 'summary' ? opportunitySummary(x) : section === 'demand' ? opportunityDemand(x) : section === 'alternatives' ? opportunityAlternatives(x) : section === 'economics' ? opportunityEconomics(x) : section === 'revenue' ? opportunityRevenue(x) : opportunityExperiments(x)}</div>`;
@@ -127,7 +128,7 @@ function opportunitySourceCaveat(source) {
   return source.id?.startsWith('web-') && source.checkedBy === 'retrieval' ? '<small>Tool-returned text may be a generated summary. Check the original page before quoting it or marking claims observed.</small>' : '';
 }
 function opportunitySourceForm(source = {}) {
-  return oForm('source', `<input type="hidden" name="id" value="${esc(source.id || '')}">` + oField('url', 'Original public URL', source.url || '', { type: 'url', required: true, wide: true }) + oField('title', 'Source title', source.title || '', { required: true }) + oField('kind', 'Source type', source.kind || 'customer', { options: [['customer', 'Customer evidence'], ['competitor', 'Competitor / alternative'], ['documentation', 'Technical documentation'], ['other', 'Other']] }) + oField('access', 'Access result', source.access || 'unverified', { options: [['unverified', 'Not checked yet'], ['opened', 'Page opened'], ['failed', 'Could not access']] }) + oField('excerpt', 'Checked excerpt or page locator (replace tool summaries)', source.excerpt || '', { rows: 3, wide: true, required: true }) + `<label class="opcheck wide"><input type="checkbox" name="attest" required> I am recording the actual source and access result, including limitations.</label>`, 'Add source');
+  return oForm('source', `<input type="hidden" name="id" value="${esc(source.id || '')}">` + oField('url', 'Original public URL', source.url || '', { type: 'url', required: true, wide: true }) + oField('title', 'Source title', source.title || '', { required: true }) + oField('kind', 'Source type', source.kind || 'customer', { options: [['customer', 'Customer evidence'], ['competitor', 'Competitor / alternative'], ['documentation', 'Technical documentation'], ['other', 'Other']] }) + oField('access', 'Access result', source.access || 'unverified', { options: [['unverified', 'Not checked yet'], ['opened', 'Page opened'], ['failed', 'Could not access']] }) + oField('publishedAt', 'Publication date (leave blank if unknown)', source.publishedAt ? new Date(source.publishedAt).toISOString().slice(0, 10) : '', { type: 'date', hint: 'Use the date on the original report, not today’s retrieval date.' }) + oField('error', 'Source limitations or access error', source.error || '', { wide: true }) + oField('excerpt', 'Checked excerpt or page locator (replace tool summaries)', source.excerpt || '', { rows: 3, wide: true, required: true }) + `<label class="opcheck wide"><input type="checkbox" name="attest" required> I am recording the actual source and access result, including limitations.</label>`, source.id ? 'Save source review' : 'Add source');
 }
 function opportunitySourceChecks(x, name, title, selected = []) {
   return `<fieldset class="opchecks wide"><legend>${esc(title)}</legend>${(x.sources || []).length ? x.sources.map((s) => `<label><input type="checkbox" name="${name}" value="${esc(s.id)}"${selected.includes(s.id) ? ' checked' : ''}> ${esc(s.title || s.url)} <small>${esc(s.access || 'unverified')}</small></label>`).join('') : '<p class="hint">Add an original source first.</p>'}</fieldset>`;
@@ -238,7 +239,7 @@ async function opportunitySubmit(form) {
       r = await api('/api/opportunities/research', { id, consent: f.consent === 'on', deep: f.deep === 'on' });
       if (r.job) S.opp.jobs.unshift(r.job);
     } else if (kind === 'source') {
-      r = await api('/api/opportunities/evidence', { id, attest: f.attest === 'on', research: { sources: [{ ...(f.id ? item.sources.find((s) => s.id === f.id) || { id: f.id } : {}), url: f.url, title: f.title, kind: f.kind, excerpt: f.excerpt, access: f.access, fetchedAt: Date.now() }] } });
+      r = await api('/api/opportunities/evidence', { id, attest: f.attest === 'on', research: { sources: [{ ...(f.id ? item.sources.find((s) => s.id === f.id) || { id: f.id } : {}), url: f.url, title: f.title, kind: f.kind, excerpt: f.excerpt, access: f.access, publishedAt: f.publishedAt ? Date.parse(f.publishedAt) : null, error: f.error, fetchedAt: Date.now() }] } });
     } else if (kind === 'claim') {
       r = await api('/api/opportunities/evidence', { id, attest: f.attest === 'on', research: { claims: [{ ...(f.id ? item.claims.find((c) => c.id === f.id) || { id: f.id } : {}), text: f.text, dimension: f.dimension, status: f.status, supportingSourceIds: data.getAll('supportingSourceIds'), opposingSourceIds: data.getAll('opposingSourceIds') }] } });
     } else if (kind === 'review') {
@@ -294,7 +295,7 @@ $('dbody').addEventListener('change', (e) => {
   if (filter) { S.opp.filters[filter.dataset.opfilter] = filter.value; S.opp.more = false; opportunitiesPatch(true); }
 });
 $('dbody').addEventListener('click', async (e) => {
-  if (S.mode !== 'opportunities') return;
+  if (!oOnScreen()) return;
   const t = e.target, open = t.closest('[data-opopen]'), section = t.closest('[data-opsection]'), cancel = t.closest('[data-opcancel]'), action = t.closest('[data-opaction]')?.dataset.opaction;
   if (!open && !section && !cancel && !action) return;
   if (action === 'discard') { opportunitiesPatch(true); return; }

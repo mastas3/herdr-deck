@@ -6,7 +6,7 @@
 ICON.compass = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><circle cx="8" cy="8" r="6.2"/><path d="m10.7 5.3-1.6 3.8-3.8 1.6 1.6-3.8z"/></svg>';
 ICON.bulb = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 12.4h4M6.6 14.4h2.8M8 1.7a4.4 4.4 0 0 0-2.6 8c.4.3.6.8.6 1.3v.4h4V11c0-.5.2-1 .6-1.3A4.4 4.4 0 0 0 8 1.7z"/></svg>';
 S.disc = { data: null, loading: false, tab: load("discTab", "you"), filter: null, idea: load("discIdea", ""), ideaRes: null, ideaBusy: false, open: null, plans: new Map(), shuffle: 0, pending: null, more: false };
-const DTABS = [["you", "For you"], ["mix", "Studio"], ["lab", "Idea lab"], ["leads", "Leads"], ["research", "Research"], ["lib", "Library"], ["ideas", "Ideas"], ["saved", "Saved"]];
+const DTABS = [["you", "For you"], ["evidence", "Evidence & tests"], ["mix", "Studio"], ["lab", "Idea lab"], ["leads", "Leads"], ["research", "Research"], ["lib", "Library"], ["ideas", "Ideas"], ["saved", "Saved"]];
 const kfmt = (n) => (n >= 10000 ? Math.round(n / 1000) + "k" : n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(Math.round(n)));
 function dHue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
@@ -15,7 +15,7 @@ async function loadDiscover(opts = {}) {
   if (S.disc.loading && !opts.refresh) return;
   S.disc.loading = true;
   if (opts.refresh && S.disc.data) { S.disc.data.refreshing = true; if (S.mode === "discover") renderDiscover(); }
-  try { S.disc.data = await api("/api/discover", { refresh: !!opts.refresh, shuffle: S.disc.shuffle }); }
+  try { S.disc.data = await api("/api/discover", { refresh: !!opts.refresh, shuffle: S.disc.shuffle, passive: !opts.refresh }); }
   catch (e) { toast(e.message, true); }
   S.disc.loading = false;
   if (S.mode !== "discover") return;
@@ -71,12 +71,14 @@ function renderDiscover() {
   if (tab === "research" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #rsbody")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return rsPatch(); }
   // The Library (public/library.js) patches under its inputs, like Leads.
   if (tab === "lib" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #libroot")) { const nav = $("dbody").querySelector(".dtabs"); if (nav) setHTML(nav, tabs); return libPatch(); }
-  const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Ideas worth building and repos worth forking, picked for what you have. Any idea, searched against what already exists and planned by an agent.</p>
+  if (tab === "evidence" && $("dbody")._mode === "discover" && $("opportunities")) return opportunitiesPatch();
+  const head = `<header class="vh"><h2>${ICON.compass}Discover</h2><p>Find a problem, check the evidence, then test whether people will pay.</p>
     <nav class="seg dtabs">${tabs}</nav></header>`;
   let body = "";
   if (tab === "leads") body = discLeads();
   else if (tab === "research") body = discResearch();
   else if (tab === "lib") body = discLibrary();
+  else if (tab === "evidence") body = opportunitiesView();
   else if (tab === "mix") body = discMix(); // the Studio paints at once from its own cache; it doesn't wait for Discover's data
   else if (!d) body = `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div><p class="hint">Reading your wiki and repos…</p>`;
   else if (tab === "lab") body = discLab(d);
@@ -115,7 +117,7 @@ function discForYou(d) {
     ${d.trending.length && !f ? `<h3 class="dsub">Trending in your areas <span class="hint">new this season, climbing fast</span></h3><div class="dstrip">${d.trending.map((g, i) => gemCard(g, i, { mini: true })).join("")}</div>` : ""}
     <h3 class="dsub">Hidden gems ${f ? `<span class="hint">in ${esc(p.interests.find((i) => i.id === f)?.label)}</span> <button class="link" data-dfilter="">Show all</button>` : `<span class="hint">30–5,000 stars, active this half-year, licensed</span>`}</h3>
     ${shown.length ? `<div class="dgrid">${shown.map((g, i) => gemCard(g, i)).join("")}</div>${gems.length > shown.length ? `<p style="text-align:center;margin-top:14px"><button class="btn" data-dmore>Show ${gems.length - shown.length} more</button></p>` : ""}`
-      : d.refreshing || !d.fetchedAt ? `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div>` : `<div class="empty-state">No gems ${f ? "in this area" : "yet"}. Try Refresh, or add an interest.</div>`}
+      : d.refreshing ? `<div class="dgrid">${Array.from({ length: 6 }, () => '<div class="gcard skel"></div>').join("")}</div>` : `<div class="empty-state">No gems ${f ? "in this area" : "yet"}. Try Refresh, or add an interest.</div>`}
     ${d.dismissed ? `<p class="hint" style="margin-top:18px">${d.dismissed} dismissed. <button class="link" data-dundis>Bring them back</button></p>` : ""}`;
 }
 function repoRow(r) {

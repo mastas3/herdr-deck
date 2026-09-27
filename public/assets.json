@@ -39,9 +39,11 @@
     "js/palette.js",
     "js/new-session.js",
     "js/events.js",
+    "js/code-actions.js",
     "js/input.js",
     "js/boot.js",
     "js/gallery-core.js",
+    "js/gallery-evidence.js",
     "js/gallery-cards.js",
     "js/gallery-nav.js",
     "js/gallery-detail.js",
@@ -79,6 +81,7 @@
     "css/gallery-sheet.css",
     "css/library.css",
     "css/plugins.css",
-    "css/comparables.css"
+    "css/comparables.css",
+    "css/gallery-evidence.css"
   ]
 }

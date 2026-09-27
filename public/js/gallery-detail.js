@@ -38,31 +38,29 @@ function galSheetHTML(c, partial) {
   const head = `${galCoverHTML(c, true, galBadges(c))}
     <header class="galshh"><p class="galkick">${esc(lane?.title ?? "Idea")}${c.premortem?.pivotedFrom || c.pivoted ? " · revised after a pre-mortem" : ""}</p>
       <h2>${esc(c.name)}</h2><p class="galhook">${esc(c.hook)}</p>
-      <dl class="galstats">${stat("Price", esc(galPriceShort(c.price)), c.price)}${stat("First $", c.timeToFirstDollarDays > 0 ? `~${c.timeToFirstDollarDays} days` : "")}${stat("≥10 paying in 60 days", typeof c.jevP10 === "number" ? galPct(c.jevP10) : "", "Jev's estimate")}${stat("Quality", galQ(c.quality), "After judging, 0–100")}</dl>
-      <div class="galhacts"><button class="btn primary" data-galplay>${p ? "Playing" : "Play this idea"}</button><button class="btn" data-galkitgo>${galHasKit(c.id) ? "Starter kit" : "Build the kit"}</button><button class="btn ghost" data-galsave aria-pressed="${galSaved(c.id)}">${galSaved(c.id) ? "Saved" : "Save"}</button><button class="btn ghost" data-galcopy>${ICON.copy ?? ""}Copy</button></div>
+      ${galProofBadge(c)}${galProofLine(c)}
+      <div class="galhacts"><button class="btn primary" data-galevidence="demand">Review evidence</button><button class="btn" data-galevidence="experiments">Plan a buyer test</button><button class="btn ghost" data-galsave aria-pressed="${galSaved(c.id)}">${galSaved(c.id) ? "Saved" : "Save"}</button><button class="btn ghost" data-galcopy>${ICON.copy ?? ""}Copy</button></div>
       ${p ? `<p class="galplaying"><span class="galbadge play">Playing</span> since ${esc(agoText(p.at))} in <code>${esc(p.dir.replace(/^\/(?:Users|home)\/[^/]+/, "~"))}</code> · <button class="link" data-galproject="${esc(p.slug)}">Project page</button> · <button class="link" data-galquests>Quest board</button></p>` : ""}
     </header>`;
   if (partial) return `${head}<div class="galsec"><span class="stsk w70"></span><span class="stsk w40"></span></div>`;
-  const ev = (c.evidence ?? []).map((e) => `<li><a class="galev" href="${esc(e.url)}" target="_blank" rel="noopener"><q>${esc(String(e.snippet).replace(/^…\s*|\s*…$/g, ""))}</q><span>${esc(e.source)} · ${esc(galHost(e.url))}</span></a></li>`).join("");
+  const ev = (c.evidence ?? []).map(e => `<li><a class="galev" href="${esc(e.url)}" target="_blank" rel="noopener"><q>${esc(e.snippet)}</q><span>${esc(e.source)} · ${esc(galHost(e.url))}</span></a><small>Published ${esc(galEvidenceDate(e.publishedAt))} · Collected ${esc(galEvidenceDate(e.fetchedAt))} · Relevance unreviewed</small></li>`).join("");
   const stack = (c.stack ?? []).map((s) => `<li><span class="galo${s.owned ? "" : " new"}">${esc(s.name)}</span><span>${esc(s.role)}</span>${s.owned ? "" : '<span class="hint">to add</span>'}</li>`).join("");
   const pm = c.premortem;
   const pmHTML = pm ? `${pm.pivotedFrom ? `<p class="galpiv">Rewritten from <b>${esc(pm.pivotedFrom.name)}</b>: ${esc(pm.pivotedFrom.hook)}</p>` : ""}
     <ol class="galfail">${pm.failures.map((f) => `<li><p>${esc(f.reason)}</p>${f.pattern ? `<span class="galpat">${esc(f.pattern)}</span>` : ""}${galEvLink(f.evidence)}</li>`).join("")}</ol>
-    <p class="galfix"><b>How this version fixes it</b> ${esc(pm.fix)}</p>` : "";
+    <p class="galfix"><b>Earlier suggested revision — untested</b> ${esc(pm.fix)}</p>` : "";
   const tr = c.trend ? `<p><b>${esc(c.trend.label)}</b>${c.trend.whyNow ? ` · ${esc(c.trend.whyNow)}` : ""}</p><ul class="galsig">${c.trend.signals.map((s) => `<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> <span class="hint">${esc(s.source)}</span></li>`).join("")}</ul>` : "";
-  const r = c.rubric;
-  const scores = `<dl class="galscores">${stat("Quality", galQ(c.quality))}${stat("Jev, ≥10 paying", typeof c.jevP10 === "number" ? galPct(c.jevP10) : "")}${stat("Evidence", typeof c.evidenceScore === "number" ? galPct(c.evidenceScore) : "")}${stat("Success patterns", typeof c.patterns === "number" ? `${Math.round(c.patterns * 8)} of 8` : "", "How many of the eight success patterns Jev sees in it")}${r ? ["spec", "feasible", "buyer", "distribution", "novelty"].map((k) => stat(k[0].toUpperCase() + k.slice(1), `${r[k]}/5`)).join("") : ""}</dl>${r?.flaw ? `<p class="hint">Biggest flaw the rubric saw: ${esc(r.flaw)}</p>` : ""}`;
   return `${head}
-    ${galSec("Who buys it", `<p>${esc(c.buyer)}</p>${c.channel ? `<p class="galwhere"><b>First customers</b> ${esc(c.channel)}</p>` : ""}`)}
-    ${galSec("In their words", `${c.pain ? `<p>${esc(c.pain.replace(/\s*\((?:[a-z]+:[^)]*)\)/gi, ""))}</p>` : ""}${ev ? `<ul class="galevs">${ev}</ul>` : ""}`)}
-    ${galSec("The offer", `<p>${esc(c.offer)}</p><dl class="galkv"><div><dt>Price</dt><dd>${esc(c.price)}</dd></div><div><dt>MVP</dt><dd>${esc(c.mvp)}</dd></div></dl>`)}
+    ${galEvidenceDetails(c)}
+    ${galSec("Proposed buyer", `<p>${esc(c.buyer)}</p>${c.channel ? `<p class="galwhere"><b>Possible channel — untested</b> ${esc(c.channel)}</p>` : ""}`)}
+    ${galSec("Problem hypothesis &amp; original leads", `${c.pain ? `<p>${esc(c.pain.replace(/\s*\((?:[a-z]+:[^)]*)\)/gi, ""))}</p>` : ""}${ev ? `<p class="hint">These are the original collected excerpts. Links do not establish demand. The evidence notebook contains any later reviews or corrections.</p><ul class="galevs">${ev}</ul>` : `<p class="hint">No original problem excerpts attached.</p>`}`)}
+    ${galSec("Proposed offer", `<p>${esc(c.offer)}</p><dl class="galkv"><div><dt>Price to test</dt><dd>${esc(c.price || "Not tested")}${c.price ? " · AI suggestion, untested" : ""}</dd></div><div><dt>MVP</dt><dd>${esc(c.mvp)}</dd></div></dl>`)}
     ${galSec("What similar founders did", galCompHTML(c), "galcompsec")}
     ${galSec("Built on what you have", stack ? `<ul class="galstack">${stack}</ul>` : "")}
-    ${galSec("Why this could fail → how this version fixes it", pmHTML)}
-    ${galSec("Why now", tr)}
+    ${galSec("Earlier AI critique — unverified", pmHTML)}
+    ${galSec("Earlier trend links — not evidence of buying intent", tr)}
     ${galSec("Connectors", galConnHTML(c))}
-    ${galSec("Scores", scores, "galsc2")}
-    <section class="galsec galkit" id="galkit">${galKitHTML(c)}</section>`;
+    <details class="galsec"><summary>Build tools &amp; existing starter kit</summary><p class="hint">A build plan is a proposal. Check the evidence and run a buyer test first.</p><button class="btn" data-galplay>${p ? "Open project" : "Start building"}</button><section class="galkit" id="galkit">${galKitHTML(c)}</section></details>`;
 }
 /** A pre-mortem's source: a comparable founder's moment ("Acme: https://…") becomes a link. */
 function galEvLink(ev) {
@@ -81,14 +79,16 @@ function galConnHTML(c) {
   return rows ? `<ul class="galconn">${rows}</ul>` : "";
 }
 function galText(c) {
-  return [`${c.name}: ${c.hook}`, "", `Buyer: ${c.buyer}`, `Pain: ${c.pain}`, `Offer: ${c.offer}`, `Price: ${c.price}`, `First channel: ${c.channel}`, `MVP: ${c.mvp}`,
-    `Stack: ${(c.stack ?? []).map((s) => `${s.name}${s.owned ? "" : " (new)"}`).join(", ")}`, ...(c.evidence ?? []).map((e) => `Evidence: ${e.url}`)].join("\n");
+  return [`${c.name}: ${c.hook}`, "", `Evidence stage: ${c.proof?.label || "Untested idea"}`, `Proposed buyer: ${c.buyer}`, `Pain: ${c.pain}`, `Offer: ${c.offer}`, `Price hypothesis (untested): ${c.price || "unknown"}`, `First channel: ${c.channel}`, `MVP: ${c.mvp}`,
+    `Stack: ${(c.stack ?? []).map((s) => `${s.name}${s.owned ? "" : " (new)"}`).join(", ")}`, ...(c.evidence ?? []).map((e) => `Original source (relevance requires review): ${e.url}`)].join("\n");
 }
 function galSheetClick(e, dlg) {
   const t = e.target, s = S.gal.sheet;
   if (!s) return;
   if (t === dlg || t.closest("[data-galx]")) return dlg.close();
   const c = S.gal.full.get(s.id) ?? galIdea(s.id);
+  const evidence = t.closest("[data-galevidence]");
+  if (evidence) return galOpenEvidence(s.id, evidence.dataset.galevidence);
   if (t.closest("[data-galplay]")) return galPlayFlow(s.id);
   if (t.closest("[data-galsave]")) return galSave(s.id);
   if (t.closest("[data-galcopy]")) return copy(galText(c), "the idea");

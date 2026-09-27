@@ -138,7 +138,7 @@ function toast(msg, err) {
 async function copy(text, what) { try { await navigator.clipboard.writeText(text); toast(`Copied ${what}`); } catch { toast("The browser blocked clipboard access", true); } }
 
 // ── a small promise-based dialog (no browser pop-ups) ────────────────────
-function askDialog({ title, text = "", input, ok = "OK", danger = false, multiline = false }) {
+function askDialog({ title, text = "", input, ok = "OK", danger = false, multiline = false, selectInput = true }) {
   return new Promise((resolve) => {
     const d = document.createElement("dialog");
     d.className = "ask";
@@ -146,6 +146,6 @@ function askDialog({ title, text = "", input, ok = "OK", danger = false, multili
     document.body.append(d);
     d.addEventListener("close", () => { const v = d.returnValue === "ok" ? (input != null ? d.querySelector(".inp").value : true) : null; d.remove(); resolve(v); });
     d.showModal();
-    d.querySelector(".inp")?.select?.();
+    if (selectInput) d.querySelector(".inp")?.select?.(); else d.querySelector("button[value=ok]")?.focus();
   });
 }
