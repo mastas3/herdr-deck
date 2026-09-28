@@ -32,6 +32,17 @@ describe("chat messages", () => {
     expect(toolSummary("Grep", { pattern: "TODO", path: `${homedir()}/x` })).toBe("TODO in ~/x");
     expect(toolSummary("TodoWrite", { todos: [{ status: "done", content: "a" }, { status: "in_progress", content: "b", activeForm: "Doing b" }] })).toBe("Doing b");
   });
+
+  test("a malformed tool input doesn't break the transcript", async () => {
+    // A real session called TodoWrite with todos as the string "[]"; the whole chat failed to load.
+    expect(toolSummary("TodoWrite", { todos: "[]" })).toBe("0 todos");
+    const path = `${tmp()}/s.jsonl`;
+    writeFileSync(path,
+      line({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: "Plan it" } }) +
+      line({ type: "assistant", timestamp: "2026-09-20T10:00:05Z", message: { id: "a1", content: [{ type: "tool_use", id: "t1", name: "TodoWrite", input: { todos: "[]" } }] } }));
+    const d = await claudeDetail(path);
+    expect(d.messages.map((m) => m.role)).toEqual(["user", "tool"]);
+  });
 });
 
 describe("project inference", () => {
