@@ -6,7 +6,6 @@
 .card .rbline { display: flex; gap: 0; align-items: baseline; min-width: 0; font-size: 13px; }
 .card .rbsum { color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 
-#pbar { padding: 0 14px; }
 #pbar[hidden] { display: none; }
 .rbcard { margin: 6px 0; padding: 9px 10px 8px 12px; border: 1px solid color-mix(in srgb, var(--done) 40%, var(--line)); border-radius: 11px;
   background: color-mix(in srgb, var(--done) 6%, var(--raise)); display: flex; flex-direction: column; gap: 5px; font-size: 13.5px;
@@ -26,7 +25,7 @@
 .rbnext .fpath { cursor: pointer; font: 12.5px var(--mono); }
 @keyframes rb-in { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .rbcard { animation: none; } }
-@media (max-width: 700px) { #pbar { padding: 0 10px; } .rbtop .rbsum { white-space: normal; } }
+@media (max-width: 700px) { .rbtop .rbsum { white-space: normal; } }
 
 .rbnew { margin-top: 10px; }
 .rbnew-l { display: inline-flex; gap: 8px; align-items: center; cursor: pointer; font-size: 14.5px; }

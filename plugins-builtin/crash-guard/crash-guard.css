@@ -1,5 +1,5 @@
 /* Crash guard: the banner above the list, and its two dialogs. */
-.cgbar { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 0; }
+.cgbar { display: flex; flex-direction: column; gap: 6px; margin: 4px 6px 4px; flex: none; } /* under the live bar, inset like it */
 .cgbar[hidden] { display: none; }
 .cg-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px 7px 10px; border-radius: 9px; font-size: 14px; line-height: 1.35;
   border: 1px solid color-mix(in srgb, var(--blocked) 50%, var(--line)); background: color-mix(in srgb, var(--blocked) 10%, var(--raise));

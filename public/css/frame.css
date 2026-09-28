@@ -68,6 +68,9 @@ button.irow:hover, .irow.on { background: var(--hover); }
 .slashpop { left: 8px; right: 8px; }
 .detail .jumpbtm { bottom: calc(var(--dock-h, 90px) + 26px); }
 .detail .appbar, .detail .askbox { border-bottom: 0; }
+/* The answer box and the plugins' bar (a report card) sit in the message box's column, not across the whole pane. */
+.detail > .askbox, .detail > .pbar { flex: none; width: calc(100% - 28px); max-width: calc(var(--measure, 560px) + 160px); margin: 0 auto 8px; }
+html:not([data-simple]) .detail > .askbox { border: 1px solid color-mix(in srgb, var(--blocked) 22%, var(--line)); border-radius: 12px; padding: 8px 10px; }
 
 /* ── the installed app on a Mac: the deck draws into the title bar (manifest: window-controls-overlay) ── */
 .wco .lh-top { padding-left: var(--tb-l, 0px); min-height: var(--tb-h, 32px); app-region: drag; }
@@ -84,6 +87,7 @@ button.irow:hover, .irow.on { background: var(--hover); }
 /* ── phone: the inspector is the screen behind the top bar's second tab ── */
 @media (max-width: 760px) {
   .dock { width: calc(100% - 16px); margin: 0 auto calc(8px + env(safe-area-inset-bottom)); border-radius: 16px; }
+  .detail > .askbox, .detail > .pbar { width: calc(100% - 16px); }
   .cmeta { padding: 5px 10px; gap: 10px; }
   .nowbar .prog, .nowbar .what { display: none; }
   .statusline { gap: 9px; }
