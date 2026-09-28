@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { claudeWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
+import { claudeMeta, claudeWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
 
 const j = (...o: object[]) => o.map((x) => JSON.stringify(x));
 
@@ -15,6 +15,23 @@ describe("Claude transcripts", () => {
     const h = parseClaudeHead(head);
     expect(h.createdAt).toBe(Date.parse("2026-09-20T10:00:00Z"));
     expect(h.firstPrompt).toBe("Build the deck");
+  });
+
+  test("a session Claude Code moved to a new transcript is followed there", async () => {
+    // The old file ends with a continued-in record; the new one repeats the history and carries on.
+    const dir = `${homedir()}/.claude/projects/-deck-test-${process.pid}`;
+    mkdirSync(dir, { recursive: true });
+    const [a, b] = [`aaaaaaaa-0000-4000-8000-${process.pid}`, `bbbbbbbb-0000-4000-8000-${process.pid}`];
+    try {
+      const ask = { type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: "Make sigils" } };
+      writeFileSync(`${dir}/${a}.jsonl`, j(ask, { type: "continued-in", timestamp: "2026-09-20T10:05:00Z", sessionId: a, continuedInSessionId: b }).join("\n") + "\n");
+      writeFileSync(`${dir}/${b}.jsonl`, j(ask, { type: "user", timestamp: "2026-09-20T10:06:00Z", message: { content: "status?" } }).join("\n") + "\n");
+      expect(parseClaudeTail(j({ type: "continued-in", continuedInSessionId: b })).continuedIn).toBe(b);
+      const m = await claudeMeta(a);
+      expect(m.sessionId).toBe(b);
+      expect(m.movedFrom).toEqual([a]);
+      expect(m.lastActiveAt).toBe(Date.parse("2026-09-20T10:06:00Z"));
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
   test("head: a first prompt that starts with a paste still counts", () => {

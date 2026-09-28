@@ -26,6 +26,10 @@ export type AgentMeta = {
   empty?: boolean;
   /** Session was matched heuristically rather than by id. */
   approx?: boolean;
+  /** Claude Code moved the session to another transcript (a continued-in record ends this one). */
+  continuedIn?: string;
+  /** The ids this session had before Claude Code moved it, oldest first: old links still find it. */
+  movedFrom?: string[];
 };
 
 const HOME = homedir();
@@ -114,10 +118,12 @@ export function claudeSwitch(content: any): { modelName?: string; effort?: strin
   if (effort) return { effort: effort[1] ?? effort[2] ?? effort[3] };
 }
 
-export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt" | "model" | "modelName" | "effort" | "ctxTokens" | "lastMessage" | "title"> {
+export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt" | "model" | "modelName" | "effort" | "ctxTokens" | "lastMessage" | "title" | "continuedIn"> {
   let lastActiveAt: number | undefined, model: string | undefined, ctxTokens: number | undefined;
   let lastMessage: string | undefined, title: string | undefined, modelName: string | undefined, effort: string | undefined;
+  let continuedIn: string | undefined;
   for (const o of jsonLines(lines)) {
+    if (o.type === "continued-in" && typeof o.continuedInSessionId === "string") continuedIn = o.continuedInSessionId;
     if (o.type === "custom-title" && o.customTitle) title = o.customTitle;
     if (o.type === "summary" && o.summary) title ??= o.summary;
     if (o.type !== "user" && o.type !== "assistant") continue;
@@ -140,7 +146,7 @@ export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt"
       if (text) lastMessage = text;
     }
   }
-  return { lastActiveAt, model, modelName, effort, ctxTokens, lastMessage: clip(lastMessage), title };
+  return { lastActiveAt, model, modelName, effort, ctxTokens, lastMessage: clip(lastMessage), title, continuedIn };
 }
 
 /** The context window Claude Code reported for a session. Only its status line is told, so the user's statusline
@@ -182,7 +188,7 @@ export function findClaudeFile(id: string): string | undefined {
   }
 }
 
-export async function claudeMeta(id: string): Promise<AgentMeta> {
+export async function claudeMeta(id: string, movedFrom: string[] = []): Promise<AgentMeta> {
   const path = findClaudeFile(id);
   // Claude only writes the transcript after the first message: no file means an untouched session.
   if (!path) return { sessionId: id, empty: true };
@@ -191,8 +197,12 @@ export async function claudeMeta(id: string): Promise<AgentMeta> {
     const tail = parseClaudeTail(await readTail(path, size));
     return { sessionId: id, ...head, ...tail, empty: !head.firstPrompt && !tail.lastMessage && !tail.ctxTokens };
   });
-  const ctxWindow = claudeWindow(id, meta.model);
-  return ctxWindow ? { ...meta, ctxWindow } : meta;
+  // herdr keeps reporting the first id, so follow the move or the chat stops where it happened.
+  const next = meta.continuedIn;
+  if (next && next !== id && !movedFrom.includes(next) && movedFrom.length < 8 && findClaudeFile(next)) return claudeMeta(next, [...movedFrom, id]);
+  const out = movedFrom.length ? { ...meta, movedFrom } : meta;
+  const ctxWindow = claudeWindow(id, out.model);
+  return ctxWindow ? { ...out, ctxWindow } : out;
 }
 
 // ── Codex ────────────────────────────────────────────────────────────────────
