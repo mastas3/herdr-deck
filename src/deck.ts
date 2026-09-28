@@ -7,6 +7,7 @@ import { claudeMeta, codexMeta, opencodeMeta, resumeCommand, type AgentMeta } fr
 import { cleanTail, isShellOnly } from "./tail";
 import { insightFor, type Insight } from "./insight";
 import { projectRoot } from "./projects";
+import { inWorktree, parseCheckout } from "./git-worktree";
 import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
 import { codexStore } from "./codex-store";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -44,6 +45,8 @@ export type Row = {
   subagents?: { id: string; type?: string; description?: string; model?: string; running: boolean; now?: string; startedAt?: number; lastActiveAt?: number; tools: number }[];
   branch?: string;
   dirty?: number;
+  gitRoot?: string; // the project folder of the repo's main checkout (the same as projectRoot outside a worktree)
+  worktree?: string; // the linked worktree's folder name, when the session works in one (projectRoot is that folder)
   startedAt?: number;
   createdAt?: number;
   bornAt?: number; // first seen by this deck (only for panes opened while it runs)
@@ -94,7 +97,7 @@ export class Deck {
   procs = new Map<number, Proc>();
   kids = new Map<number, number[]>();
   metas = new Map<string, AgentMeta>();
-  git = new Map<string, { at: number; root?: string; branch?: string; dirty?: number }>();
+  git = new Map<string, { at: number; root?: string; main?: string; branch?: string; dirty?: number }>();
   /** When each pane first appeared; panes that were already there when the deck started count as old. */
   born = new Map<string, number>();
   private bornReady = false;
@@ -421,12 +424,13 @@ export class Deck {
     const worker = async () => {
       for (let cwd; (cwd = queue.shift()); ) {
         try {
-          const root = await sh(["git", "-C", cwd, "rev-parse", "--show-toplevel"]);
-          if (!root) { this.git.set(cwd, { at: Date.now() }); continue; }
+          // One call tells both the checkout and, for a linked worktree, the repo it belongs to.
+          const co = parseCheckout(cwd, await sh(["git", "-C", cwd, "rev-parse", "--show-toplevel", "--git-dir", "--git-common-dir"]));
+          if (!co) { this.git.set(cwd, { at: Date.now() }); continue; }
           const st = await sh(["git", "-C", cwd, "status", "--porcelain=v1", "-b", "--untracked-files=no"]);
           const lines = st.split("\n").filter(Boolean);
           const branch = lines[0]?.replace(/^## /, "").split("...")[0].replace(/^No commits yet on /, "");
-          this.git.set(cwd, { at: Date.now(), root, branch, dirty: Math.max(0, lines.length - 1) });
+          this.git.set(cwd, { at: Date.now(), root: co.root, main: co.worktree ? co.main : undefined, branch, dirty: Math.max(0, lines.length - 1) });
         } catch {}
       }
     };
@@ -481,6 +485,7 @@ export class Deck {
         if (p.agent === "codex" && (status === "idle" || status === "unknown" || status === "empty") && ins?.turnOpen && ins.turnStartedAt && Date.now() - ins.turnStartedAt < 3 * 3600_000) status = "working";
         const cwdRoot = projectRoot(p.cwd) ?? g?.root ?? p.cwd;
         const projRoot = ins?.project?.root ?? cwdRoot;
+        const tree = inWorktree(g, projRoot);
         if (!this.born.has(key)) this.born.set(key, this.bornReady ? Date.now() : 0);
         rows.set(key, {
           key,
@@ -500,9 +505,11 @@ export class Deck {
           firstPrompt: meta?.firstPrompt,
           lastMessage: meta?.lastMessage,
           cwd: p.cwd,
-          project: basename(projRoot),
+          project: basename(tree?.gitRoot ?? projRoot),
           projectRoot: projRoot,
           launch: projRoot !== cwdRoot ? basename(cwdRoot) : undefined,
+          gitRoot: tree?.gitRoot ?? (g?.root ? projRoot : undefined),
+          worktree: tree?.worktree,
           now: status === "working" || status === "blocked" ? ins?.now : undefined,
           step: ins?.todo, todos: ins?.todos,
           turnStartedAt: ins?.turnStartedAt,
@@ -545,11 +552,13 @@ export class Deck {
       const scratch = /\/Documents\/Codex\/[^/]+\/?$/.test(t.cwd);
       const cwdRoot = scratch ? "Codex chat" : projectRoot(t.cwd) ?? g?.root ?? t.cwd;
       const projRoot = ins?.project && ins.project.root !== projectRoot(t.cwd) ? ins.project.root : cwdRoot;
+      const tree = scratch ? undefined : inWorktree(g, projRoot);
       const lastActiveAt = Math.max(meta?.lastActiveAt ?? 0, t.updatedAt ?? 0) || undefined;
       rows.set(key, {
         key, herdr: "codex-app", workspaceId: "codex-app", workspace: "Codex app", tabId: t.id, tab: "", tabNumber: 0, tabPanes: 1, paneId: t.id,
         agent: "codex", status, appControl, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
-        cwd: t.cwd, project: basename(projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
+        cwd: t.cwd, project: basename(tree?.gitRoot ?? projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
+        gitRoot: tree?.gitRoot ?? (g?.root && !scratch ? projRoot : undefined), worktree: tree?.worktree,
         now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
         subagents: ins?.subagents?.length ? ins.subagents : undefined,
         branch: t.branch ?? g?.branch, dirty: g?.dirty, createdAt: t.createdAt ?? meta?.createdAt, lastActiveAt,

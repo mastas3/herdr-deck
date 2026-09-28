@@ -10,11 +10,14 @@ $("rows").addEventListener("click", async (e) => {
   if (newin) { e.stopPropagation(); return openNew(projectHome(newin.dataset.proj)); }
   const jour = e.target.closest('[data-secact="journey"]');
   if (jour) { e.stopPropagation(); return projectLink()?.open(jour.dataset.proj); }
+  const fold = e.target.closest('[data-secact="folder"]');
+  if (fold) { e.stopPropagation(); return openFolderView(fold.dataset); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
     const k = sec.dataset.sec;
-    if (k.startsWith("p:")) { const p = k.slice(2); S.closedProj = { ...S.closedProj, [p]: !S.closedProj[p] }; store("closedProj", S.closedProj); }
+    // A project folds under its name; a worktree inside it under its own "w:project/name" key.
+    if (k.startsWith("p:") || k.startsWith("w:")) { const p = k.startsWith("p:") ? k.slice(2) : k; S.closedProj = { ...S.closedProj, [p]: !S.closedProj[p] }; store("closedProj", S.closedProj); }
     else { const closed = k === "old" ? S.closedSecs.old !== false : k === "empty" && S.group === "project" ? S.closedSecs.empty !== false : !!S.closedSecs[k]; S.closedSecs = { ...S.closedSecs, [k]: !closed }; store("closedSecs", S.closedSecs); }
     lastOrder = ""; return render();
   }

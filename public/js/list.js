@@ -46,7 +46,12 @@ function listGroups(rows) {
     const rank = (rs) => (rs.some((r) => r.status === "blocked" || r.status === "done") ? 0 : rs.some((r) => r.status === "working") ? 1 : 2);
     const latest = (rs) => Math.max(...rs.map(act));
     const groups = [...by.entries()].sort((a, b) => rank(a[1]) - rank(b[1]) || latest(b[1]) - latest(a[1]))
-      .map(([p, rs]) => ({ key: "p:" + p, label: p, proj: p, rows: rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || act(b) - act(a)), closed: !!S.closedProj[p] }));
+      .map(([p, rs]) => {
+        rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || act(b) - act(a));
+        // The main checkout's sessions sit right under the project, each linked worktree's in a sub-section after them.
+        const w = splitWorktrees(p, rs, S.closedProj);
+        return { key: "p:" + p, label: p, proj: p, rows: w.rows, open: w.open, main: w.main, trees: w.trees, branch: w.branch, closed: !!S.closedProj[p] };
+      });
     if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty, closed: S.closedSecs.empty !== false });
     return groups;
   }
@@ -56,6 +61,31 @@ function listGroups(rows) {
   if (tail.length) out.push({ key: "old", label: `Stale & empty`, rows: tail, closed: S.closedSecs.old !== false, tail: true });
   return out.filter((x) => x.rows.length);
 }
+/** The rows a section shows (what keyboard navigation walks): none while folded, and not a folded worktree's. */
+const shownRows = (g) => (g.closed ? [] : g.open ?? g.rows);
+const branchChip = (b) => (b ? `<span class="brc" title="Branch ${esc(b)}">${ICON.branch}<span>${esc(b)}</span></span>` : "");
+/** Projects view: fold every project shown, or unfold them all (and their worktrees) when all are folded. */
+function foldAllProjects() {
+  if (S.group !== "project") return;
+  const gs = listGroups(visibleRows()).filter((g) => g.proj);
+  const fold = gs.some((g) => !g.closed), next = { ...S.closedProj };
+  for (const g of gs) {
+    if (fold) next[g.proj] = true;
+    else { delete next[g.proj]; for (const t of g.trees ?? []) delete next[t.key]; }
+  }
+  S.closedProj = next; store("closedProj", S.closedProj);
+  lastOrder = ""; render();
+}
+$("foldAll").onclick = foldAllProjects;
+/** The header button reads what it would do now. */
+function renderFoldAll(groups) {
+  const b = $("foldAll"), gs = S.group === "project" && S.view !== "closed" ? groups.filter((g) => g.proj) : [];
+  b.hidden = !gs.length;
+  const fold = gs.some((g) => !g.closed), label = fold ? "Collapse all projects" : "Expand all projects";
+  if (b.dataset.fold !== String(fold)) { b.dataset.fold = String(fold); b.innerHTML = fold ? ICON.foldIn : ICON.foldOut; b.title = label + " (G)"; b.setAttribute("aria-label", label); }
+}
+/** A project's folder button: the quick folder window (folder-view.js), on the machine the project lives on. */
+const folderBtn = (proj, where, root, key) => `<span class="padd pfold" data-secact="folder" data-proj="${esc(proj)}"${root ? ` data-root="${esc(root)}" data-key="${esc(key)}" data-name="${esc(where)}"` : ""} role="button" title="Browse ${esc(where)}’s folder" aria-label="Browse ${esc(where)}’s folder">${ICON.folder}</span>`;
 // The order never changes under the pointer: it is frozen while the pointer is over the list, while a touch is
 // in progress, and for FREEZE_MS after it leaves. Row contents keep updating; moves are applied (FLIP) on release.
 const FREEZE_MS = 1200;
@@ -105,7 +135,8 @@ function renderList() {
   const rows = visibleRows();
   const byProject = S.group === "project";
   const groups = listGroups(rows);
-  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + g.rows.map((r) => r.key).join(",")).join("|");
+  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + (g.branch ?? "") + g.rows.map((r) => r.key).join(",")
+    + (g.trees ?? []).map((t) => `/${t.key}${t.closed ? "x" : ""}:${t.branch}:${t.rows.length}`).join("")).join("|");
   // Anything you changed yourself (filter, grouping, machine, a folded section) applies at once, even under the pointer.
   const view = [S.group, S.machine, S.q, S.deep?.q ?? "", JSON.stringify(S.closedSecs), JSON.stringify(S.closedProj)].join("\u0001");
   const selHidden = !!S.sel && rows.some((r) => r.key === S.sel) && !rowCache.get(S.sel)?.el.isConnected;
@@ -173,10 +204,20 @@ function renderList() {
       const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>`
         : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
       const jour = g.proj && projectLink() ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${projectLink().icon}</span>` : "";
+      const fold = g.proj && projectHome(g.proj) ? folderBtn(g.proj, g.proj) : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
-      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}${esc(g.label)} <span class="n">${g.rows.length}</span>${dots}${jour}${extra}</button><div class="sec-b"></div>`;
+      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${branchChip(g.branch)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
-      for (const r of g.rows) body.append(rowCache.get(r.key).el);
+      for (const r of g.main ?? g.rows) body.append(rowCache.get(r.key).el);
+      // Each worktree: a sub-header one level in (⎇, its folder name, branch, count), its sessions one level further.
+      for (const t of g.trees ?? []) {
+        const wt = document.createElement("div");
+        wt.className = "wt" + (t.closed ? " closed" : "");
+        const k = t.rows.find((r) => r.projectRoot === t.root)?.key;
+        wt.innerHTML = `<button class="sec-h wt-h" data-sec="${esc(t.key)}" aria-expanded="${!t.closed}">${ICON.chev}<span class="wti">${ICON.tree}</span><span class="sl">${esc(t.name)}</span> <span class="n">${t.rows.length}</span>${branchChip(t.branch)}${t.root && k ? folderBtn(g.proj, t.name, t.root, k) : ""}</button><div class="sec-b"></div>`;
+        for (const r of t.rows) wt.lastChild.append(rowCache.get(r.key).el);
+        body.append(wt);
+      }
       frag.append(sec);
     }
     // A live reorder glides (FLIP below); only a change you made replays the sections' entrance.
@@ -187,7 +228,7 @@ function renderList() {
     else if (!animate && rows.length && !motion.reduced()) motion.enter(box, "fade");
     const born = box.querySelectorAll(".row.born");
     if (born.length) requestAnimationFrame(() => requestAnimationFrame(() => { for (const el of born) el.classList.remove("born"); }));
-    S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
+    S.visible = groups.flatMap(shownRows);
   } else if (order !== lastOrder) {
     // Frozen: rows that went away leave, everything else holds its place, newcomers wait for the release.
     const shown = [...box.querySelectorAll(".row[data-key]")].map((el) => el.dataset.key);
@@ -199,11 +240,13 @@ function renderList() {
       for (const k of shown) if (!keep.has(k)) { box.querySelector(`.row[data-key="${CSS.escape(k)}"]`)?.remove(); lastOrder = "~" + lastOrder; }
       if (tops) { flipRows(box, tops); out(); }
     }
-    const open = new Set([...box.querySelectorAll(".sec:not(.closed) .row[data-key]")].map((el) => el.dataset.key));
+    // Shown = not inside a folded project or a folded worktree.
+    const open = new Set([...box.querySelectorAll(".row[data-key]")].filter((el) => !el.closest(".closed")).map((el) => el.dataset.key));
     S.visible = keys.filter((k) => open.has(k)).map((k) => S.rows.get(k)).filter(Boolean);
-  } else S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
+  } else S.visible = groups.flatMap(shownRows);
   if (selWas !== S.sel) { const to = rowCache.get(S.sel)?.el; if (oldSel && to?.classList.contains("sel")) motion.glide(oldSel, to, box); selWas = S.sel; }
   if (app.classList.contains("list-off")) renderRail(rows);
+  renderFoldAll(groups); // after the list's measurements, so it never forces an extra layout
   for (const k of S.picked) if (!S.rows.has(k)) S.picked.delete(k);
   $("selbar").hidden = !S.picked.size;
   if (S.picked.size) $("selInfo").textContent = `${S.picked.size} selected`;
@@ -252,6 +295,7 @@ function renderClosed() {
   const box = $("rows");
   box.dataset.view = "closed";
   lastOrder = "";
+  renderFoldAll([]);
   const q = S.q.toLowerCase();
   const list = S.graveyard.filter((g) => (S.machine === "all" || g.machine === S.machine) && (!q || [g.title, g.project, g.cwd].join(" ").toLowerCase().includes(q)));
   setHTML(box, `<div class="sec"><button class="sec-h" data-lf="inbox">${ICON.back}Back to sessions</button></div>` +

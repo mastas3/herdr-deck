@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // The list helpers live in the browser script (no build step); evaluate just their marked block.
 const src = readFileSync(new URL("../public/js/list-rows.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("/* @pure:list-begin"), src.indexOf("/* @pure:list-end */"));
-const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder };`)();
+const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder, commonBranch, splitWorktrees };`)();
 
 const NOW = 1_800_000_000_000;
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
@@ -62,5 +62,39 @@ describe("row throttle signature", () => {
 describe("frozen order", () => {
   test("keeps shown rows in place, drops gone ones, holds new ones back", () => {
     expect(L.frozenOrder(["a", "b", "c", "d"], ["d", "new", "b", "a"])).toEqual({ keys: ["a", "b", "d"], held: ["new"] });
+  });
+});
+
+describe("worktrees inside a project", () => {
+  const rows = [
+    row({ key: "a", branch: "main" }),
+    row({ key: "w1", worktree: "agent-1", branch: "feat/x", projectRoot: "/r/app/.claude/worktrees/agent-1" }),
+    row({ key: "b", branch: "main" }),
+    row({ key: "w2", worktree: "agent-2", branch: "fix/y", projectRoot: "/r/app-fix" }),
+    row({ key: "w1b", worktree: "agent-1", branch: "feat/x" }),
+    row({ key: "c", branch: "spike" }),
+  ];
+  test("the main checkout's rows come first, then each worktree in the order its first row came", () => {
+    const w = L.splitWorktrees("app", rows);
+    expect(w.main.map((r: any) => r.key)).toEqual(["a", "b", "c"]);
+    expect(w.trees.map((t: any) => [t.key, t.name, t.branch, t.root, t.rows.map((r: any) => r.key)])).toEqual([
+      ["w:app/agent-1", "agent-1", "feat/x", "/r/app/.claude/worktrees/agent-1", ["w1", "w1b"]],
+      ["w:app/agent-2", "agent-2", "fix/y", "/r/app-fix", ["w2"]],
+    ]);
+    expect(w.rows.map((r: any) => r.key)).toEqual(["a", "b", "c", "w1", "w1b", "w2"]);
+    expect(w.branch).toBe("main");
+  });
+  test("a folded worktree keeps its rows in the order but out of keyboard navigation", () => {
+    const w = L.splitWorktrees("app", rows, { "w:app/agent-1": true });
+    expect(w.trees.map((t: any) => t.closed)).toEqual([true, false]);
+    expect(w.open.map((r: any) => r.key)).toEqual(["a", "b", "c", "w2"]);
+    expect(w.rows).toHaveLength(6);
+  });
+  test("no worktrees: everything is the main checkout; the branch chip is the most common branch", () => {
+    const w = L.splitWorktrees("x", [row({ key: "1", branch: "dev" }), row({ key: "2", branch: "main" }), row({ key: "3", branch: "main" })]);
+    expect([w.trees.length, w.open.length, w.branch]).toEqual([0, 3, "main"]);
+    expect(L.commonBranch([row({ branch: "a" }), row({ branch: "b" })])).toBe("a");
+    expect(L.commonBranch([row({}), row({ worktree: "t" })])).toBe("");
+    expect(L.splitWorktrees("x", [row({ key: "t", worktree: "t" })]).branch).toBe("");
   });
 });

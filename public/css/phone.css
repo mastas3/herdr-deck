@@ -17,6 +17,9 @@
   .row { padding: 10px 10px 11px; }
   .row .tl { font-size: 16.5px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .row .pl { font-size: 14px; }
+  /* Narrow screens: the same levels, a little tighter, so titles keep their room. */
+  .sec.proj > .sec-b, .wt > .sec-b { margin-left: 11px; padding-left: 3px; }
+  .brc { max-width: 50%; }
   .lf { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .selbar { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
   .mbar { display: flex; position: fixed; top: 0; left: 0; right: 0; bottom: auto; z-index: 10; align-items: center; gap: 4px; padding: calc(4px + env(safe-area-inset-top)) 8px 4px 2px; background: var(--side); border-bottom: 1px solid var(--line); }
