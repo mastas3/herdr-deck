@@ -102,6 +102,7 @@ function moreMenu(anchor) {
     { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
     !isPhone() && { html: "Type into the terminal", run: () => focusTerminal() },
     !isPhone() && { html: `Move the terminal…<small>Now: ${TPOS_NAME[S.tpos].toLowerCase()}</small>`, run: () => layoutMenu(anchor) },
+    ...deckPlugins.each("session.menu", r, anchor).flat(), // plugins' items for this session: { html, run, danger? }
     "-",
     { html: "Close session…", danger: true, run: () => askClose([r.key]) },
   ].filter(Boolean));

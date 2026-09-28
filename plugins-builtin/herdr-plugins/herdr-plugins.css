@@ -1,0 +1,41 @@
+/* herdr plugins: the "herdr" tab in Plugins (herdr-plugins*.js). Cards, the trust screen and chips come from plugins.css. */
+.hp-bar { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+.hp-intro { margin: 8px 0 0; max-width: 680px; }
+.hp-mach { margin-top: 18px; }
+.hp-mach h3, .hp-h { margin: 0; font-size: 15px; }
+.hp-mach h3 small { color: var(--ink-3); font-weight: 400; font-size: 12.5px; margin-left: 4px; }
+.hp-h { margin-top: 20px; }
+.hp-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.hp-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.hp-act { font-size: 13px; padding: 4px 10px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-act small { color: var(--accent); margin-left: 2px; }
+.hp-auto { font-size: 13px; color: var(--ink-2); }
+.hp-auto ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
+.hp-auto code, .hp-dir code { font-size: 12px; overflow-wrap: anywhere; }
+.hp-dir { font-size: 13px; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.hp-logs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 13px; max-height: 280px; overflow: auto; }
+.hp-logs pre { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-height: 120px; overflow: auto; }
+.hp-st { font-weight: 600; }
+.hp-failed .hp-st { color: var(--danger); }
+.hp-succeeded .hp-st { color: var(--accent); }
+.hp-search { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 14px; }
+.hp-search input { flex: 1 1 220px; min-width: 0; font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg); color: var(--ink); }
+.hp-sorts { flex-wrap: wrap; }
+.hp-repo .pid small a { color: inherit; }
+.hp-why { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); display: flex; flex-direction: column; gap: 2px; }
+.hp-man { border-top: 1px solid var(--line); padding-top: 8px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.hp-manh { display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.hp-manh small { color: var(--ink-3); }
+.hp-fit { display: flex; flex-wrap: wrap; gap: 4px; }
+.hp-trust pre, .hp-job pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 260px; overflow: auto; margin: 4px 0 0; }
+.hp-commit code { font-size: 12px; overflow-wrap: anywhere; }
+.hp-picks { display: flex; flex-direction: column; gap: 6px; }
+.hp-pick { display: flex; gap: 8px; align-items: baseline; }
+.hp-pick small { color: var(--ink-3); }
+.hp-pick.off { color: var(--ink-3); }
+.hp-job { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.hp-job h4 { margin: 0; }
+.hp-job.hp-failed { border-color: var(--danger); }
+.hp-job.hp-done { border-color: var(--accent); }
+.view[data-view="plugins"] .hp-mach .plist, .view[data-view="plugins"] .hp-rec { padding-left: 0; }
+.view[data-view="plugins"] .hp-bar ~ .plist { padding-left: 0; }

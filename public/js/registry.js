@@ -6,6 +6,8 @@
 // (links). Any plugin can open its own extension point too: others extend("discover.tabs", …), it reads contributions().
 // Two more the core reads: "project.link" { icon, open(name) } (where a project's name leads) and "notify.prefs"
 // { title, prefs: [{ key, label, hint, default }] } (a section of the Notifications dialog; the hub keeps it by key).
+// Also "plugins.tabs" { id, label, order?, count?(), render() → html, open?() } (a tab of the Plugins view) and
+// "session.menu" (row, anchor) => [{ html, run, danger? }] (items in a session's ⋯ menu).
 const deckPlugins = (() => {
   /** Views the core owns: a plugin can't take them. Its keys are keymap.js's coreKeys() (read at register time). */
   const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);
