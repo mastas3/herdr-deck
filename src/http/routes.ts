@@ -14,7 +14,7 @@ import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game, plugins, pluginHost, codePlugins } = hub;
+  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, plugins, pluginHost, codePlugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
@@ -32,8 +32,8 @@ export function createRoutes(hub: Hub) {
     if (req.method === "GET") {
       { const r = await pluginHost.get(req, url); if (r) return r; }
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
-      // So do a running plugin's page links. /p (project pages) is core until the projects plugin declares it.
-      if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/") || pluginHost.isPage(url.pathname)) return send(req, page(), "text/html; charset=utf-8");
+      // So do a running plugin's page links (e.g. /p, the project pages).
+      if (url.pathname === "/" || url.pathname.startsWith("/s/") || pluginHost.isPage(url.pathname)) return send(req, page(), "text/html; charset=utf-8");
       { const a = assets.serve(req, url); if (a) return a; }
       if (url.pathname === "/events") return sse.stream(fullState);
       { const f = await staticFile(url); if (f) return f; }
@@ -115,8 +115,6 @@ export function createRoutes(hub: Hub) {
       if (url.pathname.startsWith("/api/library/")) { const d = await library.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
-      if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
-      { const g = await game.route(url.pathname, body); if (g) return json(g.data, g.status); }
       if (url.pathname.startsWith("/api/plugins/code")) { const d = await codePlugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);

@@ -1,0 +1,17 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "quests",
+  "name": "Quests",
+  "version": "1.0.0",
+  "description": "A quest board for building a business: a main quest, three quests a day, bosses that are real business numbers, levels, a streak and a weekly season. Only proofs pay.",
+  "server": "server.ts",
+  "client": ["quests.js", "quests-actions.js"],
+  "styles": ["quests.css"],
+  "machine": "any",
+  "requires": ["projects"],
+  "uses": ["discover", "connections"],
+  "routes": ["game"],
+  "provides": ["game"],
+  "extends": ["fullState", "digest.lines"]
+}

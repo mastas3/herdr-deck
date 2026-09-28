@@ -61,7 +61,9 @@ async function disablePush() {
   const r = await api("/api/push/unsubscribe", { id: PUSH.id });
   PUSH.on = false; PUSH.me = null; PUSH.devices = r.devices; store("pushOn", false);
 }
-const PREFS0 = { needs: true, done: true, digest: true, questDigest: true, quests: false, quiet: { on: false, from: "22:00", to: "07:30" } };
+const PREFS0 = { needs: true, done: true, digest: true, quiet: { on: false, from: "22:00", to: "07:30" } };
+/** Plugins' own sections ("notify.prefs": { title, prefs: [{ key, label, hint, default }] }), e.g. Quests. */
+const plugPrefs = () => deckPlugins.contributions("notify.prefs");
 async function openNotifications() {
   let info = { devices: [] };
   try { info = await api("/api/push/key", {}); S.push = { ...S.push, key: info.key, node: info.node }; } catch (e) { toast(e.message, true); }
@@ -77,7 +79,7 @@ async function openNotifications() {
     const me = PUSH.me;
     const p = me?.prefs ?? load("pushPrefs", PREFS0);
     const others = PUSH.devices.filter((x) => x.id !== PUSH.id);
-    const chk = (k, label, hint) => `<label class="nchk"><input type="checkbox" data-pref="${k}" ${(p[k] ?? PREFS0[k]) ? "checked" : ""}><span><b>${label}</b><small>${hint}</small></span></label>`;
+    const chk = (k, label, hint, def) => `<label class="nchk"><input type="checkbox" data-pref="${k}" ${(p[k] ?? PREFS0[k] ?? def) ? "checked" : ""}><span><b>${label}</b><small>${hint}</small></span></label>`;
     const state = PUSH.on && me
       ? `<div class="nstate on"><span class="dot" style="--c:var(--idle)"></span><span><b>On for this device</b><small>Through ${esc(me.service)}${me.lastOkAt ? ` · last delivered ${esc(agoText(me.lastOkAt))}` : ""}${me.lastError ? ` · <span class="warn">last try failed: ${esc(me.lastError.slice(0, 120))}</span>` : ""}</small></span></div>`
       : `<div class="nstate"><span class="dot" style="--c:var(--empty)"></span><span><b>Off for this device</b><small>${why ? "" : "Turn on to get alerts even when the deck is closed."}</small></span></div>`;
@@ -91,9 +93,8 @@ async function openNotifications() {
       ${chk("needs", "When a session needs me", "It’s waiting for an answer or a permission, on any machine")}
       ${chk("done", "When a session finishes", "It finished a turn you haven’t looked at")}
       ${chk("digest", "The morning digest", `At ${esc(S.auto?.rules?.digest?.time ?? "08:30")}: what finished overnight, what’s waiting, what’s idle (Automations sets the time)`)}
-      <h4>Quests</h4>
-      ${chk("questDigest", "Today’s quests in the morning digest", "Your main quest, its boss and today’s three quests")}
-      ${chk("quests", "Quest wins", "A quest completed, a boss hit or defeated, an achievement, the Sunday review")}
+      ${plugPrefs().map((g) => `<h4>${esc(g.title)}</h4>
+      ${g.prefs.map((x) => chk(x.key, x.label, x.hint, x.default)).join("\n      ")}`).join("\n      ")}
       <label class="nchk"><input type="checkbox" data-pref="quiet" ${p.quiet?.on ? "checked" : ""}><span><b>Quiet hours</b><small>No needs-you or finished alerts from <input type="time" class="inp tm" data-n="from" value="${esc(p.quiet?.from ?? "22:00")}"> to <input type="time" class="inp tm" data-n="to" value="${esc(p.quiet?.to ?? "07:30")}"></small></span></label>
       </div>
       ${others.length ? `<h4>Other devices</h4>${others.map((x) => `<div class="mrow"><span class="dot" style="--c:var(--${x.lastError ? "blocked" : "idle"})"></span><b>${esc(x.label)}</b><span class="hint">${esc(x.service)}${x.lastOkAt ? ` · last delivered ${esc(agoText(x.lastOkAt))}` : ""}</span><span class="spacer"></span><button type="button" class="btn ghost danger" data-ndel="${esc(x.id)}">Remove</button></div>`).join("")}` : ""}
@@ -102,7 +103,8 @@ async function openNotifications() {
   };
   const prefsNow = () => {
     const get = (k) => d.querySelector(`[data-pref="${k}"]`)?.checked;
-    return { needs: get("needs"), done: get("done"), digest: get("digest"), questDigest: get("questDigest"), quests: get("quests"), quiet: { on: get("quiet"), from: d.querySelector('[data-n="from"]').value || "22:00", to: d.querySelector('[data-n="to"]').value || "07:30" } };
+    const plug = Object.fromEntries(plugPrefs().flatMap((g) => g.prefs.map((x) => [x.key, get(x.key)])));
+    return { needs: get("needs"), done: get("done"), digest: get("digest"), ...plug, quiet: { on: get("quiet"), from: d.querySelector('[data-n="from"]').value || "22:00", to: d.querySelector('[data-n="to"]').value || "07:30" } };
   };
   const labelNow = () => d.querySelector('[data-n="label"]').value.trim() || deviceLabel();
   let saveT;

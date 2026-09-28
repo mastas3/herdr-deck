@@ -12,7 +12,7 @@ function galWire(n) {
     const sc = t.closest("[data-galscroll]");
     if (sc) { const s = sc.closest(".gallane").querySelector(".galstrip"); return s.scrollBy({ left: Number(sc.dataset.galscroll) * s.clientWidth * 0.85, behavior: reduceMotion.matches ? "auto" : "smooth" }); }
     const proj = t.closest("[data-galproject]");
-    if (proj) return openJourney(proj.dataset.galproject);
+    if (proj) return projectLink()?.open(proj.dataset.galproject);
     const hero = t.closest(".galhero[data-gid]");
     if (hero) {
       const id = hero.dataset.gid;

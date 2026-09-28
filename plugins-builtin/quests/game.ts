@@ -1,6 +1,6 @@
 // The game layer: a quest board that makes building a real, profitable business fun, without inventing anything.
 //
-// Everything is read from evidence the deck already has: project journeys (src/journey.ts: releases, deploys, wiki
+// Everything is read from evidence the deck already has: project journeys (the projects plugin: releases, deploys, wiki
 // entries that say it shipped, milestones unlocked by measured numbers, Gumroad sales, metrics you log with a note),
 // proof-of-done checks that passed (src/verify.ts), and what you log here with a link or a note (a lead you contacted,
 // a conversation with a user). The rules are in game-rules.ts, today's quests in game-quests.ts and game-daily.ts,
@@ -8,7 +8,8 @@
 // never pays twice.
 import { existsSync } from "node:fs";
 import { basename } from "node:path";
-import type { LadderItem, Runner } from "./journey-ai";
+import type { Runner } from "../../src/model-call";
+import type { LadderItem } from "./game-runs";
 import {
   achievements, currentBoss, dayOf, dayOfWeek, bossesFor, hash, last30, levelOf, levelReach, proofsFromJourney, score, streak, validTz, XP,
   type JourneyLike, type Line, type Proof,

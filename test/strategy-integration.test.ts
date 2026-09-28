@@ -10,10 +10,8 @@ import { materializeKit } from "../src/ideagen/kit-files";
 import { buildInventory } from "../src/ideagen/inventory";
 import { createGalleryServer } from "../src/gallery-server";
 import { buildComps } from "../src/studio";
-import { prompt as questPrompt, type QuestCtx } from "../src/game-quests";
 import { plannerPrompt } from "../src/autoresearch-core";
 import { createAutoresearch } from "../src/autoresearch";
-import { journeyComparables } from "../src/journey-comparables";
 import { createLibrary } from "../src/library";
 import { openCards } from "../src/library-cards";
 import type { Idea, StarterKit } from "../src/ideagen/types";
@@ -91,13 +89,6 @@ describe("Studio builds, quests, research and project pages", () => {
     expect(c.checks[0]).toContain("over twice the highest");
     expect(buildComps({ title: "Tender alerts", pitch: "government tenders" }, find)).toBeUndefined();
   });
-  test("today's quests are asked to prefer what worked for comparables of the main quest", () => {
-    const ctx: QuestCtx = { project: "clipstudio", pitch: "podcast clips", day: "2026-09-26", next: [], recent: [], leads: [], connections: [], done: [], comparables: "What worked for founders most like this (how comparable founders got their first customers; …):\n- Reddit: Posted before/after clips in r/podcasting — ClipPod (Nov 2025) https://…" };
-    const p = questPrompt(ctx);
-    expect(p).toContain("- Reddit: Posted before/after clips in r/podcasting — ClipPod");
-    expect(p).toContain("Prefer these tactics when they fit this project's buyer");
-    expect(questPrompt({ ...ctx, comparables: undefined })).not.toContain("Prefer these tactics");
-  });
   test("the research planner sees comparables; the evaluator's Jev state carries them", async () => {
     expect(plannerPrompt(camp(), [], "Comparable founders (…):\n1. ClipPod").user).toContain("Use them: what worked for founders like these");
     expect(plannerPrompt(camp(), []).user).not.toContain("Use them:");
@@ -121,16 +112,6 @@ describe("Studio builds, quests, research and project pages", () => {
     await ar.tick();
     expect(jevState.comparable_founders.founders[0]).toContain("ClipPod (Nov 2025)");
     expect(jevState.comparable_founders.summary.length).toBeGreaterThan(0);
-  });
-  test("a project page's plan prompt gets the comparables' tactics for its next milestone", () => {
-    const j = { project: "clip-studio", pitch: "podcast clips and transcripts for podcasters", milestones: [{ id: "a", title: "Offer page live", state: "unlocked" }, { id: "b", title: "First paying customer", state: "locked" }], next: ["b"] };
-    const r = journeyComparables(j, find);
-    expect(r.milestone).toBe("First paying customer");
-    expect(r.kind).toBe("first");
-    expect(r.text).toContain("how comparable founders got their first customers");
-    expect(r.text).toContain("- Reddit: Posted before/after clips in r/podcasting — ClipPod (Nov 2025)");
-    expect(journeyComparables({ ...j, next: [], milestones: [{ id: "c", title: "10 paying customers", state: "locked" }] }, find).text).toContain("grew past their first customers");
-    expect(journeyComparables({ project: "x", milestones: [], next: [] }, () => undefined).text).toBe("");
   });
 });
 

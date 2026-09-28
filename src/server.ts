@@ -3,21 +3,18 @@
 // This file starts everything, in order; the parts live in src/http/ (routes.ts is where a request goes).
 import { homedir } from "node:os";
 import { GROUPS, loadTools } from "./tools";
-import { historyProjects, historyStats, stopHistory } from "./history";
+import { historyStats, stopHistory } from "./history";
 import { inventory } from "./connections";
 import { enrich } from "./store";
 import { RECS } from "./catalog";
 import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
-import { gameForServer } from "./game-server";
 import { Deck, type Row } from "./deck";
 import { createDiscover, gh } from "./discover";
 import { galleryForServer } from "./gallery-server";
 import { createLeads } from "./leads";
 import { createLibrary, feedQuery } from "./library";
-import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
-import { HISTORY_DB } from "./history-schema";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
 import { researchForServer } from "./autoresearch-server";
@@ -100,18 +97,11 @@ const opportunities = createOpportunityService({
 });
 // Discover uses the same evidence and experiment records as Opportunities.
 const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS, library, evidenceStore: opportunities.store });
-// Project pages (journeys): their own module; the server only routes to it.
-const journeyHist = localHistory(HISTORY_DB, SELF.id);
-const journeys = createJourneys(
-  { dataDir: DATA_DIR, cacheDir: process.env.DECK_JOURNEY_DIR || undefined, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
-  { sessions: (p) => projectSessions(p, tools.historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
-);
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
 const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
-const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
 /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
 const presence = new Map<string, { key: string | null; at: number }>();
 const viewing = (key: string) => [...presence.values()].some((p) => p.key === key && Date.now() - p.at < 70_000);
@@ -124,8 +114,7 @@ const auto: Automations | undefined = new Automations({
   viewing,
   ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => dec.decisions.get(key)?.question }),
   canSend: () => !isNode(),
-  // Today's quests are core until the quests plugin contributes them to "digest.lines" like any other section.
-  digest: () => [{ title: "Today's quests", pref: "questDigest", lines: game.questLines }, ...pluginHost.contributions("digest.lines")],
+  digest: () => pluginHost.contributions("digest.lines"),
 });
 // Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
 const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, discover, machines });
@@ -134,12 +123,16 @@ const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, row
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
 const pluginHost = createPluginHost({
   builtinDir: new URL("../plugins-builtin", import.meta.url).pathname, root: PLUGINS_DIR, dataDir: DATA_DIR,
-  reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "game", "plugins"],
+  reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "plugins"],
   core: {
     rows: () => allRows(), push, automations: () => auto, decisions: () => [...dec.decisions.values()], broadcast, notice, machines, isNode,
+    history: (o) => tools.historyEverywhere(o), checks: () => deck.checks,
     sessions: { start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole) },
   },
 });
+// Parts that become plugins in their own right, offered under their service names meanwhile (the quest board uses them).
+pluginHost.provideCore("discover", discover);
+pluginHost.provideCore("connections", { inventory, enrich, recs: () => RECS });
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
@@ -151,13 +144,14 @@ function fullState() {
     ...pluginHost.state(),
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
     tools: [...loadTools(), ...pluginHost.contributions("tools.entries")], toolGroups: GROUPS, queue: queue.queues, usage: live.usage(), history: historyStats(), decisions: [...dec.decisions.values()], radar: dec.radar.list(), jev: jevUsage(), canShare: canShare(),
-    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, game: game.summary(), plugins: { active: pluginHost.active() },
+    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, plugins: { active: pluginHost.active() },
   };
 }
 
 deck.onPatch((patch) => { broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }); auto?.observe(); });
 // ── history, usage, sharing, proof of done, decisions ─────────────────────
-const live = startLive({ deck, broadcast, auto, game, detailFor: chat.detailFor });
+// Passing checks also count on the quest board (the quests plugin's `game` service), while it's on.
+const live = startLive({ deck, broadcast, auto, game: { onCheck: (root, r) => pluginHost.service("game")?.onCheck(root, r) }, detailFor: chat.detailFor });
 const dec = createDecisions({ deck, remotes, allRows, detailFor: chat.detailFor, broadcast, isNode, push, auto, viewing });
 deck.onPatch(dec.scheduleDecisions);
 setInterval(dec.scheduleDecisions, 10_000);
@@ -173,7 +167,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, discover, gallery, library, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, discover, gallery, library, leads, research, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };
@@ -197,7 +191,6 @@ for (let attempt = 0; ; attempt++) {
 }
 for (const h of remotes.values()) h.start();
 auto.start();
-setInterval(game.tick, 60_000);
 research.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);

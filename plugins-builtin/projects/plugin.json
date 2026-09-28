@@ -1,0 +1,15 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "projects",
+  "name": "Projects",
+  "version": "1.0.0",
+  "description": "Every project as a journey: where it started, the turns it took, side quests and a milestone ladder that unlocks from evidence. At /p and /p/<project>.",
+  "server": "server.ts",
+  "client": ["journey.js", "journey-graph.js", "journey-page.js"],
+  "styles": ["journey.css"],
+  "machine": "any",
+  "routes": ["journey", "journeys"],
+  "pages": ["/p"],
+  "provides": ["journeys"]
+}

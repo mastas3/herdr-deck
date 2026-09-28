@@ -1,11 +1,11 @@
 // The game layer: today's quests for the main quest. Written once a day (one model call, at most two if you switch
 // the main quest), completed by new evidence of their kind, or checked off by hand with a link or a note.
-import type { Runner } from "./journey-ai";
+import type { Runner } from "../../src/model-call";
 import { addDays, currentBoss, dayOf, hash, revokedIds, XP, type Boss, type JourneyLike, type Line, type Proof } from "./game-rules";
 import { generateQuests, type Quest, type QuestCtx } from "./game-quests";
 import { isUrl, leadsFor, normUrl, projectTerms } from "./game-runs";
 import { questKey, type DayQuests, type Store } from "./game-store";
-import { comparablesFor, tacticsText, type Comparables, type Target } from "./library-strategy";
+import { comparablesFor, tacticsText, type Comparables, type Target } from "../../src/library-strategy";
 
 export const REROLLS_PER_DAY = 2;
 export const GENERATIONS_PER_DAY = 2;

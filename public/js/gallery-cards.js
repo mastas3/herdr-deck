@@ -72,7 +72,7 @@ function galHeroHTML(x) {
       ${x.buyer ? `<p class="galfor"><span>For</span> ${esc(x.buyer)}</p>` : ""}
       ${galProofBadge(x)}${galProofLine(x)}
       <div class="galhacts"><button class="btn primary" data-galplay>${p ? "Playing" : "Play"}</button><button class="btn" data-galopen>Open</button><button class="btn ghost" data-galsave aria-pressed="${galSaved(x.id)}">${galSaved(x.id) ? "Saved" : "Save"}</button>
-        ${p ? `<button class="link" data-galproject="${esc(p.slug)}">Project page</button>` : ""}</div>
+        ${p && projectLink() ? `<button class="link" data-galproject="${esc(p.slug)}">Project page</button>` : ""}</div>
     </div>
     <div class="galhcov">${galCoverHTML(x, true)}</div></div>`;
 }

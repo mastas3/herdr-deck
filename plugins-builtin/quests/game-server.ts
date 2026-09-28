@@ -1,9 +1,10 @@
-// The quest board's wiring into the server: which deck services it reads, and the hub-only guard. server.ts keeps one
-// line per hook (the route, the digest's quest lines, passing checks, the header chip, a run's folder, the timer).
+// The quest board as the deck runs it: which deck services it reads, and the hub-only guard. This object is the `game`
+// service; server.ts hooks it up (the route, the digest's quest lines, the header chip's state, the timer), and the
+// core calls it for passing checks and a run's folder.
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { jevAskOnce, jevAvailable, jevOutcome } from "./jev";
-import { runClaude } from "./journey-ai";
+import { jevAskOnce, jevAvailable, jevOutcome } from "../../src/jev";
+import { runClaude } from "../../src/model-call";
 import { createGame, type GameDeps, type GameMessage } from "./game";
 import { runFolderOk } from "./game-runs";
 
@@ -22,7 +23,8 @@ export function gameForServer(s: ServerParts) {
     jev: { available: jevAvailable, ask: jevAskOnce, outcome: jevOutcome },
     leadsSaved: () => s.discover.leadsSaved.get(), connections: s.connections,
     checks: () => [...s.checks().entries()].map(([root, r]) => ({ ...r, root })),
-    deliver: (m: GameMessage) => (s.isNode() ? Promise.resolve() : s.push.deliver(m, { ttl: 12 * 3600, urgency: "normal", topic: `g${Bun.hash(m.tag ?? "quests").toString(36)}` })),
+    // Quest pushes go to devices that turned "Quest wins" on (the `quests` preference this plugin adds).
+    deliver: (m: GameMessage) => (s.isNode() ? Promise.resolve() : s.push.deliver({ ...m, pref: "quests" }, { ttl: 12 * 3600, urgency: "normal", topic: `g${Bun.hash(m.tag ?? "quests").toString(36)}` })),
     changed: (sum) => s.broadcast("game", sum),
   });
   return {

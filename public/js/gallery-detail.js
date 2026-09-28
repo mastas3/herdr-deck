@@ -40,7 +40,7 @@ function galSheetHTML(c, partial) {
       <h2>${esc(c.name)}</h2><p class="galhook">${esc(c.hook)}</p>
       ${galProofBadge(c)}${galProofLine(c)}
       <div class="galhacts"><button class="btn primary" data-galevidence="demand">Review evidence</button><button class="btn" data-galevidence="experiments">Plan a buyer test</button><button class="btn ghost" data-galsave aria-pressed="${galSaved(c.id)}">${galSaved(c.id) ? "Saved" : "Save"}</button><button class="btn ghost" data-galcopy>${ICON.copy ?? ""}Copy</button></div>
-      ${p ? `<p class="galplaying"><span class="galbadge play">Playing</span> since ${esc(agoText(p.at))} in <code>${esc(p.dir.replace(/^\/(?:Users|home)\/[^/]+/, "~"))}</code> · <button class="link" data-galproject="${esc(p.slug)}">Project page</button> · <button class="link" data-galquests>Quest board</button></p>` : ""}
+      ${p ? `<p class="galplaying"><span class="galbadge play">Playing</span> since ${esc(agoText(p.at))} in <code>${esc(p.dir.replace(/^\/(?:Users|home)\/[^/]+/, "~"))}</code>${projectLink() ? ` · <button class="link" data-galproject="${esc(p.slug)}">Project page</button>` : ""}${deckPlugins.has("quests") ? ' · <button class="link" data-galquests>Quest board</button>' : ""}</p>` : ""}
     </header>`;
   if (partial) return `${head}<div class="galsec"><span class="stsk w70"></span><span class="stsk w40"></span></div>`;
   const ev = (c.evidence ?? []).map(e => `<li><a class="galev" href="${esc(e.url)}" target="_blank" rel="noopener"><q>${esc(e.snippet)}</q><span>${esc(e.source)} · ${esc(galHost(e.url))}</span></a><small>Published ${esc(galEvidenceDate(e.publishedAt))} · Collected ${esc(galEvidenceDate(e.fetchedAt))} · Relevance unreviewed</small></li>`).join("");
@@ -94,8 +94,8 @@ function galSheetClick(e, dlg) {
   if (t.closest("[data-galcopy]")) return copy(galText(c), "the idea");
   if (t.closest("[data-galkitgo]")) { dlg.querySelector("#galkit")?.scrollIntoView({ block: "start", behavior: reduceMotion.matches ? "auto" : "smooth" }); if (!galHasKit(s.id)) galKitBuild(s.id); return; }
   const proj = t.closest("[data-galproject]");
-  if (proj) { dlg.close(); return openJourney(proj.dataset.galproject); }
-  if (t.closest("[data-galquests]")) { dlg.close(); return openQuests(); }
+  if (proj) { dlg.close(); return projectLink()?.open(proj.dataset.galproject); }
+  if (t.closest("[data-galquests]")) { dlg.close(); return setMode("quests"); }
   const conn = t.closest("[data-galconn]");
   if (conn) { dlg.close(); S.conn.cat = "recommended"; S.conn.q = conn.dataset.galconn; S.conn.open = null; return openConnections(); }
   const tray = t.closest("[data-galtray]");

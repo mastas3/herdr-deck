@@ -59,7 +59,7 @@ export const addDays = (k: string, n: number) => new Date(keyUtc(k) + n * 86_400
 export function weekOf(k: string) { const dow = new Date(keyUtc(k)).getUTCDay(); return addDays(k, -((dow + 6) % 7)); }
 export const dayOfWeek = (k: string) => new Date(keyUtc(k)).getUTCDay(); // 0 = Sunday
 
-// ── proofs from a project's journey (src/journey.ts is the source of truth) ─────────────────
+// ── proofs from a project's journey (the projects plugin's journey.ts is the source of truth) ──────
 /** The parts of a Journey the game reads. */
 export type JourneyLike = {
   project: string; root?: string; status?: string; nature?: string; pitch?: string; tags?: string[];

@@ -90,9 +90,14 @@ before any code runs) shows the whole surface.
   `tools.entries` (a `Tool`, runnable like the built-ins). Any other name is a plugin's own point, e.g. `discover.tabs`.
 - `host.setting(key)`.
 - Core, typed: `host.rows()`, `host.sessions.start/send/close`, `host.push`, `host.automations()`, `host.decisions()`,
-  `host.broadcast(event, data)` (core event names refused), `host.notice({ok, message})`, `host.machines()`, `host.isNode()`.
+  `host.broadcast(event, data)` (core event names refused), `host.notice({ok, message})`, `host.machines()`, `host.isNode()`,
+  `host.history(o)` (past sessions on every machine, the History search) and `host.checks()` (proof-of-done results).
 - The core reaches a plugin only through `pluginHost.service(name)` (no import; a test enforces that nothing under
   `src/` imports `plugins-builtin/`).
+- While a part is still core, the core can offer it to plugins under the service name its plugin will use:
+  `pluginHost.provideCore(name, api)` (idempotent; a plugin that provides the name wins). `use()` finds it like any other.
+- Device push preferences a plugin adds (e.g. quests' `questDigest`, `quests`) are kept by name in each device's prefs; a
+  `digest.lines` section's `pref` skips devices that set it false, a push with `pref` goes only where it is true.
 
 ### Client (`public/js/registry.js`, loaded right after core.js)
 
@@ -111,7 +116,11 @@ before any code runs) shows the whole surface.
 
 Plus `deckPlugins.contributions(point)`, `deckPlugins.each(point, ...args)`, `deckPlugins.view(mode)`,
 `deckPlugins.has(id)` (its scripts are in the page) and `deckPlugins.on(id)` (running on the deck, from
-`fullState.plugins.active`). A "plugins" SSE event (something switched) reloads the page.
+`fullState.plugins.active`). A "plugins" SSE event (something switched) reloads the page. The page's first state, the
+SSE connection and its own link wait until every script (running plugins' included) has loaded, so late-loaded state
+hooks, events and links are registered in time. Two points the core reads: `project.link` `{ icon, open(name) }` (where
+a project's name leads: the list's project headers and the session header; nothing is a link while none is on) and
+`notify.prefs` `{ title, prefs: [{ key, label, hint, default }] }` (a section of the Notifications dialog).
 
 ### Lifecycle
 

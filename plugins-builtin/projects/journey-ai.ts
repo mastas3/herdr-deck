@@ -6,11 +6,11 @@
 //
 // Only titles, dates, commit subjects, TLDRs and counts go into the digest: never transcripts, file contents or
 // anything key-like.
-import { existsSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { claudeAvailable, parseJsonLoose, runClaude, type Runner } from "../../src/model-call";
 import { clip, hash, type JEvent, type Metric } from "./journey-collect";
 
-const HOME = homedir();
+// The headless call and the JSON repair are the core's (src/model-call.ts); the quest board uses them too.
+export { closeJson, parseJsonLoose, runClaude, claudeAvailable, type Runner } from "../../src/model-call";
 
 // ── milestone vocabulary ──────────────────────────────────────────────────────────
 export type Nature = "consumer-app" | "tool" | "creative" | "internal" | "content";
@@ -164,35 +164,6 @@ Return JSON with these keys:
 Rules: use only event ids and side quest ids that appear above. A milestone's title must say exactly what its source and target measure ("100 commits", "First GitHub release", "10 paying customers"): never name a feature, launch or event after a measured source that doesn't count it; a qualitative achievement ("Hebrew support", "public launch") uses a manual.<name> source with target 1. Most of the ladder should be AHEAD of where the project is now. Consumer apps get user and revenue milestones (first user, 10/100/1k users, first paying customer, $100/$1k/$10k MRR, daily actives, usage time, invocations per day); tools get releases, outside stars/issues, downloads; creative work gets cuts, screenings, views; internal tools get daily use and "replaced X". Prefer measurable sources over manual ones when they fit. Example ladder items: ${JSON.stringify(ex)}`;
 }
 
-// ── parsing and repair ─────────────────────────────────────────────────────────────
-/** Closes whatever a truncated reply left open (strings, arrays, objects), so the complete part still parses. */
-export function closeJson(t: string): string {
-  const stack: string[] = [];
-  let inStr = false, esc = false;
-  for (const c of t) {
-    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
-    if (c === '"') inStr = true;
-    else if (c === "{" || c === "[") stack.push(c === "{" ? "}" : "]");
-    else if ((c === "}" || c === "]") && stack.length) stack.pop();
-  }
-  let out = t;
-  if (inStr) out += '"';
-  out = out.replace(/,\s*$/, "").replace(/,\s*"[^"]*"\s*:?\s*$/, "").replace(/:\s*$/, ": null");
-  return out + stack.reverse().join("");
-}
-const loose = (t: string) => t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/,\s*([}\]])/g, "$1");
-export function parseJsonLoose(text: string): any {
-  const t = String(text ?? "").replace(/```(?:json)?/gi, "").trim();
-  const a = t.indexOf("{");
-  if (a < 0) return undefined;
-  const b = t.lastIndexOf("}");
-  for (const cand of [b > a ? t.slice(a, b + 1) : "", t.slice(a)]) {
-    if (!cand) continue;
-    for (const f of [(x: string) => x, loose, (x: string) => closeJson(loose(x))]) { try { const j = JSON.parse(f(cand)); if (j && typeof j === "object") return j; } catch {} }
-  }
-  return undefined;
-}
-
 export type AiResult = {
   nature: Nature; pitch: string; story: string; idea?: string;
   turns: { event: string; label: string; why?: string }[];
@@ -255,29 +226,6 @@ export function ruleBased(inp: DigestInput): AiResult {
 }
 
 // ── engines ───────────────────────────────────────────────────────────────────────
-const BIN_DIRS = [`${HOME}/.local/bin`, `${HOME}/.claude/local`, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", ...(process.env.PATH ?? "").split(":")];
-const CLAUDE = process.env.DECK_CLAUDE_BIN || BIN_DIRS.map((d) => `${d}/claude`).find((p) => existsSync(p));
-export const claudeAvailable = () => !!CLAUDE;
-export type Runner = (system: string, user: string, timeoutMs: number) => Promise<{ text: string; model: string }>;
-
-/** Headless Claude Code: print mode, a small fast model, low effort, no tools/MCP/settings/plugins, nothing saved. */
-export const runClaude: Runner = async (system, user, timeoutMs) => {
-  if (!CLAUDE) throw new Error("Claude Code (claude) isn't installed here");
-  const model = process.env.DECK_JOURNEY_MODEL || "haiku";
-  const env: Record<string, string | undefined> = { ...process.env, CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", MAX_THINKING_TOKENS: "0", NO_COLOR: "1" };
-  delete env.CLAUDECODE;
-  const p = Bun.spawn([CLAUDE, "-p", "--safe-mode", "--model", model, "--effort", "low", "--tools", "", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands", "--setting-sources", "",
-    "--output-format", "json", "--system-prompt", system], { cwd: tmpdir(), stdin: new Blob([user]), stdout: "pipe", stderr: "pipe", env });
-  const timer = setTimeout(() => { try { p.kill(9); } catch {} }, timeoutMs);
-  try {
-    const [out, err] = await Promise.all([new Response(p.stdout as ReadableStream).text(), new Response(p.stderr as ReadableStream).text()]);
-    await p.exited;
-    if (p.signalCode) throw new Error("Claude took too long");
-    let j: any; try { j = JSON.parse(out); } catch { throw new Error(clip(err.split("\n").filter(Boolean).pop() || "Claude returned nothing readable", 160)); }
-    if (j.is_error) throw new Error(clip(j.result || "Claude reported an error", 160));
-    return { text: String(j.result ?? ""), model };
-  } finally { clearTimeout(timer); }
-};
 const OLLAMA_URL = process.env.OLLAMA_HOST ? (process.env.OLLAMA_HOST.startsWith("http") ? process.env.OLLAMA_HOST : `http://${process.env.OLLAMA_HOST}`) : "http://127.0.0.1:11434";
 /** A local Ollama model (DECK_JOURNEY_ENGINE=ollama): nothing leaves the machine. */
 export const runOllama: Runner = async (system, user, timeoutMs) => {
@@ -292,7 +240,7 @@ export const runOllama: Runner = async (system, user, timeoutMs) => {
 /** One AI pass for a project: the model's read when it is usable, otherwise the rule-based one (with a note). */
 export async function analyze(inp: DigestInput, opts: { runner?: Runner; engine?: "claude" | "ollama"; timeoutMs?: number; onCall?: () => void } = {}): Promise<AiResult> {
   const engine = opts.engine ?? (process.env.DECK_JOURNEY_ENGINE === "ollama" ? "ollama" : "claude");
-  const runner = opts.runner ?? (engine === "ollama" ? runOllama : CLAUDE ? runClaude : undefined);
+  const runner = opts.runner ?? (engine === "ollama" ? runOllama : claudeAvailable() ? runClaude : undefined);
   const fallback = ruleBased(inp);
   if (!runner) return { ...fallback, note: "No model is available here, so this read comes from simple rules." };
   const t0 = Date.now();
