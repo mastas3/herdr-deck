@@ -98,12 +98,15 @@ function paletteItems(q) {
     if (rest.length) out.push({ head: "Commands" }, ...rest.map(cmdRow));
   }
   if (q) {
-    const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
-    // A project quick switcher: show only it, or start a new session in its folder.
-    if (projects.length) out.push({ head: "Projects" }, ...projects.flatMap(({ p }) => [
-      { html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } },
-      projectHome(p) && { html: `<span class="dot" style="--c:${pc(p)}"></span><span>New session in ${esc(p)}</span><small>${esc(home(projectHome(p).cwd))}</small>`, t: `New session in ${p}`, run: () => openNew(projectHome(p)) },
-    ].filter(Boolean)));
+    // A project quick switcher: show only it, or start a new session in its folder ("acme" or "new acme").
+    const projects = [...new Set([...S.rows.values()].map((r) => r.project))].flatMap((p) => {
+      const h = projectHome(p), dot = `<span class="dot" style="--c:${pc(p)}"></span>`;
+      return [
+        { s: fuzzy(`${p} only show`, q), html: `${dot}<span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } },
+        h && { s: fuzzy(`${p} new session`, q) && fuzzy(p, q.replace(/\b(new|session)\b/gi, "")), html: `${dot}<span>New session in ${esc(p)}</span><small>${esc(home(h.cwd))}</small>`, t: `New session in ${p}`, run: () => openNew(h) },
+      ].filter((x) => x && x.s);
+    }).slice(0, 6);
+    if (projects.length) out.push({ head: "Projects" }, ...projects);
     const heads = [...new Set(plug.filter((c) => c.section).map((c) => c.section))];
     for (const h of heads) out.push({ head: h }, ...plug.filter((c) => c.section === h).map(({ html, run }) => ({ html, run })));
   }
