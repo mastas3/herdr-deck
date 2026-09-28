@@ -141,7 +141,7 @@ function srcLine(r) {
 }
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago"${r.status === "working" ? "" : ` data-t="${r.lastActiveAt ?? ""}"`}>${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
