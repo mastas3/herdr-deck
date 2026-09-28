@@ -48,7 +48,7 @@ const { broadcast } = sse;
 const fakeRows = new Map<string, Row>();
 const hosts = createMachines({
   deck, self: SELF, dataDir: DATA_DIR, hostsConf, graves, fakeRows,
-  broadcast, fullState: () => fullState(), scheduleDecisions: () => dec.scheduleDecisions(), observe: () => auto?.observe(),
+  broadcast, scheduleDecisions: () => dec.scheduleDecisions(), observe: () => auto?.observe(),
   usageChanged: () => live.pushUsage(),
 });
 const { remotes, isNode, machines, summary, allRows, allGraves, tagLocal, machineLabelOf } = hosts;
@@ -127,6 +127,7 @@ function fullState() {
 }
 
 deck.onPatch((patch) => { broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }); auto?.observe(); });
+deck.onUsage((u) => broadcast("procs", u));
 // ── history, usage, sharing, proof of done, decisions ─────────────────────
 // Passing checks also count on the quest board (the quests plugin's `game` service), while it's on.
 const live = startLive({

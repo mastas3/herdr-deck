@@ -28,6 +28,14 @@ describe("process tree", () => {
     expect(u).toEqual({ rssKB: 8000, cpu: 13.5, count: 3 });
   });
 
+  test("a process keeps its start time across reads (ps counts whole seconds, the clock milliseconds)", () => {
+    const later = parsePs(out.replace("09:00", "09:01"), now + 1_533, procs);
+    expect(later.get(200)!.startedAt).toBe(procs.get(200)!.startedAt);
+    expect(parsePs(out.replace("09:00", "09:02"), now + 1_467, later).get(200)!.startedAt).toBe(procs.get(200)!.startedAt);
+    // A new process on a reused pid starts over.
+    expect(parsePs(out.replace("09:00", "00:01"), now + 1_500, procs).get(200)!.startedAt).toBe(now + 1_500 - 1_000);
+  });
+
   test("survives a pid cycle", () => {
     const cyc = parsePs("  1   2  10 0 00:01 a\n  2   1  10 0 00:01 b", now);
     expect(treeUsage(1, cyc, childrenIndex(cyc)).count).toBe(2);

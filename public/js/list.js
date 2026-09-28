@@ -137,7 +137,9 @@ function renderList() {
     const ask = pendingAsk(r);
     const why = reasonOf(r, ask?.kind, now);
     const ctx = JSON.stringify(ask ?? "") + radarChip(r) + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
-    const sig = JSON.stringify(r) + ctx;
+    // Memory, CPU and process counts aren't in a row: a new reading (the `procs` event) doesn't rebuild it.
+    const { rssKB, cpu, procs, ...shown } = r;
+    const sig = JSON.stringify(shown) + ctx;
     c.el.classList.toggle("unseen", needsYou(r));
     if (c.sig !== sig) {
       const stable = stableSig(r) + ctx;

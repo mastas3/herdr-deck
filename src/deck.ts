@@ -9,6 +9,7 @@ import { insightFor, type Insight } from "./insight";
 import { projectRoot } from "./projects";
 import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
 import { codexStore } from "./codex-store";
+import { RowFeed, type Usage } from "./row-feed";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -99,8 +100,10 @@ export class Deck {
   born = new Map<string, number>();
   private bornReady = false;
   rows = new Map<string, Row>();
-  private sent = new Map<string, string>();
+  /** What the page has of each row (src/row-feed.ts). */
+  private feed = new RowFeed();
   private listeners = new Set<(patch: Patch) => void>();
+  private usageListeners = new Set<(u: Record<string, Usage>) => void>();
   private rebuildTimer?: Timer;
   insights = new Map<string, Insight>();
   appThreads: AppThread[] = [];
@@ -115,6 +118,10 @@ export class Deck {
   onPatch(fn: (p: Patch) => void) {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
+  }
+  /** Memory, CPU and process counts that moved (they're left out of patches). */
+  onUsage(fn: (u: Record<string, Usage>) => void) {
+    this.usageListeners.add(fn);
   }
 
   async start() {
@@ -327,7 +334,7 @@ export class Deck {
 
   private async refreshProcs() {
     try {
-      this.procs = await readProcs();
+      this.procs = await readProcs(this.procs);
       this.kids = childrenIndex(this.procs);
       this.scheduleRebuild();
     } catch {}
@@ -589,16 +596,9 @@ export class Deck {
   }
 
   private emit() {
-    const upsert: Row[] = [];
-    const remove: string[] = [];
-    for (const [k, r] of this.rows) {
-      const json = JSON.stringify(r);
-      if (this.sent.get(k) !== json) {
-        this.sent.set(k, json);
-        upsert.push(r);
-      }
-    }
-    for (const k of this.sent.keys()) if (!this.rows.has(k)) { this.sent.delete(k); remove.push(k); }
+    const { upsert, remove } = this.feed.diff(this.rows.values());
+    const usage = this.feed.takeUsage(this.rows.values());
+    if (usage) for (const fn of this.usageListeners) fn(usage);
     const summary = this.summary();
     const summaryJson = JSON.stringify(summary.herdr);
     if (!upsert.length && !remove.length && summaryJson === this.lastSummary) return;

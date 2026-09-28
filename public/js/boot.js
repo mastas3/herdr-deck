@@ -69,6 +69,8 @@ function connect() {
     if (S.sel && p.upsert.some((r) => r.key === S.sel)) chatTick();
     render();
   });
+  // Memory, CPU and process counts, apart from the rows: only the footer shows them live.
+  es.addEventListener("procs", (e) => { const u = JSON.parse(e.data); for (const k in u) { const r = S.rows.get(k); if (r) [r.rssKB, r.cpu, r.procs] = u[k]; } renderFooter(); });
   es.addEventListener("queue", (e) => { S.queue = JSON.parse(e.data); const r = rowOf(S.sel); if (r) renderQueue(r); render(); });
   es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
   es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });

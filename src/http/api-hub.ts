@@ -17,7 +17,7 @@ import type { Hub } from "./hub";
 
 export async function hubApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
   const { DEV, PORT, SELF, deck, push, auto, fakeRows, presence, decisions, scheduleDecisions, fullState } = hub;
-  const { remotes, isNode, allRows, summary, machines, localRow, addRemote, saveHosts } = hub.hosts;
+  const { remotes, isNode, allRows, machines, localRow, addRemote, saveHosts, fakeRowsChanged } = hub.hosts;
   const { broadcast } = hub.sse;
   const { startSession, sendText } = hub.sessions;
   const { resolveTool, runToolLocal, relatedFor, historyEverywhere } = hub.tools;
@@ -65,10 +65,9 @@ export async function hubApi(hub: Hub, path: string, body: any): Promise<Respons
     case "/api/dev/fake-rows": {
       // DECK_DEV only: rows that exist nowhere but here, so the automations can be driven end to end.
       if (!DEV) return json({ error: "dev only" }, 403);
-      const remove = [...fakeRows.keys()];
       if (body.clear) fakeRows.clear();
       for (const r of body.rows ?? []) fakeRows.set(String(r.key), { machine: "fake", herdr: "fake", workspaceId: "fake", workspace: "Fake", tabId: String(r.key), tab: "", tabNumber: 0, tabPanes: 1, paneId: String(r.key), agent: "claude", status: "idle", focused: false, title: "fake", cwd: "/tmp", project: "fake", rssKB: 0, cpu: 0, procs: 0, tail: [], empty: false, stale: false, duplicate: false, approx: false, ...r } as Row);
-      broadcast("patch", { upsert: [...fakeRows.values()], remove: remove.filter((k) => !fakeRows.has(k)), summary: summary() });
+      fakeRowsChanged();
       auto?.observe();
       return json({ ok: true, rows: fakeRows.size });
     }

@@ -5,13 +5,15 @@ import type { Subprocess } from "bun";
 import type { Row } from "./deck";
 import type { MachineUsage } from "./usage-accounts";
 import { nodeUsage } from "./usage-merge";
+import { RowFeed, type Usage } from "./row-feed";
 
 export type RemoteConf = { id: string; label: string; ssh: string; remotePort?: number; localPort?: number };
 export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app" };
 
 type Listener = {
+  /** Rows that changed or went (both empty: only this machine's summary or online state changed). */
   patch: (upsert: Row[], remove: string[]) => void;
-  full: () => void;
+  procs: (u: Record<string, Usage>) => void;
   graveyard: () => void;
   notice: (n: any) => void;
   usage: () => void;
@@ -29,6 +31,8 @@ export class RemoteHost {
   private tunnel?: Subprocess;
   private stopped = false;
   private tunnelUp?: Promise<void>;
+  /** Passes on only what the hub's pages show: an older node still sends rows whose start time jitters. */
+  private feed = new RowFeed();
   base = "";
 
   constructor(readonly conf: RemoteConf, private on: Listener) {}
@@ -101,7 +105,7 @@ export class RemoteHost {
     const changed = this.online || this.error !== error;
     this.online = false;
     this.error = error;
-    if (changed) this.on.full();
+    if (changed) this.on.patch([], []);
   }
 
   /** Mirrors the node's SSE stream; reconnects with backoff forever. */
@@ -154,22 +158,44 @@ export class RemoteHost {
   private tag = (r: Row): Row => ({ ...r, key: `${this.conf.id}|${r.key}`, machine: this.conf.id });
   private tagGrave = (g: any) => ({ ...g, id: `${this.conf.id}|${g.id}`, machine: this.conf.id });
 
+  /** The node's whole state (on connect): passed on as the rows that differ from what we had. */
+  private applyState(data: any) {
+    this.online = true;
+    this.error = undefined;
+    this.rows = new Map(data.rows.map((r: Row) => { const t = this.tag(r); return [t.key, t]; }));
+    this.summary = data.summary;
+    this.graveyard = (data.graveyard ?? []).map(this.tagGrave);
+    this.usage = nodeUsage(data.usage) ?? this.usage;
+    const { upsert, remove } = this.feed.diff(this.rows.values());
+    this.on.patch(upsert, remove);
+    this.on.graveyard();
+    this.on.usage();
+  }
+
   private handle(event: string, data: any) {
     if (event === "full") {
-      this.online = true;
-      this.error = undefined;
-      this.rows = new Map(data.rows.map((r: Row) => { const t = this.tag(r); return [t.key, t]; }));
-      this.summary = data.summary;
-      this.graveyard = (data.graveyard ?? []).map(this.tagGrave);
-      this.usage = nodeUsage(data.usage) ?? this.usage;
-      this.on.full();
+      this.applyState(data);
     } else if (event === "patch") {
       const upsert = data.upsert.map(this.tag);
       for (const r of upsert) this.rows.set(r.key, r);
       const remove = data.remove.map((k: string) => `${this.conf.id}|${k}`);
-      for (const k of remove) this.rows.delete(k);
+      for (const k of remove) { this.rows.delete(k); this.feed.forget(k); }
+      const summaryChanged = JSON.stringify(data.summary?.herdr) !== JSON.stringify(this.summary?.herdr);
       this.summary = data.summary;
-      this.on.patch(upsert, remove);
+      const changed = this.feed.diff(upsert, false).upsert;
+      if (changed.length || remove.length || summaryChanged) this.on.patch(changed, remove);
+      const u = this.feed.takeUsage(this.rows.values());
+      if (u) this.on.procs(u);
+    } else if (event === "procs") {
+      const u: Record<string, Usage> = {};
+      for (const [k, v] of Object.entries<Usage>(data)) {
+        const key = `${this.conf.id}|${k}`, r = this.rows.get(key);
+        if (!r) continue;
+        [r.rssKB, r.cpu, r.procs] = v;
+        this.feed.noteUsage(key, v);
+        u[key] = v;
+      }
+      if (Object.keys(u).length) this.on.procs(u);
     } else if (event === "graveyard") {
       this.graveyard = data.map(this.tagGrave);
       this.on.graveyard();

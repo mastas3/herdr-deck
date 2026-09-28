@@ -17,28 +17,33 @@ export function parseEtime(s: string): number {
   return days * 86400 + h * 3600 + m * 60 + sec;
 }
 
-export function parsePs(out: string, now = Date.now()): Map<number, Proc> {
+/** `ps` gives elapsed time in whole seconds but the clock has milliseconds, so the computed start of the same process
+ *  wobbles by tens of ms on every read. A process keeps the start time it was first seen with (`prev`, the last read),
+ *  so a row only changes when its process really does. */
+export function parsePs(out: string, now = Date.now(), prev?: Map<number, Proc>): Map<number, Proc> {
   const procs = new Map<number, Proc>();
   for (const line of out.split("\n")) {
     const m = line.trim().match(/^(\d+)\s+(\d+)\s+(\d+)\s+([\d.]+)\s+(\S+)\s+(.*)$/);
     if (!m) continue;
     const pid = Number(m[1]);
+    const startedAt = now - parseEtime(m[5]) * 1000;
+    const was = prev?.get(pid)?.startedAt;
     procs.set(pid, {
       pid,
       ppid: Number(m[2]),
       rssKB: Number(m[3]),
       cpu: Number(m[4]),
-      startedAt: now - parseEtime(m[5]) * 1000,
+      startedAt: was !== undefined && Math.abs(was - startedAt) < 2000 ? was : startedAt,
       comm: m[6].split("/").pop() ?? m[6],
     });
   }
   return procs;
 }
 
-export async function readProcs(): Promise<Map<number, Proc>> {
+export async function readProcs(prev?: Map<number, Proc>): Promise<Map<number, Proc>> {
   const p = Bun.spawn(["ps", "-axo", "pid=,ppid=,rss=,pcpu=,etime=,comm="], { stdout: "pipe", stderr: "ignore" });
   const out = await new Response(p.stdout).text();
-  return parsePs(out);
+  return parsePs(out, Date.now(), prev);
 }
 
 export function childrenIndex(procs: Map<number, Proc>): Map<number, number[]> {
