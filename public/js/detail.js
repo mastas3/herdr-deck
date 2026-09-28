@@ -8,6 +8,7 @@ function renderDetail() {
   app.classList.toggle("native-task", !!r?.app && !S.board && !S.mode);
   const d = S.details.get(S.sel)?.data;
   $("mTitle").nextElementSibling.hidden = !!r?.app && !S.board && !S.mode;
+  renderPbar(S.mode || S.board ? null : r);
   if (S.mode) return renderMode();
   $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
@@ -94,6 +95,14 @@ function renderNowbar(r, d) {
   const since = r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
   const prog = r.todos?.total ? `<span class="prog" title="${r.todos.done} of ${r.todos.total} steps done"><i style="width:${Math.round((100 * r.todos.done) / r.todos.total)}%"></i></span><span class="stp">${r.todos.done}/${r.todos.total}</span>` : "";
   setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span>${prog}<span class="what">${r.step ? `<span class="step">${esc(r.step)}</span>` : ""}${esc(r.now ? nowWords(r.now) : r.step ? "" : "thinking…")}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
+}
+/** Plugins' bars above the composer ("session.bar": (row) => html); none on the board, in a view or in a subagent. */
+function renderPbar(r) {
+  const el = $("pbar");
+  if (!el) return;
+  const html = r && !S.sub ? deckPlugins.each("session.bar", r).filter(Boolean).join("") : "";
+  setHTML(el, html);
+  el.hidden = !html;
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
@@ -231,7 +240,7 @@ function boardCard(r) {
   const ask = boardAsk(r);
   const tail = (r.tail ?? []).slice(-4).join("\n");
   return `<div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
-      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>
+      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>${rowChips(r, "board")}
       ${ask ? "" : r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.step || r.now ? `<div class="now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span> ` : ""}${esc(r.step ?? "")}${r.step && r.now ? " · " : ""}${esc(nowWords(r.now))}</div>` : ""}
       ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
       ${ask || (tail.trim() ? `<pre>${ansi(tail)}</pre>` : "")}`;

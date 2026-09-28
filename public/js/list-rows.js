@@ -139,9 +139,11 @@ function srcLine(r) {
   const where = r.app ? "Codex app" : r.hist ? `${machineLabel(r.machine)} · history` : `${machineLabel(r.machine)}${r.workspace && !S.simple ? ` · ${r.workspace}` : ""}`;
   return `<span class="src" title="Runs on ${esc(machineLabel(r.machine))}">${icon}<span>${esc(where)}</span></span>`;
 }
+/** Plugins' chips for a row ("row.chips": (row, "list" | "board") => html), at the start of its status line. */
+const rowChips = (r, where) => deckPlugins.each("row.chips", r, where).filter(Boolean).join("");
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}</span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago">${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}${rowChips(r, "list")}</span>${srcLine(r)}${rowAsk(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
@@ -178,6 +180,8 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   }
   // The status line is always there (quiet rows show the last reply, or stay blank), so rows keep their height.
   if (!line && !pendingAsk(r)) { const last = plain(r.lastMessage); line = last ? `<span class="ln last">${esc(last)}</span>` : `<span class="ln ph" aria-hidden="true">&nbsp;</span>`; }
+  const chips = hit ? "" : rowChips(r, "list");
+  if (chips && line) line = line.replace(/^<span class="ln[^"]*"( aria-hidden="true")?>/, (m) => m.replace(' aria-hidden="true"', "") + chips);
   const running = (r.subagents ?? []).filter((x) => x.running);
   const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;

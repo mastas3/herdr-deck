@@ -1,0 +1,14 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "report-back",
+  "name": "Report back",
+  "version": "1.0.0",
+  "description": "When an agent finishes, a short report card: what changed (files, lines, commits), the tests it ran and how they went, its own one-line summary, and what it's waiting for. On the list, the board and the session, and in the morning digest. No model calls.",
+  "server": "server.ts",
+  "client": ["report-back.js", "report-back-new.js"],
+  "styles": ["report-back.css"],
+  "machine": "any",
+  "routes": ["report-back"],
+  "extends": ["fullState", "digest.lines", "tools.entries"]
+}
