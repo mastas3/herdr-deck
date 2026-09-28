@@ -3,19 +3,21 @@
 // deck's data folder (discover.json, feed.json, ideas.db, ideas/, studio/, gallery/). Nothing runs on a clock: the
 // daily feed, mixes and gallery start from a page's request, so a deck with Discover off makes no model calls for it.
 // It runs on every machine, as it did in the core: Leads, Opportunities and Research read it on a node too.
-// Other plugins add tabs to Discover's page through the page's "discover.tabs" point (js/discover.js).
+// Other plugins add tabs to Discover's page through the page's "discover.tabs" point (js/discover.js), and
+// Opportunities lends the gallery its evidence notebook through the server's "discover.evidence" point.
 import { homedir } from "node:os";
 import type { Host } from "../../src/plugin-api";
 import { createDiscover, gh } from "./discover";
 import { feedQuery } from "./feed";
 import { galleryForServer, type GalleryServerDeps } from "./gallery-server";
 
-/** The services Discover works with when they're there: the library, connections and covers plugins, and Opportunities (core until phase 3). */
+/** The services Discover works with when they're there: the library, connections and covers plugins. */
 type Library = { evidence(q: string, k: number, use: "studio" | "ideas"): Promise<{ text: string; answers: any[] }> };
 type Section = { id: string; items: any[] };
 type Connections = { inventory(): Promise<{ sections: Section[] }>; enrich(inv: any): { sections: Section[]; categories: { id: string; label: string }[] }; recs(): any[] };
 type Covers = { respond(data: unknown): Response };
-type Opportunities = { store: Exclude<GalleryServerDeps["evidenceStore"], Function | undefined> };
+/** What Opportunities lends the "discover.evidence" point: the evidence notebook it keeps. */
+type Evidence = { store: Exclude<GalleryServerDeps["evidenceStore"], Function | undefined> };
 
 export type DiscoverService = ReturnType<typeof createDiscover>;
 export type GalleryService = ReturnType<typeof galleryForServer>;
@@ -43,13 +45,14 @@ export function activate(host: Host) {
       feed: { evidence: async (rows) => (await library()?.evidence(feedQuery(rows), 5, "ideas"))?.text ?? "" },
     },
   );
-  // Discover shares its evidence and experiment records with Opportunities: the gallery reads its store when it's there.
+  // Discover shares its evidence and experiment records with Opportunities: the gallery reads the notebook it lends
+  // (the "discover.evidence" point) while it's on. A point, not a service: Opportunities uses Discover already.
   const gallery = galleryForServer({
     dataDir, discover, gh,
     connections: async () => (await conns()?.inventory()) ?? { sections: [] },
     recs: () => conns()?.recs() ?? [],
     library: { evidence: async (q, k, use) => (await library()?.evidence(q, k, use)) ?? { answers: [] } },
-    evidenceStore: () => host.use<Opportunities>("opportunities")?.store,
+    evidenceStore: () => (host.contributions("discover.evidence") as Evidence[])[0]?.store,
   });
   host.provide<DiscoverService>("discover", discover);
   host.provide<GalleryService>("gallery", gallery);

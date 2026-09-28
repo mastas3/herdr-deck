@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { publicResearchUrl, runOpportunityWeb, type WebResearchSpawn } from "../src/opportunity-web";
+import { publicResearchUrl } from "../../../src/evidence-notebook";
+import { runOpportunityWeb, type WebResearchSpawn } from "../opportunity-web";
 
 const NOW = 1790416800000;
 const input = { buyer: "Field-service business owner", problem: "Repeated administration preparing completion reports", outcome: "A complete customer handover", industry: "logistics" };

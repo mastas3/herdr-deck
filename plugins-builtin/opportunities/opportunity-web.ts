@@ -2,9 +2,7 @@
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import { publicResearchUrl, type ResearchInput, type ResearchDimension } from "./evidence-notebook";
-
-export { publicResearchUrl };
+import { publicResearchUrl, type ResearchInput, type ResearchDimension } from "../../src/evidence-notebook";
 
 export type OpportunityWebInput = {
   buyer: string; problem: string; outcome?: string; industry?: string;

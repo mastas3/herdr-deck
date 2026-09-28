@@ -13,7 +13,7 @@ import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, research, plugins, pluginHost, codePlugins } = hub;
+  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, research, plugins, pluginHost, codePlugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
@@ -104,7 +104,6 @@ export function createRoutes(hub: Hub) {
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
       { const r = await pluginHost.api(req, url, body); if (r) return r; }
-      if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/plugins/code")) { const d = await codePlugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { recommendRevenueStreams, type ValuePattern } from "../src/revenue";
+import { recommendRevenueStreams, type ValuePattern } from "../revenue";
 
 describe("revenue recommendations", () => {
   test("matches billing to the actual customer value pattern", () => {

@@ -2,15 +2,15 @@
 // A model can summarize a source, but only the owner can attest the dossier's conclusions.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { createOpportunities, INDUSTRIES, DISCOVERY_MODES, OPPORTUNITY_STAGES } from "./evidence-notebook";
+import { createOpportunities, INDUSTRIES, DISCOVERY_MODES, OPPORTUNITY_STAGES } from "../../src/evidence-notebook";
 import type { OpportunityWebInput } from "./opportunity-web";
-import type { ResearchInput } from "./evidence-notebook";
-import { calculateEconomics } from "./economics";
+import type { ResearchInput } from "../../src/evidence-notebook";
+import { calculateEconomics } from "../../src/economics";
 import { recommendRevenueStreams } from "./revenue";
-import { runClaude, type RunOpts } from "./model-run";
-import { redact, buildCatalog } from "./ingredients";
-import { repairJson } from "./text";
-import { scrub, type LeadsResult } from "./pain-search";
+import { runClaude, type RunOpts } from "../../src/model-run";
+import { redact, buildCatalog } from "../../src/ingredients";
+import { repairJson } from "../../src/text";
+import { scrub, type LeadsResult } from "../../src/pain-search";
 
 type JobState = "queued" | "running" | "done" | "error" | "cancelled";
 type Job = { id: string; kind: "generate" | "research"; state: JobState; message: string; error?: string; itemId?: string; itemIds: string[]; startedAt: number; finishedAt?: number; input: any };

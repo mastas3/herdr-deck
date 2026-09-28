@@ -2,15 +2,18 @@
 // Isolated Opportunities preview. It never loads the live deck or controls agent sessions.
 import { readFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { createOpportunityService } from "../src/opportunity-service";
-import { runOpportunityWeb } from "../src/opportunity-web";
-import { createLeads } from "../src/leads";
+import { createOpportunityService } from "../plugins-builtin/opportunities/opportunity-service";
+import { runOpportunityWeb } from "../plugins-builtin/opportunities/opportunity-web";
+import { createLeads } from "../plugins-builtin/leads/leads";
 import { createAssets } from "../src/assets";
 
 const port = Number(process.env.DECK_PREVIEW_PORT || 4759);
 const dir = process.env.DECK_PREVIEW_DIR || `/tmp/herdr-opportunities-preview-${process.getuid?.() ?? "user"}`;
 const publicDir = new URL("../public/", import.meta.url).pathname;
-const assets = createAssets(publicDir);
+// The page is the deck's own files plus the opportunities plugin's (as a deck with only that plugin on would serve it).
+const pluginDir = new URL("../plugins-builtin/opportunities/", import.meta.url).pathname;
+const manifest = JSON.parse(readFileSync(`${pluginDir}/plugin.json`, "utf8"));
+const assets = createAssets(publicDir, { plugins: () => [{ id: "opportunities", dir: pluginDir, scripts: manifest.client, styles: manifest.styles }] });
 const token = crypto.randomUUID();
 const tsUser = process.env.DECK_PREVIEW_TS_USER || "";
 mkdirSync(dir, { recursive: true, mode: 0o700 });

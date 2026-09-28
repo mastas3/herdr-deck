@@ -6,7 +6,6 @@ import type { Automations } from "../automations";
 import type { McpCtx } from "../mcp";
 import type { Assets } from "../assets";
 import type { researchForServer } from "../autoresearch-server";
-import type { createOpportunityService } from "../opportunity-service";
 import type { createPlugins } from "../plugins";
 import type { PluginHost } from "../plugin-host";
 import type { createCodePluginApi } from "../plugin-code-api";
@@ -24,7 +23,7 @@ export type Hub = {
   presence: Map<string, { key: string | null; at: number }>;
   push: PushStore; auto: Automations | undefined;
   research: ReturnType<typeof researchForServer>;
-  opportunities: ReturnType<typeof createOpportunityService>; plugins: ReturnType<typeof createPlugins>;
+  plugins: ReturnType<typeof createPlugins>;
   pluginHost: PluginHost; codePlugins: ReturnType<typeof createCodePluginApi>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
   decisions: Map<string, Decision>; scheduleDecisions: () => void; broadcastGraves: () => void; refreshShared: () => Promise<void>;
@@ -40,5 +39,3 @@ export type DiscoverService = {
   ingredients(max: number): Promise<{ list: any[] }>;
   handle(path: string, body: any): Promise<any>;
 };
-/** The part of the leads plugin's service Opportunities collects public sources with. */
-export type LeadsService = { search(query: string, kind: "audience" | "idea", force: boolean): any; handle(path: string, body: any): Promise<any> };

@@ -11,8 +11,6 @@ import { Deck, type Row } from "./deck";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
 import { researchForServer } from "./autoresearch-server";
-import { createOpportunityService } from "./opportunity-service";
-import { runOpportunityWeb } from "./opportunity-web";
 import { createPlugins } from "./plugins";
 import { createPluginHost } from "./plugin-host";
 import { createCodePluginApi } from "./plugin-code-api";
@@ -30,7 +28,7 @@ import { startQueue } from "./http/queue";
 import { createMcp } from "./http/mcp-ctx";
 import { createAuth } from "./http/auth";
 import { createRoutes } from "./http/routes";
-import type { DiscoverService, Hub, LeadsService } from "./http/hub";
+import type { DiscoverService, Hub } from "./http/hub";
 
 makeDataDirs();
 const API_TOKEN = loadApiToken();
@@ -62,16 +60,6 @@ const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: cha
 // and get nothing while it's off. Leads, Opportunities and Research keep their files in its data folder, as before.
 const DISCOVER_DIR = process.env.DECK_DISCOVER_DIR || DATA_DIR;
 const discover = () => pluginHost.service<DiscoverService>("discover");
-// Opportunities collects public sources through the leads plugin; with it off, a research job ends with that reason.
-const leadsOn = () => { const l = pluginHost.service<LeadsService>("leads"); if (!l) throw new Error("Leads is off: turn it on in Plugins to collect public sources"); return l; };
-const opportunities = createOpportunityService({
-  dir: DISCOVER_DIR,
-  ingredients: async () => (await discover()?.ingredients(2500))?.list ?? [],
-  archive: async () => (await discover()?.handle("/api/discover/archive", { limit: 500, all: true }))?.ideas ?? [],
-  research: (query, kind, force) => leadsOn().search(query, kind, force),
-  researchStatus: (id) => leadsOn().handle("/api/leads/status", { id }),
-  deepResearch: runOpportunityWeb,
-});
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
 const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
@@ -109,11 +97,9 @@ const pluginHost = createPluginHost({
   },
 });
 // What plugins need from the core that no plugin owns: the other machines' decks (the connections plugin reads their
-// inventories), recipes from enabled data plugins, and Opportunities (whose evidence store the gallery shares) until
-// it is a plugin itself.
+// inventories) and recipes from enabled data plugins.
 pluginHost.provideCore("remotes", { get: (id: string) => remotes.get(id), all: () => [...remotes.values()] });
 pluginHost.provideCore("data-plugins", { recipes: () => plugins.recipes() });
-pluginHost.provideCore("opportunities", opportunities);
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
@@ -148,7 +134,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, research, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, research, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };

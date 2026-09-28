@@ -1,0 +1,16 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "opportunities",
+  "name": "Opportunities",
+  "version": "1.0.0",
+  "description": "Business opportunities as dossiers: buyer, problem, sources, claims, reviews, economics and buyer tests, in their own view and as Discover → Evidence & tests. It keeps the evidence notebook Discover's gallery shares, and collects public sources through Leads.",
+  "server": "server.ts",
+  "client": ["opportunities.js"],
+  "styles": ["opportunities.css"],
+  "machine": "any",
+  "uses": ["discover", "leads"],
+  "routes": ["opportunities"],
+  "provides": ["opportunities"],
+  "extends": ["discover.evidence", "discover.tabs"]
+}
