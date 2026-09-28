@@ -2,8 +2,8 @@
 // shows a clear offline page when the Mac can't be reached, and shows push notifications from the hub.
 // Live data is never cached.
 const CACHE = "deck-v8"; // v8 drops v7's copy of the old app.js
-// Served under a content hash (?v=…, src/assets.ts): everything public/assets.json names.
-const HASHED = /^\/(?:js\/[\w.-]+\.js|css\/[\w.-]+\.css)$/;
+// Served under a content hash (?v=…, src/assets.ts): everything public/assets.json names, and running plugins' files.
+const HASHED = /^\/(?:js\/[\w.-]+\.js|css\/[\w.-]+\.css|plugins\/[a-z0-9][a-z0-9-]{1,39}\/(?:[\w.-]+\/){0,3}[\w.-]+\.(?:js|css))$/;
 const ASSETS = [
   "/offline.html", "/manifest.webmanifest", "/icon.svg", "/icon-192.png", "/icon-512.png", "/icon-180.png",
   "/fonts/BarlowSemiCondensed-400.woff2", "/fonts/BarlowSemiCondensed-600.woff2", "/fonts/SourceSerif4-400.woff2",

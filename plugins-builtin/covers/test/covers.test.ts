@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { AVOID, categoryOf, codexBusy, coverPrompt, findBin, makeCovers, MAX_BYTES, PALETTES, pngSize } from "../src/cover-art";
-import { afterRun, createCovers, decide, DEFAULTS, freshState, rollDay, selectCandidates, type CoverState } from "../src/covers";
-import { openIdeaArchive } from "../src/idea-archive";
+import { AVOID, categoryOf, codexBusy, coverPrompt, findBin, makeCovers, MAX_BYTES, PALETTES, pngSize } from "../cover-art";
+import { afterRun, createCovers, decide, DEFAULTS, freshState, rollDay, selectCandidates, type CoverState } from "../covers";
+import { openIdeaArchive } from "../../../src/idea-archive";
 
 const dir = mkdtempSync(`${tmpdir()}/deck-covers-`);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

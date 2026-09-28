@@ -3,7 +3,8 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, 
 import { tmpdir } from "node:os";
 import { createGalleryServer, dayOf, parseRecipe, type GalleryServerDeps } from "../src/gallery-server";
 import { KIT_FILES } from "../src/ideagen/kit-files";
-import { coverIdOf, createCovers } from "../src/covers";
+import { coverIdOf } from "../src/idea-archive";
+import { createCovers } from "../plugins-builtin/covers/covers";
 import type { PainCorpus } from "../src/ideagen/types";
 import type { TrendSet } from "../src/ideagen/trends";
 

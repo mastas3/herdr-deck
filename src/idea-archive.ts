@@ -4,6 +4,10 @@ import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
+/** The id an idea is archived and painted under (the covers plugin serves /covers/<coverId>.webp): ids with other
+ *  characters (the gallery's "C-audience:4:name:x1") are made safe for a file name. */
+export const coverIdOf = (id: string) => String(id).replace(/[^\w-]+/g, "_").slice(0, 64);
+
 export type ArchivedIdea = { id: string; title: string; source: string; row?: string; score?: number; dropped?: boolean; createdAt: number; data: any };
 
 export function openIdeaArchive(file: string) {

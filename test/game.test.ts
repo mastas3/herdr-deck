@@ -201,7 +201,7 @@ describe("quest pushes: the digest by default, the rest only if you ask", () => 
     const auto = new Automations({
       file: `${root}/auto.json`, rows: () => [], changed: () => {}, viewing: () => false, canSend: () => true, ctx: () => ({ machineLabel: () => "", multi: false }),
       deliver: async (m, o) => { const to = devices.filter((d) => !o?.filter || o.filter(d)).map((d) => d.id); sent.push({ body: m.body, to }); return { sent: to.length, targets: to.length, dropped: 0 }; },
-      questLines: async () => ["⚔ astra · boss: First paying customer (100% health)", "1. Post the demo (+160 XP)"],
+      digest: () => [{ title: "Today's quests", pref: "questDigest", lines: async () => ["⚔ astra · boss: First paying customer (100% health)", "1. Post the demo (+160 XP)"] }],
     });
     await auto.runDigest(true);
     expect(sent.length).toBe(2);

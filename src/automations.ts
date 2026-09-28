@@ -207,6 +207,7 @@ export const digestMessage = (d: Digest, badge?: number): Message => ({ kind: "d
 
 // ── the rules engine on the hub ──────────────────────────────────────────
 export type Deliver = (m: Message, o?: { ttl?: number; urgency?: "very-low" | "low" | "normal" | "high"; topic?: string; filter?: (d: Device) => boolean }) => Promise<{ sent: number; targets: number; dropped: number }>;
+export type DigestSection = { title: string; lines: () => Promise<string[]>; pref?: string };
 export type AutoDeps = {
   file: string;
   rows: () => Row[];
@@ -215,8 +216,9 @@ export type AutoDeps = {
   viewing: (key: string) => boolean;
   ctx: () => Ctx;
   canSend: () => boolean; // false on a node: only the hub sends pushes
-  /** Today's quests for the digest (the game, src/game.ts): pushed to devices that keep "quests in the digest" on. */
-  questLines?: () => Promise<string[]>;
+  /** Extra sections for the digest push (the "digest.lines" extension point, e.g. today's quests). A section with a
+   *  `pref` goes only to devices that keep that preference on. */
+  digest?: () => DigestSection[];
   now?: () => number;
 };
 
@@ -295,14 +297,19 @@ export class Automations {
       if (!this.d.canSend()) note += "; not pushed (this machine is a node)";
       else {
         const badge = rows.filter(needsYou).length;
-        const quests = await this.d.questLines?.().catch(() => [] as string[]) ?? [];
+        const sections = (await Promise.all((this.d.digest?.() ?? []).map(async (s) => ({ ...s, got: await s.lines().catch(() => [] as string[]) })))).filter((s) => s.got.length);
         const o = { ttl: 12 * 3600, urgency: "normal" as const, topic: "digest" };
-        let res = await this.d.deliver(digestMessage(dg, badge), quests.length ? { ...o, filter: (d) => d.prefs.questDigest === false } : o);
-        if (quests.length) {
-          const q = await this.d.deliver({ ...digestMessage(dg, badge), body: `${dg.body}\n\nToday's quests\n${quests.join("\n")}` }, { ...o, filter: (d) => d.prefs.questDigest !== false });
-          res = { sent: res.sent + q.sent, targets: res.targets + q.targets, dropped: res.dropped + q.dropped };
-          note += ", with today's quests";
+        // One push per combination of optional sections, each to the devices whose preferences match it exactly.
+        const optional = sections.filter((s) => s.pref);
+        const keeps = (d: Device, s: DigestSection) => (d.prefs as Record<string, unknown>)[s.pref!] !== false;
+        let res = { sent: 0, targets: 0, dropped: 0 };
+        for (let mask = 0; mask < 1 << optional.length; mask++) {
+          const on = (s: DigestSection) => !s.pref || !!(mask & (1 << optional.indexOf(s)));
+          const body = [dg.body, ...sections.filter(on).map((s) => `${s.title}\n${s.got.join("\n")}`)].join("\n\n");
+          const r = await this.d.deliver({ ...digestMessage(dg, badge), body }, optional.length ? { ...o, filter: (d) => optional.every((s) => keeps(d, s) === on(s)) } : o);
+          res = { sent: res.sent + r.sent, targets: res.targets + r.targets, dropped: res.dropped + r.dropped };
         }
+        if (sections.length) note += `, with ${sections.map((s) => s.title.charAt(0).toLowerCase() + s.title.slice(1)).join(" and ")}`;
         note += res.targets ? `, pushed to ${res.sent} of ${res.targets} device${res.targets === 1 ? "" : "s"}` : "; no device wants digest pushes";
       }
     }

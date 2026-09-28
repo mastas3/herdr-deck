@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "covers",
+  "name": "Covers",
+  "version": "1.0.0",
+  "description": "Paints a cover image for the best Discover ideas, a few a day, with Codex on the hub.",
+  "server": "server.ts",
+  "client": ["covers.js"],
+  "machine": "hub",
+  "routes": ["covers", "/covers/"],
+  "provides": ["covers"]
+}

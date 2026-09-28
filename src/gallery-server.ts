@@ -19,7 +19,7 @@ import { budgetedClaude, budgetedJev, createBudget, type ClaudeRunner, type JevR
 import type { Gallery, IdeaCard, Inventory, PainCorpus, StrategyId } from "./ideagen/types";
 import type { IdeaArchive } from "./idea-archive";
 import type { GhRes } from "./discover";
-import { coverIdOf } from "./covers";
+import { coverIdOf } from "./idea-archive";
 
 const DAY = 86_400_000;
 export type Job = {

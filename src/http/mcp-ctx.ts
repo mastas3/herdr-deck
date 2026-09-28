@@ -2,7 +2,7 @@
 import { splitKey, type RemoteHost } from "../federation";
 import { inventory, inventoryText } from "../connections";
 import { needsYou, type Decision } from "../decisions";
-import { appendAudit, mcpToken, readAudit, type McpCtx } from "../mcp";
+import { appendAudit, mcpToken, readAudit, type McpCtx, type McpTool } from "../mcp";
 import type { Row } from "../deck";
 import type { Detail } from "../transcript";
 
@@ -13,6 +13,8 @@ type Deps = {
   sendText: (key: string, text: string) => Promise<void>; startSession: (body: any) => Promise<any>;
   notice: (data: { key?: string; ok: boolean; message: string }) => void; broadcast: (event: string, data: unknown) => void;
   library: { evidence: (q: string, k: number, use: any) => Promise<{ text: string }> };
+  /** MCP tools from running plugins. */
+  tools: () => McpTool[];
 };
 
 /** Reads (or makes) the MCP token, so call it where startup wants that to happen. */
@@ -73,6 +75,7 @@ export function createMcp(deps: Deps) {
     },
     audit: (e) => { appendAudit(e); broadcast("audit", readAudit(30)); },
     library: async (q, k) => (await library.evidence(q, k, "research")).text,
+    tools: deps.tools,
   };
   return { token: MCP_TOKEN, ctx: mcpCtx };
 }

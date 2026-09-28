@@ -2,11 +2,13 @@
 // saved ones, then the critic's favourites (score >= 7), then the top idea of each feed row. One at a time, spaced
 // out, under a daily cap (covers.json), never while someone else's Codex is busy, stopping after repeated failures.
 // Covers live in <data>/covers/<ideaId>.webp (+ _thumb.webp) and are served at /covers/<id>.webp; idea objects in
-// Discover replies get `coverUrl` (and `coverCat`, the palette the card's placeholder uses). Art: src/cover-art.ts.
+// Discover replies get `coverUrl` (and `coverCat`, the palette the card's placeholder uses). Art: cover-art.ts beside it.
 import { Database } from "bun:sqlite";
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { codexBusy, codexPaint, coverPrompt, categoryOf, imageTool, makeCovers, PALETTES, readJson, readPs, type CoverIdea } from "./cover-art";
-import { dayOf } from "./mix";
+
+/** The local calendar day of a time ("2026-09-28"): the daily cap starts over at midnight. */
+const dayOf = (t: number) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 export type CoverConf = { auto: boolean; dailyCap: number; spacingMin: number; busyCpu: number; maxFailures: number; minScore: number };
 export const DEFAULTS: CoverConf = { auto: true, dailyCap: 12, spacingMin: 20, busyCpu: 20, maxFailures: 3, minScore: 7 };
@@ -18,8 +20,6 @@ export type CoverState = {
 };
 export const freshState = (now: number): CoverState => ({ day: dayOf(now), today: 0, lastAt: 0, fails: 0, retryAt: 0, failed: {}, queue: [] });
 const ID = /^[\w-]{1,64}$/;
-/** Ids with other characters (the gallery's "C-audience:4:name:x1") are painted and served under this one. */
-export const coverIdOf = (id: string) => String(id).replace(/[^\w-]+/g, "_").slice(0, 64);
 const MIN = 60_000;
 
 // ── which idea next ──
@@ -149,8 +149,10 @@ export function createCovers(deps: CoverDeps) {
     // Someone asked for a cover while this one was painting: theirs goes next, not at the next minute.
     if (st.queue.length) setTimeout(() => tick(), 0);
   }
+  let stopped = false;
   /** One look at the clock: start the next cover if it's time. Returns the run's promise when one started. */
   function tick(): Promise<void> | undefined {
+    if (stopped) return;
     if (!deps.enabled()) { waiting = { why: "hub-only" }; return; }
     const cfg = conf();
     const rolled = rollDay(st, now());
@@ -160,8 +162,6 @@ export function createCovers(deps: CoverDeps) {
     waiting = { why: "painting" };
     return run(d.run).catch(() => { running = undefined; });
   }
-  let timer: ReturnType<typeof setInterval> | undefined;
-
   function status() {
     const cfg = conf();
     return {
@@ -215,9 +215,9 @@ export function createCovers(deps: CoverDeps) {
       if (!tokenOk) return new Response("forbidden", { status: 403 });
       try { return Response.json(await handle(await req.json().catch(() => ({})))); } catch (e: any) { return Response.json({ error: e?.message ?? String(e) }, { status: 400 }); }
     },
-    respond, status, tick, has: (id: string) => have.has(id), coverUrl,
-    start(firstMs = 90_000) { clearInterval(timer); setTimeout(() => tick(), firstMs).unref?.(); timer = setInterval(() => tick(), MIN); timer.unref?.(); },
-    stop() { clearInterval(timer); running?.abort.abort(); db?.close(); db = undefined; },
+    respond, status, tick, handle, has: (id: string) => have.has(id), coverUrl,
+    /** The job's clock is its owner's (the plugin host's timers); stop() makes any later tick a no-op and aborts a painting. */
+    stop() { stopped = true; running?.abort.abort(); db?.close(); db = undefined; },
     _state: () => st,
   };
 }

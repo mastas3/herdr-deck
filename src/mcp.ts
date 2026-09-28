@@ -31,7 +31,10 @@ export type McpCtx = {
   audit: (entry: { tool: string; target?: string; text?: string }) => void;
   /** Founder Library evidence as text (src/library.ts). Optional: a deck without it doesn't list the tool. */
   library?: (q: string, k: number) => Promise<string>;
+  /** Tools running plugins add (the "mcp.tools" extension point). */
+  tools?: () => McpTool[];
 };
+export type McpTool = { name: string; description: string; inputSchema: object; call: (args: any) => Promise<unknown> };
 
 const TOOLS = [
   { name: "deck_sessions", description: "List live agent sessions across all machines (herdr panes and Codex app threads): key, title, project, machine, agent, status (working|blocked|done|idle|empty), what it's doing now, last activity. Use the key with the other tools.",
@@ -67,7 +70,10 @@ export async function handleMcp(msg: any, ctx: McpCtx): Promise<any | undefined>
         return ok({ protocolVersion: params?.protocolVersion ?? "2025-06-18", capabilities: { tools: { listChanged: false } }, serverInfo: { name: "herdr-deck", version: "1.0.0" },
           instructions: "herdr deck: the user's live view of every coding-agent session across their machines. Read freely; message or start agents only when it clearly helps the user's request." });
       case "ping": return ok({});
-      case "tools/list": return ok({ tools: ctx.library ? TOOLS : TOOLS.filter((t) => t.name !== "deck_library") });
+      case "tools/list": {
+        const extra = (ctx.tools?.() ?? []).filter((t) => !TOOLS.some((x) => x.name === t.name)).map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
+        return ok({ tools: [...(ctx.library ? TOOLS : TOOLS.filter((t) => t.name !== "deck_library")), ...extra] });
+      }
       case "tools/call": {
         const a = params?.arguments ?? {};
         switch (params?.name) {
@@ -91,6 +97,8 @@ export async function handleMcp(msg: any, ctx: McpCtx): Promise<any | undefined>
             return ok(text(r));
           }
         }
+        const plugin = ctx.tools?.().find((t) => t.name === params?.name && !TOOLS.some((x) => x.name === t.name));
+        if (plugin) return ok(text(await plugin.call(a)));
         return fail(-32602, `unknown tool ${params?.name}`);
       }
     }

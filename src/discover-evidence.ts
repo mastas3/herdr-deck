@@ -1,7 +1,7 @@
 // Discover and Opportunities share one evidence notebook. Generated text never grants a reviewed stage.
 import { createHash } from "node:crypto";
 import { createOpportunities, independentGroups, sourceCurrent, type Opportunity } from "./opportunities";
-import { coverIdOf } from "./covers";
+import { coverIdOf } from "./idea-archive";
 import { publicResearchUrl } from "./opportunity-web";
 import type { IdeaCard } from "./ideagen/types";
 

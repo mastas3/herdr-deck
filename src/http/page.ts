@@ -1,15 +1,15 @@
 // The page and its files: index.html with the live state inlined, the hashed client assets, fonts, icons and the
 // service worker; plus the reply helpers every route uses.
 import { readFileSync } from "node:fs";
-import { createAssets } from "../assets";
+import { createAssets, type PluginAssets } from "../assets";
 
 const PUBLIC = new URL("../../public", import.meta.url).pathname;
 const HTML_PATH = `${PUBLIC}/index.html`;
 
 /** The page, read at startup (DEV: on every load). */
-export function createPage(o: { dev: boolean; fullState: () => unknown }) {
-  // The files public/assets.json names are served under content hashes (src/assets.ts).
-  const assets = createAssets(PUBLIC, { dev: o.dev, log: (s) => console.warn(s) });
+export function createPage(o: { dev: boolean; fullState: () => unknown; plugins: () => PluginAssets[] }) {
+  // The files public/assets.json names, then running plugins' files, are served under content hashes (src/assets.ts).
+  const assets = createAssets(PUBLIC, { dev: o.dev, log: (s) => console.warn(s), plugins: o.plugins });
   let htmlTemplate = readFileSync(HTML_PATH, "utf8");
   function page() {
     if (o.dev) htmlTemplate = readFileSync(HTML_PATH, "utf8");

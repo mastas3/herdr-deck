@@ -1,11 +1,19 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { SCRIPTS, createAssets } from "../src/assets";
+import { SCRIPTS, createAssets, type PluginAssets } from "../src/assets";
+import { parseCodeManifest, type CodeManifest } from "../src/plugin-code-format";
 
 const root = mkdtempSync(`${tmpdir()}/deck-assets-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 const PUB = new URL("../public", import.meta.url).pathname;
+const BUILTIN = new URL("../plugins-builtin", import.meta.url).pathname;
+/** Every built-in plugin's manifest, with its page files as paths from the repo. */
+const builtins = readdirSync(BUILTIN).filter((d) => existsSync(`${BUILTIN}/${d}/plugin.json`)).map((d) => {
+  const r = parseCodeManifest(JSON.parse(readFileSync(`${BUILTIN}/${d}/plugin.json`, "utf8")));
+  if (!r.ok) throw new Error(`${d}: ${JSON.stringify(r.problems)}`);
+  return { dir: `${BUILTIN}/${d}`, m: r.manifest as CodeManifest };
+});
 
 function fixture() {
   const dir = mkdtempSync(`${root}/pub-`);
@@ -47,6 +55,25 @@ describe("hashed client assets", () => {
     expect(get(a, "/js/missing.js")!.status).toBe(404);
     expect(get(a, "/icon.svg")).toBeUndefined();
     expect(get(a, "/app.js")).toBeUndefined();
+  });
+  test("running plugins' files come after the deck's own, only while they run, and can't leave their folder", async () => {
+    const dir = fixture(), pdir = mkdtempSync(`${root}/plug-`);
+    mkdirSync(`${pdir}/ui`);
+    writeFileSync(`${pdir}/ui/p.js`, "var P = 1;"); writeFileSync(`${pdir}/p.css`, ".p{}"); writeFileSync(`${pdir}/secret.js`, "no");
+    let on: PluginAssets[] = [{ id: "demo", dir: pdir, scripts: ["ui/p.js", "../x.js"], styles: ["p.css"] }];
+    const a = createAssets(dir, { plugins: () => on });
+    const out = a.inject(HTML);
+    const srcs = [...out.matchAll(/<script src="([^"?]+)\?v=/g)].map((m) => m[1]);
+    expect(srcs).toEqual(["/js/b.js", "/js/a.js", "/plugins/demo/ui/p.js"]);
+    expect(out).toMatch(/css\/g\.css\?v=\w+">\n<link rel="stylesheet" href="\/plugins\/demo\/p\.css\?v=\w+">/);
+    const js = get(a, `/plugins/demo/ui/p.js?v=${a.list().find((x) => x.path === "plugins/demo/ui/p.js")!.hash}`)!;
+    expect(js.headers.get("cache-control")).toContain("immutable");
+    expect(await js.text()).toBe("var P = 1;");
+    expect(get(a, "/plugins/demo/secret.js")!.status).toBe(404);
+    expect(get(a, "/plugins/demo/../x.js")?.status ?? 404).toBe(404);
+    on = [];
+    expect(a.inject(HTML)).not.toContain("/plugins/");
+    expect(get(a, "/plugins/demo/ui/p.js")!.status).toBe(404);
   });
   test("a changed file gets a new hash in dev (and keeps its first one otherwise)", () => {
     const dir = fixture();
@@ -101,16 +128,23 @@ describe("client files", () => {
   test("every script and style public/assets.json names exists", () => {
     for (const p of [...raw.scripts, ...raw.styles]) expect(existsSync(`${PUB}/${p}`) ? p : `missing: ${p}`).toBe(p);
   });
-  test("no two client scripts declare the same top-level name (they share one global scope)", () => {
+  const pluginScripts = builtins.flatMap(({ dir, m }) => m.client.map((f) => `${dir}/${f}`));
+  test("every built-in plugin's page files stay under 400 lines", () => {
+    const all = builtins.flatMap(({ dir, m }) => [...m.client, ...m.styles].map((f) => `${dir}/${f}`));
+    expect(all.length).toBeGreaterThan(0);
+    for (const f of all) expect([f, readFileSync(f, "utf8").split("\n").length < 400]).toEqual([f, true]);
+  });
+  test("no two client scripts, the deck's or any plugin's, declare the same top-level name (they share one global scope)", () => {
     const seen = new Map<string, string>(), dups: string[] = [];
-    for (const p of raw.scripts) for (const n of topLevelNames(readFileSync(`${PUB}/${p}`, "utf8"))) {
+    for (const p of [...raw.scripts.map((s: string) => `${PUB}/${s}`), ...pluginScripts]) for (const n of topLevelNames(readFileSync(p, "utf8"))) {
       if (seen.has(n)) dups.push(`${n}: ${seen.get(n)} and ${p}`);
       else seen.set(n, p);
     }
     expect(dups).toEqual([]);
-    expect(seen.get("S")).toBe("js/core.js"); // the scanner finds what it should
-    expect(seen.get("renderList")).toBe("js/list.js");
-    expect(seen.get("queued")).toBe("js/list.js"); // "let lastOrder = "", queued = false"
+    expect(seen.get("S")).toBe(`${PUB}/js/core.js`); // the scanner finds what it should
+    expect(seen.get("renderList")).toBe(`${PUB}/js/list.js`);
+    expect(seen.get("queued")).toBe(`${PUB}/js/list.js`); // "let lastOrder = "", queued = false"
+    expect(seen.get("covPut")).toBe(`${BUILTIN}/covers/covers.js`);
   });
   test("the scanner reads one statement's declarators, not its brackets", () => {
     expect(topLevelNames('const a = f(1, 2), b = { c: 3, d: [4, 5] };\nlet e, g = "x,y";\n  const inner = 1;\nasync function h() {}\nfunction* k() {}')).toEqual(["a", "b", "e", "g", "h", "k"]);
@@ -138,7 +172,7 @@ describe("service worker", () => {
   test("hashed js/* and css/* are served cache-first; a new version replaces the old one", async () => {
     const w = sw();
     expect(w.self.__CACHE).not.toBe("deck-v7");
-    for (const p of ["/js/core.js?v=1", "/js/gallery-core.js?v=1", "/css/gallery.css?v=1"]) expect(await w.fetchOf(p)).toBe(true);
+    for (const p of ["/js/core.js?v=1", "/js/gallery-core.js?v=1", "/css/gallery.css?v=1", "/plugins/covers/covers.js?v=1"]) expect(await w.fetchOf(p)).toBe(true);
     await Bun.sleep(20);
     expect(w.store.has("http://deck/js/gallery-core.js?v=1")).toBe(true);
     await w.fetchOf("/js/gallery-core.js?v=2");
@@ -148,6 +182,6 @@ describe("service worker", () => {
   });
   test("unhashed assets, the API and other paths go to the network", async () => {
     const w = sw();
-    for (const p of ["/js/gallery-core.js", "/api/ideas/state", "/js/sub/x.js?v=1", "/events"]) expect(await w.fetchOf(p)).toBe(false);
+    for (const p of ["/js/gallery-core.js", "/api/ideas/state", "/js/sub/x.js?v=1", "/events", "/plugins/covers/covers.js", "/covers/x.webp?v=1"]) expect(await w.fetchOf(p)).toBe(false);
   });
 });

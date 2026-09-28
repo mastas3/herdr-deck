@@ -5,7 +5,6 @@ import type { PushStore } from "../push";
 import type { Automations } from "../automations";
 import type { McpCtx } from "../mcp";
 import type { Assets } from "../assets";
-import type { createCovers } from "../covers";
 import type { createDiscover } from "../discover";
 import type { galleryForServer } from "../gallery-server";
 import type { createLibrary } from "../library";
@@ -15,6 +14,8 @@ import type { createJourneys } from "../journey";
 import type { gameForServer } from "../game-server";
 import type { createOpportunityService } from "../opportunity-service";
 import type { createPlugins } from "../plugins";
+import type { PluginHost } from "../plugin-host";
+import type { createCodePluginApi } from "../plugin-code-api";
 import type { Graves, Self } from "./config";
 import type { Sse } from "./sse";
 import type { Machines } from "./machines";
@@ -28,9 +29,10 @@ export type Hub = {
   /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
   presence: Map<string, { key: string | null; at: number }>;
   push: PushStore; auto: Automations | undefined; game: ReturnType<typeof gameForServer>;
-  covers: ReturnType<typeof createCovers>; discover: ReturnType<typeof createDiscover>; gallery: ReturnType<typeof galleryForServer>;
+  discover: ReturnType<typeof createDiscover>; gallery: ReturnType<typeof galleryForServer>;
   library: ReturnType<typeof createLibrary>; leads: ReturnType<typeof createLeads>; research: ReturnType<typeof researchForServer>;
   journeys: ReturnType<typeof createJourneys>; opportunities: ReturnType<typeof createOpportunityService>; plugins: ReturnType<typeof createPlugins>;
+  pluginHost: PluginHost; codePlugins: ReturnType<typeof createCodePluginApi>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
   decisions: Map<string, Decision>; scheduleDecisions: () => void; broadcastGraves: () => void; refreshShared: () => Promise<void>;
   sessions: Sessions; chat: Chat; tools: ToolRuns; queue: { queues: Record<string, { id: string; text: string; at: number }[]>; saveQueues: () => void };

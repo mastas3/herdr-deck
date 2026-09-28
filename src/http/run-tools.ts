@@ -8,6 +8,8 @@ import type { Deck, Row } from "../deck";
 type Deps = {
   deck: Deck; remotes: Map<string, RemoteHost>; selfId: string;
   sendText: (key: string, text: string) => Promise<void>; notice: (data: { key?: string; ok: boolean; message: string }) => void;
+  /** Tools running plugins add (the "tools.entries" extension point). */
+  extraTools: () => Tool[];
 };
 type HistHit = HistSession & { machine?: string };
 
@@ -15,7 +17,7 @@ export function createToolRuns(deps: Deps) {
   const { deck, remotes, selfId, sendText, notice } = deps;
   function resolveTool(body: any): Tool | undefined {
     if (body.tool && typeof body.tool === "object") return body.tool as Tool; // a hub already resolved it
-    return loadTools().find((t) => t.id === body.id);
+    return loadTools().find((t) => t.id === body.id) ?? deps.extraTools().find((t) => t.id === body.id);
   }
 
   /** Waits for the agent to take the message and finish its turn (sequences: handoff, then compact). */

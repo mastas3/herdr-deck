@@ -1,5 +1,5 @@
 "use strict";
-// ── covers:start ── Painted covers on idea cards (server: src/covers.ts). One block: its CSS, a watcher that adds a
+// ── covers:start ── Painted covers on idea cards (the covers plugin; server: covers.ts beside this file). One block: its CSS, a watcher that adds a
 // cover (or its category's halftone placeholder) to feed cards, saved builds and Studio builds, the plan dialog's
 // Generate / Regenerate, and the "Covers: …" line on Ideas for you. Nothing else in the page needs to know about it.
 S.covers = { st: null, at: 0, want: null };
@@ -98,8 +98,8 @@ function covGenerate(x, force) {
   const idea = { title: x.title, pitch: x.pitch, row: x.row, customer: x.customer, problem: x.problem, offer: x.offer, how: x.how };
   coversLoad("generate", { id: x.id, force, idea }).then(() => { if (covBusy(x.id)) toast(`Painting a cover for “${x.title}”. About a minute.`); });
 }
-// The plan dialog shows the cover on top, with Generate / Regenerate.
-{
+// The plan dialog shows the cover on top, with Generate / Regenerate (when Discover, which opens it, is there).
+if (typeof openPlan === "function") {
   const open0 = openPlan;
   openPlan = function (x, from) {
     const r = open0(x, from);

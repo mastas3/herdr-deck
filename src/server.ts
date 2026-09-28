@@ -13,7 +13,6 @@ import { jevUsage } from "./jev";
 import { gameForServer } from "./game-server";
 import { Deck, type Row } from "./deck";
 import { createDiscover, gh } from "./discover";
-import { createCovers } from "./covers";
 import { galleryForServer } from "./gallery-server";
 import { createLeads } from "./leads";
 import { createLibrary, feedQuery } from "./library";
@@ -25,6 +24,8 @@ import { researchForServer } from "./autoresearch-server";
 import { createOpportunityService } from "./opportunity-service";
 import { runOpportunityWeb } from "./opportunity-web";
 import { createPlugins } from "./plugins";
+import { createPluginHost } from "./plugin-host";
+import { createCodePluginApi } from "./plugin-code-api";
 import { DATA_DIR, DEV, HOST, PORT, PUBLIC_URL, PUSH_DIR, TOKEN, loadApiToken, loadGraves, loadHosts, makeDataDirs } from "./http/config";
 import { createSse } from "./http/sse";
 import { createMachines } from "./http/machines";
@@ -64,7 +65,7 @@ const notice = (data: { key?: string; ok: boolean; message: string }) => { if (!
 const broadcastGraves = () => broadcast("graveyard", allGraves());
 const chat = createChat({ deck, selfId: SELF.id });
 const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice });
-const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice });
+const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 
 // Founder Library (Discover → Library): its own module; the server routes /api/library/* to it, and the Studio, the
@@ -84,9 +85,6 @@ const discover = createDiscover(
     feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
   },
 );
-// Cover images for Discover ideas, a few a day from Codex on the hub (src/covers.ts). DECK_COVERS_DIR moves them and their covers.json (tests).
-const COVERS_DIR = process.env.DECK_COVERS_DIR || `${process.env.DECK_DISCOVER_DIR || DATA_DIR}/covers`;
-const covers = createCovers({ dir: COVERS_DIR, confFile: process.env.DECK_COVERS_DIR ? `${COVERS_DIR}/covers.json` : `${DATA_DIR}/covers.json`, dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, enabled: () => !isNode() });
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
 const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
@@ -109,7 +107,8 @@ const journeys = createJourneys(
   { sessions: (p) => projectSessions(p, tools.historyEverywhere), live: () => liveSessions(allRows(), journeyHist.started), historyProjects, local: journeyHist },
 );
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
-const plugins = createPlugins({ dataDir: process.env.DECK_PLUGINS_DIR || DATA_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
+const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
+const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
 const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
@@ -125,20 +124,34 @@ const auto: Automations | undefined = new Automations({
   viewing,
   ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => dec.decisions.get(key)?.question }),
   canSend: () => !isNode(),
-  questLines: game.questLines,
+  // Today's quests are core until the quests plugin contributes them to "digest.lines" like any other section.
+  digest: () => [{ title: "Today's quests", pref: "questDigest", lines: game.questLines }, ...pluginHost.contributions("digest.lines")],
 });
 // Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
 const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, discover, machines });
 
+// Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
+// lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
+const pluginHost = createPluginHost({
+  builtinDir: new URL("../plugins-builtin", import.meta.url).pathname, root: PLUGINS_DIR, dataDir: DATA_DIR,
+  reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "game", "plugins"],
+  core: {
+    rows: () => allRows(), push, automations: () => auto, decisions: () => [...dec.decisions.values()], broadcast, notice, machines, isNode,
+    sessions: { start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole) },
+  },
+});
+const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
+
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
-for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, () => { for (const h of remotes.values()) h.stop(); stopHistory(); process.exit(0); });
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { for (const h of remotes.values()) h.stop(); stopHistory(); await Promise.race([pluginHost.stop(), Bun.sleep(2000)]); process.exit(0); });
 
 /** What a page starts from: inlined into the HTML, and sent first on every SSE connection. */
 function fullState() {
   return {
+    ...pluginHost.state(),
     token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
-    tools: loadTools(), toolGroups: GROUPS, queue: queue.queues, usage: live.usage(), history: historyStats(), decisions: [...dec.decisions.values()], radar: dec.radar.list(), jev: jevUsage(), canShare: canShare(),
-    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, game: game.summary(),
+    tools: [...loadTools(), ...pluginHost.contributions("tools.entries")], toolGroups: GROUPS, queue: queue.queues, usage: live.usage(), history: historyStats(), decisions: [...dec.decisions.values()], radar: dec.radar.list(), jev: jevUsage(), canShare: canShare(),
+    auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, game: game.summary(), plugins: { active: pluginHost.active() },
   };
 }
 
@@ -150,19 +163,22 @@ deck.onPatch(dec.scheduleDecisions);
 setInterval(dec.scheduleDecisions, 10_000);
 sse.startPing();
 
-const { assets, page } = createPage({ dev: DEV, fullState });
+const { assets, page } = createPage({ dev: DEV, fullState, plugins: () => pluginHost.assets() });
 const queue = startQueue({ dataDir: DATA_DIR, broadcast, allRows, sendAny: sessions.sendAny });
 const mcp = createMcp({
   selfId: SELF.id, remotes, allRows, localRow: hosts.localRow, machineLabelOf, detailFor: chat.detailFor, searchLocal: chat.searchLocal,
   historyEverywhere: tools.historyEverywhere, decisions: dec.decisions, sendText: sessions.sendText, startSession: sessions.startSession, notice, broadcast, library,
+  tools: () => pluginHost.contributions("mcp.tools"),
 });
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, covers, discover, gallery, library, leads, research, journeys, opportunities, plugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, discover, gallery, library, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };
+// Plugins start before the port opens, so their routes exist for the first request.
+await pluginHost.start();
 const serveOptions = { hostname: HOST, port: PORT, idleTimeout: 0, fetch: createRoutes(hub).fetch };
 
 // A restart can race the previous instance for the port. Retry briefly; if it never frees up, exit so
@@ -183,7 +199,6 @@ for (const h of remotes.values()) h.start();
 auto.start();
 setInterval(game.tick, 60_000);
 research.start();
-covers.start();
 // Warm the slow scans so the first "/" and the first Connections view are instant.
 setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
 

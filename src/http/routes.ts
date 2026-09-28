@@ -1,6 +1,7 @@
-// Every request, in order: the Host check, covers, the page and static files, the SSE stream, images and raw files,
-// then /mcp, then POSTs carrying the action token: uploads (files, plugins), the feature modules' own /api/* routes,
-// a session on another machine, and last the deck's API (api-hub.ts, api-connections.ts, api-sessions.ts).
+// Every request, in order: the Host check, GETs a running plugin serves (e.g. /covers/*), the page and static files,
+// the SSE stream, images and raw files, then /mcp, then POSTs carrying the action token: uploads (files, plugins),
+// running plugins' /api/* routes, the feature modules' own /api/* routes, a session on another machine, and last the
+// deck's API (api-hub.ts, api-connections.ts, api-sessions.ts).
 import { splitKey } from "../federation";
 import { choiceFromInput, recordOutcome } from "../decisions";
 import { handleMcp } from "../mcp";
@@ -13,22 +14,26 @@ import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, covers, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game, plugins } = hub;
+  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game, plugins, pluginHost, codePlugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
   const { hasApiToken, allowedHost } = auth;
 
+  /** Discover's replies get painted covers from the covers plugin when it's on (a shim until Discover is a plugin
+   *  that uses the service itself); with covers off the page draws each card's placeholder. */
+  const withCovers = (d: unknown) => pluginHost.service<{ respond(d: unknown): Response }>("covers")?.respond(d) ?? json(d);
+
   async function handle(req: Request): Promise<Response> {
     // Host check blocks DNS-rebinding; the token blocks cross-site POSTs.
     if (!allowedHost(req)) return new Response("forbidden host", { status: 403 });
     const url = new URL(req.url);
-    const cover = await covers.route(req, url, req.headers.get("x-deck-token") === TOKEN || hasApiToken(req));
-    if (cover) return cover;
 
     if (req.method === "GET") {
+      { const r = await pluginHost.get(req, url); if (r) return r; }
       // "/" and every session link (/s/<machine>/<agent>/<session id>) serve the same page; the page resolves the link.
-      if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/")) return send(req, page(), "text/html; charset=utf-8");
+      // So do a running plugin's page links. /p (project pages) is core until the projects plugin declares it.
+      if (url.pathname === "/" || url.pathname.startsWith("/s/") || url.pathname === "/p" || url.pathname.startsWith("/p/") || pluginHost.isPage(url.pathname)) return send(req, page(), "text/html; charset=utf-8");
       { const a = assets.serve(req, url); if (a) return a; }
       if (url.pathname === "/events") return sse.stream(fullState);
       { const f = await staticFile(url); if (f) return f; }
@@ -103,14 +108,16 @@ export function createRoutes(hub: Hub) {
         const choice = d && choiceFromInput(d, { text: body.text, keys: body.keys });
         if (d && choice) recordOutcome(d.key, choice === "other" ? "reply" : "answer", choice, d);
       }
+      { const r = await pluginHost.api(req, url, body); if (r) return r; }
       if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
-      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
-      if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return covers.respond(d); }
+      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
+      if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
       if (url.pathname.startsWith("/api/library/")) { const d = await library.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
       { const g = await game.route(url.pathname, body); if (g) return json(g.data, g.status); }
+      if (url.pathname.startsWith("/api/plugins/code")) { const d = await codePlugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
