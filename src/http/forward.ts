@@ -55,14 +55,14 @@ export function createForward(deps: Deps) {
     if (!route.remote) return;
     if (path === "/api/brief") {
       const row = route.remote.rows.get(body.key);
-      const d = (await route.remote.post("/api/detail", { key: route.key })).data;
+      const d = (await route.remote.post("/api/detail", { key: route.key, chat: false })).data;
       if (!row || !d?.turns?.length) return json({ error: "This pane has no conversation to summarise" }, 400);
       const detail: Detail = { gen: 0, messages: [], touch: new Map(), started: d.started, recap: d.recap, turns: d.turns, images: [], compactions: d.compactions ?? 0, asks: d.asks ?? d.turns.length, startedAt: d.startedAt };
       return json({ brief: await writeBrief(briefKey(row), row.title, row.project, detail) });
     }
     if (path === "/api/detail") {
       const row = route.remote.rows.get(body.key);
-      const r = await route.remote.post(path, { key: route.key });
+      const r = await route.remote.post(path, { key: route.key, lite: body.lite, chat: body.chat, limit: body.limit });
       const brief = row?.sessionId ? cachedBrief(briefKey(row)) : undefined;
       return json({ ...r.data, brief, briefStale: !!brief && brief.asks !== r.data?.asks }, r.status);
     }

@@ -33,7 +33,9 @@ async function chatTick(now) {
   const visible = chatOn() && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
   const c = chatOf(chatId(key, sub));
   const live = r.status === "working" || r.status === "blocked" || (r.subagents ?? []).some((x) => x.running) || c.pending.length;
-  if (visible && !document.hidden && !c.busy && r.sessionId) {
+  // Opening a session: its detail, already on the way, brings this chat's first window.
+  const coming = !sub && c.gen == null && inflight.get(key)?.withChat;
+  if (visible && !document.hidden && !c.busy && !coming && r.sessionId) {
     const due = now === true || live || c.stamp !== r.lastActiveAt;
     if (due) {
       c.busy = true;
@@ -131,7 +133,7 @@ function blockHTML(b, key) {
   const all = b.ms;
   const open = expanded.has(b.key) || all.length <= 4;
   const shown = open ? all : all.slice(-3);
-  const line = (t) => { const w = toolWords(t.tool); const run = t.state === "running"; return `<div class="tool${run ? " run" : ""}${t.state === "error" ? " err" : ""}" title="${esc(t.tool)}">${toolIcon(w.k)}<span class="nm">${esc(run ? w.doing : w.done)}</span><span class="sm">${esc(t.summary ?? "")}</span>${run ? '<span class="spin"></span>' : t.state === "error" ? '<span class="x">failed</span>' : ""}</div>`; };
+  const line = (t) => { const w = toolWords(t.tool); const run = t.state === "running"; return `<div class="tool${run ? " run" : ""}${t.state === "error" ? " err" : ""}" title="${esc(t.tool)}">${toolIcon(w.k)}<span class="nm">${esc(run ? w.doing : w.done)}</span><span class="sm">${esc(t.summary ?? "")}${run ? `<span class="shine" data-text="${esc(t.summary ?? "")}" aria-hidden="true"></span>` : ""}</span>${run ? '<span class="spin"></span>' : t.state === "error" ? '<span class="x">failed</span>' : ""}</div>`; };
   const allImgs = all.flatMap((t) => t.images ?? []);
   return `<div class="tools msg">${MSG_TOOLS}${!open ? `<button class="fold" data-fold="${b.key}">▸ ${all.length - 3} earlier tool calls</button>` : all.length > 4 ? `<button class="fold" data-fold="${b.key}">▾ hide</button>` : ""}${shown.map(line).join("")}${imgs(allImgs.slice(-6))}</div>`;
 }

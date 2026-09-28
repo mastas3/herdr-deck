@@ -17,7 +17,17 @@
 .tool .x { color: var(--blocked); font: 12px var(--sans); flex: none; }
 .tool.err .ti { color: var(--blocked); }
 .tool.run .nm, .tool.run .ti { color: var(--working); }
-.tool.run .sm { background: linear-gradient(90deg, var(--ink-3) 0%, var(--ink) 45%, var(--ink-3) 90%); background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.6s linear infinite; }
+/* Running: a light sweeps across the summary. A copy of the text in --ink sits in a masked strip; the strip slides one
+   way and the copy slides back, so the letters stay put and only transforms animate (no repaint per frame). The strip's
+   tiles and travel match a 220%-wide gradient moving from 120% to -120%, the text-clipped sweep this replaces. */
+.tool.run .sm { position: relative; }
+.tool.run .shine { position: absolute; top: 0; bottom: 0; left: -220%; width: 660%; pointer-events: none; animation: shine 1.6s linear infinite;
+  -webkit-mask: linear-gradient(90deg, transparent 0%, #000 45%, transparent 90%) 0 0 / calc(100% / 3) 100% repeat-x;
+  mask: linear-gradient(90deg, transparent 0%, #000 45%, transparent 90%) 0 0 / calc(100% / 3) 100% repeat-x; }
+.tool.run .shine::after { content: attr(data-text); position: absolute; top: 0; left: calc(100% / 3); width: calc(100% / 6.6); overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; color: var(--ink); animation: shine-back 1.6s linear infinite; }
+@keyframes shine { from { transform: translateX(-21.8182%); } to { transform: translateX(21.8182%); } }
+@keyframes shine-back { from { transform: translateX(144%); } to { transform: translateX(-144%); } }
 .choices { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 12px; }
 .choice { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 12px; background: var(--raise); }
 .choice .cl { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; font: 700 13px var(--sans); background: var(--bg); border: 1px solid var(--line-2); color: var(--ink-2); }
