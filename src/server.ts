@@ -104,6 +104,7 @@ const pluginHost = createPluginHost({
       start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole),
       screen: async (key) => { const row = allRows().find((r) => r.key === key); return row ? ((await dec.screenOf(row)) ?? []).join("\n") : ""; },
       keys: async (key, keys) => { const f = deck.find(key); if (f) await call(f.sess.socket, "pane.send_keys", { pane_id: f.row.paneId, keys }); },
+      reopen: (o) => sessions.openTab(o),
     },
   },
 });

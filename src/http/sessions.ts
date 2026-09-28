@@ -11,6 +11,8 @@ import type { CodexControl } from "../codex-control";
 import { codexUploadImages } from "./codex";
 
 type SendOptions = { requestId?: string; onlyIdle?: boolean };
+/** Where to reopen a session (a graveyard entry, or a crash-guard snapshot's pane). */
+export type ReopenSpec = { herdr?: string; workspaceId?: string; workspace?: string; createWorkspace?: boolean; cwd: string; tab?: string; project?: string; resume?: string };
 
 type Deps = {
   deck: Deck; graves: Graves; remotes: Map<string, RemoteHost>; broadcastGraves: () => void;
@@ -75,23 +77,45 @@ export function createSessions(o: Deps) {
     }
   }
 
-  async function reopen(id: string) {
-    const g = graves.list.find((x) => x.id === id);
-    if (!g) throw new Error("not in graveyard");
-    const sess = deck.sessions.get(g.herdr) ?? [...deck.sessions.values()].find((s) => s.online);
+  /**
+   * Opens a tab where a session used to be and resumes it there: the Closed list's Reopen, and plugins (crash-guard
+   * restores many this way). Its workspace by id, else by name; when neither exists any more and `createWorkspace` is
+   * set, a new workspace by that name (its first tab is the session's). Then waits for the shell's prompt and types
+   * the resume command.
+   */
+  async function openTab(g: ReopenSpec) {
+    const sess = (g.herdr ? deck.sessions.get(g.herdr) : undefined) ?? [...deck.sessions.values()].find((s) => s.online);
     if (!sess) throw new Error("no herdr server running");
-    const ws = sess.snap?.workspaces?.some((w: any) => w.workspace_id === g.workspaceId) ? g.workspaceId : undefined;
-    const r = await call(sess.socket, "tab.create", { cwd: g.cwd, label: g.tab || g.project, workspace_id: ws ?? null, focus: false });
-    const paneId = r.root_pane?.pane_id;
+    const wss: any[] = sess.snap?.workspaces ?? [];
+    let ws: string | undefined = wss.find((w) => w.workspace_id === g.workspaceId)?.workspace_id ?? (g.workspace ? wss.find((w) => w.label === g.workspace)?.workspace_id : undefined);
+    const label = g.tab || g.project;
+    let paneId: string | undefined;
+    if (!ws && g.workspace && g.createWorkspace) {
+      const r = await call(sess.socket, "workspace.create", { cwd: g.cwd, label: g.workspace, focus: false });
+      ws = r.workspace?.workspace_id;
+      paneId = r.root_pane?.pane_id;
+      if (label && r.tab?.tab_id) await call(sess.socket, "tab.rename", { tab_id: r.tab.tab_id, label }).catch(() => {});
+    }
+    if (!paneId) {
+      const r = await call(sess.socket, "tab.create", { cwd: g.cwd, label, workspace_id: ws ?? null, focus: false });
+      paneId = r.root_pane?.pane_id;
+    }
     if (g.resume && paneId) {
       // A slow .zshrc can drop input typed before the first prompt, so wait for it.
       await waitForPrompt(sess.socket, paneId);
       await call(sess.socket, "pane.send_input", { pane_id: paneId, text: g.resume, keys: ["enter"] });
     }
+    await deck.kick(sess.name);
+    return { key: paneId ? `${sess.name}/${paneId}` : undefined, paneId, workspaceId: ws };
+  }
+
+  async function reopen(id: string) {
+    const g = graves.list.find((x) => x.id === id);
+    if (!g) throw new Error("not in graveyard");
+    const { paneId } = await openTab(g);
     graves.list = graves.list.filter((x) => x.id !== id);
     graves.save();
     broadcastGraves();
-    await deck.kick(sess.name);
     return { ok: true, paneId };
   }
 
@@ -196,6 +220,6 @@ export function createSessions(o: Deps) {
     for (const h of new Set(keys.map((k) => k.split("/")[0]))) await deck.kick(h);
     return results;
   }
-  return { reopen, startSession, sendText, sendAny, closeLocal };
+  return { reopen, openTab, startSession, sendText, sendAny, closeLocal };
 }
 export type Sessions = ReturnType<typeof createSessions>;
