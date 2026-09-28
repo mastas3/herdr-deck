@@ -71,7 +71,7 @@ async function main() {
       if (px.png) writeFileSync(join(B, `${name}.diff.png`), Buffer.from(px.png.split(",")[1], "base64"));
     }
     // Clock times the deck's server prints (the digest's "01:53 PM") follow its real clock, not the page's frozen one.
-    const clock = (t) => t.replace(/\b\d{1,2}:\d{2}(?: ?[AP]M)?\b/g, "hh:mm");
+    const clock = (t) => t.replace(/\b\d{1,2}:\d{2}(?: ?[AP]M)?\b/g, "hh:mm").replace(/deck-ui-home-\d+/g, "deck-ui-home-N");
     ja.text = clock(ja.text); jb.text = clock(jb.text);
     if (ja.text !== jb.text) issues.push(`text:\n      ${textDiff(ja.text, jb.text).join("\n      ")}`);
     const keep = (r) => !o.ignore || !o.ignore.test(r);
