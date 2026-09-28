@@ -90,13 +90,7 @@
 .menu { animation: pop var(--dur-2) var(--ease-out); }
 .menu.up { animation-name: popup; }
 .slashpop { transform-origin: 30px 100%; }
-dialog { opacity: 0; transform: scale(.96);
-  transition: opacity var(--dur-1) var(--ease-in-out), transform var(--dur-1) var(--ease-in-out), overlay var(--dur-1) allow-discrete, display var(--dur-1) allow-discrete; }
-dialog[open] { opacity: 1; transform: none; transition-duration: var(--dur-3); transition-timing-function: var(--ease-out); }
-@starting-style { dialog[open] { opacity: 0; transform: scale(.96); } }
-dialog::backdrop { opacity: 0; transition: opacity var(--dur-1) linear, overlay var(--dur-1) allow-discrete, display var(--dur-1) allow-discrete; }
-dialog[open]::backdrop { opacity: 1; transition-duration: var(--dur-3); }
-@starting-style { dialog[open]::backdrop { opacity: 0; } }
+/* Dialogs open, close and drag down as sheets in nav.css. */
 .palette { transform-origin: 50% 0; }
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
 .toasts .toast { pointer-events: auto; }
@@ -122,9 +116,6 @@ dialog[open]::backdrop { opacity: 1; transition-duration: var(--dur-3); }
 :root.vt-swap::view-transition-old(root), :root.vt-swap::view-transition-new(root) { animation-duration: var(--dur-3); animation-timing-function: var(--ease-in-out); }
 
 @media (max-width: 760px) {
-  /* Sheets rise from the bottom edge instead of growing from the middle. */
-  dialog { transform: translateY(32px); }
-  @starting-style { dialog[open] { opacity: 0; transform: translateY(32px); } }
   .menu { animation-name: popup; }
   .toasts { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); align-items: stretch; }
 }

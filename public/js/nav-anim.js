@@ -5,7 +5,7 @@
 // happened when a slide starts, and reduced motion means none.
 const NAV_EASE = "cubic-bezier(.2, .8, .2, 1)";
 const NAV_PAR = 0.28, NAV_DIM = 0.3;
-const navReduced = () => reduceMotion.matches || load("motion", "") === "off";
+const navReduced = () => motion.reduced();
 // The screen's width, kept current: reading innerWidth mid-change forces a layout, pulling the next frame's work into
 // the tap.
 let navW = innerWidth;
