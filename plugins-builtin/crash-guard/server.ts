@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import type { Host } from "../../src/plugin-api";
 import { createStore } from "./store";
 import { createRestorer } from "./restore";
-import { isPane, looksLikeCrash, lostPanes, paneOf, sigOf, stillOpen, worthRestoring, type Crash, type Snapshot, type SnapPane } from "./snapshot";
+import { isPane, looksLikeCrash, restoreCommand, lostPanes, paneOf, sigOf, stillOpen, worthRestoring, type Crash, type Snapshot, type SnapPane } from "./snapshot";
 
 type CoreRemotes = { get(id: string): { post(path: string, body: unknown): Promise<{ status: number; data: any }>; online: boolean; conf: { id: string } } | undefined; all(): { online: boolean; conf: { id: string }; post(path: string, body: unknown): Promise<{ status: number; data: any }> }[] };
 const TICK = 5_000, MINUTE = 60_000, COALESCE = 20_000, MAX_AGE = 7 * 86400_000;
@@ -28,7 +28,7 @@ export function activate(host: Host) {
   let remoteJobs = false;
 
   const status = () => ({
-    machine: selfId(), at: Date.now(),
+    machine: selfId(), at: Date.now(), atOnce: num("atOnce", 2),
     snapshots: store.list().slice(0, 40),
     crashes: store.crashes().filter((c) => c.lost > 0),
     job: restorer.job(),
@@ -122,7 +122,7 @@ export function activate(host: Host) {
         const s = store.get(String(body.id ?? ""));
         if (!s) return Response.json({ error: "That snapshot is gone" }, { status: 404 });
         const cur = localPanes();
-        return { ...s, panes: s.panes.map((p) => ({ ...p, open: stillOpen(p, cur) })) };
+        return { ...s, panes: s.panes.map((p) => ({ ...p, open: stillOpen(p, cur), cmd: restoreCommand(p) })) };
       }
       case "restore": {
         const s = store.get(String(body.id ?? ""));
