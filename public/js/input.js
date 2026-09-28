@@ -13,25 +13,12 @@ function drag(el, axisOf, onMove, onEnd) {
     addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
   });
 }
-let lw = load("lw", 380), th = load("th", Math.round(innerHeight * 0.34)), tw = load("tw", Math.round(innerWidth * 0.4));
+let lw = load("lw", 380);
 const setLw = (v) => { lw = Math.round(Math.max(260, Math.min(innerWidth * 0.6, v))); app.style.setProperty("--lw-open", lw + "px"); };
-const setTh = (v) => { th = Math.round(Math.max(90, Math.min(innerHeight - 180, v))); app.style.setProperty("--th-open", th + "px"); };
-const setTw = (v) => { tw = Math.round(Math.max(280, Math.min(innerWidth - lw - 320, v))); app.style.setProperty("--tw-open", tw + "px"); };
-const unCollapse = () => { if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); } };
 drag($("splitV"), () => "x", (e) => setLw(e.clientX), () => { store("lw", lw); fitTerm(); });
-drag($("splitH"), () => (S.tpos === "right" ? "x" : "y"), (e) => {
-  if (S.tpos === "right") setTw(innerWidth - e.clientX);
-  else setTh(S.tpos === "top" ? e.clientY : innerHeight - e.clientY);
-  unCollapse();
-}, () => { store("th", th); store("tw", tw); fitTerm(); });
 $("splitV").ondblclick = () => { setLw(380); store("lw", lw); fitTerm(); };
-$("splitH").ondblclick = () => { if (S.tpos === "right") { setTw(Math.round(innerWidth * 0.4)); store("tw", tw); } else { setTh(Math.round(innerHeight * 0.34)); store("th", th); } fitTerm(); };
 $("splitV").addEventListener("keydown", (e) => { const step = e.shiftKey ? 60 : 20; if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); setLw(lw + (e.key === "ArrowRight" ? step : -step)); store("lw", lw); fitTerm(); } });
-$("splitH").addEventListener("keydown", (e) => {
-  const step = e.shiftKey ? 60 : 20;
-  if (S.tpos === "right" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) { e.preventDefault(); setTw(tw + (e.key === "ArrowLeft" ? step : -step)); store("tw", tw); fitTerm(); }
-  if (S.tpos !== "right" && (e.key === "ArrowUp" || e.key === "ArrowDown")) { e.preventDefault(); setTh(th + ((e.key === "ArrowUp") === (S.tpos === "bottom") ? step : -step)); store("th", th); fitTerm(); }
-});
+// The inspector's own splitter is in inspector.js.
 new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {

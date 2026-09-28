@@ -100,8 +100,9 @@ function moreMenu(anchor) {
     { html: "Copy folder path", run: () => copy(r.cwd, "path") },
     { html: "Rename…<small>The herdr pane and the agent’s own name</small>", run: () => renameSession(r) },
     { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
-    !isPhone() && { html: "Type into the terminal", run: () => focusTerminal() },
-    !isPhone() && { html: `Move the terminal…<small>Now: ${TPOS_NAME[S.tpos].toLowerCase()}</small>`, run: () => layoutMenu(anchor) },
+    !isPhone() && { html: "Type into the terminal<small>t</small>", run: () => focusTerminal() },
+    { html: "Servers…<small>Open, share or preview what it runs</small>", run: () => openInspector("ports") },
+    { html: "Home: what’s running now<small>Esc</small>", run: goHome },
     "-",
     { html: "Close session…", danger: true, run: () => askClose([r.key]) },
   ].filter(Boolean));
@@ -112,7 +113,6 @@ function settingsMenu(anchor) {
     { html: `Notifications on this device…<small>${PUSH.on ? "On: pushed even when the deck is closed" : S.notify ? "Page alerts on (only while the deck is open)" : "When an agent needs you or finishes"}</small>`, run: openNotifications },
     { html: "Automations…<small>Alerts, morning digest, empty sessions, proof of done</small>", run: openAutomations },
     { html: `Auto briefs: ${S.autoBrief ? "on" : "off"}<small>Write a brief when you open a session</small>`, run: () => { S.autoBrief = !S.autoBrief; store("autoBrief", S.autoBrief); toast(`Auto briefs ${S.autoBrief ? "on" : "off"}`); } },
-    !isPhone() && { html: `Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}<small>Move it (\\)</small>`, run: () => layoutMenu(anchor) },
     { html: "Close candidates<small>Select empty, duplicate and week-old sessions</small>", run: suggestClose },
     { html: `Simple mode: ${S.simple ? "on" : "off"}<small>Big, friendly, only the essentials</small>`, run: () => setSimple(!S.simple) },
     { html: "Machines…<small>Add or remove computers the deck watches</small>", run: openMachines },
@@ -194,7 +194,6 @@ function setSimple(on) {
   store("simple", on);
   if (on) document.documentElement.dataset.simple = ""; else delete document.documentElement.dataset.simple;
   if (on && S.group !== "priority") setGroup("priority");
-  app.classList.toggle("term-off", on || load("termOff", false));
   if (on) { S.tab = "chat"; S.mode = null; }
   headSig = ""; bodySig = ""; chatDom.key = null; lastOrder = "";
   for (const c of rowCache.values()) c.sig = "";

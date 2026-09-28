@@ -228,7 +228,7 @@ function setMView(v) {
   const from = app.dataset.mview;
   app.dataset.mview = v;
   for (const b of document.querySelectorAll(".mbar [data-mv]")) b.setAttribute("aria-selected", b.dataset.mv === v);
-  if (v === "term") pollTerm(true);
+  if (v === "term") { renderInspector(); pollTerm(true); }
   if (v === "detail") { chatTick(true); renderDetail(); }
   // Back on the list: exactly where you left it (opening a session scrolls the hidden list to its row).
   if (v === "list" && from !== "list") {

@@ -2,7 +2,8 @@
 // Page events: the list, the session pane's buttons, the selection bar, search, the file viewer and the lightbox.
 // ── events ───────────────────────────────────────────────────────────────
 function setMachine(id) { S.machine = id; store("machine", id); S.picked.clear(); lastOrder = ""; render(); }
-$("machines").addEventListener("click", (e) => { const b = e.target.closest("[data-machine]"); if (b) setMachine(b.dataset.machine); });
+$("machines").onclick = (e) => machineMenu(e.currentTarget);
+$("brand").onclick = () => goHome();
 $("groupSeg").addEventListener("click", (e) => { const g = e.target.closest("[data-group]")?.dataset.group; if (g) setGroup(g); });
 $("live").onclick = () => setBoard(!S.board);
 $("rows").addEventListener("click", async (e) => {
@@ -109,8 +110,6 @@ $("detail").addEventListener("click", (e) => {
   }
   const img = e.target.closest("[data-img]");
   if (img) return openLightbox(Number(img.dataset.img));
-  const main = e.target.closest("button[data-main]");
-  if (main) return setMain(main.dataset.main);
   const tab = e.target.closest("[data-tab]");
   if (tab) { S.tab = tab.dataset.tab; store("tab2", S.tab); if (S.tab !== "chat") S.sub = null; headSig = ""; bodySig = ""; renderDetail(); if (S.tab === "chat") chatTick(true); return; }
   const b = e.target.closest("[data-dact]");
@@ -173,11 +172,6 @@ $("paletteMini").onclick = () => openPalette();
 $("newBtn").onclick = openNew;
 $("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed font size"); };
 $("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); lastOrder = ""; $("mini")._h = ""; render(); setTimeout(fitTerm, 0); };
-$("termToggle").onclick = () => {
-  app.classList.toggle("term-off"); store("termOff", app.classList.contains("term-off")); pollTerm();
-  headSig = ""; renderDetail();
-  if (app.classList.contains("term-off") && S.tpos === "right") toast("Terminal collapsed. Bring it back with the Terminal button at the top, or ]");
-};
 
 let fileCtx = null;
 async function openFile(path, key = S.sel) {

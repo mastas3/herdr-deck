@@ -132,7 +132,16 @@ const SRC_ICON = {
   mac: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3" width="11" height="7.5" rx="1"/><path d="M1 13h14"/></svg>',
   remote: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/><path d="M4.5 4.7h.01M4.5 11.2h.01"/></svg>',
   app: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="11" height="11" rx="3"/><path d="M6 8h4"/></svg>',
+  all: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3" width="8" height="6" rx="1"/><rect x="6.5" y="7" width="8" height="6" rx="1"/></svg>',
 };
+/** Where a row runs, as a small icon (its name and workspace on hover): only when there's more than one place. */
+function machIcon(r) {
+  if (!r.app && !multiMachine()) return "";
+  const m = (S.summary.machines ?? []).find((x) => x.id === r.machine);
+  const icon = r.app ? SRC_ICON.app : m && !m.local ? SRC_ICON.remote : SRC_ICON.mac;
+  const where = r.app ? "Codex app" : `${machineLabel(r.machine)}${r.workspace ? ` · ${r.workspace}` : ""}${r.hist ? " · history" : ""}`;
+  return `<span class="rm" title="Runs on ${esc(where)}">${icon}</span>`;
+}
 function srcLine(r) {
   const m = (S.summary.machines ?? []).find((x) => x.id === r.machine);
   const icon = r.app ? SRC_ICON.app : m && !m.local ? SRC_ICON.remote : SRC_ICON.mac;
@@ -178,10 +187,11 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   }
   // The status line is always there (quiet rows show the last reply, or stay blank), so rows keep their height.
   if (!line && !pendingAsk(r)) { const last = plain(r.lastMessage); line = last ? `<span class="ln last">${esc(last)}</span>` : `<span class="ln ph" aria-hidden="true">&nbsp;</span>`; }
+  // Three lines at most: project (where it runs, its subagents) and why it's here · the title · one live line.
   const running = (r.subagents ?? []).filter((x) => x.running);
-  const subs = running.length ? `<span class="subs" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span><span class="st">↳ ${running.length} subagent${running.length === 1 ? "" : "s"}: ${esc(running[0].description || running[0].type || "agent")}</span></span>` : "";
+  const subs = running.length ? `<span class="sb" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span>${running.length}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   const rc = radarChip(r);
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}${machIcon(r)}${subs}</span>${agoEl}${line}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${machIcon(r)}${subs}${rc}</span>${agoEl}${title}${line}${rowAsk(r)}`;
 }

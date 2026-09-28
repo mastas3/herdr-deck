@@ -98,23 +98,18 @@ mark { background: color-mix(in srgb, var(--working) 38%, transparent); color: i
 .fimg { display: block; max-width: 100%; margin: 12px auto; }
 .dirlist { margin: 0; padding: 12px 22px; list-style: none; columns: 2; font: 13.5px/1.9 var(--mono); }
 
-/* ── terminal ─────────────────────────────────────────────────── */
-.term { grid-area: term; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--term-bg); }
-.th { display: flex; align-items: center; gap: 6px; padding: 4px 8px 4px 6px; background: var(--side); border-bottom: 1px solid var(--line); min-height: 37px; font-size: 13.5px; color: var(--ink-3); user-select: none; }
-.th .grip { cursor: grab; width: 22px; height: 28px; display: grid; place-items: center; border: 0; background: none; color: var(--ink-3); border-radius: 6px; touch-action: none; }
-.th .grip:hover { background: var(--hover); color: var(--ink); }
-.th .grip svg { width: 12px; height: 16px; }
-.th .t-title { color: var(--ink); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* ── terminal: the inspector's first tab ───────────────────────── */
+.tpane { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; background: var(--term-bg); }
+.th { display: flex; align-items: center; gap: 6px; padding: 2px 8px 2px 12px; background: var(--side); border-bottom: 1px solid var(--line); min-height: 34px; font-size: 12.5px; color: var(--ink-3); user-select: none; }
 .th .t-mode { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.term.typing .t-mode { color: var(--working); font-weight: 600; }
+.tpane.typing .t-mode { color: var(--working); font-weight: 600; }
 .keys { display: flex; gap: 3px; flex-wrap: wrap; padding: 6px 10px; background: var(--side); border-bottom: 1px solid var(--line); }
 .keys button, .askbox .ks button { font: 12px var(--mono); padding: 4px 10px; border-radius: 6px; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink-2); }
 .keys button:hover, .askbox .ks button:hover { color: var(--ink); border-color: var(--ink-3); }
 .screen { flex: 1; margin: 0; padding: 8px 12px; overflow: auto; color: var(--term-ink); font: 12.5px/1.35 var(--mono); white-space: pre; cursor: text; outline: none; min-height: 0; overscroll-behavior: contain; }
-.term.typing .screen { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--working) 70%, transparent); }
+.tpane.typing .screen { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--working) 70%, transparent); }
 .reply { display: none; gap: 6px; align-items: flex-end; padding: 8px 10px; background: var(--side); border-top: 1px solid var(--line); }
 .reply textarea { flex: 1; resize: none; min-height: 38px; max-height: 30vh; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 11px; font: 15px/1.4 var(--read); color: var(--ink); outline: none; }
-@media (min-width: 761px) { .app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) :is(.screen, .keys) { display: none; } }
 /* Code blocks: Copy, and Run for a "!" command in a live Claude Code session (public/js/code-actions.js). */
 .cb { position: relative; }
 .cb > pre { padding-right: 96px; }

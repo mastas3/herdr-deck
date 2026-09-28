@@ -138,10 +138,8 @@ async function standup() {
 }
 function setGroup(g) { S.group = g; store("group", g); lastOrder = ""; render(); }
 function focusTerminal() {
-  if (S.tpos === "none") showTerminal();
-  if (S.tpos === "tab") setMain("term");
-  else if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
-  $("screen").focus();
+  openInspector("term");
+  requestAnimationFrame(() => $("screen").focus());
 }
 
 // ── tools (replace recipes) ──────────────────────────────────────────────

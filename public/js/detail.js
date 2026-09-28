@@ -7,13 +7,12 @@ function renderDetail() {
   syncCodexControl(r);
   app.classList.toggle("native-task", !!r?.app && !S.board && !S.mode);
   const d = S.details.get(S.sel)?.data;
-  $("mTitle").nextElementSibling.hidden = !!r?.app && !S.board && !S.mode;
   if (S.mode) return renderMode();
   $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, d?.subagents?.length, d?.subagents?.filter((x) => x.running).length, tab, S.tpos, S.main, S.sub, S.summary.machines?.length, radarChip(r)]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, tab, S.insp.open, S.sub, S.summary.machines?.length, radarChip(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -35,7 +34,6 @@ function renderDetail() {
   renderPastes();
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? r.app ? "Reply to Codex" : "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
-  $("tTitle").textContent = r.title || r.agent;
   $("mTitle").innerHTML = `<span class="dot" style="--c:${statusVar(r.status)}"></span><span style="overflow:hidden;text-overflow:ellipsis">${esc(r.title || r.agent)}</span>`;
   $("subcrumb").hidden = !S.sub;
   if (S.sub) {
@@ -54,36 +52,37 @@ function renderDetail() {
   chatDom.key = null;
   const box = $("dbody");
   const scroll = box.scrollTop;
-  box.innerHTML = `<div class="pad">${!d ? `<p class="hint">Reading the conversation…</p>` : tab === "images" ? imagesHTML(r, d) : tab === "info" ? factsHTML(r, d) : tab === "agents" ? agentsHTML(d) : aboutHTML(r, d)}</div>`;
+  box.innerHTML = `<div class="pad">${!d ? `<p class="hint">Reading the conversation…</p>` : tab === "images" ? imagesHTML(r, d) : tab === "info" ? factsHTML(r, d) : aboutHTML(r, d)}</div>`;
   box.scrollTop = scroll;
 }
 function renderHead(r, d, tab) {
-  // Title first, then one compact meta row: the signals that matter (status, uncommitted work, proof of done) lead.
+  // One line: the title and what it is (status, project, branch), the few actions on the right. Under it one quiet
+  // row: the chips that need an eye (uncommitted work, proof of done, servers), then the pane's tabs.
   const where = [r.launch ? `via ${r.launch}` : "", home(r.cwd), r.app ? "Codex app" : r.hist ? "past session" : `herdr ${paneName(r)}`].filter(Boolean).join(" · ");
-  const meta = [
+  const id = [
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
-    radarChip(r),
     projectLink() ? `<button class="pj" data-dact="journey" style="--pc:${pc(r.project)}" title="${esc(where)} · open the project page">${esc(r.project)}</button>` : `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
+    r.branch ? `<span class="mono br" title="Branch">${esc(r.branch)}</span>` : "",
+  ].join("");
+  const chips = [
+    radarChip(r),
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
     r.duplicate ? `<span class="wchip" title="Two panes are attached to this one conversation">${ICON.warn}duplicate</span>` : "",
-    ...(r.ports ?? []).map((p) => p.url
-      ? `<span class="portw"><a class="port on" href="${esc(p.url)}" target="_blank" rel="noopener" title="Open on your tailnet: ${esc(p.url)}">${ICON.globe}${esc(String(p.port))} ↗</a><button class="port-x" data-dact="unshare" data-port="${p.port}" title="Stop sharing">×</button></span>`
-      : `<button class="port" data-dact="share" data-port="${p.port}" title="${esc(p.cmd)} is serving on :${p.port}. Share it on your tailnet">${ICON.globe}:${p.port} · share</button>`),
-    r.branch ? `<span class="mono br" title="Branch">${esc(r.branch)}</span>` : "",
-    `<span class="ag">${esc(r.agent)}${r.model ? ` · ${esc(r.model.replace(/^claude-/, ""))}` : ""}</span>`,
-    multiMachine() ? `<span class="opt">${esc(machineLabel(r.machine))}</span>` : "",
+    portsChip(r),
+    multiMachine() ? `<span class="opt" title="${esc(where)}">${esc(machineLabel(r.machine))}</span>` : "",
     r.lastActiveAt ? `<span class="opt" title="Last active ${esc(abs(r.lastActiveAt))}">active <b data-t="${r.lastActiveAt}" data-fmt="long">${agoText(r.lastActiveAt)}</b></span>` : "",
   ].filter(Boolean).join("");
-  const subsRun = d?.subagents?.filter((x) => x.running).length;
-  const tabs = [["chat", "Chat"], ["agents", "Subagents", d?.subagents?.length, subsRun], ["about", "About"], ["images", "Images", d?.imagesTotal], ["info", "Info"]]
-    .filter(([k, , n]) => (k !== "images" && k !== "agents") || n)
-    .map(([k, label, n, run]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${label}${n ? ` <span class="n">${run ? `${run} running · ` : ""}${n}</span>` : ""}</button>`).join("");
-  const swap = !r.app && S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
-  setHTML($("dh"), `<div class="dh-top"><h1 class="dh-title" title="${esc(r.title || "")}">${esc(r.title || "(untitled)")}</h1>
-      <div class="dh-acts"><button class="ib desk" data-dact="home" aria-label="Home" title="Home: the live board (Esc)">${ICON.home}</button>${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${termHidden() ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.bolt}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
-    <div class="dh-meta">${meta}</div>
-    <nav class="tabsbar" role="tablist">${tabs}${swap}</nav>`);
+  const tabs = [["chat", "Chat"], ["about", "About"], ["images", "Images", d?.imagesTotal], ["info", "Info"]]
+    .filter(([k, , n]) => k !== "images" || n)
+    .map(([k, label, n]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${label}${n ? ` <span class="n">${n}</span>` : ""}</button>`).join("");
+  const insp = inspTabs(r).length ? `<button class="ib desk" data-dact="insp" aria-pressed="${app.classList.contains("insp-on")}" aria-label="Inspector: terminal, subagents, servers" title="Inspector: terminal, subagents, servers (])">${ICON.panel}</button>` : "";
+  const acts = r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>`
+    : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>`
+    : `<button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`;
+  setHTML($("dh"), `<div class="dh-top"><h1 class="dh-title" title="${esc(r.title || "")}">${esc(r.title || "(untitled)")}</h1><div class="dh-id">${id}</div>
+      <div class="dh-acts">${acts}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button>${insp}</div></div>
+    <div class="dh-row2"><div class="dh-meta">${chips}</div><nav class="tabsbar" role="tablist">${tabs}</nav></div>`);
 }
 function renderNowbar(r, d) {
   const el = $("nowbar");
@@ -93,7 +92,7 @@ function renderNowbar(r, d) {
   if (!on) return;
   const since = r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
   const prog = r.todos?.total ? `<span class="prog" title="${r.todos.done} of ${r.todos.total} steps done"><i style="width:${Math.round((100 * r.todos.done) / r.todos.total)}%"></i></span><span class="stp">${r.todos.done}/${r.todos.total}</span>` : "";
-  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span>${prog}<span class="what">${r.step ? `<span class="step">${esc(r.step)}</span>` : ""}${esc(r.now ? nowWords(r.now) : r.step ? "" : "thinking…")}</span>${subs.length ? `<button class="btn ghost" data-tab="agents" style="padding:2px 8px">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
+  setHTML(el, `<span class="spin"></span><span>Working${since ? ` <b data-since="${since}">${clock(Date.now() - since)}</b>` : ""}</span>${prog}<span class="what">${r.step ? `<span class="step">${esc(r.step)}</span>` : ""}${esc(r.now ? nowWords(r.now) : r.step ? "" : "thinking…")}</span>${subs.length ? `<button class="sub-n" data-insp="agents" title="See them in the inspector">${ICON.bot}${subs.length} subagent${subs.length === 1 ? "" : "s"}</button>` : ""}`);
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
@@ -178,11 +177,6 @@ function aboutHTML(r, d) {
   if (d.started) out.push(`<div class="blk"><h4>Your first message <button class="link" data-dact="expand" data-target="startedText">Show all</button></h4><p class="prose clamp" id="startedText">${esc(d.started)}</p><div class="when">${esc(abs(d.startedAt))}</div></div>`);
   if (!out.length) out.push(`<p class="hint">${r.empty ? "Nothing has happened in this pane yet." : "No conversation found for this pane."}</p>`);
   return out.join("");
-}
-function agentsHTML(d) {
-  const subs = [...(d.subagents ?? [])].sort((a, b) => Number(b.running) - Number(a.running) || (b.startedAt ?? 0) - (a.startedAt ?? 0));
-  return `<p class="hint" style="margin:0">${subs.length} subagent${subs.length === 1 ? "" : "s"}${subs.some((x) => x.running) ? `, ${subs.filter((x) => x.running).length} running now` : ""}. Open one to read its whole conversation.</p>
-    <table class="subtable">${subs.map((x) => `<tr data-sub="${esc(x.id)}"><td style="width:18px">${x.running ? '<span class="spin"></span>' : '<span class="dot" style="--c:var(--idle)"></span>'}</td><td><b>${esc(x.description ?? x.id)}</b><div class="hint">${esc([x.type, x.model, x.tools ? `${x.tools} tool calls` : ""].filter(Boolean).join(" · "))}</div>${x.running && x.now ? `<div class="mono hint" style="font-size:12px">${esc(x.now)}</div>` : ""}</td><td class="hint" style="white-space:nowrap;text-align:right">${esc(when(x.startedAt))}<br>${x.running ? "running" : "done " + esc(agoText(x.lastActiveAt))}</td></tr>`).join("")}</table>`;
 }
 function imagesHTML(r, d) {
   const imgs = [...(d.images ?? [])].reverse();
@@ -277,7 +271,6 @@ function renderBoard() {
   syncCards(root.querySelector('[data-bl="done"]'), done, !fresh);
   root.querySelector(".bh").hidden = !done.length;
   bodySig = "board"; headSig = "";
-  $("tTitle").textContent = "Terminal";
   setHTML($("mTitle"), "Live board");
 }
 // Answers on board cards go straight to the agent; the rest of the card opens the session.
@@ -326,14 +319,16 @@ function renderStatusLine(r) {
   if (!el) return;
   if (!r || r.hist || S.sub || S.mode || S.board) { el.hidden = true; return; }
   el.hidden = false;
-  const parts = [`<span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>`];
+  // The project and branch are in the header, the model by the message box: here only what's being used up.
+  const parts = [];
   const cx = isAgent(r) ? ctxInfo(r) : null;
   if (cx?.pct != null) parts.push(meter(cx.pct, "context", `${tok(cx.tokens)} of ${tok(cx.window)} tokens in context${cx.guessed ? " (window size guessed from the model)" : ""}`, null, tok(cx.tokens)));
   else if (cx) parts.push(`<span class="meter" title="${esc(`${cx.tokens.toLocaleString()} tokens in context; this model’s window size isn’t known`)}"><span class="ml">context</span><b>${tok(cx.tokens)}</b><span class="mx">tokens</span></span>`);
   parts.push(...usageParts(r)); // usage.js: the account this session spends and its limits
   if (r.agent === "opencode" && r.cost) parts.push(`<span class="meter" title="What this OpenCode session has cost so far"><span class="ml">spent</span><b>$${r.cost.toFixed(2)}</b></span>`);
-  if (r.model) parts.push(`<span class="sl-m">${esc(r.model.replace(/^claude-/, ""))}</span>`);
-  if (r.branch) parts.push(`<span class="sl-m">${esc(r.branch)}${r.dirty ? ` · ${r.dirty}±` : ""}</span>`);
+  const m = $("cModel"), model = r.model ? r.model.replace(/^claude-/, "") : "";
+  m.hidden = !model; m.textContent = model; m.title = `${r.agent}${model ? ` · ${model}` : ""}`;
+  el.hidden = !parts.length;
   setHTML(el, parts.join(""));
   motion.bars(el); // meters glide to their new value (and between sessions)
 }

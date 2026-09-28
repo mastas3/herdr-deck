@@ -1,15 +1,12 @@
 "use strict";
-// The terminal: polling the pane, typing into it, ANSI colours, and where it sits (bottom, right, top, tab).
+// The terminal: polling the pane, typing into it and ANSI colours. It is the inspector's first tab (inspector.js).
 // ── terminal ─────────────────────────────────────────────────────────────
 let termTimer = null, termText = "", termHash = "", typing = false;
-/** Out of sight with no handle on screen: hidden, or collapsed while docked on the right. */
-const termHidden = () => !S.simple && (S.tpos === "none" || (S.tpos === "right" && app.classList.contains("term-off")));
-const termVisible = () => (isPhone() ? app.dataset.mview === "term" : S.tpos === "none" ? false : S.tpos === "tab" ? S.main === "term" : !app.classList.contains("term-off"));
-const showTerminal = () => {
-  if (app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
-  setTpos(S.tpos === "none" ? load("lastTpos", "bottom") : S.tpos);
-  headSig = ""; renderDetail(); pollTerm(true);
-};
+/** On screen now: the inspector shows its Terminal tab (on the phone, the inspector screen is up). */
+const termVisible = () => inspTab() === "term" && (isPhone() ? app.dataset.mview === "term" : app.classList.contains("insp-on"));
+const showTerminal = () => openInspector("term");
+/** Not on screen (the chat offers to open it). */
+const termHidden = () => !termVisible();
 async function pollTerm(first) {
   clearTimeout(termTimer);
   const key = S.sel;
@@ -62,8 +59,8 @@ async function flushType() {
   try { await api("/api/type", { key: S.sel, ops }); } catch (e) { toast("Typing failed: " + e.message, true); }
   setTimeout(pollTerm, 40);
 }
-$("screen").addEventListener("focus", () => { if (isPhone()) return; typing = true; $("term").classList.add("typing"); $("tMode").textContent = "· typing into the pane, Ctrl+] to stop"; pollTerm(); });
-$("screen").addEventListener("blur", () => { typing = false; $("term").classList.remove("typing"); $("tMode").textContent = "· click to type into it"; });
+$("screen").addEventListener("focus", () => { if (isPhone()) return; typing = true; $("tpane").classList.add("typing"); $("tMode").textContent = "Typing into the pane · Ctrl+] to stop"; pollTerm(); });
+$("screen").addEventListener("blur", () => { typing = false; $("tpane").classList.remove("typing"); $("tMode").textContent = "Click the screen to type into it"; });
 $("screen").addEventListener("keydown", (e) => {
   if (e.metaKey || isPhone()) return;
   if (e.ctrlKey && e.key === "]") { e.preventDefault(); $("screen").blur(); return; }
@@ -132,67 +129,3 @@ function ansi(text) {
   if (open) out += "</span>";
   return out;
 }
-
-// ── layout: where the terminal lives ─────────────────────────────────────
-const TPOS = ["bottom", "right", "top", "tab", "none"];
-const TPOS_NAME = { bottom: "Bottom", right: "Right", top: "Top", tab: "Shared with chat", none: "Hidden" };
-function setTpos(p) {
-  if (!TPOS.includes(p)) return;
-  if (p !== "none") store("lastTpos", p);
-  S.tpos = p; store("tpos", p); app.dataset.tpos = p;
-  if (p === "tab" && app.classList.contains("term-off")) { app.classList.remove("term-off"); store("termOff", false); }
-  $("tMain").hidden = p !== "tab";
-  $("termToggle").hidden = p === "tab" || p === "none";
-  $("splitH").setAttribute("aria-orientation", p === "right" ? "vertical" : "horizontal");
-  headSig = "";
-  render();
-  requestAnimationFrame(() => { fitTerm(); pollTerm(); chatTick(true); });
-}
-function setMain(m) {
-  S.main = m; store("main", m); app.dataset.main = m;
-  for (const b of $("tMain").children) b.setAttribute("aria-selected", b.dataset.main === m);
-  headSig = "";
-  render();
-  if (m === "term") pollTerm(true); else chatTick(true);
-}
-function layoutMenu(anchor) {
-  openMenu(anchor, TPOS.map((p) => ({ html: `Terminal: ${TPOS_NAME[p]}${p === "tab" ? "<small>Switch between them with `</small>" : ""}`, on: S.tpos === p, run: () => setTpos(p) })), "Move the terminal (or drag its handle)");
-}
-$("layoutBtn").onclick = (e) => layoutMenu(e.currentTarget);
-$("termHide").onclick = () => { setTpos("none"); toast("Terminal hidden. Bring it back with the Terminal button or \\"); };
-$("tMain").addEventListener("click", (e) => { const m = e.target.closest("button[data-main]")?.dataset.main; if (m) setMain(m); });
-// Drag the terminal's handle onto a drop zone to move it.
-$("tGrip").addEventListener("pointerdown", (e) => {
-  if (e.button !== 0) return;
-  e.preventDefault();
-  const listW = $("list").getBoundingClientRect().right;
-  const mx = listW + 12, mw = innerWidth - listW - 24, mh = innerHeight;
-  const zones = {
-    top: [mx, 12, mw, mh * 0.2],
-    bottom: [mx, mh * 0.8 - 12, mw, mh * 0.2],
-    right: [mx + mw * 0.72, mh * 0.24, mw * 0.28, mh * 0.52],
-    tab: [mx + mw * 0.2, mh * 0.3, mw * 0.44, mh * 0.4],
-  };
-  for (const el of $("dz").children) {
-    const [x, y, w, h] = zones[el.dataset.pos];
-    Object.assign(el.style, { left: x + "px", top: y + "px", width: w + "px", height: h + "px" });
-  }
-  document.body.classList.add("moving");
-  let target = null;
-  const move = (ev) => {
-    target = null;
-    for (const el of $("dz").children) {
-      const b = el.getBoundingClientRect();
-      const on = ev.clientX >= b.left && ev.clientX <= b.right && ev.clientY >= b.top && ev.clientY <= b.bottom;
-      el.classList.toggle("on", on);
-      if (on) target = el.dataset.pos;
-    }
-  };
-  const up = () => {
-    document.body.classList.remove("moving");
-    for (const el of $("dz").children) el.classList.remove("on");
-    removeEventListener("pointermove", move); removeEventListener("pointerup", up); removeEventListener("pointercancel", up);
-    if (target) { setTpos(target); if (target === "tab") setMain("term"); toast(`Terminal: ${TPOS_NAME[target].toLowerCase()}`); }
-  };
-  addEventListener("pointermove", move); addEventListener("pointerup", up); addEventListener("pointercancel", up);
-});

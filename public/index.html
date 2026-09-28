@@ -18,21 +18,20 @@
 <link rel="preload" href="/fonts/SourceSerif4.woff2" as="font" type="font/woff2" crossorigin>
 </head>
 <body>
-<div class="app" id="app" data-mview="list" data-tpos="bottom" data-main="chat">
+<div class="app" id="app" data-mview="list">
   <section class="list" id="list" aria-label="Sessions">
     <div class="lh">
       <div class="lh-top">
         <button class="ib keep" id="listToggle" title="Collapse the list ([)" aria-label="Collapse the list"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M6 3v10"/></svg></button>
-        <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="6" rx="1" fill="var(--working)"/><rect x="3" y="13" width="26" height="6" rx="1" fill="var(--idle)"/><rect x="3" y="21" width="26" height="6" rx="1" fill="var(--done)"/></svg>herdr deck<span class="conn" id="conn" title="Live"></span></div>
+        <button class="brand" id="brand" title="Home: what’s running now (Esc)"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="3" y="5" width="26" height="6" rx="1" fill="var(--working)"/><rect x="3" y="13" width="26" height="6" rx="1" fill="var(--idle)"/><rect x="3" y="21" width="26" height="6" rx="1" fill="var(--done)"/></svg><span>herdr deck</span><span class="conn" id="conn" title="Live"></span></button>
+        <nav class="views" id="views" aria-label="Views"></nav>
         <span class="spacer"></span>
         <button class="ib keep-mini keep" id="paletteMini" title="Search and commands (⌘K)" aria-label="Search and commands"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg></button>
         <button class="ib keep" id="newBtn" title="New session (n)" aria-label="New session"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg></button>
       </div>
-      <nav class="views" id="views" aria-label="Views"></nav>
-      <div class="machines" id="machines" role="tablist" aria-label="Machines"></div>
-      <div class="lh-row"><label class="find" style="flex:1;min-width:0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="q" type="search" placeholder="Filter sessions" autocomplete="off" spellcheck="false" aria-label="Filter sessions"><button type="button" class="ib" id="paletteBtn" title="Commands and search everywhere (⌘K)" aria-label="Commands" style="width:auto;padding:0 4px"><kbd>⌘K</kbd></button></label><div class="seg2" id="groupSeg" role="tablist" aria-label="Group by"><button role="tab" data-group="priority" title="Attention order, like herdr (g)">Priority</button><button role="tab" data-group="project" title="Group by project (g)">Projects</button></div></div>
-      <button class="livebar" id="live" hidden aria-pressed="false" title="Show the live board"></button>
+      <div class="lh-row"><label class="find"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="q" type="search" placeholder="Filter sessions" autocomplete="off" spellcheck="false" aria-label="Filter sessions"><button type="button" class="ib" id="paletteBtn" title="Commands and search everywhere (⌘K)" aria-label="Commands" style="width:auto;padding:0 4px"><kbd>⌘K</kbd></button></label><button type="button" class="mpick" id="machines" hidden aria-haspopup="menu" title="Which machine’s sessions to show (1–9)"></button><div class="seg2 gseg" id="groupSeg" role="tablist" aria-label="Group by"><button role="tab" data-group="priority" title="Attention order, like herdr (g)" aria-label="Priority order"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 4h10M3 8h7M3 12h4"/></svg></button><button role="tab" data-group="project" title="Group by project (g)" aria-label="Group by project"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 4.5h4.5L8 6h6v6.5H2z"/></svg></button></div></div>
     </div>
+    <button class="livebar" id="live" hidden aria-pressed="false" title="Show the live board: everything running, answerable in place (l)"></button>
     <div class="mini" id="mini" aria-label="Sessions (collapsed)"></div>
     <div class="rows" id="rows"></div>
     <div class="selbar" id="selbar" hidden><span id="selInfo"></span><span class="spacer"></span><button class="btn" id="selRecipe">Send…</button><button class="btn" id="selClose">Close…</button><button class="btn ghost" id="selClear">Clear</button></div>
@@ -42,53 +41,55 @@
   <header class="mbar" id="mbar">
     <button class="back" id="mBack" aria-label="Back to sessions"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.5 4 6.5 10l6 6"/></svg></button>
     <span class="m-title" id="mTitle"></span>
-    <div class="seg2" role="tablist"><button role="tab" data-mv="detail" aria-selected="true">Chat</button><button role="tab" data-mv="term" aria-selected="false">Terminal</button></div>
+    <div class="seg2" role="tablist"><button role="tab" data-mv="detail" aria-selected="true">Chat</button><button role="tab" data-mv="term" aria-selected="false" id="mInsp">Terminal</button></div>
   </header>
   <main class="detail" id="detail" aria-label="Session">
     <div class="dh" id="dh"></div>
     <div class="subcrumb" id="subcrumb" hidden></div>
     <div class="dbody" id="dbody"></div>
     <button class="jumpbtm" id="jumpBottom" hidden aria-label="Jump to the latest message" title="Jump to the latest (End)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/></svg><span class="n"></span></button>
-    <div class="nowbar" id="nowbar" hidden></div>
     <div class="askbox" id="askbox" hidden></div>
     <div class="appbar" id="appbar" hidden></div>
-    <div class="statusline" id="statusline" hidden></div>
-    <div class="qbar" id="qbar" hidden aria-label="Queued messages"></div>
-    <div class="catt" id="cAtt" hidden></div>
-    <form class="composer" id="composer" hidden>
-      <div class="slashpop" id="slashPop" hidden role="listbox" aria-label="Commands"></div>
-      <label class="ib" id="cAttach" for="fileIn" role="button" tabindex="0" title="Attach files (or drop / paste them into the chat)" aria-label="Attach files"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m13 7.5-5.2 5.2a3.2 3.2 0 0 1-4.5-4.5L8.8 2.7a2.1 2.1 0 0 1 3 3L6.4 11.1a1 1 0 0 1-1.5-1.5L9.8 4.7"/></svg></label>
-      <input type="file" id="fileIn" multiple class="file-in" tabindex="-1" aria-hidden="true">
-      <button type="button" class="ctools" id="cRecipe" title="Tools (.) · or type / for commands" aria-label="Tools"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg><span>Tools</span></button>
-      <textarea id="cText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>
-      <button type="button" class="btn" id="cStop" hidden title="Interrupt the agent (Esc in its terminal)">Stop</button>
-      <button type="button" class="btn" id="cSteer" hidden title="Send now: the agent sees it right away (⌘Enter)">Steer</button>
-      <button class="btn primary" id="cSend">Send</button>
-    </form>
-  </main>
-  <div class="split h" id="splitH" role="separator" aria-label="Resize the terminal" tabindex="0"></div>
-  <section class="term" id="term" aria-label="Terminal">
-    <div class="th" id="th">
-      <button class="grip" id="tGrip" title="Drag to move the terminal" aria-label="Move the terminal"><svg viewBox="0 0 12 16" fill="currentColor"><circle cx="3.5" cy="3" r="1.3"/><circle cx="8.5" cy="3" r="1.3"/><circle cx="3.5" cy="8" r="1.3"/><circle cx="8.5" cy="8" r="1.3"/><circle cx="3.5" cy="13" r="1.3"/><circle cx="8.5" cy="13" r="1.3"/></svg></button>
-      <span class="t-title" id="tTitle">Terminal</span>
-      <span class="t-mode" id="tMode">· click to type into it</span>
-      <span class="spacer"></span>
-      <div class="seg2" id="tMain" hidden><button role="tab" data-main="chat">Chat</button><button role="tab" data-main="term" aria-selected="true">Terminal</button></div>
-      <button class="btn ghost" id="keysBtn" aria-expanded="false" title="Quick keys">Keys</button>
-      <button class="ib" id="fitBtn" title="Fit the pane's width" aria-label="Fit width"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3"/></svg></button>
-      <button class="ib" id="layoutBtn" title="Where the terminal goes (\)" aria-label="Terminal position"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><path d="M2 9.5h12"/></svg></button>
-      <button class="ib" id="termHide" title="Hide the terminal" aria-label="Hide the terminal"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
-      <button class="ib" id="termToggle" title="Collapse the terminal (])" aria-label="Collapse the terminal"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="m4 6 4 4 4-4"/></svg></button>
+    <div class="dock" id="dock">
+      <div class="cmeta"><div class="nowbar" id="nowbar" hidden></div><div class="statusline" id="statusline" hidden></div></div>
+      <div class="qbar" id="qbar" hidden aria-label="Queued messages"></div>
+      <div class="catt" id="cAtt" hidden></div>
+      <form class="composer" id="composer" hidden>
+        <div class="slashpop" id="slashPop" hidden role="listbox" aria-label="Commands"></div>
+        <textarea id="cText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>
+        <div class="cbar">
+          <label class="ib" id="cAttach" for="fileIn" role="button" tabindex="0" title="Attach files (or drop / paste them into the chat)" aria-label="Attach files"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="m13 7.5-5.2 5.2a3.2 3.2 0 0 1-4.5-4.5L8.8 2.7a2.1 2.1 0 0 1 3 3L6.4 11.1a1 1 0 0 1-1.5-1.5L9.8 4.7"/></svg></label>
+          <input type="file" id="fileIn" multiple class="file-in" tabindex="-1" aria-hidden="true">
+          <button type="button" class="ctools" id="cRecipe" title="Tools (.) · or type / for commands" aria-label="Tools"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg><span>Tools</span></button>
+          <span class="cmodel" id="cModel" hidden></span>
+          <span class="spacer"></span>
+          <button type="button" class="btn" id="cStop" hidden title="Interrupt the agent (Esc in its terminal)">Stop</button>
+          <button type="button" class="btn" id="cSteer" hidden title="Send now: the agent sees it right away (⌘Enter)">Steer</button>
+          <button class="btn primary" id="cSend">Send</button>
+        </div>
+      </form>
     </div>
-    <div class="keys" id="keys" hidden></div>
-    <pre class="screen" id="screen" tabindex="0" aria-label="Live terminal output. Focus it to type into the pane."></pre>
-    <form class="reply" id="reply">
-      <textarea id="replyText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>
-      <button class="btn primary">Send</button>
-    </form>
-  </section>
+  </main>
+  <div class="split h" id="splitH" role="separator" aria-orientation="vertical" aria-label="Resize the inspector" tabindex="0"></div>
+  <aside class="insp" id="insp" aria-label="Inspector">
+    <div class="ih" id="ih"><nav class="itabs" id="itabs" role="tablist" aria-label="Inspector"></nav><button class="ib" id="inspClose" title="Hide the inspector (])" aria-label="Hide the inspector"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg></button></div>
+    <section class="tpane" id="tpane" aria-label="Terminal">
+      <div class="th" id="th">
+        <span class="t-mode" id="tMode">Click the screen to type into it</span>
+        <span class="spacer"></span>
+        <button class="btn ghost" id="keysBtn" aria-expanded="false" title="Quick keys">Keys</button>
+        <button class="ib" id="fitBtn" title="Fit the pane’s width" aria-label="Fit width"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 8h12M2 8l3-3M2 8l3 3M14 8l-3-3M14 8l-3 3"/></svg></button>
+      </div>
+      <div class="keys" id="keys" hidden></div>
+      <pre class="screen" id="screen" tabindex="0" aria-label="Live terminal output. Focus it to type into the pane."></pre>
+      <form class="reply" id="reply">
+        <textarea id="replyText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>
+        <button class="btn primary">Send</button>
+      </form>
+    </section>
+    <div class="ipane" id="ipane" hidden></div>
+  </aside>
 </div>
-<div class="dz" id="dz" aria-hidden="true"><div data-pos="top">Top</div><div data-pos="bottom">Bottom</div><div data-pos="right">Right</div><div data-pos="tab">Swap with chat</div></div>
 
 <dialog id="palette" class="palette" aria-label="Commands and search">
   <input id="palQ" placeholder="Search sessions, projects, commands…" autocomplete="off" spellcheck="false">

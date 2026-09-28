@@ -27,7 +27,7 @@ function renderViews() {
   const tabs = [...core, ...deckPlugins.contributions("view.tabs")].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   setHTML(el, tabs.map(({ view, label, icon, key, count }) => {
     const ic = typeof icon === "function" ? icon() : icon ?? "", c = typeof count === "function" ? count() : count;
-    return `<button data-view="${esc(view)}" aria-pressed="${S.mode === view}" title="${esc(label)}${key ? ` (${esc(key)})` : ""}">${ic}<span>${esc(label)}</span>${c ? `<b>${c}</b>` : ""}</button>`;
+    return `<button data-view="${esc(view)}" aria-pressed="${S.mode === view}" aria-label="${esc(label)}" title="${esc(label)}${key ? ` (${esc(key)})` : ""}">${ic}<span>${esc(label)}</span>${c ? `<b>${c}</b>` : ""}</button>`;
   }).join(""));
 }
 function renderMode() {

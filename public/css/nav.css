@@ -2,13 +2,13 @@
 /* The shared motion tokens (public/css/motion.css owns them; same names and values). */
 .navghost, .navshade { display: none; }
 @media (max-width: 760px) {
-  /* Bottom to top: the list, the ghost of the screen below, its dimming, the session pane, (dimming,) the terminal,
+  /* Bottom to top: the list, the ghost of the screen below, its dimming, the session pane, (dimming,) the inspector,
      the top bar; a ghost leaving over everything when you go back. Each screen keeps its own layer and never changes
      its look to move (no visibility flips, no shadow switched on), so a slide starts without repainting a thing. */
-  .list, .detail, .term, .mbar, .navghost { will-change: transform; }
+  .list, .detail, .insp, .mbar, .navghost { will-change: transform; }
   .list { z-index: 0; }
   .detail { z-index: 3; }
-  .term { z-index: 5; }
+  .insp { z-index: 5; }
   .navghost { display: block; position: fixed; inset: 0; z-index: 1; pointer-events: none; contain: layout paint style; }
   .navghost > * { transform: none !important; visibility: inherit !important; transition: none !important; }
   .navghost.rest { visibility: hidden; }
@@ -18,7 +18,7 @@
   .navshade.mid { z-index: 4; }
   .navshade.over { z-index: 11; }
   /* A screen's left edge casts a soft shadow on what it uncovers; at rest it falls off screen. */
-  .detail, .term, .navghost.over { box-shadow: -1px 0 0 var(--line), -12px 0 32px rgba(0, 0, 0, .22); }
+  .detail, .insp, .navghost.over { box-shadow: -1px 0 0 var(--line), -12px 0 32px rgba(0, 0, 0, .22); }
 }
 
 /* Dialogs rise into place and sink away (the exit plays because display and the top layer wait for it).

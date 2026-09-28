@@ -1,29 +1,39 @@
 /* ── list ─────────────────────────────────────────────────────── */
 .list { grid-area: list; display: flex; flex-direction: column; min-height: 0; background: var(--side); user-select: none; }
-.lh { padding: 10px 10px 6px; display: flex; flex-direction: column; gap: 8px; }
-.lh-top { display: flex; align-items: center; gap: 4px; }
-.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 17px; padding: 0 4px; white-space: nowrap; }
-.brand svg { width: 18px; height: 18px; }
+.lh { padding: 8px 10px 6px; display: flex; flex-direction: column; gap: 7px; }
+/* One header row: the brand (home), the views as icons with their counts, new session. */
+.lh-top { display: flex; align-items: center; gap: 2px; min-height: 32px; }
+.brand { display: flex; align-items: center; gap: 7px; font-weight: 700; font-size: 15.5px; padding: 3px 6px 3px 4px; margin-right: 4px; white-space: nowrap; border: 0; background: none; border-radius: 8px; color: var(--ink); flex: none; }
+.brand:hover { background: var(--hover); }
+.brand svg { width: 16px; height: 16px; }
 .conn { width: 6px; height: 6px; border-radius: 50%; background: var(--idle); }
 .conn.off { background: var(--blocked); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { opacity: .2; } }
+/* The filter row: search, the machine picker, grouping. */
 .lh-row { display: flex; align-items: center; gap: 6px; }
-.machines { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
-.machines:empty { display: none; }
-.machines::-webkit-scrollbar { display: none; }
-.machines button { border: 0; background: transparent; border-radius: 6px; padding: 3px 9px; font-size: 14px; color: var(--ink-3); white-space: nowrap; display: inline-flex; gap: 6px; align-items: center; }
-.machines button:hover { color: var(--ink); background: var(--hover); }
-.machines button[aria-selected="true"] { color: var(--ink); background: var(--raise); box-shadow: inset 0 0 0 1px var(--line-2); font-weight: 600; }
-.machines .n { font-variant-numeric: tabular-nums; color: var(--ink-3); font-weight: 400; }
-.machines .off { width: 6px; height: 6px; border-radius: 50%; background: var(--blocked); }
-.find { display: flex; align-items: center; gap: 6px; background: var(--raise); border: 1px solid var(--line); border-radius: 9px; padding: 0 6px 0 9px; }
+.mpick { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 42%; height: 33px; padding: 0 6px 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--raise); color: var(--ink-2); font-size: 13.5px; white-space: nowrap; }
+.mpick:hover { color: var(--ink); border-color: var(--line-2); }
+.mpick svg { width: 14px; height: 14px; flex: none; }
+.mpick .chev { width: 12px; height: 12px; opacity: .7; }
+.mpick span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.mpick .off { width: 6px; height: 6px; border-radius: 50%; background: var(--blocked); flex: none; }
+.gseg button { padding: 3px 7px; display: grid; place-items: center; }
+.gseg svg { width: 15px; height: 15px; }
+.find { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--raise); border: 1px solid var(--line); border-radius: 9px; padding: 0 6px 0 9px; }
 .find:focus-within { border-color: var(--accent); }
 .find svg { width: 15px; height: 15px; color: var(--ink-3); flex: none; }
 .find input { flex: 1; min-width: 0; border: 0; background: transparent; padding: 7px 0; font-size: 15px; outline: none; user-select: text; }
-.livebar { display: flex; align-items: center; gap: 8px; border: 1px solid color-mix(in srgb, var(--working) 45%, var(--line)); background: color-mix(in srgb, var(--working) 9%, transparent); border-radius: 9px; padding: 6px 10px; font-size: 14px; text-align: left; width: 100%; color: var(--ink); }
-.livebar b { font-weight: 600; }
-.livebar .dim { color: var(--ink-3); }
-.livebar[aria-pressed="true"] { border-color: var(--working); }
+/* The list's title while anything runs ("Running 3 · 1 subagent"): it opens the live board. */
+.livebar { display: flex; align-items: center; gap: 8px; border: 0; background: none; border-radius: 7px; margin: 0 6px; padding: 5px 8px; font-size: 13.5px; font-weight: 600; text-align: left; color: var(--ink-2); flex: none; }
+.livebar .lt { display: inline-flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.livebar b { color: var(--working); font-variant-numeric: tabular-nums; }
+.livebar .lx { color: var(--ink-3); font-weight: 400; }
+.livebar .spin { width: 10px; height: 10px; border-width: 1.5px; }
+.livebar .dim { display: inline-flex; align-items: center; gap: 2px; color: var(--ink-3); font-weight: 400; font-size: 12.5px; }
+.livebar .dim .chev { width: 12px; height: 12px; transform: rotate(-90deg); }
+.livebar:hover { background: var(--hover); color: var(--ink); }
+.livebar:hover .dim { color: var(--ink); }
+.livebar[aria-pressed="true"] { background: color-mix(in srgb, var(--working) 10%, transparent); }
 .rows { flex: 1; overflow-y: auto; padding: 2px 6px 12px; min-height: 0; overscroll-behavior: contain; }
 .sec { margin-top: 10px; }
 .sec:first-child { margin-top: 2px; }
@@ -56,6 +66,12 @@
 .row[data-status="empty"] > .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--empty); }
 .row .pl { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 13.5px; }
 .pj { color: var(--pc); font-weight: 700; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 70%; }
+.row .pl .pj { flex: 0 1 auto; min-width: 3ch; }
+/* Where it runs (an icon; the name on hover) and its running subagents, after the project. */
+.row .rm { flex: none; display: inline-grid; place-items: center; color: var(--ink-3); align-self: center; }
+.row .rm svg { width: 13px; height: 13px; }
+.row .sb { flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center; font-size: 11.5px; font-weight: 600; color: var(--working); }
+.row .sb .spin { width: 9px; height: 9px; border-width: 1.5px; }
 .via { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
 .mach { flex: none; font-size: 11.5px; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; line-height: 1.3; }
 .row .ago { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }

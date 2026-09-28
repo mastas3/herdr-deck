@@ -75,7 +75,7 @@ function backDrag(e) {
     },
   };
 }
-for (const host of [$("detail"), $("term"), $("mbar")]) touchDrag(host, backDrag);
+for (const host of [$("detail"), $("insp"), $("mbar")]) touchDrag(host, backDrag);
 
 // ── sheets: drag down to close ──
 /** A bottom sheet (the panel `panelOf` finds under the finger) follows a drag down from its top, or from anywhere once

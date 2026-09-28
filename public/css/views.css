@@ -1,11 +1,13 @@
 /* ── v7: views, decisions, history, tools, connections, status line, uploads ── */
-.views { display: flex; gap: 3px; padding: 0 10px 8px; overflow-x: auto; scrollbar-width: none; }
+/* The views, as icons in the list's header row (the name on hover), a count badge on the corner. */
+.views { display: flex; gap: 1px; overflow-x: auto; scrollbar-width: none; min-width: 0; flex: 0 1 auto; }
 .views::-webkit-scrollbar { display: none; }
-.views button { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 1px solid var(--line); background: transparent; color: var(--ink-2); border-radius: 9px; padding: 5px 7px; font: 500 12.5px/1 var(--sans, system-ui); cursor: pointer; }
-.views button svg { width: 14px; height: 14px; }
-.views button:hover { color: var(--ink); background: var(--raise); }
-.views button[aria-pressed="true"] { color: var(--ink); background: var(--raise); border-color: var(--accent); }
-.views button b { background: var(--blocked); color: #fff; border-radius: 9px; padding: 1px 6px; font-size: 11px; }
+.views button { position: relative; display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; padding: 0; border: 0; background: transparent; color: var(--ink-2); border-radius: 8px; cursor: pointer; }
+.views button span { display: none; }
+.views button svg { width: 16px; height: 16px; }
+.views button:hover { color: var(--ink); background: var(--hover); }
+.views button[aria-pressed="true"] { color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.views button b { position: absolute; top: 0; right: -1px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--blocked); color: #fff; font: 700 10px/15px var(--sans, system-ui); box-shadow: 0 0 0 2px var(--side); }
 .app.list-off .views { display: none; }
 .view { max-width: 980px; margin: 0 auto; padding: 22px 26px 60px; }
 .vh h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font: 650 22px/1.2 var(--sans, system-ui); }
@@ -164,8 +166,6 @@
 .mcpcmd { display: flex; gap: 8px; align-items: center; background: var(--raise); border: 1px solid var(--line-2); border-radius: 9px; padding: 8px 10px; }
 .mcpcmd code { flex: 1; font: 12px/1.45 var(--mono); overflow-x: auto; white-space: nowrap; filter: blur(0); }
 .audit { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 6px; font-size: 13.5px; }
-.statusline { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 22px; border-top: 1px solid var(--line); background: var(--side); font-size: 12.5px; color: var(--ink-2); flex: none; }
-.statusline .pj { font-weight: 600; }
 .meter { display: inline-flex; align-items: center; gap: 6px; }
 .meter .ml { color: var(--ink-3); }
 .meter .mb { width: 74px; height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
@@ -182,9 +182,8 @@ dialog.ask .inp { width: 100%; box-sizing: border-box; background: var(--raise);
 dialog.ask .hint { max-height: 50vh; overflow: auto; }
 @media (max-width: 760px) {
   .view { padding: 14px 14px 80px; }
-  .statusline { padding: 6px 12px; gap: 9px; }
-  .meter .mb { width: 46px; }
-  .sl-m, .statusline .pj, .meter .mx { display: none; }
+  .meter .mb { width: 40px; }
+  .sl-m, .meter .mx { display: none; }
   .cgrid, .tgrid { grid-template-columns: 1fr; }
 }
 
@@ -197,9 +196,6 @@ dialog.ask .hint { max-height: 50vh; overflow: auto; }
 .jumpbtm[hidden] { display: none; }
 .newpill { position: sticky; bottom: 10px; align-self: center; z-index: 3; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink); border-radius: 99px; padding: 5px 14px; font-size: 13.5px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
 .subcrumb { display: flex; gap: 8px; align-items: center; padding: 8px 22px; border-bottom: 1px solid var(--line); background: var(--raise); font-size: 14px; }
-.nowbar { display: flex; align-items: center; gap: 10px; padding: 7px 22px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--working) 7%, var(--bg)); font-size: 13.5px; min-width: 0; flex: none; }
-.nowbar .what { font: 12.5px var(--mono); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
-.nowbar b { font-variant-numeric: tabular-nums; }
 .askbox { border-top: 1px solid var(--line); background: color-mix(in srgb, var(--blocked) 7%, var(--bg)); padding: 8px 22px; flex: none; }
 .askbox .askcard .rask { margin: 0 0 8px; }
 .askbox .askcard:empty { display: none; }
@@ -207,10 +203,6 @@ dialog.ask .hint { max-height: 50vh; overflow: auto; }
 .askbox .ks { display: flex; gap: 5px; flex-wrap: wrap; }
 .appbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 22px 12px; border-top: 1px solid var(--line); background: var(--side); flex: none; font-size: 14px; color: var(--ink-2); }
 .appbar .spacer { min-width: 8px; }
-.composer { display: flex; gap: 6px; align-items: flex-end; padding: 10px 22px 12px; border-top: 1px solid var(--line); background: var(--side); flex: none; }
-.composer textarea { flex: 1; resize: none; min-height: 40px; max-height: 34vh; background: var(--raise); border: 1px solid var(--line-2); border-radius: 12px; padding: 9px 12px; font: 15.5px/1.45 var(--read); color: var(--ink); outline: none; }
-.composer textarea:focus { border-color: var(--accent); }
-.composer .btn { border-radius: 10px; padding: 8px 14px; }
 .brief { border-left: 3px solid var(--pc); padding: 2px 0 2px 18px; margin-bottom: 28px; }
 .brief .about { font: 400 21px/1.45 var(--serif); margin: 0 0 12px; text-wrap: pretty; }
 .brief .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 28px; }

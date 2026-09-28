@@ -2,7 +2,7 @@
 /* The notebook uses the full desktop detail area without changing saved terminal layout. */
 @media (min-width: 761px) {
   .app:has(.view[data-view="opportunities"]) { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
-  .app:has(.view[data-view="opportunities"]) :is(#term, #splitH) { display: none; }
+  .app:has(.view[data-view="opportunities"]) :is(#insp, #splitH) { display: none; }
   .app:has(.view[data-view="opportunities"]) .detail { display: flex; }
 }
 .view[data-view="opportunities"] { max-width: 1100px; }

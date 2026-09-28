@@ -18,7 +18,7 @@ const DECK_KEYS = [
 
   { sec: "The selected session", id: "reply", keys: ["r"], when: () => cursel(), label: "Write it a message (start with ! to run a shell command)", run: () => focusReply() },
   { sec: "The selected session", id: "tools", keys: ["."], when: () => cursel() || S.picked.size, label: "Tools for it, or for the selection", run: () => openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe")) },
-  { sec: "The selected session", id: "term", keys: ["t"], when: () => cursel(), label: "Type straight into its terminal (Ctrl+] to stop)", run: () => focusTerminal() },
+  { sec: "The selected session", id: "term", keys: ["t"], when: () => cursel(), label: "Type straight into its terminal, in the inspector (Ctrl+] to stop)", run: () => focusTerminal() },
   { sec: "The selected session", id: "focus", keys: ["f"], when: () => cursel(), label: "Switch herdr to it (a Codex app thread opens in the app)", run: () => { const r = rowOf(cursel()); r?.app ? codexAct("codex-open", r) : focusPane(r.key); } },
   { sec: "The selected session", id: "link", keys: ["y"], when: () => cursel(), label: "Copy a link to it", run: () => copy(linkUrl(rowOf(cursel())), "link") },
   { sec: "The selected session", id: "resume", keys: ["Y"], when: () => cursel(), label: "Copy its resume command", run: () => { const r = rowOf(cursel()); r.resume ? copy(r.resume, "resume command") : toast("This session has no resume command yet", true); } },
@@ -36,9 +36,8 @@ const DECK_KEYS = [
   { sec: "Views", id: "group", keys: ["g"], label: "Group the list by priority or by project", run: () => setGroup(S.group === "project" ? "priority" : "project") },
 
   { sec: "Layout", id: "list", keys: ["["], label: "Collapse the list", run: () => $("listToggle").click() },
-  { sec: "Layout", id: "termToggle", keys: ["]"], label: "Collapse the terminal", run: () => $("termToggle").click() },
-  { sec: "Layout", id: "swap", keys: ["`"], when: () => S.tpos === "tab", label: "Switch chat ⇄ terminal (when they share a place)", run: () => setMain(S.main === "chat" ? "term" : "chat") },
-  { sec: "Layout", id: "tpos", keys: ["\\"], label: "Move the terminal: bottom → right → top → shared with chat → hidden", run: () => { setTpos(TPOS[(TPOS.indexOf(S.tpos) + 1) % TPOS.length]); toast(`Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}`); } },
+  { sec: "Layout", id: "insp", keys: ["]", "\\"], label: "Show or hide the inspector: terminal, subagents, servers", run: () => toggleInspector() },
+  { sec: "Layout", id: "itab", keys: ["`"], when: () => cursel(), label: "Next inspector tab (opens it)", run: () => inspNextTab() },
 
   { sec: "Message box", keys: ["Enter"], label: "Send (on a phone, a new line)" },
   { sec: "Message box", keys: ["⇧Enter"], label: "New line" },

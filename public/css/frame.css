@@ -1,0 +1,98 @@
+/* ── the inspector: the open session's terminal, subagents, servers and plugins' tabs (inspector.js) ── */
+.insp { grid-area: insp; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--side); }
+.ih { display: flex; align-items: flex-end; gap: 4px; padding: 6px 8px 0 10px; border-bottom: 1px solid var(--line); flex: none; min-height: 43px; }
+.itabs { display: flex; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.itabs::-webkit-scrollbar { display: none; }
+.itabs button { display: inline-flex; align-items: center; gap: 6px; flex: none; border: 0; background: none; padding: 6px 9px 8px; font-size: 13.5px; color: var(--ink-3); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.itabs button svg { width: 14px; height: 14px; }
+.itabs button:hover { color: var(--ink); }
+.itabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.itabs .n { font-weight: 400; color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ih #inspClose { align-self: center; margin-bottom: 4px; }
+.ipane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.ipbody { min-height: 100%; display: flex; flex-direction: column; }
+.ipad { margin: 12px 14px 8px; }
+.iempty { padding: 28px 18px; color: var(--ink-3); font-size: 14px; line-height: 1.5; }
+.iempty b { display: block; color: var(--ink-2); font-size: 15px; margin-bottom: 4px; }
+.iempty p { margin: 0 0 10px; }
+.ilist { display: flex; flex-direction: column; padding: 0 8px 12px; gap: 2px; }
+.irow { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 8px; border: 0; border-radius: 9px; background: none; text-align: left; color: var(--ink); min-width: 0; }
+button.irow:hover, .irow.on { background: var(--hover); }
+.irow .im { display: flex; flex-direction: column; min-width: 0; flex: 1; gap: 1px; }
+.irow .im b { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.irow .im .hint { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.irow .inow { font-size: 11.5px; }
+.irow .iw { flex: none; font-size: 12px; white-space: nowrap; }
+.srow { flex-wrap: wrap; row-gap: 6px; }
+.srow .sp { font-weight: 600; color: var(--accent); font-size: 14px; flex: none; min-width: 5ch; }
+.srow .sacts { display: flex; gap: 4px; flex: none; margin-left: auto; }
+.srow .sacts .btn svg { width: 13px; height: 13px; }
+.srow .sacts a.btn { text-decoration: none; }
+.srow .sacts .btn.on { border-color: var(--accent); color: var(--accent); }
+.srow a { color: var(--ink-2); }
+/* A live preview of one server, under the list: only this session's servers, never the deck's own page. */
+.spv { flex: 1; display: flex; flex-direction: column; min-height: 320px; margin: 0 8px 8px; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; background: #fff; }
+.spvh { display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; background: var(--raise); border-bottom: 1px solid var(--line); font-size: 12px; color: var(--ink-2); }
+.spvh .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.spv iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+
+/* ── the dock under the chat: one frame holding the status line, the queue, attachments and the message box ── */
+.dock { flex: none; width: calc(100% - 28px); max-width: calc(var(--measure, 560px) + 160px); margin: 2px auto 12px; border: 1px solid var(--line-2); border-radius: 14px; background: var(--raise); overflow: hidden; transition: border-color var(--dur-1); }
+.dock:focus-within { border-color: color-mix(in srgb, var(--accent) 70%, var(--line-2)); }
+/* One line: what the agent is doing now (left) and what's being used up (right). */
+.cmeta { display: flex; align-items: center; gap: 14px; padding: 5px 12px; border-bottom: 1px solid var(--line); font-size: 12.5px; color: var(--ink-2); min-width: 0; white-space: nowrap; background: color-mix(in srgb, var(--side) 60%, var(--raise)); }
+.cmeta:not(:has(> :not([hidden]))) { display: none; }
+.dock:has(.nowbar:not([hidden])) .cmeta { background: color-mix(in srgb, var(--working) 8%, var(--raise)); }
+.nowbar { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.nowbar .spin { width: 10px; height: 10px; border-width: 1.5px; }
+.nowbar b { font-variant-numeric: tabular-nums; }
+.nowbar .what { font: 12px var(--mono); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.nowbar .step { color: var(--ink); font-family: var(--sans); font-size: 12.5px; font-weight: 600; margin-right: 6px; }
+.nowbar .prog { width: 54px; }
+.nowbar .sub-n { display: inline-flex; align-items: center; gap: 5px; flex: none; border: 0; background: none; padding: 1px 6px; border-radius: 6px; color: var(--ink-2); font-size: 12.5px; }
+.nowbar .sub-n:hover { background: var(--hover); color: var(--ink); }
+.nowbar .sub-n svg { width: 13px; height: 13px; }
+.statusline { display: flex; align-items: center; gap: 12px; flex: none; margin-left: auto; min-width: 0; overflow: hidden; }
+.cmeta .nowbar[hidden] + .statusline { margin-left: 0; }
+.statusline .meter .mb { width: 44px; }
+.dock .qbar, .dock .catt { background: none; border-top: 0; padding: 8px 12px 0; }
+.dock .qbar { border-bottom: 0; }
+/* The box: the text grows (up to a third of the screen), the tools sit on one row inside it. */
+.composer { display: flex; flex-direction: column; gap: 2px; padding: 8px 8px 7px 12px; }
+.composer textarea { width: 100%; resize: none; min-height: 26px; max-height: 34vh; background: transparent; border: 0; padding: 3px 2px; font: 15.5px/1.45 var(--read); color: var(--ink); outline: none; }
+.cbar { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.cbar .ctools { height: 32px; border-radius: 9px; background: transparent; }
+.cbar .btn { border-radius: 9px; padding: 5px 13px; }
+.cbar #cAttach { width: 32px; height: 32px; }
+.cmodel { font: 12px var(--mono); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 0 4px; }
+.slashpop { left: 8px; right: 8px; }
+.detail .jumpbtm { bottom: calc(var(--dock-h, 90px) + 26px); }
+.detail .appbar, .detail .askbox { border-bottom: 0; }
+
+/* ── the installed app on a Mac: the deck draws into the title bar (manifest: window-controls-overlay) ── */
+.wco .lh-top { padding-left: var(--tb-l, 0px); min-height: var(--tb-h, 32px); app-region: drag; }
+.wco .lh { padding-top: 0; }
+.wco .lh-top > *, .wco .dh-top > *, .wco .ih > * { app-region: no-drag; }
+.wco .app:not(.insp-on) .dh-top, .wco .app.insp-on .ih { padding-right: var(--tb-r, 0px); app-region: drag; }
+.wco .dh { padding-top: 0; }
+.wco .dh-top { min-height: var(--tb-h, 32px); }
+.wco .app:not(.insp-on) .ih { padding-right: 8px; }
+/* The board and the views have no header row: leave the window's buttons their strip. */
+.wco .detail:has(> .dh[hidden]) { padding-top: var(--tb-h, 0px); }
+.wco .detail:has(> .dh[hidden])::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: var(--tb-h, 0px); app-region: drag; }
+
+/* ── phone: the inspector is the screen behind the top bar's second tab ── */
+@media (max-width: 760px) {
+  .dock { width: calc(100% - 16px); margin: 0 auto calc(8px + env(safe-area-inset-bottom)); border-radius: 16px; }
+  .cmeta { padding: 5px 10px; gap: 10px; }
+  .nowbar .prog, .nowbar .what { display: none; }
+  .statusline { gap: 9px; }
+  .composer { padding: 6px 6px 6px 10px; }
+  .composer textarea { font-size: 16px; }
+  .cbar .btn { padding: 7px 14px; font-size: 15.5px; }
+  .ih { padding: 4px 8px 0; min-height: 44px; }
+  .ih #inspClose { display: none; }
+  .itabs button { font-size: 14.5px; padding: 8px 10px 9px; }
+  .insp .tpane { flex: 1; }
+  .srow .sacts .btn { padding: 6px 11px; }
+}
