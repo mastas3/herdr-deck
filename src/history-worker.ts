@@ -10,6 +10,7 @@ import { basename } from "node:path";
 import { claudeDetail, codexDetail, forgetTranscript, type Detail } from "./transcript";
 import { inferProject, projectRoot, displayName } from "./projects";
 import { HISTORY_DB, SCHEMA } from "./history-schema";
+import { isPrivatePath } from "./private-folder";
 
 const HOME = homedir();
 const db = new Database(HISTORY_DB, { create: true });
@@ -48,6 +49,7 @@ function sources(): Src[] {
   for (const f of claude) {
     const name = basename(f, ".jsonl");
     if (name.startsWith("agent-") || f.includes("/subagents/") || f.includes("claude-mem-observer")) continue; // sidechains belong to their parent; memory-plugin observers are noise
+    if (isPrivatePath(f)) continue; // a private session's folder: never indexed (its old rows go at the next pass)
     try { const st = statSync(f); out.push({ file: f, agent: "claude", id: name, size: st.size, mtime: st.mtimeMs, ino: st.ino }); } catch {}
   }
   const codex: string[] = [];
@@ -112,8 +114,18 @@ function noise(d: Detail, asks: number) {
 }
 
 async function indexOne(s: Src, prev: any) {
-  const d = s.agent === "claude" ? await claudeDetail(s.file) : await codexDetail(s.file);
   const f = facts(s);
+  if (isPrivatePath(f.cwd)) {
+    // A private session (Codex names no folder in its path): keep only a blank marker row so it isn't re-read each
+    // pass. No title, no text, and empty = 1 keeps it out of every search and list.
+    db.transaction(() => {
+      q.delMsgs.run(s.file);
+      q.upsert.run({ $file: s.file, $id: s.id, $agent: s.agent, $cwd: "", $project: "", $root: null, $title: "", $first: "", $started: null, $last: s.mtime, $asks: 0,
+        $model: null, $size: s.size, $mtime: s.mtime, $ino: s.ino, $msgs: 0, $gen: 0, $empty: 1 });
+    })();
+    return;
+  }
+  const d = s.agent === "claude" ? await claudeDetail(s.file) : await codexDetail(s.file);
   const userMsgs = d.messages.filter((m) => m.role === "user");
   // Sessions another agent started (codex exec, spawned workers) have no typed prompt: their first reply stands in.
   const first = [d.started, ...userMsgs.map((m) => m.text)].find((t) => t && !PREAMBLE.test(t.trim())) ?? d.messages.find((m) => m.role === "assistant")?.text;

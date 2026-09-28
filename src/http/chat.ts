@@ -4,6 +4,7 @@ import { detailFor as detailOf, imageFor as imageOf, subDetailFor } from "../ins
 import { cachedBrief } from "../brief";
 import type { Deck, Row } from "../deck";
 import type { Detail, Msg } from "../transcript";
+import { isPrivatePath } from "../private-folder";
 
 export function createChat(o: { deck: Deck; selfId: string }) {
   const { deck } = o;
@@ -43,7 +44,7 @@ export function createChat(o: { deck: Deck; selfId: string }) {
     const hits: any[] = [];
     const t0 = performance.now();
     for (const row of deck.rows.values()) {
-      if (!row.sessionId || performance.now() - t0 > 400) continue;
+      if (!row.sessionId || isPrivatePath(row.cwd) || performance.now() - t0 > 400) continue; // private sessions stay out of search
       const d = await detailFor(row).catch(() => undefined);
       if (!d) continue;
       let best: Msg | undefined, count = 0;
