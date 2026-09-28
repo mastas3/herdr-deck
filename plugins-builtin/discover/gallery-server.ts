@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { createIdeasRoutes, type IdeasDeps } from "./ideagen/routes";
 import { cachedProblems, PROBLEM_VERSION } from "./ideagen/problem-gallery";
 import { createDiscoverEvidence, discoverProof, evidenceLanes } from "./discover-evidence";
-import type { createOpportunities } from "../../src/opportunities";
+import type { createOpportunities } from "../../src/evidence-notebook";
 import { cachedGallery, targetOf } from "./ideagen/gallery";
 import type { LibrarySearch } from "./ideagen/library";
 import { comparablesFor, type Comparables, type Target } from "../../src/library-strategy";

@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createOpportunities, DIMENSIONS, INDUSTRIES, type ResearchInput, type ExperimentInput, type ExperimentResultInput } from "../src/opportunities";
+import { createOpportunities, DIMENSIONS, INDUSTRIES, type ResearchInput, type ExperimentInput, type ExperimentResultInput } from "../src/evidence-notebook";
 
 const dir = mkdtempSync(`${tmpdir()}/deck-opportunities-`);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

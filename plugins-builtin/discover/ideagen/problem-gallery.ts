@@ -6,7 +6,7 @@ import type { GalleryDeps } from "./gallery";
 import { normalizeIdea } from "./strategies";
 import { extractRecords, str } from "./json";
 import { mapConnectors, ownedRatio } from "./connectors";
-import { publicResearchUrl } from "../../../src/opportunity-web";
+import { publicResearchUrl } from "../../../src/evidence-notebook";
 
 export const PROBLEM_VERSION = "evidence-v1";
 const DAY = 86_400_000;

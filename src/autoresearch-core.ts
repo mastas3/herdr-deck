@@ -4,6 +4,9 @@
 //
 // The loop (Karpathy's "autoresearch" shape): plan → run → evaluate → keep/discard → plan the next question.
 import { inQuiet } from "./push";
+import { repairJson } from "./text";
+
+export { repairJson };
 
 // ── types ─────────────────────────────────────────────────────────────────────────
 export const QTYPES = ["trend", "deep_dive", "sizing", "combo", "teardown", "channel"] as const;
@@ -69,31 +72,6 @@ export function isNovel(q: string, previous: string[], threshold = 0.6) {
   const k = words(q).join(" ");
   if (!k) return false;
   return previous.every((p) => words(p).join(" ") !== k && overlap(q, p) < threshold);
-}
-
-// ── JSON from a model: validate and repair ────────────────────────────────────────────
-function balanced(text: string): string[] {
-  const out: string[] = [];
-  const stack: number[] = [];
-  let inStr = false, esc = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inStr) { if (esc) esc = false; else if (c === "\\") esc = true; else if (c === '"') inStr = false; continue; }
-    if (c === '"') inStr = true;
-    else if (c === "{") stack.push(i);
-    else if (c === "}" && stack.length) { const s = stack.pop()!; if (!stack.length) out.push(text.slice(s, i + 1)); }
-  }
-  return out;
-}
-const loose = (t: string) => t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/,\s*([}\]])/g, "$1").replace(/([{,]\s*)([A-Za-z_][\w]*)\s*:/g, '$1"$2":');
-function tryJson(t: string): any { try { return JSON.parse(t); } catch { try { return JSON.parse(loose(t)); } catch { return undefined; } } }
-/** The first JSON object in a model's reply: code fences, prose around it, trailing commas and bare keys are all forgiven. */
-export function repairJson(text: string): any {
-  const t = String(text ?? "").replace(/```(?:json)?/gi, "").trim();
-  const whole = tryJson(t);
-  if (whole && typeof whole === "object") return whole;
-  for (const o of balanced(t)) { const j = tryJson(o); if (j && typeof j === "object") return j; }
-  return undefined;
 }
 
 // ── the planner ─────────────────────────────────────────────────────────────────────────

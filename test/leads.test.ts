@@ -3,9 +3,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import type { GhRes } from "../src/gh";
 import {
-  analyze, clusterThemes, createLeads, deepPrompt, htmlText, ideaFor, keywordHits, keywordsFor, listReports, painOf, parseAppReviews, parseAppSearch,
-  parseGitHubIssues, parseHN, parseRedditAtom, parseSE, planPrompt, scrub, setRedditWait, snippetOf, starters, surprise, toEvidence, whoOf, type Evidence, type FetchLike, type Raw,
-} from "../src/leads";
+  analyze, clusterThemes, htmlText, ideaFor, keywordHits, keywordsFor, painOf, parseAppReviews, parseAppSearch,
+  parseGitHubIssues, parseHN, parseRedditAtom, parseSE, scrub, setRedditWait, snippetOf, toEvidence, whoOf, type Evidence, type FetchLike, type Raw,
+} from "../src/pain-search";
+import { createLeads, deepPrompt, listReports, planPrompt, starters, surprise } from "../src/leads";
 
 const root = mkdtempSync(`${tmpdir()}/deck-leads-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));

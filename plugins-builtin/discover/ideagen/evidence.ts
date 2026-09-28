@@ -1,7 +1,7 @@
 // Demand evidence: real public posts where people say something hurts (from the Leads engine), gathered per audience
 // the user can reach, and matched back to ideas. An idea's evidence score says "people are already asking for this",
 // with links, and is the same for every strategy: cited posts count more, but only when they're actually on topic.
-import { analyze, FETCHERS, keywordsFor, SOURCES, type Dir, type Limits, type Raw, type SourceCtx, type SourceId } from "../../../src/leads";
+import { analyze, FETCHERS, keywordsFor, SOURCES, type Dir, type Limits, type Raw, type SourceCtx, type SourceId } from "../../../src/pain-search";
 import { gh as ghDefault } from "../discover";
 import type { Audience, EvidenceMatch, Idea, PainCorpus, PainPost, PainTheme } from "./types";
 import { topicsOf } from "./inventory";

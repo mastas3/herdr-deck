@@ -2,15 +2,15 @@
 // A model can summarize a source, but only the owner can attest the dossier's conclusions.
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { createOpportunities, INDUSTRIES, DISCOVERY_MODES, OPPORTUNITY_STAGES } from "./opportunities";
+import { createOpportunities, INDUSTRIES, DISCOVERY_MODES, OPPORTUNITY_STAGES } from "./evidence-notebook";
 import type { OpportunityWebInput } from "./opportunity-web";
-import type { ResearchInput } from "./opportunities";
+import type { ResearchInput } from "./evidence-notebook";
 import { calculateEconomics } from "./economics";
 import { recommendRevenueStreams } from "./revenue";
 import { runClaude, type RunOpts } from "./model-run";
 import { redact, buildCatalog } from "./ingredients";
-import { repairJson } from "./autoresearch-core";
-import { scrub, type LeadsResult } from "./leads";
+import { repairJson } from "./text";
+import { scrub, type LeadsResult } from "./pain-search";
 
 type JobState = "queued" | "running" | "done" | "error" | "cancelled";
 type Job = { id: string; kind: "generate" | "research"; state: JobState; message: string; error?: string; itemId?: string; itemIds: string[]; startedAt: number; finishedAt?: number; input: any };

@@ -1,4 +1,5 @@
-// Research and customer outcomes stay separate from generated pitches. Only people can attest review.
+// The evidence notebook Discover and Opportunities share (opportunities.db): sources, claims, reviews and buyer tests
+// per idea. Research and customer outcomes stay separate from generated pitches. Only people can attest review.
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -464,3 +465,16 @@ export function createOpportunities(opts: { file: string; now?: () => number }) 
   };
 }
 export type Opportunities = ReturnType<typeof createOpportunities>;
+/** Reject literal IPs and private host references. WebFetch provides the network fetch boundary. */
+export function publicResearchUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.length > 2048 || /[\x00-\x20\x7f]/.test(raw)) return null;
+  let u: URL; try { u = new URL(raw); } catch { return null; }
+  const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  if (!["https:", "http:"].includes(u.protocol) || u.username || u.password || u.port ||
+    !host.includes(".") || host.startsWith("[") || /^[\d.]+$/.test(host) ||
+    !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(host) ||
+    /(?:^|\.)(?:localhost|local|localdomain|internal|private|corp|arpa|test|invalid|example|onion|home|lan|intranet)$/.test(host) ||
+    /(?:^|\.)(?:ts\.net|tailscale\.com|nip\.io|sslip\.io|localtest\.me|lvh\.me)$/.test(host) ||
+    /(?:^|\.)(?:localhost|internal|intranet|metadata|metadata\.google\.internal|instance-data)(?:\.|$)/.test(host)) return null;
+  u.hostname = host; u.hash = ""; return u.href;
+}

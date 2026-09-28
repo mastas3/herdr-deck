@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createOpportunities } from "../../../src/opportunities";
+import { createOpportunities } from "../../../src/evidence-notebook";
 import { createDiscoverEvidence, discoverProof, evidenceLanes } from "../discover-evidence";
 import { cachedProblems, currentProblemPosts, generateProblems, problemBriefs } from "../ideagen/problem-gallery";
 import { createGalleryServer, dayOf } from "../gallery-server";

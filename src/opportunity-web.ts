@@ -2,7 +2,9 @@
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { homedir, tmpdir } from "node:os";
-import type { ResearchInput, ResearchDimension } from "./opportunities";
+import { publicResearchUrl, type ResearchInput, type ResearchDimension } from "./evidence-notebook";
+
+export { publicResearchUrl };
 
 export type OpportunityWebInput = {
   buyer: string; problem: string; outcome?: string; industry?: string;
@@ -49,19 +51,6 @@ function topic(v: unknown): string {
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[email omitted]")
     .replace(/\b(?:sk-|gh[pousr]_|github_pat_|xox[baprs]-|AKIA)[A-Za-z0-9_-]{8,}\b/g, "[credential omitted]")
     .replace(/\b(?:api[ _-]?key|token|secret|password)\s*[:=]\s*[^\s,;]+/gi, "[credential omitted]");
-}
-/** Reject literal IPs and private host references. WebFetch provides the network fetch boundary. */
-export function publicResearchUrl(raw: unknown): string | null {
-  if (typeof raw !== "string" || raw.length > 2048 || /[\x00-\x20\x7f]/.test(raw)) return null;
-  let u: URL; try { u = new URL(raw); } catch { return null; }
-  const host = u.hostname.toLowerCase().replace(/\.$/, "");
-  if (!["https:", "http:"].includes(u.protocol) || u.username || u.password || u.port ||
-    !host.includes(".") || host.startsWith("[") || /^[\d.]+$/.test(host) ||
-    !/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/.test(host) ||
-    /(?:^|\.)(?:localhost|local|localdomain|internal|private|corp|arpa|test|invalid|example|onion|home|lan|intranet)$/.test(host) ||
-    /(?:^|\.)(?:ts\.net|tailscale\.com|nip\.io|sslip\.io|localtest\.me|lvh\.me)$/.test(host) ||
-    /(?:^|\.)(?:localhost|internal|intranet|metadata|metadata\.google\.internal|instance-data)(?:\.|$)/.test(host)) return null;
-  u.hostname = host; u.hash = ""; return u.href;
 }
 const sourceId = (url: string) => `web-${createHash("sha256").update(url).digest("hex").slice(0, 20)}`;
 const flatten = (value: unknown): string => typeof value === "string" ? plain(value, 8000) : Array.isArray(value) ? value.filter(x => x?.type === "text" && typeof x.text === "string").map(x => plain(x.text, 8000)).join(" ").slice(0, 8000) : "";

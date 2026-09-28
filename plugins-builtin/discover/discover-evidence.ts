@@ -1,8 +1,7 @@
 // Discover and Opportunities share one evidence notebook. Generated text never grants a reviewed stage.
 import { createHash } from "node:crypto";
-import { createOpportunities, independentGroups, sourceCurrent, type Opportunity } from "../../src/opportunities";
+import { createOpportunities, independentGroups, publicResearchUrl, sourceCurrent, type Opportunity } from "../../src/evidence-notebook";
 import { coverIdOf } from "./idea-archive";
-import { publicResearchUrl } from "../../src/opportunity-web";
 import type { IdeaCard } from "./ideagen/types";
 
 export const DISCOVER_STAGES = ["concept", "problem-documented", "buying-signal", "paid-pilot", "repeat-use"] as const;

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createOpportunityService, generationPrompt, leadsEvidence, opportunityIdentity } from "../src/opportunity-service";
-import { INDUSTRIES } from "../src/opportunities";
+import { INDUSTRIES } from "../src/evidence-notebook";
 
 const disposables: (() => void)[] = [];
 afterEach(() => { for (const f of disposables.splice(0).reverse()) f(); });

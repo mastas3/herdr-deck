@@ -8,7 +8,7 @@
 // sources × recency) and "earliness" (fast growth from a small base, few signals yet, mostly new).
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { decode, htmlText, UA, type FetchLike } from "../../../src/leads";
+import { decode, htmlText, UA, type FetchLike } from "../../../src/pain-search";
 import { gh as ghDefault, type GhRes } from "../discover";
 import { topicsOf } from "./inventory";
 
