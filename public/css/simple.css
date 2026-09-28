@@ -45,6 +45,3 @@
 [data-simple] .askbox .btn { font-size: 17px; padding: 10px 18px; border-radius: 14px; }
 [data-simple] .toast { font-size: 16px; border-radius: 14px; }
 [data-simple] .list .lh { padding-top: 6px; }
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
-}

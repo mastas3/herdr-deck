@@ -10,16 +10,15 @@ button { cursor: pointer; touch-action: manipulation; }
 .spacer { flex: 1; }
 kbd { font: 11px var(--mono); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--ink-3); }
 
-.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--raise); border-radius: 8px; padding: 5px 11px; font-size: 14.5px; color: var(--ink); white-space: nowrap; transition: transform .08s, background .12s; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--raise); border-radius: 8px; padding: 5px 11px; font-size: 14.5px; color: var(--ink); white-space: nowrap; }
 .btn:hover { border-color: var(--ink-3); }
-.btn:active, .ib:active, .row:active, .sec-h:active, .card:active { transform: scale(.975); }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
 .btn.ghost:hover { background: var(--hover); color: var(--ink); }
 .btn.danger { background: var(--danger); border-color: var(--danger); color: #fff; font-weight: 600; }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn svg, .ib svg { width: 16px; height: 16px; flex: none; }
-.ib { width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border: 0; background: transparent; border-radius: 8px; color: var(--ink-2); flex: none; transition: transform .08s; }
+.ib { width: 30px; height: 30px; display: inline-grid; place-items: center; padding: 0; border: 0; background: transparent; border-radius: 8px; color: var(--ink-2); flex: none; }
 .ib:hover { background: var(--hover); color: var(--ink); }
 .link { background: none; border: 0; padding: 2px; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); font-size: 13.5px; }
 .link:hover { color: var(--ink); text-decoration-color: currentColor; }
@@ -63,7 +62,7 @@ body.dragging :is(.screen, .chat) { pointer-events: none; }
 .dz { position: fixed; z-index: 50; display: none; pointer-events: none; }
 body.moving .dz { display: block; }
 body.moving { cursor: grabbing; user-select: none; }
-.dz div { position: fixed; display: grid; place-items: center; border: 2px dashed var(--line-2); border-radius: 12px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--ink-2); font-weight: 600; font-size: 15px; transition: background .1s, border-color .1s; }
+.dz div { position: fixed; display: grid; place-items: center; border: 2px dashed var(--line-2); border-radius: 12px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--ink-2); font-weight: 600; font-size: 15px; transition: background-color var(--dur-1), border-color var(--dur-1); }
 .dz div.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); }
 
 /* 24-hour HH:MM fields (time24 in format.js) */
