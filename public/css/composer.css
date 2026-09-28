@@ -36,6 +36,19 @@ label.ib { display: inline-grid; place-items: center; cursor: pointer; }
 .ctools { display: inline-flex; align-items: center; gap: 5px; height: 40px; padding: 0 11px 0 9px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink-2); font-weight: 600; }
 .ctools:hover { color: var(--ink); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--raise)); }
 .ctools svg { width: 15px; height: 15px; color: var(--working); }
+/* The model + effort chip (model-chip.js): quieter than Tools, it says what the next turn runs on. */
+.mchip { display: inline-flex; align-items: center; gap: 4px; height: 40px; max-width: 240px; padding: 0 8px 0 11px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--raise); color: var(--ink-2); font-size: 13px; font-weight: 600; white-space: nowrap; flex: none; }
+.mchip span { overflow: hidden; text-overflow: ellipsis; }
+.mchip:hover { color: var(--ink); border-color: var(--accent); }
+.mchip svg { width: 13px; height: 13px; flex: none; color: var(--ink-3); }
+.mchip .mc-short { display: none; }
+.menu .mnote { margin: 4px 10px 6px; max-width: 300px; color: var(--ink-3); font-size: 12px; line-height: 1.4; }
+@media (max-width: 760px) {
+  .mchip .mc-full { display: none; }
+  .mchip .mc-short { display: inline; }
+  .composer .ctools:has(~ .mchip:not([hidden])) { margin-right: 0; }
+  .composer .mchip:not([hidden]) { margin-right: auto; max-width: 46vw; }
+}
 #cSteer { border-color: color-mix(in srgb, var(--working) 55%, var(--line-2)); color: var(--working); }
 #cSteer:hover { background: color-mix(in srgb, var(--working) 12%, transparent); }
 .qbar { display: flex; flex-direction: column; gap: 4px; padding: 8px 22px 0; background: var(--side); border-top: 1px solid var(--line); flex: none; max-height: 30vh; overflow-y: auto; }

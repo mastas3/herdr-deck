@@ -64,7 +64,8 @@ button.irow:hover, .irow.on { background: var(--hover); }
 .ctbar .ctools { height: 32px; border-radius: 9px; background: transparent; }
 .ctbar .btn { border-radius: 9px; padding: 5px 13px; }
 .ctbar #cAttach { width: 32px; height: 32px; }
-.cmodel { font: 12px var(--mono); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 0 4px; }
+/* The model + effort chip (model-chip.js) sits in the box's tool row, as quiet as Tools. */
+.ctbar .mchip { height: 32px; border-radius: 9px; background: transparent; min-width: 0; flex: 0 1 auto; }
 .slashpop { left: 8px; right: 8px; }
 .detail .jumpbtm { bottom: calc(var(--dock-h, 90px) + 26px); }
 .detail .appbar, .detail .askbox { border-bottom: 0; }

@@ -24,6 +24,7 @@ function renderDetail() {
   $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
   else if (r.app) setHTML($("appbar"), codexConnectionHTML(r));
+  renderModelChip(r); // model-chip.js
   $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
   $("cStop").title = r.app ? "Stop this Codex turn" : "Interrupt the agent (Esc in its terminal)";
   const busy = r.status === "working" && isAgent(r);
@@ -331,15 +332,14 @@ function renderStatusLine(r) {
   if (!el) return;
   if (!r || r.hist || S.sub || S.mode || S.board) { el.hidden = true; return; }
   el.hidden = false;
-  // The project and branch are in the header, the model by the message box: here only what's being used up.
+  // The project and branch are in the header, the model on its chip in the message box (model-chip.js): here only
+  // what's being used up.
   const parts = [];
   const cx = isAgent(r) ? ctxInfo(r) : null;
   if (cx?.pct != null) parts.push(meter(cx.pct, "context", `${tok(cx.tokens)} of ${tok(cx.window)} tokens in context${cx.guessed ? " (window size guessed from the model)" : ""}`, null, tok(cx.tokens)));
   else if (cx) parts.push(`<span class="meter" title="${esc(`${cx.tokens.toLocaleString()} tokens in context; this model’s window size isn’t known`)}"><span class="ml">context</span><b>${tok(cx.tokens)}</b><span class="mx">tokens</span></span>`);
   parts.push(...usageParts(r)); // usage.js: the account this session spends and its limits
   if (r.agent === "opencode" && r.cost) parts.push(`<span class="meter" title="What this OpenCode session has cost so far"><span class="ml">spent</span><b>$${r.cost.toFixed(2)}</b></span>`);
-  const m = $("cModel"), model = r.model ? r.model.replace(/^claude-/, "") : "";
-  m.hidden = !model; m.textContent = model; m.title = `${r.agent}${model ? ` · ${model}` : ""}`;
   el.hidden = !parts.length;
   setHTML(el, parts.join(""));
   motion.bars(el); // meters glide to their new value (and between sessions)

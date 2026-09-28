@@ -19,6 +19,7 @@
     "js/detail.js",
     "js/usage.js",
     "js/composer.js",
+    "js/model-chip.js",
     "js/terminal.js",
     "js/actions.js",
     "js/views.js",
