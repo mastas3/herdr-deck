@@ -17,7 +17,7 @@ import {
 } from "./autoresearch-core";
 import { KEEP_MIN, keepRun, mergeNiches, nicheProblems, parseReport, reportProblems, rubric, type ParsedNiche, type Report } from "./autoresearch-eval";
 import { fixtureReport, researchPrompt } from "./autoresearch-prompts";
-import { comparablesText, type Comparables, type Target } from "./library-strategy";
+import { comparablesText, type Comparables, type Target } from "../../src/library-strategy";
 
 export type StartOpts = { machine: string; kind: "claude"; cwd: string; prompt: string; label: string; model?: string };
 export type Deps = {
@@ -38,6 +38,7 @@ export type Deps = {
   comparables?: (t: Target) => Comparables | undefined;
   changed?: () => void;
 };
+export type Timers = { every(ms: number, fn: () => unknown): () => void; after(ms: number, fn: () => unknown): () => void };
 export type Conf = {
   dir: string; // campaigns.json and the reports (~/.config/herdr-deck/research)
   workRoot: string; // where research sessions run (~/Documents/Projects/_research/<campaign>)
@@ -59,7 +60,9 @@ export function createLoop(conf: Conf, deps: Deps) {
   mkdirSync(conf.dir, { recursive: true });
   let store: Store = emptyStore();
   try { const j = JSON.parse(readFileSync(FILE, "utf8")); if (j?.v === 1 && Array.isArray(j.campaigns)) store = { ...emptyStore(), ...j, stats: { ...emptyStore().stats, ...j.stats } }; } catch {}
+  let stopped = false; // switched off (stop() below)
   const save = () => {
+    if (stopped) return; // switched off: what's on disk is where the next start picks up, as after a restart
     const tmp = `${FILE}.${process.pid}.tmp`;
     writeFileSync(tmp, JSON.stringify(store, null, 1));
     renameSync(tmp, FILE);
@@ -151,8 +154,8 @@ export function createLoop(conf: Conf, deps: Deps) {
     deps.changed?.();
     let plan: Plan;
     try { plan = await planNext(c); } finally { planning = undefined; }
-    // Paused, stopped, killed or already running something while the planner thought: start nothing.
-    if (c.status !== "running" || store.halted || store.campaigns.some((x) => activeRun(x))) { save(); return; }
+    // Paused, stopped, killed, switched off or already running something while the planner thought: start nothing.
+    if (stopped || c.status !== "running" || store.halted || store.campaigns.some((x) => activeRun(x))) { save(); return; }
     const n = c.runs.length + 1;
     const id = `${c.id}-${n}-${now().toString(36).slice(-4)}`;
     const slug = slugify(plan.focus || plan.question, 40) || `run-${n}`;
@@ -307,7 +310,7 @@ export function createLoop(conf: Conf, deps: Deps) {
   // ── the loop ─────────────────────────────────────────────────────────────────────────────
   let busy = false;
   async function tick() {
-    if (busy) return;
+    if (busy || stopped) return;
     busy = true;
     try {
       rollDay();
@@ -332,12 +335,24 @@ export function createLoop(conf: Conf, deps: Deps) {
       if (dirty) save();
     } finally { busy = false; }
   }
-  let timer: Timer | undefined;
-  function start() { if (!timer) { timer = setInterval(() => { tick().catch((e) => note(`tick: ${e?.message ?? e}`)); }, conf.tickMs ?? 4000); (timer as any).unref?.(); } setTimeout(() => tick().catch(() => {}), 500); }
+  // The loop ticks on the timers it's given: the plugin host's, which all stop when Research is switched off.
+  let timers: Timers | undefined, cancel: (() => void) | undefined;
+  function start(t: Timers) {
+    if (cancel) return;
+    stopped = false; timers = t;
+    cancel = t.every(conf.tickMs ?? 4000, () => tick().catch((e) => note(`tick: ${e?.message ?? e}`)));
+    t.after(500, () => tick().catch(() => {}));
+  }
+  /** Switched off: no more ticks, nothing new starts, and a tick still under way saves nothing. The campaigns stay as
+   *  they were on disk, so the next start carries on like after a restart (a run caught starting is adopted, one
+   *  being evaluated is evaluated again, never twice). */
+  function stop() { cancel?.(); cancel = timers = undefined; stopped = true; }
+  /** A tick soon (after the page changed something), while the loop runs. */
+  const soon = () => { timers?.after(50, () => tick().catch(() => {})); };
 
   return {
-    conf, deps, now, save, note, log, tick, start, closeOwn, allRows, fakes, tilde,
+    conf, deps, now, save, note, log, tick, start, stop, soon, closeOwn, allRows, fakes, tilde,
     get store() { return store; },
-    starting: (id: string) => starting.has(id), planning: () => planning, looping: () => !!timer,
+    starting: (id: string) => starting.has(id), planning: () => planning,
   };
 }

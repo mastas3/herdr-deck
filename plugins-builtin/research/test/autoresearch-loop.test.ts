@@ -1,9 +1,9 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { RowLite } from "../src/autoresearch-core";
-import { combined } from "../src/autoresearch-eval";
-import { createAutoresearch, type Deps } from "../src/autoresearch";
+import type { RowLite } from "../autoresearch-core";
+import { combined } from "../autoresearch-eval";
+import { createAutoresearch, type Deps } from "../autoresearch";
 import { MIN, REPORT, T0 } from "./autoresearch-fixtures";
 
 const root = mkdtempSync(`${tmpdir()}/deck-research-`);

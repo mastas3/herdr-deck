@@ -5,7 +5,6 @@ import type { PushStore } from "../push";
 import type { Automations } from "../automations";
 import type { McpCtx } from "../mcp";
 import type { Assets } from "../assets";
-import type { researchForServer } from "../autoresearch-server";
 import type { createPlugins } from "../plugins";
 import type { PluginHost } from "../plugin-host";
 import type { createCodePluginApi } from "../plugin-code-api";
@@ -22,7 +21,6 @@ export type Hub = {
   /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
   presence: Map<string, { key: string | null; at: number }>;
   push: PushStore; auto: Automations | undefined;
-  research: ReturnType<typeof researchForServer>;
   plugins: ReturnType<typeof createPlugins>;
   pluginHost: PluginHost; codePlugins: ReturnType<typeof createCodePluginApi>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
@@ -30,12 +28,4 @@ export type Hub = {
   sessions: Sessions; chat: Chat; tools: ToolRuns; queue: { queues: Record<string, { id: string; text: string; at: number }[]>; saveQueues: () => void };
   mcp: { token: string; ctx: McpCtx }; auth: { hasApiToken: (req: Request) => boolean; allowedHost: (req: Request) => boolean };
   forwardToMachine: (path: string, body: any) => Promise<Response | undefined>;
-};
-
-/** The part of the discover plugin's service (plugins-builtin/discover) the core reads: the profile Research starts
- *  from, and the ingredients and archive Opportunities builds on. */
-export type DiscoverService = {
-  profile(): Promise<{ interests: { id: string; label: string; score?: number }[]; projects: { name: string; tldr: string; status: string; weight: number }[] }>;
-  ingredients(max: number): Promise<{ list: any[] }>;
-  handle(path: string, body: any): Promise<any>;
 };

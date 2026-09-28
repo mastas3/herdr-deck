@@ -1,16 +1,15 @@
 // HTTP front: one HTML page, one SSE stream of row patches, a handful of action endpoints.
 // This deck is also a hub: machines listed in hosts.json are mirrored in and their actions forwarded.
 // This file starts everything, in order; the parts live in src/http/ (routes.ts is where a request goes).
-import { homedir } from "node:os";
 import { GROUPS, loadTools } from "./tools";
 import { historyStats, stopHistory } from "./history";
 import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
+import { call } from "./herdr";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
-import { researchForServer } from "./autoresearch-server";
 import { createPlugins } from "./plugins";
 import { createPluginHost } from "./plugin-host";
 import { createCodePluginApi } from "./plugin-code-api";
@@ -28,7 +27,7 @@ import { startQueue } from "./http/queue";
 import { createMcp } from "./http/mcp-ctx";
 import { createAuth } from "./http/auth";
 import { createRoutes } from "./http/routes";
-import type { DiscoverService, Hub } from "./http/hub";
+import type { Hub } from "./http/hub";
 
 makeDataDirs();
 const API_TOKEN = loadApiToken();
@@ -56,10 +55,6 @@ const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 
-// Discover is a plugin (plugins-builtin/discover): the core parts below that read it ask for its service each time
-// and get nothing while it's off. Leads, Opportunities and Research keep their files in its data folder, as before.
-const DISCOVER_DIR = process.env.DECK_DISCOVER_DIR || DATA_DIR;
-const discover = () => pluginHost.service<DiscoverService>("discover");
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
 const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
@@ -79,12 +74,6 @@ const auto: Automations | undefined = new Automations({
   canSend: () => !isNode(),
   digest: () => pluginHost.contributions("digest.lines"),
 });
-// Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
-const research = researchForServer({
-  self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, machines,
-  discover: { profile: async () => (await discover()?.profile()) ?? { projects: [], interests: [] }, paths: { ideas: `${DISCOVER_DIR}/ideas` } },
-});
-
 // Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
 const pluginHost = createPluginHost({
@@ -93,7 +82,11 @@ const pluginHost = createPluginHost({
   core: {
     rows: () => allRows(), push, automations: () => auto, decisions: () => [...dec.decisions.values()], broadcast, notice, machines, isNode,
     history: (o) => tools.historyEverywhere(o), checks: () => deck.checks,
-    sessions: { start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole) },
+    sessions: {
+      start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole),
+      screen: async (key) => { const row = allRows().find((r) => r.key === key); return row ? ((await dec.screenOf(row)) ?? []).join("\n") : ""; },
+      keys: async (key, keys) => { const f = deck.find(key); if (f) await call(f.sess.socket, "pane.send_keys", { pane_id: f.row.paneId, keys }); },
+    },
   },
 });
 // What plugins need from the core that no plugin owns: the other machines' decks (the connections plugin reads their
@@ -134,7 +127,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, research, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };
@@ -158,7 +151,6 @@ for (let attempt = 0; ; attempt++) {
 }
 for (const h of remotes.values()) h.start();
 auto.start();
-research.start();
 // Warm the slow scan so the first "/" is instant (the connections plugin warms its own).
 setTimeout(warmSlash, 8_000);
 

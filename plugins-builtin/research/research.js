@@ -1,7 +1,7 @@
 "use strict";
 // ══ Autoresearch ═════════════════════════════════════════════════════════════
 // Discover → Research: campaigns that run research sessions one after another (plan → run → evaluate → keep or
-// discard) and rank the niches they find. Server: src/autoresearch*.ts. Nothing starts until you confirm a campaign;
+// discard) and rank the niches they find. Server: autoresearch*.ts. Nothing starts until you confirm a campaign;
 // each run opens its own "research: …" session and closes it when the report is in.
 S.rs = { st: null, sel: load("rsSel", null), open: new Set(), reports: new Map(), timer: 0, loading: false };
 const RS_TYPE = { trend: "Trend scan", deep_dive: "Deep-dive", sizing: "Market sizing", combo: "Combo test", teardown: "Teardown", channel: "Channel test" };

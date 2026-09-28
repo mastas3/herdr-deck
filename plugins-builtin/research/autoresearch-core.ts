@@ -3,8 +3,8 @@
 // functions of that data and a clock. No I/O here. Reports and scoring: autoresearch-eval.ts.
 //
 // The loop (Karpathy's "autoresearch" shape): plan → run → evaluate → keep/discard → plan the next question.
-import { inQuiet } from "./push";
-import { repairJson } from "./text";
+import { inQuiet } from "../../src/push";
+import { repairJson } from "../../src/text";
 
 export { repairJson };
 

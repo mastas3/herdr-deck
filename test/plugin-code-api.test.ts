@@ -24,7 +24,7 @@ function deck(builtins: string[] = []) {
   const events: string[] = [];
   const host = createPluginHost({
     builtinDir: builtin, root: data, dataDir: data, log: () => {},
-    core: { rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => false, broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) } },
+    core: { rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => false, broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} } },
   });
   const api = createCodePluginApi({ host, root: data, broadcast: (e) => events.push(e), dataPluginIds: () => ["taken-by-data"] });
   return { host, api, data, events };

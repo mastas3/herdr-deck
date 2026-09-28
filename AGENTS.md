@@ -65,17 +65,19 @@ the typed `Host`. Worked example: `plugins-builtin/covers/`.
   `host.onStop(covers.stop)`. No `setInterval` of your own: host timers are what stop when it's switched off.
   Keep data where it lives today (`host.dataDir`, `host.env("DECK_…_DIR")`), no migrations.
 - **Talking to other plugins**: `host.use("covers")` (declare the provider in `requires`/`uses`; it's `undefined`
-  while off), or an extension point (`host.extend("discover.tabs", …)` / `host.contributions(…)`). Never import
-  another plugin's files. The core reaches you only through `pluginHost.service(name)` or a core point
-  (`fullState`, `digest.lines`, `mcp.tools`, `tools.entries`). What no plugin owns the core lends with
-  `pluginHost.provideCore(name, api)`, and any plugin reads it with `host.use(name)` (nothing to declare): today
-  `remotes` (the other machines' decks), `data-plugins` (recipes from enabled data plugins) and, until its plugin
-  exists, `opportunities`.
+  while off), or an extension point (`host.extend("discover.tabs", …)` / `host.contributions(…)`). A dependency
+  both ways (`uses` or `requires`) is a cycle, which stops both: when the provider already depends on you, have it
+  extend a point of yours instead (Opportunities lends Discover its evidence notebook through
+  `discover.evidence`). Never import another plugin's files; what two plugins share as code is a core module
+  (`src/pain-search.ts`, `src/evidence-notebook.ts`, `src/library-strategy.ts`). The core reaches you only through
+  `pluginHost.service(name)` or a core point (`fullState`, `digest.lines`, `mcp.tools`, `tools.entries`). What no
+  plugin owns the core lends with `pluginHost.provideCore(name, api)`, and any plugin reads it with `host.use(name)`
+  (nothing to declare): `remotes` (the other machines' decks) and `data-plugins` (recipes from enabled data plugins).
 - **Page**: move the files from `public/js`/`public/css` and `public/assets.json` into the folder and `client`/`styles`
   (they load after the core's, so code that runs at load may only use core globals and plugins you `require`).
   Register with `deckPlugins.register(id, { views, tabs, palette, keys, settings, events, state, links })` instead of
   editing `views.js`, `palette.js`, `input.js`, `menus.js` or `boot.js`; look at the registrations at the end of
-  `discover.js`, `quests.js`, `journey.js`, `connections.js` and `opportunities.js`, which move with those plugins.
+  `discover.js`, `quests.js`, `journey.js`, `connections.js` and `opportunities.js` in their plugin folders.
 - **Migrating**: `git mv` the files, fix imports, remove the wiring from `src/server.ts`, `src/http/routes.ts`,
   `src/http/hub.ts` and the page, and check `test/plugin-guards.test.ts`. Behaviour must not change: prove it with
   the snapshot harness (below) with everything on, then with your plugin off (no requests, timers or errors).

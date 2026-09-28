@@ -22,7 +22,8 @@ export type RouteReq = { method: string; path: string; url: URL; body: any; req:
 export type RouteHandler = (r: RouteReq) => unknown | Promise<unknown>;
 
 export type Notice = { key?: string; ok: boolean; message: string };
-export type StartSession = { kind: string; cwd: string; prompt?: string; args?: string[]; label?: string; model?: string; effort?: string; focus?: boolean };
+/** `mode` is the agent's permission mode (e.g. "auto" for Claude's auto mode), as in the New session dialog. */
+export type StartSession = { kind: string; cwd: string; prompt?: string; args?: string[]; label?: string; model?: string; effort?: string; mode?: string; focus?: boolean };
 
 /** Extension points the core reads. Plugins may also open their own (e.g. `discover.tabs`): any other name is free. */
 export type CorePoints = {
@@ -70,7 +71,13 @@ export type Host = {
 
   // ── the core, lent as it is ──
   rows(): Row[];
-  sessions: { start(o: StartSession): Promise<{ key?: string; paneId?: string }>; send(key: string, text: string): Promise<void>; close(keys: string[], wholeTab?: boolean): Promise<unknown> };
+  sessions: {
+    start(o: StartSession): Promise<{ key?: string; paneId?: string }>; send(key: string, text: string): Promise<void>; close(keys: string[], wholeTab?: boolean): Promise<unknown>;
+    /** What a session's terminal shows now, as text (a pane here or on another machine); "" when it's gone. */
+    screen(key: string): Promise<string>;
+    /** Presses keys in a pane on this machine (e.g. ["enter"]); nothing happens when the pane isn't here. */
+    keys(key: string, keys: string[]): Promise<void>;
+  };
   push: PushStore;
   automations(): Automations | undefined;
   decisions(): Decision[];

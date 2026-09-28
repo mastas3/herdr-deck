@@ -1,4 +1,4 @@
-/* ══ Leads ══ (public/js/leads.js, src/leads.ts) */
+/* ══ Leads ══ (leads.js, leads.ts) */
 .lx { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .lxbar { display: flex; }
 .ldir button { display: inline-flex; align-items: center; gap: 6px; }

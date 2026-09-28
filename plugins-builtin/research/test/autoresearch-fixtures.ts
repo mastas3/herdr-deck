@@ -1,5 +1,5 @@
 // Shared fixtures for the autoresearch tests: a campaign, a run and a research report that passes every filter.
-import type { Campaign, Run } from "../src/autoresearch-core";
+import type { Campaign, Run } from "../autoresearch-core";
 
 export const T0 = new Date(2026, 8, 26, 12, 0, 0).getTime(); // local noon: outside any night quiet window
 export const MIN = 60_000;

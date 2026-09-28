@@ -17,7 +17,7 @@ describe("the covers plugin", () => {
     process.env.DECK_COVERS_DIR = covers;
     const host = createPluginHost({
       builtinDir: builtin, root: data, dataDir: data, log: () => {},
-      core: { rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => false, broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) } },
+      core: { rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => false, broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} } },
     });
     await host.start();
     expect(host.active()).toEqual(["covers"]);

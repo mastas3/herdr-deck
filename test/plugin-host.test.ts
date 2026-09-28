@@ -23,7 +23,7 @@ function core(o: { node?: boolean; events?: [string, unknown][] } = {}): CoreCap
   return {
     rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => !!o.node, history: async () => [], checks: () => new Map(),
     broadcast: (e, d) => o.events?.push([e, d]), notice: () => {},
-    sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) },
+    sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} },
   };
 }
 function setup(o: { node?: boolean } = {}) {

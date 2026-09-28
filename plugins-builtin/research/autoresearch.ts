@@ -3,10 +3,10 @@
 // pause, resume, skip, stop, the kill switch) and what the page gets; the loop itself is autoresearch-loop.ts.
 import { existsSync, readFileSync } from "node:fs";
 import { ACTIVE, HHMM, activeRun, attempts, clip, slugify, words, type Campaign, type Niche, type Quiet, type Run } from "./autoresearch-core";
-import { createLoop, type Conf, type Deps } from "./autoresearch-loop";
+import { createLoop, type Conf, type Deps, type Timers } from "./autoresearch-loop";
 import { PRESETS, planAppPrompt } from "./autoresearch-prompts";
 
-export type { Conf, Deps };
+export type { Conf, Deps, Timers };
 export function createAutoresearch(conf: Conf, deps: Deps) {
   const L = createLoop(conf, deps);
   const { now, save, note, tick, closeOwn, allRows, fakes, tilde } = L;
@@ -53,7 +53,7 @@ export function createAutoresearch(conf: Conf, deps: Deps) {
     L.store.campaigns.unshift(c);
     save();
     note(`campaign ${c.slug} started (${c.budget} runs on ${c.machine})`);
-    if (L.looping()) setTimeout(() => tick().catch(() => {}), 50);
+    L.soon();
     return c;
   }
   async function control(id: string, op: string) {
@@ -82,7 +82,7 @@ export function createAutoresearch(conf: Conf, deps: Deps) {
     }
     note(`campaign ${c.slug}: ${op}`);
     save();
-    if (L.looping()) setTimeout(() => tick().catch(() => {}), 50);
+    L.soon();
   }
   async function kill(on: boolean) {
     L.store.halted = on;
@@ -151,5 +151,5 @@ export function createAutoresearch(conf: Conf, deps: Deps) {
     return undefined;
   }
 
-  return { handle, state, create, control, kill, tick, start: L.start, get store() { return L.store; }, fakes };
+  return { handle, state, create, control, kill, tick, start: L.start, stop: L.stop, get store() { return L.store; }, fakes };
 }

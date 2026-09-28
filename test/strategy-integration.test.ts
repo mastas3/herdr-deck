@@ -10,13 +10,13 @@ import { materializeKit } from "../plugins-builtin/discover/ideagen/kit-files";
 import { buildInventory } from "../plugins-builtin/discover/ideagen/inventory";
 import { createGalleryServer } from "../plugins-builtin/discover/gallery-server";
 import { buildComps } from "../plugins-builtin/discover/studio";
-import { plannerPrompt } from "../src/autoresearch-core";
-import { createAutoresearch } from "../src/autoresearch";
+import { plannerPrompt } from "../plugins-builtin/research/autoresearch-core";
+import { createAutoresearch } from "../plugins-builtin/research/autoresearch";
 import { createLibrary } from "../plugins-builtin/library/library";
 import { openCards } from "../plugins-builtin/library/library-cards";
 import type { Idea, StarterKit } from "../plugins-builtin/discover/ideagen/types";
 import { CARDS } from "./strategy-fixtures";
-import { camp, MIN, REPORT, T0 } from "./autoresearch-fixtures";
+import { camp, MIN, REPORT, T0 } from "../plugins-builtin/research/test/autoresearch-fixtures";
 
 const root = mkdtempSync(`${tmpdir()}/deck-strategy-int-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));

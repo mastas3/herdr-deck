@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { attempts, canClose, findRow, isNovel, labelFor, nextStep, overlap, plannerPrompt, repairJson, templatePlan, typeOf, vague, validatePlan, type RowLite } from "../src/autoresearch-core";
-import { combined, frontmatter, keepRun, mergeNiches, nicheProblems, parseReport, reportProblems, rubric, sameNiche, score10 } from "../src/autoresearch-eval";
-import { fixtureReport, researchPrompt } from "../src/autoresearch-prompts";
+import { attempts, canClose, findRow, isNovel, labelFor, nextStep, overlap, plannerPrompt, repairJson, templatePlan, typeOf, vague, validatePlan, type RowLite } from "../autoresearch-core";
+import { combined, frontmatter, keepRun, mergeNiches, nicheProblems, parseReport, reportProblems, rubric, sameNiche, score10 } from "../autoresearch-eval";
+import { fixtureReport, researchPrompt } from "../autoresearch-prompts";
 import { MIN, REPORT, T0, camp, run } from "./autoresearch-fixtures";
 
 describe("planner", () => {

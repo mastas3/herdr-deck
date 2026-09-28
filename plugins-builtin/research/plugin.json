@@ -1,0 +1,16 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "research",
+  "name": "Research",
+  "version": "1.0.0",
+  "description": "Discover → Research (autoresearch): campaigns that start deep research sessions one after another, score the niches they find and keep a leaderboard, with a kill switch. Starts and closes its own sessions and pushes when it finds a top niche or finishes.",
+  "server": "server.ts",
+  "client": ["research.js"],
+  "styles": ["research.css"],
+  "machine": "any",
+  "uses": ["discover"],
+  "routes": ["research"],
+  "provides": ["research"],
+  "extends": ["discover.tabs"]
+}

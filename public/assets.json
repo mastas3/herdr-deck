@@ -18,7 +18,6 @@
     "js/inbox.js",
     "js/history.js",
     "js/tools-view.js",
-    "js/research.js",
     "js/menus.js",
     "js/notifications.js",
     "js/palette.js",
@@ -42,7 +41,6 @@
     "css/composer.css",
     "css/controls.css",
     "css/notifications.css",
-    "css/research.css",
     "css/motion.css",
     "css/simple.css",
     "css/plugins.css"

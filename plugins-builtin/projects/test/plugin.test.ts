@@ -22,7 +22,7 @@ function setup(ids: string[]) {
     core: {
       rows: () => [], push: { deliver: async () => ({}) } as any, automations: () => undefined, decisions: () => [], isNode: () => false,
       machines: () => [{ id: "mac", label: "Mac", local: true, online: true }], history: async () => [], checks: () => new Map(),
-      broadcast: (e) => events.push(e), notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) },
+      broadcast: (e) => events.push(e), notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} },
     },
   });
   const post = (path: string, body: unknown = {}) => host.api(new Request(`http://d${path}`, { method: "POST" }), new URL(`http://d${path}`), body);

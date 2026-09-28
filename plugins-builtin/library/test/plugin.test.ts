@@ -29,7 +29,7 @@ describe("the library plugin", () => {
       core: {
         rows: () => [], push: { deliver: async () => ({}) } as any, automations: () => undefined, decisions: () => [], isNode: () => false,
         machines: () => [{ id: "mac", label: "Mac", local: true, online: true }], history: async () => [], checks: () => new Map(),
-        broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) },
+        broadcast: () => {}, notice: () => {}, sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} },
       },
     });
     const target = { name: "Podcast clip maker", offer: "turns podcast episodes into short clips", btype: "saas" };
