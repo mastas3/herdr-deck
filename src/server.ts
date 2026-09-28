@@ -79,6 +79,8 @@ const auto: Automations | undefined = new Automations({
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
 const pluginHost = createPluginHost({
   builtinDir: new URL("../plugins-builtin", import.meta.url).pathname, root: PLUGINS_DIR, dataDir: DATA_DIR,
+  // Built-ins start off: the core stays small until you turn an extra on in Plugins (DECK_PLUGINS_DEFAULT=on for tests/harness).
+  builtinsOn: process.env.DECK_PLUGINS_DEFAULT === "on",
   reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "plugins"],
   core: {
     rows: () => allRows(), push, automations: () => auto, decisions: () => [...dec.decisions.values()], broadcast, notice, machines, isNode,

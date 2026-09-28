@@ -21,7 +21,7 @@ export type Entry = { id: string; dir: string; builtin: boolean; manifest?: Code
 /** SSE events the page already uses: a plugin can't send these. */
 const CORE_EVENTS = new Set(["full", "patch", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
 
-export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void }) {
+export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void; builtinsOn?: boolean }) {
   const log = o.log ?? ((s: string) => console.warn(s));
   const entries = new Map<string, Entry>();
   let order: string[] = [];
@@ -75,7 +75,9 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   }
 
   // ── what should run ──
-  const enabled = (e: Entry) => st.enabled[e.id] ?? true;
+  // A built-in you never switched runs only if the deck says built-ins start on (the deck itself: off, so the core
+  // stays small until you turn an extra on in Plugins); an installed plugin is on once you approve it.
+  const enabled = (e: Entry) => st.enabled[e.id] ?? (e.builtin ? (o.builtinsOn ?? true) : true);
   /** Why a plugin can't run now, given which plugins before it in the order are running; undefined when it can. */
   function blocker(e: Entry, running: Set<string>): { state: PluginStatus; error?: string } | undefined {
     if (!e.manifest) return { state: "invalid", error: e.problems };

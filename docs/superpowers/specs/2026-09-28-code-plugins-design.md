@@ -130,7 +130,7 @@ a project's name leads: the list's project headers and the session header; nothi
 `start()`/`reconcile()` scans, orders by dependencies (built-ins before installed, then by id; a cycle → failed),
 stops (dependents first) whatever may no longer run, then starts what should, in order. Status per plugin: `on`,
 `off`, `failed` (+error), `hub-only`, `changed` (installed files differ from the approved hashes), `invalid` (bad
-manifest). Built-ins default on. Enable/disable is live: `/api/plugins/code/enable` → reconcile → broadcast.
+manifest). Built-ins default off on a real deck (the core stays small until you turn an extra on; `DECK_PLUGINS_DEFAULT=on` for tests and the snapshot harness); `createPluginHost` itself defaults `builtinsOn` to true. Enable/disable is live: `/api/plugins/code/enable` → reconcile → broadcast.
 
 ### Trust
 

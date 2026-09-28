@@ -31,6 +31,14 @@ const HELP = `usage: bin/ui-snapshot.mjs --out <dir> [options]
 export const VIEWS = {
   home: "",
   session: `select("fake:blocked", { scroll: true, open: true })`,
+  "codex-session": `S.summary.machines.push({ id: "codex-app", kind: "app", label: "Codex app", local: true, online: true });
+    select("fake:codex", { scroll: true, open: true });
+    mergeChat(S.sel, { gen: 1, total: 2, messages: [{ i: 0, role: "user", text: "Improve Codex support in the deck." }, { i: 1, role: "assistant", text: "I’m checking the session index and subagent conversations." }] });
+    S.details.set(S.sel, { stamp: rowOf(S.sel).lastActiveAt, data: { asks: 1, subagents: [{ id: "child", description: "Review the API", type: "explorer", running: true, tools: 3 }], turns: [], images: [] } });
+    headSig = ""; renderDetail();
+    if (!$("composer").hidden || !document.querySelector('[data-dact="codexresume"]').disabled) throw new Error("Busy Codex controls are unsafe");
+    if (!document.querySelector('[data-tab="agents"]')) throw new Error("Codex subagents tab is missing");`,
+  "codex-menu": `select("fake:codex", { scroll: true, open: true }); renderDetail(); moreMenu(document.querySelector('[data-dact="more"]'));`,
   "tools-menu": `select("fake:blocked", { scroll: true, open: true }); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe"))`,
   inbox: `setMode("inbox")`,
   history: `setMode("history")`,
@@ -110,7 +118,7 @@ async function startDeck(o, home) {
   const log = openSync(join(o.out, "server.log"), "w");
   const env = {
     PATH: process.env.PATH, HOME: home, TMPDIR: process.env.TMPDIR ?? "/tmp", LANG: "en_US.UTF-8", TZ: process.env.TZ ?? "",
-    DECK_PORT: String(o.port), DECK_DEV: "1", DECK_ROLE: "hub",
+    DECK_PORT: String(o.port), DECK_DEV: "1", DECK_ROLE: "hub", DECK_PLUGINS_DEFAULT: "on",
     // No model calls, no Codex, no background workers that reach the network or this machine's real accounts.
     DECK_NO_JEV: "1", DECK_CLAUDE_BIN: "/usr/bin/false", DECK_CODEX_BIN: "/usr/bin/false", DECK_JEV_BIN: "/usr/bin/false",
     DECK_NO_LIBRARY: "1", DECK_NO_LOGINS: "1", DECK_NO_GUMROAD: "1", DECK_GAME_AI: "0", DECK_JOURNEY_AI: "0", OLLAMA_HOST: "http://127.0.0.1:9",
@@ -128,7 +136,8 @@ async function startDeck(o, home) {
   const token = html.match(/"token":"([^"]+)"/)?.[1];
   if (!token) throw new Error("no action token in the page");
   const post = (path, body) => fetch(`${base}${path}`, { method: "POST", headers: { "content-type": "application/json", "x-deck-token": token }, body: JSON.stringify(body) });
-  const r = await post("/api/dev/fake-rows", { clear: true, rows: FAKE_ROWS });
+  const codex = o.views.some((v) => v.startsWith("codex-")) ? [{ ...FAKE_ROWS[0], key: "fake:codex", agent: "codex", app: "codex", title: "Improve the Codex integration", projectRoot: "/tmp/acme-api", sessionId: "fixture-codex" }] : [];
+  const r = await post("/api/dev/fake-rows", { clear: true, rows: [...FAKE_ROWS, ...codex] });
   if (!r.ok) throw new Error(`fake rows: ${r.status}`);
   return { child, base, post };
 }
