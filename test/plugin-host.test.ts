@@ -185,6 +185,18 @@ describe("the plugin host", () => {
   });
 });
 
+test("settings: the manifest's default until the user sets one, checked against its type", async () => {
+  const s = setup();
+  plugin(s.builtin, "setty", { settings: { daily: { label: "Covers a day", type: "number", default: 12 } } }, `(globalThis as any).__setty = host;`);
+  const h = s.make();
+  await h.start();
+  expect(g.__setty.setting("daily")).toBe(12);
+  await expect(h.setSetting("setty", "daily", "lots")).rejects.toThrow(/takes a number/);
+  await h.setSetting("setty", "daily", 3);
+  expect(g.__setty.setting("daily")).toBe(3);
+  expect(loadCodeState(s.data).settings).toEqual({ setty: { daily: 3 } });
+});
+
 describe("code plugin manifests", () => {
   const ok = { deck: 1, kind: "code", id: "demo", name: "Demo", version: "1" };
   test("the minimal manifest gets its defaults", () => {
