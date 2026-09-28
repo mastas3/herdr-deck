@@ -73,8 +73,9 @@ export function createChat(o: { deck: Deck; selfId: string }) {
 
   const briefKey = (row: Row) => (row.machine && row.machine !== o.selfId ? `${row.machine}-` : "") + `${row.agent}-${row.sessionId}`;
 
-  /** Detail payload: newest turns first are what the page shows, so cap from the end. */
-  function detailPayload(row: Row, d: Detail | undefined) {
+  /** Detail payload: newest turns first are what the page shows, so cap from the end. `lite` (the page) leaves the
+   *  turns out: it only needs their count, while the hub's brief of another machine's session reads them. */
+  function detailPayload(row: Row, d: Detail | undefined, lite = false) {
     const brief = row.sessionId ? cachedBrief(briefKey(row)) : undefined;
     if (!d) return { brief };
     return {
@@ -87,8 +88,8 @@ export function createChat(o: { deck: Deck; selfId: string }) {
       asks: d.asks,
       compactions: d.compactions,
       workMs: d.workMs,
-      turns: d.turns.slice(-150),
-      turnsOmitted: Math.max(0, d.turns.length - 150),
+      turnsCount: d.turns.length,
+      ...(lite ? {} : { turns: d.turns.slice(-150), turnsOmitted: Math.max(0, d.turns.length - 150) }),
       images: d.images.slice(-60),
       imagesTotal: d.images.length,
     };

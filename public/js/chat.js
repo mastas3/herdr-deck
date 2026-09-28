@@ -33,7 +33,9 @@ async function chatTick(now) {
   const visible = chatOn() && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
   const c = chatOf(chatId(key, sub));
   const live = r.status === "working" || r.status === "blocked" || (r.subagents ?? []).some((x) => x.running) || c.pending.length;
-  if (visible && !document.hidden && !c.busy && r.sessionId) {
+  // Opening a session: its detail, already on the way, brings this chat's first window.
+  const coming = !sub && c.gen == null && inflight.get(key)?.withChat;
+  if (visible && !document.hidden && !c.busy && !coming && r.sessionId) {
     const due = now === true || live || c.stamp !== r.lastActiveAt;
     if (due) {
       c.busy = true;

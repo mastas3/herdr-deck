@@ -45,10 +45,12 @@ function select(key, opts = {}) {
   const row = rowOf(key);
   if (row && unseenDone(row)) { row.seen = true; api("/api/seen", { key }).catch(() => {}); }
   render();
-  loadDetail(key);
+  // A detail from the last minute that the session hasn't moved on from is still good: reopening doesn't fetch it again.
+  let loaded = null;
+  if (detailFresh(key)) maybeAutoBrief(key); else loaded = loadDetail(key);
   pollTerm(true);
   chatTick(true);
-  prefetchNeighbours(key);
+  prefetchNeighbours(key, loaded);
   if (opts.scroll) requestAnimationFrame(() => rowCache.get(key)?.el.scrollIntoView({ block: "nearest" }));
   if (opts.open && isPhone()) setMView("detail", true);
   // Opening a session puts you straight in its message box (desktop; on a phone it would pop the keyboard).
@@ -69,35 +71,46 @@ function select(key, opts = {}) {
 }
 S.drafts = new Map();
 const inflight = new Map();
+/** One request per open: the detail brings the newest chat too, unless the page already holds that chat (then
+ *  /api/chat keeps it fresh). The turns stay on the server: the page only needs their count. */
 async function loadDetail(key) {
   if (inflight.has(key)) return inflight.get(key);
+  const c = chats.get(chatId(key));
+  const withChat = !c || c.gen == null;
+  const asked = rowOf(key)?.lastActiveAt;
   const p = (async () => {
     try {
-      const data = await api("/api/detail", { key });
+      const data = await api("/api/detail", withChat ? { key, lite: true, limit: 150 } : { key, lite: true, chat: false });
       S.details.set(key, { data, stamp: rowOf(key)?.lastActiveAt, at: Date.now() });
-      if (data.chat) mergeChat(key, data.chat);
+      if (data.chat) { mergeChat(key, data.chat); chatOf(chatId(key)).stamp = asked; } // as fresh as a chatTick fetch
       if (S.sel === key) { headSig = ""; bodySig = ""; renderDetail(); maybeAutoBrief(key); }
     } catch {}
     inflight.delete(key);
   })();
+  p.withChat = withChat;
   inflight.set(key, p);
   return p;
 }
+/** A detail loaded in the last minute that the session hasn't moved on from. */
+function detailFresh(key) {
+  const c = S.details.get(key), r = rowOf(key);
+  return !!r && !!c && c.stamp === r.lastActiveAt && Date.now() - c.at < 60_000;
+}
 /** Hovering or moving next to a session warms its detail, so opening it is instant. */
 function prefetch(key) {
-  const c = S.details.get(key);
-  const r = rowOf(key);
-  if (!r || (c && c.stamp === r.lastActiveAt && Date.now() - c.at < 60_000)) return;
-  loadDetail(key);
+  if (rowOf(key) && !detailFresh(key)) loadDetail(key);
 }
-function prefetchNeighbours(key) {
+/** On a desktop, the sessions next to the one you opened, once its own detail is in. A phone's link is too thin to
+ *  share with guesses. */
+function prefetchNeighbours(key, loaded) {
+  if (isPhone()) return;
   const v = S.visible ?? [];
   const i = v.findIndex((r) => r.key === key);
-  setTimeout(() => { for (const r of [v[i + 1], v[i - 1]]) if (r) prefetch(r.key); }, 250);
+  Promise.resolve(loaded).then(() => setTimeout(() => { for (const r of [v[i + 1], v[i - 1]]) if (r) prefetch(r.key); }, 250));
 }
 function maybeAutoBrief(key) {
   clearTimeout(briefTimer);
   const d = S.details.get(key)?.data;
-  if (!S.autoBrief || !d || d.brief || !d.turns?.length || (d.asks ?? 0) < 2 || briefBusy.has(key)) return;
+  if (!S.autoBrief || !d || d.brief || !(d.turnsCount ?? d.turns?.length) || (d.asks ?? 0) < 2 || briefBusy.has(key)) return;
   briefTimer = setTimeout(() => { if (S.sel === key) writeBrief(key, true); }, 1400);
 }

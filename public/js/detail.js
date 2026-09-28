@@ -43,7 +43,8 @@ function renderDetail() {
     setHTML($("subcrumb"), `<button class="btn ghost" data-dact="unsub">${ICON.back} Main conversation</button><span>${ICON.bot.replace("<svg", '<svg style="width:15px;height:15px;vertical-align:-3px"')} <b>${esc(sub?.description ?? "Subagent")}</b></span><span class="hint">${esc([sub?.type, sub?.model].filter(Boolean).join(" · "))}${sub?.running ? " · running" : ""}</span>`);
   }
   if (tab === "chat") {
-    if (bodySig !== "chat") { bodySig = "chat"; chatDom.key = null; chatDom.fresh = null; }
+    // Coming from another tab, the board or a view: build the chat afresh. Already showing it: renderChat updates it.
+    if (bodySig !== "chat") { bodySig = "chat"; if (chatDom.key !== chatId(S.sel, S.sub) || !chatDom.el?.isConnected) { chatDom.key = null; chatDom.fresh = null; } }
     renderChat();
     return;
   }
@@ -167,7 +168,7 @@ $("askbox").addEventListener("click", (e) => {
 function aboutHTML(r, d) {
   const out = [];
   const busy = briefBusy.has(r.key);
-  if (d.turns?.length) {
+  if (d.turnsCount ?? d.turns?.length) {
     const b = d.brief;
     if (b) out.push(`<div class="brief" style="--pc:${pc(r.project)}"><p class="about">${esc(b.about)}</p><div class="cols"><div><h4>How it started</h4><p>${esc(b.started)}</p></div><div><h4>Where it stands</h4><p>${esc(b.now)}</p></div></div>
       <div class="foot">Brief by ${esc(b.model)}, ${agoText(b.at)}${d.briefStale ? " · the session has moved on since" : ""}<button class="link" data-dact="brief" ${busy ? "disabled" : ""}>${busy ? "Writing…" : "Rewrite"}</button></div></div>`);
