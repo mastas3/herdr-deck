@@ -19,16 +19,18 @@ function renderDetail() {
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
   renderNowbar(r, d);
   renderAsk(r);
-  $("composer").hidden = !r || S.sub != null || !codexCanReply(r) || !!r.hist;
-  $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
+  $("composer").hidden = !r || S.sub != null || !!r.hist;
+  $("appbar").hidden = !(r.app || r.hist) || S.sub != null || !!(r.app && codexView(r)?.ready && !codexConnecting.has(r.key));
   renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
   else if (r.app) setHTML($("appbar"), codexConnectionHTML(r));
   renderModelChip(r); // model-chip.js
-  $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
+  $("cStop").hidden = !codexCanReply(r) || !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
   $("cStop").title = r.app ? "Stop this Codex turn" : "Interrupt the agent (Esc in its terminal)";
-  const busy = r.status === "working" && isAgent(r);
-  $("cSend").textContent = r.app && busy ? "Queue" : "Send";
+  const busy = (r.app ? codexView(r)?.status === "working" : r.status === "working") && isAgent(r);
+  $("cSend").disabled = !!r.app && (codexSending.has(r.key) || codexConnecting.has(r.key));
+  $("cSteer").disabled = $("cSend").disabled;
+  $("cSend").textContent = r.app && codexConnecting.has(r.key) ? "Connecting…" : r.app && busy ? "Queue" : "Send";
   $("cSend").title = busy ? "Send now; the agent picks it up while it works (⌥Enter: hold it until it finishes)" : "Send (Enter)";
   $("cSteer").hidden = !(r.app && busy);
   if (r.app && busy) $("cSend").title = "Send after the current turn; Steer sends now";

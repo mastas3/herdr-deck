@@ -161,6 +161,23 @@ describe("native delivery recovery", () => {
 });
 
 describe("desktop socket framing", () => {
+  test("unloaded chats and incompatible protocols retain distinct recovery reasons", async () => {
+    const path = `${root}/refused.sock`; let peer: Socket | undefined, reason = "no-client-found";
+    const server = createServer((s) => {
+      peer = s;
+      s.on("data", ipcDecoder((m) => s.write(ipcFrame(m.method === "initialize"
+        ? { type: "response", requestId: m.requestId, resultType: "success", result: { clientId: "deck" } }
+        : { type: "response", requestId: m.requestId, resultType: "error", error: reason }))));
+    });
+    await new Promise<void>((r) => server.listen(path, r));
+    const control = createCodexControl({ path, timeoutMs: 500 });
+    try {
+      expect(await control.watch(thread)).toMatchObject({ ready: false, connectionIssue: "not-loaded", error: "This chat is not loaded in the Codex app." });
+      for (reason of ["request-version-mismatch", "no-handler-for-request"]) {
+        expect(await control.watch(thread, true)).toMatchObject({ ready: false, connectionIssue: "incompatible" });
+      }
+    } finally { control.close(); peer?.destroy(); await new Promise<void>((r) => server.close(() => r())); }
+  });
   test("handles split headers, split UTF-8 and coalesced frames; rejects oversize frames", () => {
     const values: any[] = [], decode = ipcDecoder((m) => values.push(m));
     const frames = Buffer.concat([ipcFrame({ text: "שלום 🌍" }), ipcFrame({ id: 2 })]);

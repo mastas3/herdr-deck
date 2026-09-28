@@ -272,7 +272,7 @@ describe("createMixer", () => {
     const d2 = mx.daily(SEL, now);
     expect(d2.running).toBe(false);
     expect(d2.mixes[0].title).toBe("Voice Chart");
-    mx.daily(SEL, now + 3600_000);
+    mx.daily(SEL, new Date(now).setHours(23, 59, 59, 999)); // Adding an hour can cross midnight on the test host.
     expect(calls.n).toBe(1);
     // Waiting for the connections scan doesn't start it.
     const mx2 = createMixer({ file: `${root}/f/mix-cache.json`, runClaude: fakeClaude([good], 5, calls), claudeAvailable: () => true, ollamaModels: async () => [] });

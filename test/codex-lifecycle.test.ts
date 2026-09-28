@@ -115,7 +115,7 @@ describe("metadata process safety", () => {
   test("rejects execution methods and unsolicited approval requests", async () => {
     const marker = `${root}/rejected.json`;
     const binary = fakeBinary("metadata-good", fakeLoop(`if(m.error) await Bun.write(${JSON.stringify(marker)}, JSON.stringify(m));else if(m.method==='initialize'){console.log(JSON.stringify({id:m.id,result:{}}));console.log(JSON.stringify({id:'approval',method:'item/commandExecution/requestApproval',params:{}}));}else if(m.id)console.log(JSON.stringify({id:m.id,result:{ok:true}}));`));
-    const s = await openCodexMetadataSession(binary, 1000);
+    const s = await openCodexMetadataSession(binary, 3000); // Leave room for cold child-process startup on a busy host.
     try {
       await expect(s.request("turn/start", {}, true)).rejects.toMatchObject({ code: "CODEX_INVALID" });
       await s.request("thread/read", { threadId: sourceId });
@@ -125,7 +125,7 @@ describe("metadata process safety", () => {
   });
   test("lost mutation acknowledgement is uncertain and process is reaped", async () => {
     const binary = fakeBinary("metadata-lost", fakeLoop(`if(m.method==='initialize')console.log(JSON.stringify({id:m.id,result:{}}));else if(m.id)process.exit(0);`));
-    const s = await openCodexMetadataSession(binary, 1000);
+    const s = await openCodexMetadataSession(binary, 3000);
     try { await expect(s.request("thread/name/set", {}, true)).rejects.toMatchObject({ code: "CODEX_DELIVERY_UNKNOWN" }); }
     finally { await s.close(); }
   });

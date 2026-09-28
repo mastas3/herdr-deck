@@ -1,5 +1,6 @@
 export type CodexControlState = {
   ready: boolean; error?: string; status?: string; activeTurnId?: string; model?: string; effort?: string;
+  connectionIssue?: "not-loaded" | "incompatible" | "unavailable";
   requests: { id: string | number; method: string; params: any }[];
 };
 
