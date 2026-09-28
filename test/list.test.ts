@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // The list helpers live in the browser script (no build step); evaluate just their marked block.
 const src = readFileSync(new URL("../public/js/list-rows.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("/* @pure:list-begin"), src.indexOf("/* @pure:list-end */"));
-const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder, commonBranch, splitWorktrees };`)();
+const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder, commonBranch, splitWorktrees, timeSig };`)();
 
 const NOW = 1_800_000_000_000;
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
@@ -107,5 +107,29 @@ describe("simple mode row", () => {
   test("its time since last activity is a live label; a working row's isn't a time", () => {
     expect(simpleRow(row({ lastActiveAt: NOW }))).toContain(`<span class="ago" data-t="${NOW}">3m</span>`);
     expect(simpleRow(row({ status: "working", lastActiveAt: NOW }))).not.toContain("data-t");
+  });
+});
+
+describe("the list's minute ticker", () => {
+  const none = () => undefined;
+  test("a new session turning empty after 15 minutes changes the time signature; nothing else moving keeps it", () => {
+    const rows = [row({ key: "a", empty: true, bornAt: NOW - 14 * MIN }), row({ key: "b", lastActiveAt: NOW - HOUR })];
+    const at14 = L.timeSig(rows, none, NOW);
+    expect(at14).toContain("a:new;");
+    expect(L.timeSig(rows, none, NOW + 30_000)).toBe(at14);
+    const at16 = L.timeSig(rows, none, NOW + 2 * MIN);
+    expect(at16).toContain("a:empty;");
+    expect(at16).not.toBe(at14);
+  });
+  test("a stale flag or a pending question counts too", () => {
+    const r = row({ key: "s", lastActiveAt: NOW - DAY });
+    expect(L.timeSig([{ ...r, stale: true }], none, NOW)).not.toBe(L.timeSig([r], none, NOW));
+    expect(L.timeSig([r], () => "question", NOW)).toBe("s:ask;");
+  });
+  test("list.js runs it once a minute and redraws only the list", () => {
+    const list = readFileSync(new URL("../public/js/list.js", import.meta.url), "utf8");
+    const tick = list.slice(list.indexOf("let lastTimeSig"), list.indexOf("}, 60_000);"));
+    expect(tick).toContain("timeSig(S.rows.values()");
+    expect(tick).toContain("renderList()");
   });
 });

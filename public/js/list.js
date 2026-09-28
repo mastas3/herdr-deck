@@ -329,4 +329,12 @@ setInterval(() => {
   // Only labels whose text changed are written: an unchanged write still costs every row a relayout.
   for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (!t) continue; const v = el.dataset.why ? reasonLabel(el.dataset.why, t, now) : el.dataset.fmt === "long" ? agoText(t) : ago(t); if (el.textContent !== v) el.textContent = v; }
 }, 20000);
+// Time moves some states by itself ("new" turns "empty"): once a minute, redraw the list if one did. renderList
+// rebuilds only the rows whose state or label changed, and nothing when none did.
+let lastTimeSig = "";
+setInterval(() => {
+  if (document.hidden || S.view === "closed") return;
+  const sig = timeSig(S.rows.values(), (r) => pendingAsk(r)?.kind, Date.now());
+  if (sig !== lastTimeSig) { const first = !lastTimeSig; lastTimeSig = sig; if (!first) renderList(); }
+}, 60_000);
 setInterval(() => { for (const el of document.querySelectorAll("[data-since]")) el.textContent = clock(Date.now() - Number(el.dataset.since)); }, 1000);

@@ -90,6 +90,13 @@ function splitWorktrees(proj, rows, closed = {}) {
   // Display order, and what keyboard navigation walks (folded sub-sections are skipped).
   return { main, trees, branch: commonBranch(main), rows: main.concat(...trees.map((t) => t.rows)), open: main.concat(...trees.map((t) => (t.closed ? [] : t.rows))) };
 }
+/** Each row's time-based state at `now` (a new session reads "empty" after 15 minutes): the list's minute ticker redraws
+ *  when this changes, so an idle deck moves such rows without waiting for an event. */
+function timeSig(rows, askOf, now) {
+  let s = "";
+  for (const r of rows) s += r.key + ":" + reasonOf(r, askOf(r), now).k + ";";
+  return s;
+}
 /* @pure:list-end */
 function sectionOf(r) {
   const k = rank(r);
