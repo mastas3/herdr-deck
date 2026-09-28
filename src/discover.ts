@@ -465,7 +465,7 @@ export function forkPrompt(g: Repo & { why?: Why[] }, ctx: PromptCtx) {
     "4. Suggest one small first experiment (under an hour) and wait for me before doing it. Don't push, publish or open issues/PRs.",
   ].join("\n");
 }
-/** Research agents are told about the Founder Library (src/library.ts), which they reach through the deck's MCP tool. */
+/** Research agents are told about the Founder Library (plugins-builtin/library), which they reach through the deck's MCP tool. */
 export const LIBRARY_STEP = "Also ask the Founder Library, if the herdr-deck MCP tool `deck_library` is available: how real founders priced, launched and got the first customers for something similar. Quote what fits in Costs and risks and Build order with its YouTube timestamp link, and treat their numbers as claims.";
 export function researchPrompt(idea: string, slug: string, ctx: PromptCtx & { repos?: Repo[]; projects?: string[]; keywords?: string[] }) {
   const file = `${tilde(ctx.ideasDir)}/${slug}.md`;

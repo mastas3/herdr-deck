@@ -7,27 +7,17 @@
 //    cited line doesn't.
 // So a card can be thin, but what it says was said, and each line links to the moment it was said.
 
-export const CHANNELS = ["reddit", "x_twitter", "tiktok", "youtube", "instagram", "linkedin", "facebook_groups", "product_hunt", "hacker_news", "seo", "content_blog", "newsletter", "cold_email", "cold_calls", "door_to_door", "in_person", "friends_network", "existing_audience", "communities", "paid_ads", "partnerships", "affiliates", "app_store", "marketplace", "word_of_mouth", "press", "influencers", "cold_dms", "other"] as const;
-export const BTYPES = ["saas", "mobile_app", "ecommerce", "service_agency", "info_product", "marketplace", "content_media", "local_business", "newsletter", "community", "hardware", "other"] as const;
-export type Channel = (typeof CHANNELS)[number];
+import { BTYPES, CHANNELS, cleanCaption, fmtT, inferChannel, linkAt, type Card, type Channel, type Claim, type Item } from "../../src/library-card";
+
+// The card's shape and the helpers other features print cards with live in the core (src/library-card.ts).
+export { BTYPES, CHANNELS, cleanCaption, fmtT, inferChannel, linkAt, type Card, type Channel, type Claim, type Item };
+
 /** Bumped when the prompt or the checks change: older cards are re-extracted in the background. */
 export const EXTRACT_VERSION = 4;
-export type Claim = { text: string; quote?: string; t: number | null; src: "transcript" | "title"; moved?: boolean };
-export type Item = { text: string; t: number | null; channel?: Channel; moved?: boolean };
-export type Card = {
-  id: string; source: string; channelTitle?: string; title: string; url: string; views?: number; date?: string; duration?: number;
-  kind: "founder_story" | "advice" | "other";
-  business: string | null; founder: string | null; sells: string | null; btype: (typeof BTYPES)[number]; customer: string | null;
-  price?: Claim; revenue?: Claim & { perMonth?: number; currency?: string }; ttfr?: Claim; team?: Claim;
-  first: Item[]; growth: Item[]; stack: string[]; failed: Item[]; lessons: Item[];
-  model: string; at: number; checks: { dropped: string[]; moved: number }; v?: number;
-};
 export type Segment = { start: number; end?: number; text: string };
 export type Line = { t: number; text: string };
 
 // ── transcript → prompt lines ──────────────────────────────────────────────────────
-const ENT: Record<string, string> = { "&gt;": ">", "&lt;": "<", "&amp;": "&", "&quot;": '"', "&#39;": "'", "&nbsp;": " " };
-export const cleanCaption = (s: string) => String(s ?? "").replace(/&(gt|lt|amp|quot|#39|nbsp);/g, (m) => ENT[m] ?? m).replace(/>>\s*/g, "— ").replace(/\[(music|applause|laughter|__)\]/gi, "").replace(/\s+/g, " ").trim();
 /** Segments grouped into ~20-second lines, each starting at its first segment's time. */
 export function toLines(segs: Segment[], every = 20): Line[] {
   const out: Line[] = [];
@@ -42,7 +32,6 @@ export function toLines(segs: Segment[], every = 20): Line[] {
   if (cur) out.push(cur);
   return out;
 }
-export const fmtT = (t: number) => { const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = Math.floor(t % 60); return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`; };
 export function parseT(x: unknown): number | null {
   const m = String(x ?? "").trim().replace(/^\[|\]$/g, "").replace(/^t\s*[:=]\s*/i, "").match(/^(?:(\d+):)?(\d{1,3}):(\d{2})$/);
   if (!m) return null;
@@ -213,30 +202,7 @@ export function checkItem(text: string | null, rawT: unknown, lines: Line[], dur
   return t != null ? { text, t } : undefined;
 }
 
-// ── channels ───────────────────────────────────────────────────────────────────
-// Small models often name a channel outside the list ("influencer marketing", "Twitter DMs"). The tactic's own words
-// usually say which one it is; the first rule that matches wins, most specific first.
-const CHANNEL_RULES: [RegExp, Channel][] = [
-  [/influencer|ugc|creators? (to|who) post|streamers?|content creators?/i, "influencers"], [/product ?hunt/i, "product_hunt"], [/hacker ?news|show hn/i, "hacker_news"],
-  [/reddit|subreddit|\br\/\w/i, "reddit"], [/tiktok/i, "tiktok"], [/youtube/i, "youtube"], [/instagram|\breels?\b/i, "instagram"], [/linkedin/i, "linkedin"],
-  [/facebook group/i, "facebook_groups"], [/twitter|\btweet|\bx\.com|on x\b/i, "x_twitter"], [/cold email|email outreach|emailed (people|businesses|leads)/i, "cold_email"],
-  [/cold call|called (businesses|them|people)|phone/i, "cold_calls"], [/door[- ]to[- ]door|walk(ed|ing)? into|knock/i, "door_to_door"],
-  [/\bdms?\b|direct messag|messag(ed|ing) (people|them)/i, "cold_dms"], [/app store|\baso\b/i, "app_store"],
-  [/etsy|amazon|fiverr|upwork|gumroad|shopify app store|marketplace|chrome web store/i, "marketplace"], [/\bseo\b|google search|rank(ed|ing)? on google|keywords?/i, "seo"],
-  [/newsletter/i, "newsletter"], [/blog|article|content marketing|wrote posts/i, "content_blog"], [/\bads?\b|paid (ads|acquisition)|facebook ads|google ads|meta ads/i, "paid_ads"],
-  [/affiliate|referral program/i, "affiliates"], [/partner/i, "partnerships"], [/press|journalist|techcrunch|featured in/i, "press"],
-  [/discord|slack (group|community)|forum|community|communities|facebook|whatsapp group/i, "communities"], [/audience|followers|my (channel|list)|existing customers/i, "existing_audience"],
-  [/friend|family|network|former (colleague|employer|boss)/i, "friends_network"], [/conference|meetup|event|trade show|in person|in-person/i, "in_person"],
-  [/word of mouth|referrals?\b|told (their|his|her) friends/i, "word_of_mouth"],
-];
 const NOT_TACTIC = /^(the |their |his |her )?first (sale|customer|user|dollar|payment)s? (came|was|were|arrived)|\b(scaled|grew|got) to (about |around |over )?\$?\d|\b(generated|made|earned|hit|reached|did) (over |about |around |nearly |almost )?\$\d|\bspent the next .* (trying|figuring)/i;
-export function inferChannel(named: unknown, text: string): Channel {
-  const n = String(named ?? "").toLowerCase().trim().replace(/[\s/-]+/g, "_");
-  if ((CHANNELS as readonly string[]).includes(n) && n !== "other") return n as Channel;
-  for (const [re, ch] of CHANNEL_RULES) if (re.test(`${named ?? ""} ${text}`)) return ch;
-  return "other";
-}
-
 // ── normalizing ───────────────────────────────────────────────────────────────────
 const NULLISH = /^[\[(<"']*(null|none|n\/a|na|unknown|not (mentioned|stated|specified|said|given)|-|)[\])>"']*$/i;
 function str(x: unknown, max = 240): string | null {
@@ -294,5 +260,3 @@ export function buildCard(raws: any[], lines: Line[], v: VideoMeta, model: strin
   for (const k of ["price", "ttfr", "team", "revenue"] as const) if (!card[k]) delete card[k];
   return card;
 }
-
-export const linkAt = (url: string, t: number | null | undefined) => (t ? `${url}${url.includes("?") ? "&" : "?"}t=${Math.floor(t)}s` : url);

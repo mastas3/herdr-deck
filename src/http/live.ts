@@ -1,7 +1,7 @@
 // What the deck keeps current on its own: the history index, plan usage, which dev servers are shared on the
 // tailnet, and proof of done. Started once at startup (src/server.ts), in this order.
 import { startHistory, historyStats } from "../history";
-import { usage } from "../connections";
+import { usage } from "../usage";
 import { servedPorts } from "../share";
 import { claimsDone, onCheck, resultFor, verify } from "../verify";
 import type { Automations } from "../automations";

@@ -6,9 +6,11 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import type { Inventory, Item } from "./connections";
 import { allItems, stateOf } from "./store";
+import type { Need } from "../../src/plugin-format";
 
-/** Any one of these connections will do. An id ending in "*" matches by prefix (e.g. "ssh:*": any SSH host). */
-export type Need = { label: string; any: string[] };
+/** Any one of these connections will do. An id ending in "*" matches by prefix (e.g. "ssh:*": any SSH host). Data
+ *  plugins declare recipes in the same shape, so the type lives with their format. */
+export type { Need };
 export type Agent = "claude" | "codex" | "opencode";
 export type Recipe = {
   id: string; title: string; pitch: string; cat: string;

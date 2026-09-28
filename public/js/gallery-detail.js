@@ -73,7 +73,7 @@ function galConnHTML(c) {
   const rows = [...(c.connectors ?? [])].sort((a, b) => Number(b.missing) - Number(a.missing)).map((x) => {
     if (!x.missing) return `<li class="have"><b>${esc(x.label)}</b><span>${x.have.slice(0, 3).map((h) => `<span class="galo">${esc(h.name)}</span>`).join("")}</span></li>`;
     const sug = x.suggestions.slice(0, 3).map((s, i) => `<div class="galsug"><p><b>${esc(s.name)}</b> <span class="hint">${esc(s.type)}${s.free ? ` · ${esc(s.free)}` : ""}</span><br>${esc(s.why)}</p>
-      <div class="galsuga">${s.type === "repo" && s.url ? `<a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">Open on GitHub</a>` : ""}${s.type === "service" ? `<button class="btn sm" data-galconn="${esc(s.name)}">Open in Connections</button>${s.url ? `<a class="btn ghost sm" href="${esc(s.url)}" target="_blank" rel="noopener">Site</a>` : ""}` : ""}<button class="btn ghost sm" data-galtray="${esc(x.cap)}|${i}">Add to Studio tray</button></div></div>`).join("");
+      <div class="galsuga">${s.type === "repo" && s.url ? `<a class="btn sm" href="${esc(s.url)}" target="_blank" rel="noopener">Open on GitHub</a>` : ""}${s.type === "service" ? `${deckPlugins.has("connections") ? `<button class="btn sm" data-galconn="${esc(s.name)}">Open in Connections</button>` : ""}${s.url ? `<a class="btn ghost sm" href="${esc(s.url)}" target="_blank" rel="noopener">Site</a>` : ""}` : ""}<button class="btn ghost sm" data-galtray="${esc(x.cap)}|${i}">Add to Studio tray</button></div></div>`).join("");
     return `<li class="miss"><b>${esc(x.label)}</b><span class="galmiss">missing</span>${sug}</li>`;
   }).join("");
   return rows ? `<ul class="galconn">${rows}</ul>` : "";
@@ -97,7 +97,7 @@ function galSheetClick(e, dlg) {
   if (proj) { dlg.close(); return openJourney(proj.dataset.galproject); }
   if (t.closest("[data-galquests]")) { dlg.close(); return openQuests(); }
   const conn = t.closest("[data-galconn]");
-  if (conn) { dlg.close(); S.conn.cat = "recommended"; S.conn.q = conn.dataset.galconn; S.conn.open = null; return openConnections(); }
+  if (conn && deckPlugins.has("connections")) { dlg.close(); S.conn.cat = "recommended"; S.conn.q = conn.dataset.galconn; S.conn.open = null; return openConnections(); }
   const tray = t.closest("[data-galtray]");
   if (tray) {
     const [cap, i] = tray.dataset.galtray.split("|");

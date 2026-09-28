@@ -3,12 +3,12 @@
 // (the browser keeps it locked), only the origin_url and signon_realm columns are read, each is reduced to a
 // host, banks/finance/health/government/dating/adult sites are dropped, and the copy is deleted. Usernames,
 // passwords and cookies are never selected. Safari and the Keychain are never touched; history is never read.
-// The scanner runs this file as its own short-lived process with a timeout (bun src/logins.ts --logins).
+// The scanner runs this file as its own short-lived process with a timeout (bun logins.ts --logins).
 import { Database } from "bun:sqlite";
 import { copyFileSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { homedir, platform, tmpdir } from "node:os";
 import { join } from "node:path";
-import { hostOf, sensitive } from "./catalog";
+import { hostOf, sensitive } from "../../src/catalog";
 
 export type LoginProfile = { browser: string; profile: string; label: string; hosts: string[] };
 export type LoginScan = { profiles: LoginProfile[]; files: number; ms: number; error?: string };

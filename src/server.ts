@@ -4,9 +4,6 @@
 import { homedir } from "node:os";
 import { GROUPS, loadTools } from "./tools";
 import { historyProjects, historyStats, stopHistory } from "./history";
-import { inventory } from "./connections";
-import { enrich } from "./store";
-import { RECS } from "./catalog";
 import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
@@ -15,7 +12,7 @@ import { Deck, type Row } from "./deck";
 import { createDiscover, gh } from "./discover";
 import { galleryForServer } from "./gallery-server";
 import { createLeads } from "./leads";
-import { createLibrary, feedQuery } from "./library";
+import { feedQuery, type LibraryReader } from "./library-search";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
 import { PushStore } from "./push";
@@ -68,18 +65,24 @@ const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 
-// Founder Library (Discover → Library): its own module; the server routes /api/library/* to it, and the Studio, the
-// ideas feed and the MCP tool read it as evidence. Its worker resumes only if you left it running.
-const library = createLibrary();
-if (!process.env.DECK_NO_LIBRARY) library.autostart();
+// Connections and the Founder Library are plugins (plugins-builtin/connections, plugins-builtin/library). Discover, the
+// gallery, the Studio, the ideas feed and the quest board still live here and reach them through their services: a
+// shim until those are plugins that use() them. With a plugin off they get no inventory and no evidence, never an error.
+type ConnectionsReader = { inventory(): Promise<{ sections: { id: string; items: any[] }[] }>; enrich<T>(inv: T): T & { categories: { id: string; label: string }[] }; recs(): any[] };
+const connections = () => { const c = pluginHost.service<ConnectionsReader>("connections"); if (!c) throw new Error("Connections is off"); return c; };
+const connectionNames = async () => (await connections().inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name);
+const library: LibraryReader = {
+  evidence: async (q, k, use) => (await pluginHost.service<LibraryReader>("library")?.evidence(q, k, use)) ?? { text: "", answers: [] },
+  cards: () => pluginHost.service<LibraryReader>("library")?.cards() ?? { all: () => [] },
+};
 
 // Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
 const discover = createDiscover(
   { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
   {
-    connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name),
+    connections: connectionNames,
     // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
-    items: async () => { const inv = enrich(await inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
+    items: async () => { const c = connections(), inv = c.enrich(await c.inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
     rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
     studio: { evidence: async (text) => (await library.evidence(text, 4, "studio")).text },
     feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
@@ -99,7 +102,7 @@ const opportunities = createOpportunityService({
   deepResearch: runOpportunityWeb,
 });
 // Discover uses the same evidence and experiment records as Opportunities.
-const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS, library, evidenceStore: opportunities.store });
+const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: async () => connections().inventory(), gh, recs: () => pluginHost.service<ConnectionsReader>("connections")?.recs() ?? [], library, evidenceStore: opportunities.store });
 // Project pages (journeys): their own module; the server only routes to it.
 const journeyHist = localHistory(HISTORY_DB, SELF.id);
 const journeys = createJourneys(
@@ -111,7 +114,7 @@ const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
-const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
+const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: connectionNames, checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
 /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
 const presence = new Map<string, { key: string | null; at: number }>();
 const viewing = (key: string) => [...presence.values()].some((p) => p.key === key && Date.now() - p.at < 70_000);
@@ -140,6 +143,10 @@ const pluginHost = createPluginHost({
     sessions: { start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole) },
   },
 });
+// What plugins need from the core that no plugin owns: the other machines' decks (the connections plugin reads their
+// inventories) and recipes from enabled data plugins.
+pluginHost.provideCore("remotes", { get: (id: string) => remotes.get(id), all: () => [...remotes.values()] });
+pluginHost.provideCore("data-plugins", { recipes: () => plugins.recipes() });
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
@@ -167,13 +174,13 @@ const { assets, page } = createPage({ dev: DEV, fullState, plugins: () => plugin
 const queue = startQueue({ dataDir: DATA_DIR, broadcast, allRows, sendAny: sessions.sendAny });
 const mcp = createMcp({
   selfId: SELF.id, remotes, allRows, localRow: hosts.localRow, machineLabelOf, detailFor: chat.detailFor, searchLocal: chat.searchLocal,
-  historyEverywhere: tools.historyEverywhere, decisions: dec.decisions, sendText: sessions.sendText, startSession: sessions.startSession, notice, broadcast, library,
+  historyEverywhere: tools.historyEverywhere, decisions: dec.decisions, sendText: sessions.sendText, startSession: sessions.startSession, notice, broadcast,
   tools: () => pluginHost.contributions("mcp.tools"),
 });
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, discover, gallery, library, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, discover, gallery, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };
@@ -199,7 +206,7 @@ for (const h of remotes.values()) h.start();
 auto.start();
 setInterval(game.tick, 60_000);
 research.start();
-// Warm the slow scans so the first "/" and the first Connections view are instant.
-setTimeout(() => { warmSlash(); inventory().catch(() => {}); }, 8_000);
+// Warm the slow scan so the first "/" is instant (the connections plugin warms its own).
+setTimeout(warmSlash, 8_000);
 
 console.log(`herdr-deck "${SELF.label}" on http://${HOST}:${PORT}  (${deck.rows.size} panes across ${deck.sessions.size} herdr server(s); ${remotes.size} other machine(s))`);

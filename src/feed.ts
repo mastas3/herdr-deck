@@ -52,7 +52,7 @@ export type FeedDeps = {
   timeoutMs?: number; now?: () => number;
   /** Where every idea is kept for good (the feed itself only holds today). */
   archive?: { put: (idea: any) => void; score: (id: string, score: number, dropped: boolean) => void };
-  /** Founder Library evidence for a batch (what real founders did), or "" (src/library.ts). */
+  /** Founder Library evidence for a batch (what real founders did), or "" (the library plugin, plugins-builtin/library). */
   evidence?: (rows: string[]) => Promise<string>;
 };
 

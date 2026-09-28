@@ -1,6 +1,5 @@
 // Plugin manifests. A plugin is data, never code: a plugin.json plus the prompt files it points to. Strangers
 // write these, so the validator rejects anything it doesn't know and every problem names its exact JSON path.
-import type { Need } from "./recipes";
 
 export type Machine = "hub" | "other";
 export type AgentKind = "claude" | "codex" | "opencode";
@@ -14,6 +13,8 @@ export type GrantDef = { tools: string[]; writes?: boolean };
 export type SourceDef = { id: string; prompt: string; grants: string[]; schema: SchemaDef; refresh?: string; model?: string; machine?: Machine };
 export type ViewDef = { id: string; title: string; template: Template; source: string; item: Record<string, string>; actions?: string[]; pin?: boolean };
 export type ActionDef = { id: string; label: string; mode: "draft" | "session"; prompt: string; draftSchema?: SchemaDef; grants?: string[] };
+/** A connection a recipe needs: any one of these store ids will do ("ssh:*" matches by prefix). */
+export type Need = { label: string; any: string[] };
 export type PluginRecipe = { id: string; title: string; pitch: string; cat: string; needs: Need[]; optional?: Need[]; steps: string[]; prompt: string; folder?: string; agent?: AgentKind; machine?: Machine };
 export type ProjectDef = { id: string; name: string; folder: string; repo?: { url: string; ref: string }; playbook?: string };
 export type RoleDef = { id: string; project: string; title: string; agent: AgentKind; model?: string; prompt: string; machine?: Machine };

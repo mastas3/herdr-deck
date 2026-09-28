@@ -1,12 +1,13 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createLibrary } from "../src/library";
-import { ftsQuery, openCards } from "../src/library-cards";
-import { addSource, defaultConfig, loadConfig, parseSource, removeSource, saveConfig, setEnabled } from "../src/library-config";
-import { amounts, buildCard, checkClaim, checkItem, parseCardJson, parseT, perMonth, toLines, transcriptParts, type Card, type Line } from "../src/library-extract";
-import { evidenceText, mergeResults, type Passage } from "../src/library-search";
-import { handleMcp } from "../src/mcp";
+import { createLibrary } from "../library";
+import { ftsQuery, openCards } from "../library-cards";
+import { addSource, defaultConfig, loadConfig, parseSource, removeSource, saveConfig, setEnabled } from "../library-config";
+import { amounts, buildCard, checkClaim, checkItem, parseCardJson, parseT, perMonth, toLines, transcriptParts, type Card, type Line } from "../library-extract";
+import { evidenceText, mergeResults, type Passage } from "../../../src/library-search";
+import { handleMcp } from "../../../src/mcp";
+import { libraryTool } from "../server";
 
 const dir = mkdtempSync(`${tmpdir()}/deck-library-`);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -220,16 +221,17 @@ describe("libraryEvidence", () => {
 });
 
 describe("research agents: the deck_library MCP tool", () => {
-  const base = { sessions: () => [], session: async () => ({}), search: async () => ({}), history: async () => ({}), decisions: async () => [], connections: async () => "", send: async () => ({}), start: async () => ({}), audit: () => {} };
-  test("listed only when the deck has a library; answers with the evidence text", async () => {
+  const base = { sessions: () => [], session: async () => ({}), search: async () => ({}), history: async () => ({}), decisions: async () => [], send: async () => ({}), start: async () => ({}), audit: () => {} };
+  test("listed only while the library plugin contributes it; answers with the evidence text", async () => {
     const names = async (ctx: any) => (await handleMcp({ id: 1, method: "tools/list" }, ctx)).result.tools.map((t: any) => t.name);
     expect(await names(base)).not.toContain("deck_library");
     const seen: any[] = [];
-    const ctx = { ...base, library: async (q: string, k: number) => { seen.push([q, k]); return q.includes("bot") ? "Founder Library: 1. GymBot" : ""; } };
+    const tool = libraryTool({ evidence: async (q: string, k?: number, use?: string) => { seen.push([q, k, use]); return { text: q.includes("bot") ? "Founder Library: 1. GymBot" : "", answers: [] }; } } as any);
+    const ctx = { ...base, tools: () => [tool] };
     expect(await names(ctx)).toContain("deck_library");
     const r = await handleMcp({ id: 2, method: "tools/call", params: { name: "deck_library", arguments: { query: "telegram bot", limit: 50 } } }, ctx);
     expect(r.result.content[0].text).toBe("Founder Library: 1. GymBot");
-    expect(seen).toEqual([["telegram bot", 8]]);
+    expect(seen).toEqual([["telegram bot", 8, "research"]]);
     const none = await handleMcp({ id: 3, method: "tools/call", params: { name: "deck_library", arguments: { query: "zzz" } } }, ctx);
     expect(none.result.content[0].text).toContain("nothing on that yet");
   });

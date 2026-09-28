@@ -1,6 +1,6 @@
 // Founder cards for the strategy tests: three podcast-clip SaaS stories (two recent, one from 2020), a habit app and an
 // advice video, with prices, claimed revenue, first-customer tactics and failures, each at a timestamp.
-import type { Card } from "../src/library-extract";
+import type { Card } from "../src/library-card";
 
 /** A founder card with sensible defaults; each fixture overrides what it's about. */
 export function card(o: Partial<Card> & { id: string }): Card {

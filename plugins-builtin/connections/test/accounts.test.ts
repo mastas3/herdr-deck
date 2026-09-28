@@ -2,13 +2,13 @@ import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { interestsFrom, mergeAccounts, owned, recommend, upsertAccount, type Account } from "../src/accounts";
-import { RECS, SITES_CATALOG, hostOf, registrable, sensitive, siteFor } from "../src/catalog";
-import type { Inventory, Item } from "../src/connections";
-import { inventoryText } from "../src/connections";
-import { type LoginProfile, browserRoots, profileLabel, readLoginFile, readLogins } from "../src/logins";
-import { RECIPES, readiness } from "../src/recipes";
-import { CATEGORIES, enrich, stateOf } from "../src/store";
+import { interestsFrom, mergeAccounts, owned, recommend, upsertAccount, type Account } from "../accounts";
+import { RECS, SITES_CATALOG, hostOf, registrable, sensitive, siteFor } from "../../../src/catalog";
+import type { Inventory, Item } from "../connections";
+import { inventoryText } from "../connections";
+import { type LoginProfile, browserRoots, profileLabel, readLoginFile, readLogins } from "../logins";
+import { RECIPES, readiness } from "../recipes";
+import { CATEGORIES, enrich, stateOf } from "../store";
 
 // Values that must never come out of the reader, the scan or CONNECTIONS.md.
 const USERS = ["FAKEUSER_alice@example.org", "FAKEUSER_bob", "FAKEUSER_bank_login", "FAKEUSER_health"];
@@ -319,7 +319,7 @@ describe("the whole scan in a fake HOME", () => {
     writeFileSync(`${home}/.config/herdr-deck/connections.json`, JSON.stringify({ accounts: [{ id: "youtube", handle: "stasmaksin", notes: "Upload as private only" }] }));
     mkdirSync(`${home}/wiki`, { recursive: true });
     writeFileSync(`${home}/wiki/index.md`, "- [[astra-apple]] Human Design 2027 prophecy funnel gumroad; story-reel HyperFrames shorts video; falafel-rush phaser game");
-    const p = Bun.spawn([process.execPath, new URL("../src/connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, TMPDIR: tmp }, stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn([process.execPath, new URL("../connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, TMPDIR: tmp }, stdout: "pipe", stderr: "pipe" });
     const out = await new Response(p.stdout).text();
     await p.exited;
     const inv = JSON.parse(out) as Inventory;
@@ -341,7 +341,7 @@ describe("the whole scan in a fake HOME", () => {
     expect(readdirSync(tmp).filter((f) => f.startsWith("deck-logins-"))).toEqual([]);
   }, 60_000);
   test("DECK_NO_LOGINS turns the login read off", async () => {
-    const p = Bun.spawn([process.execPath, new URL("../src/connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, TMPDIR: tmp, DECK_NO_LOGINS: "1", DECK_SCAN_DRY: "1" }, stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn([process.execPath, new URL("../connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, TMPDIR: tmp, DECK_NO_LOGINS: "1", DECK_SCAN_DRY: "1" }, stdout: "pipe", stderr: "pipe" });
     const inv = JSON.parse(await new Response(p.stdout).text()) as Inventory;
     await p.exited;
     const acc = inv.sections.find((s) => s.id === "accounts")!.items;
@@ -357,7 +357,7 @@ describe("New badges after an upgrade", () => {
       mkdirSync(`${h}/.config/herdr-deck`, { recursive: true });
       writeFileSync(`${h}/.config/herdr-deck/connections-seen.json`, JSON.stringify({ ids: { "svc:old": 0 } })); // an older deck's file
       writeFileSync(`${h}/.config/herdr-deck/connections.json`, JSON.stringify({ accounts: [{ id: "instagram", handle: "a" }] }));
-      const scan = async () => { const p = Bun.spawn([process.execPath, new URL("../src/connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: h, DECK_NO_LOGINS: "1" }, stdout: "pipe", stderr: "pipe" }); const o = await new Response(p.stdout).text(); await p.exited; return JSON.parse(o) as Inventory; };
+      const scan = async () => { const p = Bun.spawn([process.execPath, new URL("../connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: h, DECK_NO_LOGINS: "1" }, stdout: "pipe", stderr: "pipe" }); const o = await new Response(p.stdout).text(); await p.exited; return JSON.parse(o) as Inventory; };
       const card = (inv: Inventory, id: string) => inv.sections.flatMap((s) => s.items).find((i) => i.id === id);
       const a = await scan();
       expect(card(a, "acct:instagram")?.since).toBeUndefined();

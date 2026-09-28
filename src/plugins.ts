@@ -4,8 +4,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import type { Recipe } from "./recipes";
-import { PLUGIN_ID, isFileRef, parseBundle, promptText, referencedFiles, type Bundle, type Problem } from "./plugin-format";
+import { PLUGIN_ID, isFileRef, parseBundle, promptText, referencedFiles, type Bundle, type PluginRecipe, type Problem } from "./plugin-format";
 import { diffBundles, trustSummary, type Diff, type Trust } from "./plugin-trust";
 
 export type From = { catalog?: string; file?: string; url?: string; ref?: string };
@@ -266,7 +265,7 @@ export function createPlugins(o: { dataDir: string; catalogDir: string }) {
     };
   }
   /** Recipes from enabled plugins whose files are as approved, ids prefixed with the plugin's. */
-  function recipes(): Recipe[] {
+  function recipes(): (PluginRecipe & { plugin: string })[] {
     return load().filter((x) => x.enabled).flatMap((rec) => {
       const c = current(rec);
       if (c.state !== "on" || !c.bundle) return [];

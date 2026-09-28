@@ -148,8 +148,9 @@ function openToolMenu(anchor, compact) {
   const n = targets().length;
   const cell = (icon, label, hint, run) => ({ html: `<span class="tg">${icon}</span><span class="tl2">${esc(label)}</span>`, title: hint, run });
   const items = S.tools.filter((t) => t.action !== "upload").map((t) => cell(toolGlyph(t), t.label, t.hint ?? "", () => runTool(t)));
-  items.push("-",
-    cell(ICON.plug, "Connections", "Tell this agent what it can use: deploy targets, APIs, MCP servers…", () => openConnections(S.sel)),
+  // Cells plugins add ("tools.menu": { icon, label, hint, run(sel) }), e.g. Connections.
+  const extra = deckPlugins.contributions("tools.menu").map((c) => cell(c.icon ?? "", c.label, c.hint ?? "", () => c.run(S.sel)));
+  items.push("-", ...extra,
     cell(ICON.clip, "Attach files", "Or drop / paste them into the chat", pickFiles),
     cell(ICON.tools, "Manage tools", "What each tool sends; add your own", () => setMode("tools")));
   openMenu(anchor, items, n > 1 ? `Tools for ${n} selected sessions` : "Tools", compact ? "grid up" : "grid");

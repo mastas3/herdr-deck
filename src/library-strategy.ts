@@ -6,8 +6,7 @@
 //
 // Only what the cards say: no number here is computed from a guess. Revenue is always "claimed". Matching is plain
 // word and field overlap (no model), so it is instant and can run on every gallery card, kit, quest board and plan.
-import { fmtT, inferChannel, linkAt, type Card, type Channel } from "./library-extract";
-import { fmtPublished, oldLabel, recencyWeight } from "./library-dates";
+import { fmtPublished, fmtT, inferChannel, linkAt, oldLabel, recencyWeight, type Card, type Channel } from "./library-card";
 
 export type Target = { name?: string; hook?: string; buyer?: string; offer?: string; price?: string; channel?: string; btype?: string; text?: string };
 export type Moment = { text: string; at: string; link: string };

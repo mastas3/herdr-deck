@@ -1,10 +1,6 @@
 /* ── connections: the store ── */
 .view[data-view="connections"] { max-width: 1320px; padding-bottom: 96px; }
-.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 10px; padding: 2px; gap: 2px; }
-.seg button { border: 0; background: none; color: var(--ink-2); padding: 4px 10px; border-radius: 8px; }
-.seg button[aria-pressed="true"] { background: var(--sel); color: var(--ink); }
-.seg button:disabled { opacity: .45; }
-.seg .n, .crail .n, .rchips .n { color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: .9em; margin-left: 2px; }
+.crail .n, .rchips .n { color: var(--ink-3); font-variant-numeric: tabular-nums; font-size: .9em; margin-left: 2px; }
 .ctabs button { font-weight: 600; padding: 5px 14px; }
 .ctoolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0 4px; }
 .csearch { width: min(300px, 100%); background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 6px 10px; color: var(--ink); }
@@ -108,10 +104,6 @@
 .cuse { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; color: var(--ink); font: 14px/1.45 var(--read); resize: vertical; }
 .cuse:focus { outline: none; border-color: var(--accent); }
 .cacts { display: flex; gap: 6px; align-items: center; }
-/* Was ".btn.danger", which also matched the solid dialog danger button and, coming after its own rule, overrode its
-   white text to red-on-red (invisible). Scoped to the ghost variant, and reset to a transparent, ghost-style
-   background so its own red text (and the .btn.danger rule's solid red background) don't collide the same way. */
-.btn.ghost.danger { color: var(--danger); background: transparent; border-color: var(--line-2); }
 .cbar { position: sticky; bottom: 12px; z-index: 5; margin-top: 20px; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--raise); border: 1px solid var(--accent); box-shadow: 0 12px 34px rgba(0,0,0,.35); transform: translateY(140%); opacity: 0; pointer-events: none; transition: transform .25s var(--ease), opacity .2s; }
 .cbar.on { transform: none; opacity: 1; pointer-events: auto; }
 .cbar .btn svg { width: 15px; height: 15px; }
@@ -179,9 +171,3 @@
   .ccard, .rcard, .ctile { animation: none; }
   .ccard:hover, .rcard:hover, .ctile:hover, .cmini:hover { transform: none; }
 }
-
-/* ── machines ── */
-.mrow { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px solid var(--line); }
-.mrow .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
-.madd { display: flex; gap: 6px; flex-wrap: wrap; }
-.madd .inp { flex: 1; min-width: 150px; }

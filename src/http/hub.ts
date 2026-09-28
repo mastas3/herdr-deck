@@ -7,7 +7,6 @@ import type { McpCtx } from "../mcp";
 import type { Assets } from "../assets";
 import type { createDiscover } from "../discover";
 import type { galleryForServer } from "../gallery-server";
-import type { createLibrary } from "../library";
 import type { createLeads } from "../leads";
 import type { researchForServer } from "../autoresearch-server";
 import type { createJourneys } from "../journey";
@@ -30,7 +29,7 @@ export type Hub = {
   presence: Map<string, { key: string | null; at: number }>;
   push: PushStore; auto: Automations | undefined; game: ReturnType<typeof gameForServer>;
   discover: ReturnType<typeof createDiscover>; gallery: ReturnType<typeof galleryForServer>;
-  library: ReturnType<typeof createLibrary>; leads: ReturnType<typeof createLeads>; research: ReturnType<typeof researchForServer>;
+  leads: ReturnType<typeof createLeads>; research: ReturnType<typeof researchForServer>;
   journeys: ReturnType<typeof createJourneys>; opportunities: ReturnType<typeof createOpportunityService>; plugins: ReturnType<typeof createPlugins>;
   pluginHost: PluginHost; codePlugins: ReturnType<typeof createCodePluginApi>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;

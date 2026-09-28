@@ -6,56 +6,10 @@
 // Dates matter for strategy: a Reddit tactic from 2019 may not work today. Evidence is weighted toward recent stories
 // and anything older than about three years is labelled "older (2021)" wherever it is quoted.
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { ageYears, fmtDuration, fmtMeta, fmtPublished, isoDate, oldLabel, OLD_YEARS, recencyWeight, type MetaMap, type VideoMeta } from "../../src/library-card";
 
-export type VideoMeta = { date?: string; ts?: number; duration?: number; views?: number; at: number; err?: string };
-export type MetaMap = Record<string, VideoMeta>;
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const YEAR = 365.25 * 86_400_000;
-/** Stories older than this are labelled "older (year)" when quoted. */
-export const OLD_YEARS = 3;
-
-// ── formats ─────────────────────────────────────────────────────────────────────────
-/** "20240315" (yt-dlp's upload_date) or a Unix time → "2024-03-15". Undefined for anything else. */
-export function isoDate(x: unknown): string | undefined {
-  const s = String(x ?? "").trim();
-  if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-  if (/^\d{4}-\d\d-\d\d/.test(s)) return s.slice(0, 10);
-  const n = Number(s);
-  if (/^\d{9,11}(\.\d+)?$/.test(s) && Number.isFinite(n)) return new Date(n * 1000).toISOString().slice(0, 10);
-  return undefined;
-}
-/** "2024-03-15" → "Mar 2024". */
-export function fmtPublished(date?: string): string {
-  const m = String(date ?? "").match(/^(\d{4})-(\d\d)/);
-  return m ? `${MONTHS[Number(m[2]) - 1] ?? ""} ${m[1]}`.trim() : "";
-}
-/** Seconds → "18 min", "1 h 05 min", "45 s". */
-export function fmtDuration(s?: number): string {
-  if (!s || s <= 0) return "";
-  if (s < 60) return `${Math.round(s)} s`;
-  const m = Math.round(s / 60);
-  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, "0")} min`;
-}
-/** "Published Mar 2024 · 18 min" (either half may be missing). */
-export const fmtMeta = (date?: string, duration?: number) => [fmtPublished(date) && `Published ${fmtPublished(date)}`, fmtDuration(duration)].filter(Boolean).join(" · ");
-
-// ── recency ─────────────────────────────────────────────────────────────────────────
-export const ageYears = (date: string | undefined, now = Date.now()) => { const t = date ? Date.parse(date) : NaN; return Number.isFinite(t) ? Math.max(0, (now - t) / YEAR) : undefined; };
-/**
- * How much a story counts next to a fresh one: full weight in its first year, then a tenth less per year, never under
- * half (an old story is still a real story). An unknown date sits in between.
- */
-export function recencyWeight(date?: string, now = Date.now()): number {
-  const y = ageYears(date, now);
-  if (y == null) return 0.85;
-  return Math.max(0.5, 1 - 0.1 * Math.max(0, y - 1));
-}
-/** "older (2021)" for a story more than three years old; "" otherwise (or when the date is unknown). */
-export function oldLabel(date?: string, now = Date.now()): string {
-  const y = ageYears(date, now);
-  return y != null && y > OLD_YEARS ? `older (${date!.slice(0, 4)})` : "";
-}
+// How dates print and weigh live in the core (src/library-card.ts): Discover and the Studio print cards too.
+export { ageYears, fmtDuration, fmtMeta, fmtPublished, isoDate, oldLabel, OLD_YEARS, recencyWeight, type MetaMap, type VideoMeta };
 
 // ── yt-dlp output ───────────────────────────────────────────────────────────────────
 /** The --print template the backfill asks yt-dlp for, one tab-separated line per video. */

@@ -374,7 +374,7 @@ export type StudioDeps = {
   runClaude?: typeof runClaude; runOllama?: typeof runOllama;
   timeouts?: { haiku: number; sonnet: number; ollama: number };
   archive?: { put: (idea: any) => void };
-  /** Founder Library evidence for a message (3–5 real founder cards with links), or "" (src/library.ts). */
+  /** Founder Library evidence for a message (3–5 real founder cards with links), or "" (the library plugin, plugins-builtin/library). */
   evidence?: (text: string) => Promise<string>;
   /** Comparable founders for a build (src/library-strategy.ts); the deck's shared library when not given. */
   comparables?: (t: Target) => Comparables | undefined;

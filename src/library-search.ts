@@ -1,8 +1,7 @@
 // Founder Library: one answer list out of three searches. Transcript passages come from Chroma (meaning), founder
 // cards and web pages from SQLite full-text (words). Results are grouped per video and ranked by reciprocal rank
 // fusion, so a video that both a passage and its card match rises to the top, and either one alone still counts.
-import { cleanCaption, fmtT, linkAt, type Card } from "./library-extract";
-import { fmtPublished, oldLabel, recencyWeight, type MetaMap } from "./library-dates";
+import { cleanCaption, fmtPublished, fmtT, linkAt, oldLabel, recencyWeight, type Card, type MetaMap } from "./library-card";
 
 export type Passage = {
   id: string; score: number | null; text: string; video_id: string; video_title: string; video_url: string;
@@ -11,6 +10,18 @@ export type Passage = {
 export type Clip = { t: number; at: string; link: string; text: string; score: number | null };
 export type Answer = { kind: "video" | "web"; id: string; title: string; url: string; source?: string; card?: Card; clips: Clip[]; score: number; why: ("passage" | "card" | "page")[]; date?: string; duration?: number };
 export type WebHit = { url: string; title: string; snippet: string; rank: number };
+
+/** What the features that read the Founder Library need from the `library` service (plugins-builtin/library):
+ *  Discover's gallery, the Studio and the ideas feed, the quest board, research and project pages. */
+export type LibraryReader = {
+  evidence(q: string, k?: number, use?: "studio" | "ideas" | "research"): Promise<{ text: string; answers: Answer[] }>;
+  cards(): { all(): Card[] };
+};
+
+/** The ideas feed's rows as a library question (what founders did for that kind of business). */
+const FEED_Q: Record<string, string> = { money: "first paying customers small business pricing", saas: "saas first customers pricing", automations: "automation agency first clients",
+  content: "content creator audience monetization", projects: "side project first revenue", gem: "open source project monetization", weekend: "simple app built in a weekend first revenue", wild: "unusual niche business first customers" };
+export const feedQuery = (rows: string[]) => rows.map((r) => FEED_Q[r] ?? r).join(" ");
 
 const K = 60; // the usual RRF constant: rank 1 and rank 5 differ, rank 40 and 45 hardly do
 const MIN_PASSAGE_SCORE = 0.45; // cosine similarity under this is noise with nomic-embed-text

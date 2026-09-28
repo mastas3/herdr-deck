@@ -1,9 +1,9 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { Inventory, Item } from "../src/connections";
-import { detectProjects, portsIn, projectItems, toolsIn, type McpRef } from "../src/projconn";
-import { RECIPES, readiness } from "../src/recipes";
+import type { Inventory, Item } from "../connections";
+import { detectProjects, portsIn, projectItems, toolsIn, type McpRef } from "../projconn";
+import { RECIPES, readiness } from "../recipes";
 
 const ARG_SECRET = "FAKEMCPARGSECRET_42", URL_SECRET = "FAKEURLTOKEN_77";
 let home = "";
@@ -106,7 +106,7 @@ describe("the whole scan: project cards replace their MCP cards; args never leak
   test("fake HOME", async () => {
     w(".claude.json", JSON.stringify({ mcpServers: { "fb-group": { command: "uv", args: ["--directory", `${P()}/fb-group-scraper`, "run", "fb-scraper", "mcp", "--token", ARG_SECRET] } } }));
     w("Documents/Projects/astra/.mcp.json", JSON.stringify({ mcpServers: { "esoteric-rag": { command: "node", args: [`${home}/Downloads/lib/esoteric-rag/mcp-server/index.js`, `--key=${ARG_SECRET}`] }, remote: { url: `https://mcp.example.com/x/${URL_SECRET}` } } }));
-    const p = Bun.spawn([process.execPath, new URL("../src/connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, DECK_NO_LOGINS: "1" }, stdout: "pipe", stderr: "pipe" });
+    const p = Bun.spawn([process.execPath, new URL("../connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, DECK_NO_LOGINS: "1" }, stdout: "pipe", stderr: "pipe" });
     const out = await new Response(p.stdout).text();
     await p.exited;
     const inv = JSON.parse(out) as Inventory;

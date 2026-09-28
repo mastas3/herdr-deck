@@ -4,7 +4,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import type { Library } from "./library";
 import { amounts, buildCard, EXTRACT_SYSTEM, extractUser, parseCardJson, toLines, transcriptParts, type Card } from "./library-extract";
-import { runClaude } from "./mix";
+import { runClaude } from "../../src/mix";
 
 export const SPOTCHECK_CAP = 15;
 const norm = (s: string | null | undefined) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");

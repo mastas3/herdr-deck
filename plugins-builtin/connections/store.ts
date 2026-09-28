@@ -1,6 +1,6 @@
 // The Connections store: categories, states and the enrichment the hub applies to every machine's
 // inventory (its own, and older nodes' that predate categories), so the page gets one shape everywhere.
-import { SITES_CATALOG } from "./catalog";
+import { SITES_CATALOG } from "../../src/catalog";
 import type { Inventory, Item } from "./connections";
 
 export const CATEGORIES = [

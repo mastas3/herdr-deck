@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { Inventory, Item } from "../src/connections";
-import { categorize, enrich, stateOf } from "../src/store";
-import { RECIPES, fillPrompt, rankRecipes, readiness, recipeIds, type Recipe } from "../src/recipes";
+import type { Inventory, Item } from "../connections";
+import { categorize, enrich, stateOf } from "../store";
+import { RECIPES, fillPrompt, rankRecipes, readiness, recipeIds, type Recipe } from "../recipes";
 
 // The store's pure helpers live in the browser script between <conn-store> markers; run exactly that block.
-const src = readFileSync(new URL("../public/js/conn-store.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../conn-store.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("// <conn-store>"), src.indexOf("// </conn-store>"));
 const B = new Function(`"use strict";${block};return { connState, connItems, connView, connSelectAll, connSelectNone, connAllPicked, recipesFor, connFeatured, connRecent, connMatch, connInCat, connLoginsElsewhere, connCatalogGroups };`)();
 
@@ -179,7 +179,7 @@ describe("the scanner never records secret values", () => {
       w(".config/higgsfield/credentials.json", JSON.stringify({ key: SECRETS[8] }));
       w(".config/opencode/opencode.jsonc", `{\n // comment\n "mcp": { "oc": { "type": "remote", "url": "https://x", "headers": { "k": "${SECRETS[11]}" } } },\n}`);
       w(".ssh/config", "Host box\n  IdentityFile ~/.ssh/id_x\n");
-      const p = Bun.spawn([process.execPath, new URL("../src/connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, DECK_TEST_SECRET: SECRETS[10] }, stdout: "pipe", stderr: "pipe" });
+      const p = Bun.spawn([process.execPath, new URL("../connections.ts", import.meta.url).pathname, "--scan"], { env: { ...process.env, HOME: home, DECK_TEST_SECRET: SECRETS[10] }, stdout: "pipe", stderr: "pipe" });
       const out = await new Response(p.stdout).text();
       await p.exited;
       const invj = JSON.parse(out) as Inventory;

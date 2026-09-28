@@ -1,0 +1,15 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "library",
+  "name": "Founder Library",
+  "version": "1.0.0",
+  "description": "How real builders built and got customers, from YouTube interviews and pages you add: Discover → Library, evidence and comparable founders for the Studio, the ideas feed, the gallery, quests and research, and the deck_library MCP tool. Its worker and Python bridge run on the hub.",
+  "server": "server.ts",
+  "client": ["library.js"],
+  "styles": ["library.css"],
+  "machine": "hub",
+  "routes": ["library"],
+  "provides": ["library"],
+  "extends": ["mcp.tools", "discover.tabs"]
+}

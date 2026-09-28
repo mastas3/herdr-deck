@@ -1,9 +1,9 @@
 // Accounts: one card per social network or site you have, merging every sign of it (a saved login's site name,
 // a desktop app, API key NAMES, an MCP server, a CLI, or an account you added with your handle). And the
 // "Recommended for you" row: services you don't have yet, ranked by how well they fit your projects.
-// Pure functions over what the scanner found; the scanner (src/connections.ts) does the I/O.
+// Pure functions over what the scanner found; the scanner (connections.ts) does the I/O.
 import type { Item } from "./connections";
-import { HOW_LABEL, INTERESTS, RECS, SITES_CATALOG, cardId, registrable, sensitive, siteFor, type Rec, type Site } from "./catalog";
+import { HOW_LABEL, INTERESTS, RECS, SITES_CATALOG, cardId, registrable, sensitive, siteFor, type Rec, type Site } from "../../src/catalog";
 import type { LoginProfile } from "./logins";
 import { RECIPES, type Recipe } from "./recipes";
 

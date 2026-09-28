@@ -1,0 +1,15 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "connections",
+  "name": "Connections",
+  "version": "1.0.0",
+  "description": "What each machine can reach (agents, subscriptions, MCP servers, signed-in CLIs, API key names, accounts, skills): the store and its recipes, CONNECTIONS.md, and the deck_connections MCP tool. Runs on every machine, so the hub can read each one's inventory.",
+  "server": "server.ts",
+  "client": ["conn-store.js", "connections.js"],
+  "styles": ["connections.css"],
+  "machine": "any",
+  "routes": ["connections", "connections-conf", "connections-text", "recipes", "suggest-projects"],
+  "provides": ["connections"],
+  "extends": ["mcp.tools", "tools.menu"]
+}

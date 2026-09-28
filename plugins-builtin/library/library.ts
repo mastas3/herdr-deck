@@ -1,7 +1,7 @@
 // Founder Library: how real builders build and get customers, from YouTube channels (Starter Story and similar) and
 // web pages you add. Discover → Library shows it; the Studio, the ideas feed and research agents read it as evidence.
 //
-// Pieces: library-config (channels.json), library-queue (what to ingest next), library-bridge (+ bin/library-bridge.py,
+// Pieces: library-config (channels.json), library-queue (what to ingest next), library-bridge (+ library-bridge.py,
 // which reuses yt-transcriber for captions, chunking and Chroma), library-runner (the background worker),
 // library-extract + library-cards (founder cards, checked against the transcript), library-search (hybrid answers),
 // library-web (polite page fetching), library-playbooks, library-dates (when each video came out) and library-strategy
@@ -18,7 +18,7 @@ import { buildCard, EXTRACT_SYSTEM, EXTRACT_VERSION, extractUser, LISTS_USER, ne
 import { listPlaybooks, readPlaybook, writePlaybooks } from "./library-playbooks";
 import { applyRules, countQueue, queueStore, type Queue } from "./library-queue";
 import { createRunner, sourceChannelId } from "./library-runner";
-import { byRecency, evidenceText, mergeResults, withDates, type Answer, type Passage } from "./library-search";
+import { byRecency, evidenceText, mergeResults, withDates, type Answer, type Passage } from "../../src/library-search";
 import { backfillDates, isoDate, metaStore, pendingIds, ytdlpFetcher, type Fetcher } from "./library-dates";
 import { fetchPage } from "./library-web";
 
@@ -35,6 +35,7 @@ export async function ollamaJson(model: string, system: string, user: string, ti
   return String(((await r.json()) as any).message?.content ?? "");
 }
 
+type Timers = { after: (ms: number, fn: () => void) => unknown; every: (ms: number, fn: () => void) => unknown };
 export type LibraryDeps = { dir?: string; bridge?: Bridge; ask?: typeof ollamaJson; fetchPage?: typeof fetchPage; fetchDates?: Fetcher };
 export function createLibrary(deps: LibraryDeps = {}) {
   const dir = deps.dir ?? libraryDir();
@@ -288,26 +289,31 @@ export function createLibrary(deps: LibraryDeps = {}) {
     dir, config, handle, status, search, evidence, setRunning, runner, extractNext, reextract, recheck, add,
     cards: db, queues, meta, backfill, syncDates, dateCoverage,
     writePlaybooks: () => writePlaybooks(dir, db().all()),
-    /** Resume the worker if it was running when the deck last stopped (and this machine has yt-transcriber). */
-    autostart() {
+    /** Resume the worker if it was running when the deck last stopped (and this machine has yt-transcriber). The
+     *  plugin passes its host's timers, so they stop when the Library is switched off. */
+    autostart(t: Timers = { after: (ms, f) => setTimeout(f, ms).unref?.(), every: (ms, f) => setInterval(f, ms).unref?.() }) {
       if (config().ingest.running && bridge.available().ok) runner.run().catch(() => {});
       syncDates();
       // Dates for videos ingested before the bridge reported them: a few minutes after start, then every six hours.
       if (bridge.available().ok) {
         const tick = () => { if (pendingIds(videoIds(), meta.read()).length) backfill().catch(() => {}); };
-        setTimeout(tick, 5 * 60_000).unref?.();
-        setInterval(tick, 6 * 3600_000).unref?.();
+        t.after(5 * 60_000, tick);
+        t.every(6 * 3600_000, tick);
       }
+    },
+    /** Switched off: the worker stops after the video in hand, the bridge this deck talks to exits once it's idle (the
+     *  Chroma store keeps exactly one owner), and the cards database closes. A worker another process runs (the CLI)
+     *  keeps its bridge. */
+    async stop() {
+      runner.stop();
+      if (!runner.lockOwner() || runner.hasLock()) await bridge.quit?.();
+      try { cards?.close(); } catch {}
+      cards = undefined;
     },
     transcriptPath,
   };
 }
 export type Library = ReturnType<typeof createLibrary>;
-
-/** The ideas feed's rows as a library question (what founders did for that kind of business). */
-const FEED_Q: Record<string, string> = { money: "first paying customers small business pricing", saas: "saas first customers pricing", automations: "automation agency first clients",
-  content: "content creator audience monetization", projects: "side project first revenue", gem: "open source project monetization", weekend: "simple app built in a weekend first revenue", wild: "unusual niche business first customers" };
-export const feedQuery = (rows: string[]) => rows.map((r) => FEED_Q[r] ?? r).join(" ");
 
 /** What research agents (autoresearch, pre-mortems) are told about the library: the MCP tool first, HTTP as backup. */
 export const LIBRARY_AGENT_NOTE = "Founder Library: before judging an idea, look up how real founders did something similar. Call the herdr-deck MCP tool `deck_library` with a question (e.g. \"how did people get first customers for a Telegram bot?\"): it returns founder cards (claimed revenue, price, first-customer tactics) and transcript quotes, each with a YouTube timestamp link. Cite those links; treat numbers as the founders' claims.";

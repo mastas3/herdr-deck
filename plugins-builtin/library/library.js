@@ -1,7 +1,8 @@
 // ══ Library ══════════════════════════════════════════════════════════════════
 // Discover → Library: how real builders built and got customers, from YouTube channels (Starter Story and similar)
 // and pages you add. Ask it a question, browse founder cards, read the playbooks, and manage the sources and the
-// background worker. Server: src/library.ts. Loaded after the deck's own files, sharing their globals.
+// background worker. Server: library.ts beside this file (the library plugin). Loaded after the deck's own files,
+// sharing their globals.
 // Every claim on screen links to the moment in the video where it was said; numbers are marked as claims.
 ICON.book = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.2c1.8-.8 3.8-.8 5.5.5v9.6c-1.7-1.3-3.7-1.3-5.5-.5zM13.5 3.2c-1.8-.8-3.8-.8-5.5.5v9.6c1.7-1.3 3.7-1.3 5.5-.5z"/></svg>';
 ICON.play = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5v9l7-4.5z"/></svg>';
@@ -13,7 +14,7 @@ const LBT = { saas: "SaaS", mobile_app: "Mobile app", ecommerce: "E-commerce", s
 const lOn = () => S.mode === "discover" && S.disc.tab === "lib" && !!$("dbody").querySelector(":scope > .view #libroot");
 const lFmt = (t) => { t = Math.floor(t || 0); const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60; return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`; };
 const lAt = (url, t) => (t ? `${url}${url.includes("?") ? "&" : "?"}t=${Math.floor(t)}s` : url);
-// When each video came out: "Published Mar 2024 · 18 min", and "older (2021)" past three years (src/library-dates.ts).
+// When each video came out: "Published Mar 2024 · 18 min", and "older (2021)" past three years (src/library-card.ts).
 const LMON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const lPub = (d) => { const m = String(d ?? "").match(/^(\d{4})-(\d\d)/); return m ? `${LMON[Number(m[2]) - 1]} ${m[1]}` : ""; };
 const lDur = (s) => (!s ? "" : s < 3600 ? `${Math.max(1, Math.round(s / 60))} min` : `${Math.floor(s / 3600)} h ${String(Math.round((s % 3600) / 60)).padStart(2, "0")} min`);
@@ -286,4 +287,9 @@ $("dbody").addEventListener("keydown", (e) => {
   const t = e.target;
   if (t.matches?.("[data-libq]") && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); libSearch(t.value); }
   if (t.matches?.("[data-liburl]") && e.key === "Enter") { e.preventDefault(); libAdd(); }
+});
+// Discover → Library. Registered for the "discover.tabs" point ({ id, label, after, html, patch, mounted }); until
+// Discover reads that point, discover.js draws its own "lib" tab while this plugin is in the page.
+deckPlugins.register("library", {}).extend("discover.tabs", {
+  id: "lib", label: "Library", after: "research", html: () => discLibrary(), patch: () => libPatch(), mounted: () => !!$("dbody").querySelector(":scope > .view #libroot"),
 });

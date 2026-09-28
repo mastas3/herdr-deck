@@ -25,12 +25,9 @@ export type McpCtx = {
   search: (q: string, history: boolean, limit: number) => Promise<any>;
   history: (f: { query?: string; project?: string; agent?: string; limit?: number }) => Promise<any>;
   decisions: () => Promise<any[]>;
-  connections: (machine?: string) => Promise<string>;
   send: (key: string, text: string) => Promise<any>;
   start: (o: { agent: string; cwd: string; prompt?: string; model?: string; effort?: string; machine?: string; label?: string }) => Promise<any>;
   audit: (entry: { tool: string; target?: string; text?: string }) => void;
-  /** Founder Library evidence as text (src/library.ts). Optional: a deck without it doesn't list the tool. */
-  library?: (q: string, k: number) => Promise<string>;
   /** Tools running plugins add (the "mcp.tools" extension point). */
   tools?: () => McpTool[];
 };
@@ -47,12 +44,8 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { query: { type: "string" }, project: { type: "string" }, agent: { type: "string", enum: ["claude", "codex"] }, limit: { type: "number" } } } },
   { name: "deck_decisions", description: "The user's decision inbox: sessions blocked on a prompt, asking a question, or claiming to be done, with options and any Jev suggestion.",
     inputSchema: { type: "object", properties: {} } },
-  { name: "deck_connections", description: "What this setup can reach: coding agents, AI subscriptions, MCP servers and connectors, signed-in CLIs, API key NAMES (never values), browser profiles, skills. Use it to plan work that spans services.",
-    inputSchema: { type: "object", properties: { machine: { type: "string" } } } },
   { name: "deck_send", description: "Send a message to another live agent session (it arrives as if the user typed it). Use sparingly; the user sees every message in the deck.",
     inputSchema: { type: "object", properties: { key: { type: "string" }, text: { type: "string" } }, required: ["key", "text"] } },
-  { name: "deck_library", description: "The Founder Library: how real builders built and got customers, from YouTube interviews (Starter Story, My First Million, Y Combinator and more) the user collected. Ask a question (\"how did people get first customers for a Telegram bot?\", \"pricing for a B2B Chrome extension\"); get founder cards (claimed revenue, price, first-customer tactics, lessons) and transcript quotes, each with a YouTube timestamp link. Use it for idea research and pre-mortems; cite the links; numbers are the founders' claims.",
-    inputSchema: { type: "object", properties: { query: { type: "string" }, limit: { type: "number", description: "How many videos (default 5, max 8)" } }, required: ["query"] } },
   { name: "deck_start", description: "Start a new agent session in a herdr tab (claude, codex or opencode) in a folder, optionally with a first prompt. It starts in the agent's normal permission mode; skip-permission modes can't be requested here.",
     inputSchema: { type: "object", properties: { agent: { type: "string", enum: ["claude", "codex", "opencode"] }, cwd: { type: "string" }, prompt: { type: "string" }, model: { type: "string" }, effort: { type: "string" }, machine: { type: "string" }, label: { type: "string" } }, required: ["agent", "cwd"] } },
 ];
@@ -72,18 +65,16 @@ export async function handleMcp(msg: any, ctx: McpCtx): Promise<any | undefined>
       case "ping": return ok({});
       case "tools/list": {
         const extra = (ctx.tools?.() ?? []).filter((t) => !TOOLS.some((x) => x.name === t.name)).map(({ name, description, inputSchema }) => ({ name, description, inputSchema }));
-        return ok({ tools: [...(ctx.library ? TOOLS : TOOLS.filter((t) => t.name !== "deck_library")), ...extra] });
+        return ok({ tools: [...TOOLS, ...extra] });
       }
       case "tools/call": {
         const a = params?.arguments ?? {};
         switch (params?.name) {
           case "deck_sessions": return ok(text(ctx.sessions(a)));
-          case "deck_library": if (ctx.library) return ok(text((await ctx.library(String(a.query ?? ""), Math.min(Number(a.limit) || 5, 8))) || "The Founder Library has nothing on that yet.")); break;
           case "deck_session": return ok(text(await ctx.session(String(a.key), Math.min(Number(a.messages) || 20, 80))));
           case "deck_search": return ok(text(await ctx.search(String(a.query ?? ""), a.history !== false, Math.min(Number(a.limit) || 20, 60))));
           case "deck_history": return ok(text(await ctx.history(a)));
           case "deck_decisions": return ok(text(await ctx.decisions()));
-          case "deck_connections": return ok(text(await ctx.connections(a.machine)));
           case "deck_send": {
             const t = String(a.text ?? "").trim();
             if (!t) return ok({ ...text("text is empty"), isError: true });

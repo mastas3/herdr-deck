@@ -1,19 +1,26 @@
-// The deck's own API, part 2: Connections (what each machine can reach), recipes, and "suggest mega projects".
+// The connections plugin's API: the store (what each machine can reach), recipes, and "suggest mega projects". Another
+// machine's inventory comes from that machine's deck (its own connections plugin) through the core's "remotes" service.
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { inventory, inventoryText, loadConnConf, saveConnConf, type Item as ConnItem } from "../connections";
-import { CATEGORIES, enrich } from "../store";
-import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCustom } from "../recipes";
-import { upsertAccount } from "../accounts";
-import { json } from "./page";
-import type { Hub } from "./hub";
+import type { Host } from "../../src/plugin-api";
+import type { RemoteHost } from "../../src/federation";
+import { inventory, inventoryText, loadConnConf, saveConnConf, type Item as ConnItem } from "./connections";
+import { CATEGORIES, enrich } from "./store";
+import { allRecipes, deleteCustom, fillPrompt, rankRecipes, recipeIds, saveCustom, type Recipe } from "./recipes";
+import { upsertAccount } from "./accounts";
 
-export async function connectionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
-  const { SELF, plugins } = hub;
+/** Lent by the core (src/server.ts provideCore): the other machines' decks, and recipes from enabled data plugins. */
+export type CoreRemotes = { get(id: string): RemoteHost | undefined; all(): RemoteHost[] };
+export type CoreDataPlugins = { recipes(): Recipe[] };
+const json = (data: unknown, status = 200) => Response.json(data, { status });
+
+export async function connectionsApi(host: Host, path: string, body: any): Promise<Response | undefined> {
+  const SELF = { id: host.machines().find((m) => m.local && m.kind !== "app")?.id ?? "" };
+  const remotes = { get: (id: string) => host.use<CoreRemotes>("remotes")?.get(id), values: () => host.use<CoreRemotes>("remotes")?.all() ?? [] };
   /** Built-in and your own recipes, plus those from enabled plugins. */
-  const recipesWithPlugins = () => [...allRecipes(), ...plugins.recipes()];
-  const { remotes, allRows } = hub.hosts;
-  const { startSession } = hub.sessions;
+  const recipesWithPlugins = () => [...allRecipes(), ...(host.use<CoreDataPlugins>("data-plugins")?.recipes() ?? [])];
+  const allRows = () => host.rows();
+  const startSession = (o: Parameters<Host["sessions"]["start"]>[0]) => host.sessions.start(o);
   switch (path) {
     case "/api/connections": {
       if (body.machine && body.machine !== SELF.id) {

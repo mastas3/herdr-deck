@@ -1,6 +1,6 @@
 "use strict";
 // Live data (SSE) and startup: the last of the deck's own files, so everything it calls is defined by now. The
-// Gallery and Library files load after it (public/assets.json) and hook into what they need.
+// Gallery files, then running plugins' files, load after it (public/assets.json) and hook into what they need.
 // ── live data ────────────────────────────────────────────────────────────
 function notifyTransitions(prev, next) {
   if (!S.notify || PUSH.on || !prev || prev.status === next.status) return;

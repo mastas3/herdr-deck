@@ -1,6 +1,6 @@
 // Founder Library: the background worker. Two loops, one per bottleneck: ingestion waits on YouTube (captions take
 // seconds a video), card extraction waits on the local Ollama model. Only one process runs them at a time (the deck
-// service or `bun src/library-cli.ts run`), guarded by <library>/runner.lock, and a restart resumes where it stopped.
+// service or `bun plugins-builtin/library/library-cli.ts run`), guarded by <library>/runner.lock, and a restart resumes where it stopped.
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import type { Bridge } from "./library-bridge";
 import type { LibConfig, LibSource } from "./library-config";

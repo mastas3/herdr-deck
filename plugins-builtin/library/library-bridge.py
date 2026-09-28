@@ -1,6 +1,6 @@
 """Founder Library bridge: the one process that owns the library's Chroma store.
 
-The deck (src/library-bridge.ts) starts it on demand and talks to it over HTTP on 127.0.0.1 with a per-run token.
+The deck (library-bridge.ts) starts it on demand and talks to it over HTTP on 127.0.0.1 with a per-run token.
 It reuses the user's yt-transcriber project for everything YouTube: channel enumeration, caption fetching, the
 channel orchestrator (resume state + transcript.json) and the per-channel Chroma corpus (nomic-embed-text).
 
@@ -264,8 +264,14 @@ def counts(_body: dict) -> dict:
     return {"counts": out}
 
 
+def quit_when_idle(_body: dict) -> dict:
+    """The deck switched the Library off: exit as soon as no video is being ingested (idle_watch does it)."""
+    state["quit"] = True
+    return {"ok": True}
+
+
 ROUTES = {"/enumerate": enumerate_source, "/ingest": ingest_video, "/ingest-text": ingest_text, "/search": search, "/counts": counts,
-          "/health": lambda b: {"ok": True, "pid": os.getpid()}}
+          "/health": lambda b: {"ok": True, "pid": os.getpid()}, "/quit": quit_when_idle}
 TOKEN = secrets.token_hex(16)
 
 
@@ -295,8 +301,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def idle_watch(server):
     while True:
-        time.sleep(30)
-        if time.time() - state["last"] > IDLE_EXIT_S and not ingest_lock.locked():
+        time.sleep(1)
+        if (state.get("quit") or time.time() - state["last"] > IDLE_EXIT_S) and not ingest_lock.locked():
             server.shutdown()
             return
 

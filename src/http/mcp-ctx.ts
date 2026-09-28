@@ -1,6 +1,5 @@
 // MCP: what other agents can do through the deck (src/mcp.ts speaks the protocol; this is the deck behind it).
 import { splitKey, type RemoteHost } from "../federation";
-import { inventory, inventoryText } from "../connections";
 import { needsYou, type Decision } from "../decisions";
 import { appendAudit, mcpToken, readAudit, type McpCtx, type McpTool } from "../mcp";
 import type { Row } from "../deck";
@@ -12,14 +11,13 @@ type Deps = {
   searchLocal: (q: string) => Promise<any[]>; historyEverywhere: (o: any) => Promise<any[]>; decisions: Map<string, Decision>;
   sendText: (key: string, text: string) => Promise<void>; startSession: (body: any) => Promise<any>;
   notice: (data: { key?: string; ok: boolean; message: string }) => void; broadcast: (event: string, data: unknown) => void;
-  library: { evidence: (q: string, k: number, use: any) => Promise<{ text: string }> };
-  /** MCP tools from running plugins. */
+  /** MCP tools from running plugins (deck_connections, deck_library, …). */
   tools: () => McpTool[];
 };
 
 /** Reads (or makes) the MCP token, so call it where startup wants that to happen. */
 export function createMcp(deps: Deps) {
-  const { selfId, remotes, allRows, localRow, machineLabelOf, detailFor, searchLocal, historyEverywhere, decisions, sendText, startSession, notice, broadcast, library } = deps;
+  const { selfId, remotes, allRows, localRow, machineLabelOf, detailFor, searchLocal, historyEverywhere, decisions, sendText, startSession, notice, broadcast } = deps;
   const MCP_TOKEN = mcpToken();
   const brief = (r: Row) => ({
     key: r.key, title: r.title, project: r.project, machine: machineLabelOf(r.machine), agent: r.agent, status: r.status, needs_you: needsYou(r),
@@ -54,10 +52,6 @@ export function createMcp(deps: Deps) {
     },
     history: async (f) => (await historyEverywhere({ q: f.query, project: f.project, agent: f.agent, limit: Math.min(Number(f.limit) || 30, 100) })).map((h) => ({ key: h.key, title: h.title, project: h.project, agent: h.agent, machine: h.machine, started: h.started ? new Date(h.started).toISOString().slice(0, 10) : undefined, last: h.last ? new Date(h.last).toISOString().slice(0, 10) : undefined, requests: h.asks, cwd: h.cwd })),
     decisions: async () => [...decisions.values()].map((d) => ({ ...d, session: brief(allRows().find((r) => r.key === d.key)!) })),
-    connections: async (machine) => {
-      if (machine && machine !== selfId) { const r = remotes.get(machine); if (!r) throw new Error("unknown machine"); return inventoryText((await r.post("/api/connections", {})).data); }
-      return inventoryText(await inventory());
-    },
     send: async (key, text) => {
       const route = splitKey(key, remotes);
       if (route.remote) { const r = await route.remote.post("/api/send", { key: route.key, text }); if (r.status >= 300) throw new Error(r.data?.error ?? "send failed"); }
@@ -74,7 +68,6 @@ export function createMcp(deps: Deps) {
       return r;
     },
     audit: (e) => { appendAudit(e); broadcast("audit", readAudit(30)); },
-    library: async (q, k) => (await library.evidence(q, k, "research")).text,
     tools: deps.tools,
   };
   return { token: MCP_TOKEN, ctx: mcpCtx };

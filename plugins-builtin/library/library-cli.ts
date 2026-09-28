@@ -1,10 +1,10 @@
 // Founder Library from the terminal, for when the deck service isn't the one running the worker.
-//   bun src/library-cli.ts run          ingest + extract cards in the foreground (Ctrl-C to stop; it resumes later)
-//   bun src/library-cli.ts status       per-source counts
-//   bun src/library-cli.ts search "q"   what the Library tab would answer
-//   bun src/library-cli.ts playbooks    write the playbooks from the cards
-//   bun src/library-cli.ts spotcheck N  compare N local cards with Claude's reading of the same transcript
-//   bun src/library-cli.ts dates        fill in publish dates and lengths with yt-dlp (resumable; never touches Chroma)
+//   bun plugins-builtin/library/library-cli.ts run          ingest + extract cards in the foreground (Ctrl-C to stop; it resumes later)
+//   bun plugins-builtin/library/library-cli.ts status       per-source counts
+//   bun plugins-builtin/library/library-cli.ts search "q"   what the Library tab would answer
+//   bun plugins-builtin/library/library-cli.ts playbooks    write the playbooks from the cards
+//   bun plugins-builtin/library/library-cli.ts spotcheck N  compare N local cards with Claude's reading of the same transcript
+//   bun plugins-builtin/library/library-cli.ts dates        fill in publish dates and lengths with yt-dlp (resumable; never touches Chroma)
 import { createLibrary } from "./library";
 
 const lib = createLibrary();
@@ -40,5 +40,5 @@ if (cmd === "run") {
   await lib.reextract(rest);
   for (const id of rest) console.log(JSON.stringify(lib.cards().get(id)));
 } else {
-  console.log("usage: bun src/library-cli.ts run | status | search <q> | playbooks | spotcheck <n> | dates [parallel]");
+  console.log("usage: bun plugins-builtin/library/library-cli.ts run | status | search <q> | playbooks | spotcheck <n> | dates [parallel]");
 }

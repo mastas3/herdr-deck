@@ -294,8 +294,8 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   shows which connections it needs and whether this machine has them; ready ones sort first. **Run** opens the New
   session dialog with the prompt, folder and agent filled in (nothing starts until you press Start). **Copy prompt**,
   or **Customize** to save your own copy in the hub's `~/.config/herdr-deck/recipes.json`. Built-ins live in
-  `src/recipes.ts`. Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`; your notes, hidden
-  cards and additions live in `~/.config/herdr-deck/connections.json`.
+  `plugins-builtin/connections/recipes.ts`. Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`;
+  your notes, hidden cards and additions live in `~/.config/herdr-deck/connections.json`.
 - **Discover** (`d`, or ⌘K): repos worth forking and ideas worth building.
   - **For you** starts with an evidence shortlist, which can be empty. New problem leads come from dated
     public excerpts; AI may suggest an offer but cannot certify demand. Stages come from reviewed sources

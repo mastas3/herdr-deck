@@ -3,9 +3,7 @@
 // Connections ─────────────────────────────────────────────────────────────
 // An app store for what each machine can reach: categories, featured rows, search, select-all, and recipes
 // that combine connections into workflows. Open it from a session to add picks to that session's context.
-// Each machine keeps its own inventory; the hub gives every card a category and a state (src/store.ts).
-ICON.bolt = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9 1.5 3.5 9H8l-1 5.5L12.5 7H8z"/></svg>';
-ICON.x = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+// Each machine keeps its own inventory; the hub gives every card a category and a state (store.ts).
 
 // <conn-store> pure helpers (tested in test/store.test.ts)
 function connState(i) { return i.state ?? (i.status === "off" ? "off" : i.status === "partial" ? "signed-out" : "ready"); }

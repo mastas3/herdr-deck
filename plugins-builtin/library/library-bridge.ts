@@ -1,4 +1,4 @@
-// Founder Library: the client for bin/library-bridge.py, the Python process that owns the library's Chroma store and
+// Founder Library: the client for library-bridge.py, the Python process that owns the library's Chroma store and
 // drives yt-transcriber. It is started on first use (at low priority), found again through <library>/bridge.json by
 // any deck process or the CLI, and exits by itself after 45 idle minutes.
 import { existsSync, readFileSync } from "node:fs";
@@ -9,6 +9,8 @@ export type BridgeOpts = { dir: string; ytDir?: string; python?: string };
 export type Bridge = {
   available: () => { ok: boolean; why?: string };
   call: <T = any>(path: string, body: unknown, timeoutMs?: number) => Promise<T>;
+  /** Asks the running bridge to exit once nothing is being ingested. Never starts one. */
+  quit?: () => Promise<void>;
 };
 
 const alive = (pid: number) => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -20,7 +22,7 @@ export function libraryPython(yt = ytTranscriberDir()) { return process.env.DECK
 
 export function createBridge(o: BridgeOpts): Bridge {
   const yt = o.ytDir ?? ytTranscriberDir();
-  const script = new URL("../bin/library-bridge.py", import.meta.url).pathname;
+  const script = new URL("./library-bridge.py", import.meta.url).pathname;
   const python = o.python ?? libraryPython(yt);
   let starting: Promise<BridgeInfo> | undefined;
 
@@ -56,8 +58,13 @@ export function createBridge(o: BridgeOpts): Bridge {
   return {
     available() {
       if (!existsSync(`${yt}/rag_corpus.py`)) return { ok: false, why: `yt-transcriber isn't at ${yt}` };
-      if (!existsSync(script)) return { ok: false, why: "bin/library-bridge.py is missing" };
+      if (!existsSync(script)) return { ok: false, why: "library-bridge.py is missing" };
       return { ok: true };
+    },
+    async quit() {
+      const i = readInfo();
+      if (!i) return;
+      try { await fetch(`http://127.0.0.1:${i.port}/quit`, { method: "POST", headers: { "x-token": i.token }, body: "{}", signal: AbortSignal.timeout(1500) }); } catch {}
     },
     async call(path, body, timeoutMs = 15_000) {
       for (let attempt = 0; attempt < 2; attempt++) {

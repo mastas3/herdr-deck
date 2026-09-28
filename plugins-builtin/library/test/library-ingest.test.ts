@@ -1,12 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { defaultConfig, type LibConfig, type LibSource } from "../src/library-config";
-import { buildCard, inferChannel, type Card } from "../src/library-extract";
-import { buildPlaybooks } from "../src/library-playbooks";
-import { applyResult, applyRules, countQueue, mergeEnumeration, nextVideo, queueStore, rankVideos, recover, skipReason, type Queue, type QVideo } from "../src/library-queue";
-import { createRunner } from "../src/library-runner";
-import { fetchPage, htmlToText, robotsAllows, robotsRules } from "../src/library-web";
+import { defaultConfig, type LibConfig, type LibSource } from "../library-config";
+import { buildCard, inferChannel, type Card } from "../library-extract";
+import { buildPlaybooks } from "../library-playbooks";
+import { applyResult, applyRules, countQueue, mergeEnumeration, nextVideo, queueStore, rankVideos, recover, skipReason, type Queue, type QVideo } from "../library-queue";
+import { createRunner } from "../library-runner";
+import { fetchPage, htmlToText, robotsAllows, robotsRules } from "../library-web";
 
 const dir = mkdtempSync(`${tmpdir()}/deck-library-ingest-`);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

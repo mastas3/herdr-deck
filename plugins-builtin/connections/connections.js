@@ -327,4 +327,4 @@ deckPlugins.register("connections", {
   ],
   settings: [{ html: "Connections<small>Everything this setup can reach</small>", run: () => openConnections() }],
   events: { audit: (a) => { S.audit = a; if (S.mode === "connections") renderConnections(); } },
-});
+}).extend("tools.menu", { icon: ICON.plug, label: "Connections", hint: "Tell this agent what it can use: deploy targets, APIs, MCP servers…", run: (sel) => openConnections(sel) });

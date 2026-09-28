@@ -57,9 +57,12 @@ function discStatus(d) {
 }
 function renderDiscover() {
   const d = S.disc.data;
-  const tab = S.disc.tab;
+  // The Library tab is the library plugin's: shown only while its script is in the page (it also offers itself to a
+  // "discover.tabs" point, which Discover reads once it's a plugin).
+  const hasTab = (id) => id !== "lib" || deckPlugins.has("library");
+  const tab = hasTab(S.disc.tab) ? S.disc.tab : "you";
   const nIdeas = d?.ideas?.length ?? 0, nSaved = (d?.saved?.length ?? 0) + (d?.mixes?.saved?.length ?? 0);
-  const tabs = DTABS.map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("");
+  const tabs = DTABS.filter(([id]) => hasTab(id)).map(([id, label]) => `<button data-dtab="${id}" aria-pressed="${tab === id}">${label}${id === "ideas" && nIdeas ? ` <span class="n">${nIdeas}</span>` : id === "saved" && nSaved ? ` <span class="n">${nSaved}</span>` : ""}</button>`).join("");
   // The Studio, once on screen, is only ever patched region by region: its inputs are never rebuilt under your fingers.
   if (tab === "mix" && $("dbody")._mode === "discover" && $("dbody").querySelector(":scope > .view #studio")) {
     const nav = $("dbody").querySelector(".dtabs");

@@ -6,13 +6,14 @@
 // The one rule: this records names, versions and signed-in flags only. It never reads a secret value
 // into memory it keeps: env files are matched line by line for the NAME, credential files are only
 // checked for existence (or a user/account field's presence), and probes print names, never tokens.
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, readlinkSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, readlinkSync, statSync, writeFileSync } from "node:fs";
 import { homedir, hostname, platform } from "node:os";
 import { mergeAccounts, recommend, type Account, type Evidence, type RecInfo } from "./accounts";
-import type { Site } from "./catalog";
+import type { Site } from "../../src/catalog";
 import type { LoginScan } from "./logins";
 import { detectProjects, projectItems, type ServiceRef, type SkillRef } from "./projconn";
 import type { Cat, State } from "./store";
+import { latestCodexLimits } from "../../src/usage";
 
 const HOME = homedir();
 const MAC = platform() === "darwin";
@@ -36,7 +37,7 @@ export type Item = {
   use?: string; // how an agent should use it
   since?: number; // first seen on this machine (0 = there since the first scan)
   custom?: boolean; hidden?: boolean;
-  // accounts (social media, sites): see src/accounts.ts
+  // accounts (social media, sites): see accounts.ts
   site?: string; // catalog id
   glyph?: string; // short badge text
   handle?: string; url?: string; // your public handle / profile link, when you added one
@@ -45,7 +46,7 @@ export type Item = {
   connect?: string[]; // how agents can connect it, best first
   sites?: string[]; // "Other sites" only: registrable domains, shown in the deck, never written to CONNECTIONS.md
   rec?: RecInfo; // "Recommended" only
-  // your projects (src/projconn.ts)
+  // your projects (projconn.ts)
   path?: string; // ~/Documents/Projects/x
   aliases?: string[]; // card ids this one replaces (its MCP server, a service card), so recipes still match
   tools?: string[]; // MCP tool names found in the server's source
@@ -404,7 +405,7 @@ const AGENTS: [string, string, string][] = [
 ];
 
 const AGENT_COLOR: Record<string, string> = { claude: "#d97757", codex: "#10a37f", opencode: "#211e1e", gemini: "#4285f4", hermes: "#7c3aed", "cursor-agent": "#1b1b1b", aider: "#14b014", amp: "#f34e3f", goose: "#000000", copilot: "#6e40c9", crush: "#6b50ff" };
-/** `hints`: the command, args, cwd and local URL, used only to match a server to one of your projects (src/projconn.ts). Never stored or shown: args can hold tokens. */
+/** `hints`: the command, args, cwd and local URL, used only to match a server to one of your projects (projconn.ts). Never stored or shown: args can hold tokens. */
 type McpEntry = { name: string; where: string; remote: boolean; hints: string[] };
 const LOCAL_URL = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\])[:/]/;
 function mcpHints(c: any): string[] {
@@ -613,7 +614,7 @@ function browsers(): Item[] {
   return out;
 }
 
-/** Saved-login site names, read in their own process with a hard timeout (src/logins.ts). DECK_NO_LOGINS=1 turns it off. */
+/** Saved-login site names, read in their own process with a hard timeout (logins.ts). DECK_NO_LOGINS=1 turns it off. */
 async function loginScan(): Promise<LoginScan> {
   if (process.env.DECK_NO_LOGINS) return { profiles: [], files: 0, ms: 0, error: "turned off (DECK_NO_LOGINS)" };
   const { out } = await run([process.execPath, `${import.meta.dir}/logins.ts`, "--logins"], Number(process.env.DECK_LOGINS_MS) || 6000);
@@ -711,49 +712,6 @@ export function loadConnConf(): ConnConf {
 export function saveConnConf(c: ConnConf) {
   try { mkdirSync(`${HOME}/.config/herdr-deck`, { recursive: true }); writeFileSync(CONF, JSON.stringify(c, null, 1)); } catch {}
   cached = undefined;
-}
-
-export function latestCodexLimits(): { plan?: string; windows: { label: string; pct: number; resets?: number; minutes?: number }[]; at?: number } | undefined {
-  const root = `${HOME}/.codex/sessions`;
-  const files: { f: string; m: number }[] = [];
-  const now = new Date();
-  for (let back = 0; back < 4 && files.length < 6; back++) {
-    const d = new Date(now.getTime() - back * 86400_000);
-    const dir = `${root}/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
-    for (const n of ls(dir)) if (n.endsWith(".jsonl")) { try { files.push({ f: `${dir}/${n}`, m: statSync(`${dir}/${n}`).mtimeMs }); } catch {} }
-  }
-  files.sort((a, b) => b.m - a.m);
-  for (const { f, m } of files.slice(0, 6)) {
-    let tail = "";
-    try {
-      const size = statSync(f).size;
-      const fd = openSync(f, "r");
-      const len = Math.min(size, 512 * 1024);
-      const buf = Buffer.alloc(len);
-      readSync(fd, buf, 0, len, size - len);
-      closeSync(fd);
-      tail = buf.toString("utf8");
-    } catch { continue; }
-    const hits = [...tail.matchAll(/"rate_limits":(\{"limit_id".*?"plan_type":(?:"[^"]*"|null)[^}]*\})/g)];
-    const last = hits[hits.length - 1]?.[1];
-    if (!last) continue;
-    let o: any;
-    try { o = JSON.parse(last); } catch { continue; }
-    const w = (x: any) => x && { pct: Number(x.used_percent), resets: x.resets_at ? x.resets_at * 1000 : undefined, minutes: x.window_minutes, label: x.window_minutes >= 10000 ? "Weekly" : x.window_minutes >= 250 ? `${Math.round(x.window_minutes / 60)}h` : `${x.window_minutes}m` };
-    return { plan: o.plan_type ?? undefined, windows: [w(o.primary), w(o.secondary)].filter(Boolean), at: m };
-  }
-}
-
-export function usage() {
-  let claude: any;
-  const rc = readJson(`${HOME}/.claude/rate-cache.json`);
-  if (rc) {
-    const n = (v: any) => (v === "" || v == null ? undefined : Number(v));
-    let at = rc.at ? rc.at * 1000 : undefined;
-    try { at ??= statSync(`${HOME}/.claude/rate-cache.json`).mtimeMs; } catch {}
-    claude = { fiveHour: n(rc.five_hour), weekly: n(rc.seven_day), fiveHourResets: rc.five_hour_resets ? rc.five_hour_resets * 1000 : undefined, weeklyResets: rc.seven_day_resets ? rc.seven_day_resets * 1000 : undefined, at };
-  }
-  return { claude, codex: latestCodexLimits() };
 }
 
 let cached: Inventory | undefined;

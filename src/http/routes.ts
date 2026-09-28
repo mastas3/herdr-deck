@@ -1,7 +1,7 @@
 // Every request, in order: the Host check, GETs a running plugin serves (e.g. /covers/*), the page and static files,
 // the SSE stream, images and raw files, then /mcp, then POSTs carrying the action token: uploads (files, plugins),
 // running plugins' /api/* routes, the feature modules' own /api/* routes, a session on another machine, and last the
-// deck's API (api-hub.ts, api-connections.ts, api-sessions.ts).
+// deck's API (api-hub.ts, api-sessions.ts).
 import { splitKey } from "../federation";
 import { choiceFromInput, recordOutcome } from "../decisions";
 import { handleMcp } from "../mcp";
@@ -9,12 +9,11 @@ import { MAX_UPLOAD } from "../plugins";
 import { gzipJson, json, send, staticFile } from "./page";
 import { resolveSafe, saveUpload } from "./files";
 import { hubApi } from "./api-hub";
-import { connectionsApi } from "./api-connections";
 import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, library, leads, research, journeys, game, plugins, pluginHost, codePlugins } = hub;
+  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, leads, research, journeys, game, plugins, pluginHost, codePlugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
@@ -112,7 +111,6 @@ export function createRoutes(hub: Hub) {
       if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
       if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
-      if (url.pathname.startsWith("/api/library/")) { const d = await library.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/journey")) { const d = await journeys.handle(url.pathname, body); if (d !== undefined) return json(d); }
@@ -121,7 +119,7 @@ export function createRoutes(hub: Hub) {
       if (url.pathname.startsWith("/api/plugins")) { const d = await plugins.handle(url.pathname, body); if (d !== undefined) return json(d); }
       const forwarded = await forwardToMachine(url.pathname, body);
       if (forwarded) return forwarded;
-      const res = (await hubApi(hub, url.pathname, body)) ?? (await connectionsApi(hub, url.pathname, body)) ?? (await sessionsApi(hub, url.pathname, body));
+      const res = (await hubApi(hub, url.pathname, body)) ?? (await sessionsApi(hub, url.pathname, body));
       if (res) return res;
     } catch (e: any) {
       return json({ error: e?.message ?? String(e), code: e?.code }, 500);
