@@ -50,7 +50,7 @@ function listGroups(rows) {
         rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || act(b) - act(a));
         // The main checkout's sessions sit right under the project, each linked worktree's in a sub-section after them.
         const w = splitWorktrees(p, rs, S.closedProj);
-        return { key: "p:" + p, label: p, proj: p, rows: w.rows, open: w.open, main: w.main, trees: w.trees, branch: w.branch, closed: !!S.closedProj[p] };
+        return { key: "p:" + p, label: p, proj: p, rows: w.rows, open: w.open, main: w.main, trees: w.trees, branch: w.branch, dir: projectHome(p)?.cwd, closed: !!S.closedProj[p] };
       });
     if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty, closed: S.closedSecs.empty !== false });
     return groups;
@@ -64,6 +64,10 @@ function listGroups(rows) {
 /** The rows a section shows (what keyboard navigation walks): none while folded, and not a folded worktree's. */
 const shownRows = (g) => (g.closed ? [] : g.open ?? g.rows);
 const branchChip = (b) => (b ? `<span class="brc" title="Branch ${esc(b)}">${ICON.branch}<span>${esc(b)}</span></span>` : "");
+/** The folder a project (or worktree) lives in, shortened to ~; it loses its start first, so the folder's own name stays. Click copies it. */
+const pathChip = (p) => (p ? `<span class="pthc" data-secact="copypath" data-path="${esc(p)}" role="button" title="${esc(p)} (click to copy)"><bdi>${esc(home(p))}</bdi></span>` : "");
+/** Branch and folder on a quiet second line under the name, so neither crowds the name or the buttons. */
+const metaLine = (b, p) => (b || p ? `<span class="smeta">${branchChip(b)}${pathChip(p)}</span>` : "");
 /** Projects view: fold every project shown, or unfold them all (and their worktrees) when all are folded. */
 function foldAllProjects() {
   if (S.group !== "project") return;
@@ -135,7 +139,7 @@ function renderList() {
   const rows = visibleRows();
   const byProject = S.group === "project";
   const groups = listGroups(rows);
-  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + (g.branch ?? "") + g.rows.map((r) => r.key).join(",")
+  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + (g.branch ?? "") + (g.dir ?? "") + g.rows.map((r) => r.key).join(",")
     + (g.trees ?? []).map((t) => `/${t.key}${t.closed ? "x" : ""}:${t.branch}:${t.rows.length}`).join("")).join("|");
   // Anything you changed yourself (filter, grouping, machine, a folded section) applies at once, even under the pointer.
   const view = [S.group, S.machine, S.q, S.deep?.q ?? "", JSON.stringify(S.closedSecs), JSON.stringify(S.closedProj)].join("\u0001");
@@ -206,7 +210,7 @@ function renderList() {
       const jour = g.proj && projectLink() ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${projectLink().icon}</span>` : "";
       const fold = g.proj && projectHome(g.proj) ? folderBtn(g.proj, g.proj) : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
-      sec.innerHTML = `<button class="sec-h" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${branchChip(g.branch)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
+      sec.innerHTML = `<button class="sec-h${g.branch || g.dir ? " has-meta" : ""}" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${metaLine(g.branch, g.dir)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
       for (const r of g.main ?? g.rows) body.append(rowCache.get(r.key).el);
       // Each worktree: a sub-header one level in (⎇, its folder name, branch, count), its sessions one level further.
@@ -214,7 +218,7 @@ function renderList() {
         const wt = document.createElement("div");
         wt.className = "wt" + (t.closed ? " closed" : "");
         const k = t.rows.find((r) => r.projectRoot === t.root)?.key;
-        wt.innerHTML = `<button class="sec-h wt-h" data-sec="${esc(t.key)}" aria-expanded="${!t.closed}">${ICON.chev}<span class="wti">${ICON.tree}</span><span class="sl">${esc(t.name)}</span> <span class="n">${t.rows.length}</span>${branchChip(t.branch)}${t.root && k ? folderBtn(g.proj, t.name, t.root, k) : ""}</button><div class="sec-b"></div>`;
+        wt.innerHTML = `<button class="sec-h wt-h${t.branch || t.root ? " has-meta" : ""}" data-sec="${esc(t.key)}" aria-expanded="${!t.closed}">${ICON.chev}<span class="wti">${ICON.tree}</span><span class="sl">${esc(t.name)}</span> <span class="n">${t.rows.length}</span>${metaLine(t.branch, t.root)}${t.root && k ? folderBtn(g.proj, t.name, t.root, k) : ""}</button><div class="sec-b"></div>`;
         for (const r of t.rows) wt.lastChild.append(rowCache.get(r.key).el);
         body.append(wt);
       }

@@ -12,6 +12,8 @@ $("rows").addEventListener("click", async (e) => {
   if (jour) { e.stopPropagation(); return projectLink()?.open(jour.dataset.proj); }
   const fold = e.target.closest('[data-secact="folder"]');
   if (fold) { e.stopPropagation(); return openFolderView(fold.dataset); }
+  const path = e.target.closest('[data-secact="copypath"]');
+  if (path) { e.stopPropagation(); return copy(path.dataset.path, "the folder path"); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
