@@ -122,8 +122,10 @@ export function toolSummary(name: string, input: any): string {
     case "webfetch": return oneLine(i.url);
     case "websearch": return oneLine(i.query);
     case "todowrite": {
-      const cur = (i.todos ?? []).find((t: any) => t?.status === "in_progress");
-      return cur ? oneLine(cur.activeForm ?? cur.content) : `${(i.todos ?? []).length} todos`;
+      // Models sometimes send todos as a string; a throw here would fail the whole transcript.
+      const todos = Array.isArray(i.todos) ? i.todos : [];
+      const cur = todos.find((t: any) => t?.status === "in_progress");
+      return cur ? oneLine(cur.activeForm ?? cur.content) : `${todos.length} todos`;
     }
     case "skill": return oneLine(i.skill ?? i.command);
   }
