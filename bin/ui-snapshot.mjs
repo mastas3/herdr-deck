@@ -31,11 +31,13 @@ const HELP = `usage: bin/ui-snapshot.mjs --out <dir> [options]
 export const VIEWS = {
   home: "",
   session: `select("fake:blocked", { scroll: true, open: true })`,
+  "tools-menu": `select("fake:blocked", { scroll: true, open: true }); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe"))`,
   inbox: `setMode("inbox")`,
   history: `setMode("history")`,
   tools: `setMode("tools")`,
   connections: `setMode("connections")`,
   discover: `setMode("discover")`,
+  library: `setMode("discover"); discTab("lib")`,
   opportunities: `setMode("opportunities")`,
   quests: `setMode("quests")`,
   projects: `openProjects()`,

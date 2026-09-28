@@ -150,6 +150,19 @@ describe("the plugin host", () => {
     expect(h.active()).toEqual(["svc-c", "svc-x"]); // an optional dependency going away doesn't stop its users
   });
 
+  test("provideCore: the core lends every plugin a service, nothing to declare; calling it again replaces it", async () => {
+    const s = setup();
+    plugin(s.builtin, "core-user", {}, `(globalThis as any).__coreUser = host;`);
+    const h = s.make();
+    h.provideCore("remotes", { n: 1 });
+    await h.start();
+    expect(g.__coreUser.use("remotes")).toEqual({ n: 1 });
+    h.provideCore("remotes", { n: 2 });
+    expect(g.__coreUser.use("remotes")).toEqual({ n: 2 });
+    expect(g.__coreUser.use("nobody-lends-this")).toBeUndefined();
+    expect(h.service("remotes")).toBeUndefined(); // the core's own lookup is for plugins' services
+  });
+
   test("core extension points check what they're given", async () => {
     const s = setup();
     plugin(s.builtin, "pts", { extends: ["fullState", "mcp.tools", "digest.lines", "tools.entries"] }, `

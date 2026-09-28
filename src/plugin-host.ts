@@ -29,6 +29,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   const apiRoutes = new Map<string, { id: string; handler: RouteHandler }>();
   const getRoutes = new Map<string, { id: string; handler: RouteHandler }>();
   const services = new Map<string, { id: string; api: object }>();
+  /** Services the core lends plugins (provideCore): what a plugin needs that isn't a plugin's yet, or never will be. */
+  const coreServices = new Map<string, object>();
   const contribs = new Map<string, { id: string; c: unknown }[]>();
 
   // ── finding plugins ──
@@ -178,7 +180,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       },
       use<T>(name: string) {
         const p = providerOf(name);
-        if (!p) return undefined;
+        if (!p) return coreServices.get(name) as T | undefined;
         if (p.id !== id && !m.requires.includes(p.id) && !m.uses.includes(p.id)) throw new Error(`${id}: the ${name} service comes from ${p.id}; list it in plugin.json "requires" or "uses"`);
         return services.get(name)?.api as T | undefined;
       },
@@ -259,6 +261,9 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     setting: (id: string, key: string) => st.settings[id]?.[key] ?? entries.get(id)?.manifest?.settings[key]?.default,
     /** Core's own access to a service (no dependency check): undefined while its plugin is off. */
     service: <T = any>(name: string) => services.get(name)?.api as T | undefined,
+    /** The core lends a service to every plugin under a fixed name (`host.use(name)`, nothing to declare). A plugin that
+     *  provides the same name wins; calling it again replaces the api. */
+    provideCore(name: string, api: object) { coreServices.set(name, api); },
     /** Running plugins' page files, in load order (src/assets.ts appends them after the deck's own). */
     assets: () => active().map((e) => ({ id: e.id, dir: e.dir, scripts: e.manifest!.client, styles: e.manifest!.styles })),
     /** fullState slices from running plugins. */
