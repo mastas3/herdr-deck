@@ -13,7 +13,7 @@
   ],
   "styles": ["css/discover.css", "css/studio.css", "css/feed.css", "css/gallery.css", "css/gallery-sheet.css", "css/comparables.css", "css/gallery-evidence.css"],
   "machine": "any",
-  "uses": ["covers", "library", "connections", "opportunities"],
+  "uses": ["covers", "library", "connections"],
   "routes": ["discover", "ideas"],
   "provides": ["discover", "gallery"]
 }
