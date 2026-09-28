@@ -201,6 +201,8 @@ dialog.ask .hint { max-height: 50vh; overflow: auto; }
 .nowbar .what { font: 12.5px var(--mono); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
 .nowbar b { font-variant-numeric: tabular-nums; }
 .askbox { border-top: 1px solid var(--line); background: color-mix(in srgb, var(--blocked) 7%, var(--bg)); padding: 8px 22px; flex: none; }
+.askbox .askcard .rask { margin: 0 0 8px; }
+.askbox .askcard:empty { display: none; }
 .askbox pre { margin: 0 0 8px; font: 12px/1.4 var(--mono); color: var(--term-ink); background: var(--term-bg); border-radius: 8px; padding: 8px 10px; max-height: 30vh; overflow: auto; white-space: pre-wrap; }
 .askbox .ks { display: flex; gap: 5px; flex-wrap: wrap; }
 .appbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 10px 22px 12px; border-top: 1px solid var(--line); background: var(--side); flex: none; font-size: 14px; color: var(--ink-2); }

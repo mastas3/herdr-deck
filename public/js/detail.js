@@ -92,10 +92,22 @@ function renderNowbar(r, d) {
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
+  if (r.app) return renderCodexRequests(r);
+  $("askbox")._codexSig = null;
   const el = $("askbox");
-  const on = r.status === "blocked" && !S.sub && !S.board && (!isPhone() || app.dataset.mview === "detail");
-  if (!on) { el.hidden = true; clearTimeout(askTimer); askHash = ""; return; }
-  if (el.hidden) { el.hidden = false; el.innerHTML = `<pre>…</pre><div class="ks">${["1", "2", "3", "y", "n", "enter", "esc", "up", "down"].map((k) => `<button data-akey="${k}">${k}</button>`).join("")}</div>`; }
+  // The same question the list shows (its options, or Approve / Deny for a permission prompt), answerable here too;
+  // a blocked agent's live screen and keys stay underneath it.
+  const d = pendingAsk(r), blocked = r.status === "blocked";
+  const on = (blocked || !!d) && !S.sub && !S.board && (!isPhone() || app.dataset.mview === "detail");
+  if (!on) { el.hidden = true; el._card = ""; clearTimeout(askTimer); askTimer = null; askHash = ""; return; }
+  if (el.hidden || !el.querySelector(".askcard")) {
+    el.hidden = false; el._card = "";
+    el.innerHTML = `<div class="askcard"></div><div class="askterm"><pre>…</pre><div class="ks">${["1", "2", "3", "y", "n", "enter", "esc", "up", "down"].map((k) => `<button data-akey="${k}">${k}</button>`).join("")}</div></div>`;
+  }
+  const card = d ? boardAsk(r) : "";
+  if (card !== el._card) { el._card = card; el.querySelector(".askcard").innerHTML = card; }
+  el.querySelector(".askterm").hidden = !blocked;
+  if (!blocked) { clearTimeout(askTimer); askTimer = null; askHash = ""; return; }
   if (askTimer) return;
   const tick = async () => {
     askTimer = null;
@@ -109,6 +121,21 @@ async function renderAsk(r) {
   };
   askTimer = setTimeout(tick, 0);
 }
+// Answers in the session's own answer box go straight to the agent, like the list's and the board's.
+$("askbox").addEventListener("click", async (e) => {
+  const box = e.target.closest("[data-rask]");
+  if (!box) return;
+  const key = box.dataset.rask, d = pendingAsk({ key });
+  if (!d) return;
+  if (e.target.closest("[data-rreply], [data-ropen]")) return focusReply();
+  const pick = e.target.closest("[data-ropt], [data-rdeny]");
+  if (!pick) return;
+  const o = pick.hasAttribute("data-rdeny") ? permChoices(d).deny : d.options.find((x) => String(x.id) === pick.dataset.ropt);
+  if (!o) return;
+  box.classList.add("sending");
+  try { await answerOption(d, o); toast(`${pick.classList.contains("no") ? "Denied" : pick.classList.contains("yes") ? "Approved" : "Answered"}: ${plain(d.question).slice(0, 60)}`); render(); renderViews(); const cur = rowOf(S.sel); if (cur) renderAsk(cur); }
+  catch (x) { box.classList.remove("sending"); toast(x.message, true); }
+});
 $("appbar").addEventListener("click", (e) => {
   const act = e.target.closest("[data-dact]")?.dataset.dact;
   const r = rowOf(S.sel);

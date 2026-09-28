@@ -75,7 +75,7 @@ function connect() {
   es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); if (S.mode === "usage") renderUsage(); });
   es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
   es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
-  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
+  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); const cur = S.sel && rowOf(S.sel); if (cur) renderAsk(cur); });
   es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
   for (const { event, fn } of deckPlugins.contributions("sse.events")) es.addEventListener(event, (e) => { try { fn(JSON.parse(e.data)); } catch (err) { console.error(err); } });
   // A plugin was turned on or off: its files join or leave the page, so load it again.
