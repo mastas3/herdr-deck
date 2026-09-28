@@ -48,7 +48,7 @@ const { broadcast } = sse;
 const fakeRows = new Map<string, Row>();
 const hosts = createMachines({
   deck, self: SELF, dataDir: DATA_DIR, hostsConf, graves, fakeRows,
-  broadcast, fullState: () => fullState(), scheduleDecisions: () => dec.scheduleDecisions(), observe: () => auto?.observe(),
+  broadcast, scheduleDecisions: () => dec.scheduleDecisions(), observe: () => auto?.observe(),
   usageChanged: () => live.pushUsage(),
 });
 const { remotes, isNode, machines, summary, allRows, allGraves, tagLocal, machineLabelOf } = hosts;
@@ -96,7 +96,7 @@ const pluginHost = createPluginHost({
   builtinDir: BUILTIN_DIR, root: PLUGINS_DIR, dataDir: DATA_DIR, devDirs: DEV_PLUGIN_DIRS,
   // Built-ins start off: the core stays small until you turn an extra on in Plugins (DECK_PLUGINS_DEFAULT=on for tests/harness).
   builtinsOn: process.env.DECK_PLUGINS_DEFAULT === "on",
-  reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "plugins"],
+  reservedState: ["seq", "token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "plugins"],
   core: {
     rows: () => allRows(), push, automations: () => auto, decisions: () => [...dec.decisions.values()], broadcast, notice, machines, isNode,
     history: (o) => tools.historyEverywhere(o), checks: () => deck.checks,
@@ -116,17 +116,19 @@ const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, b
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
 for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { codex.close(); for (const h of remotes.values()) h.stop(); stopHistory(); await Promise.race([pluginHost.stop(), Bun.sleep(2000)]); process.exit(0); });
 
-/** What a page starts from: inlined into the HTML, and sent first on every SSE connection. */
+/** What a page starts from: inlined into the HTML, fetched (GET /api/state) or sent first on the stream. `seq` is the
+ *  stream's last event in it, so a page asks only for what came after (src/http/sse.ts). */
 function fullState() {
   return {
     ...pluginHost.state(),
-    token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
+    seq: sse.seq(), token: TOKEN, self: SELF.id, publicUrl: PUBLIC_URL, rows: allRows(), summary: summary(), graveyard: allGraves(),
     tools: [...loadTools(), ...pluginHost.contributions("tools.entries")], toolGroups: GROUPS, queue: queue.queues, usage: live.usage(), history: historyStats(), decisions: [...dec.decisions.values()], radar: dec.radar.list(), jev: jevUsage(), canShare: canShare(),
     auto: auto?.publicState(), push: { key: push.vapid.publicKey, node: isNode() }, plugins: { active: pluginHost.active() },
   };
 }
 
 deck.onPatch((patch) => { broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }); auto?.observe(); });
+deck.onUsage((u) => broadcast("procs", u));
 // ── history, usage, sharing, proof of done, decisions ─────────────────────
 // Passing checks also count on the quest board (the quests plugin's `game` service), while it's on.
 const live = startLive({

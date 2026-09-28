@@ -164,7 +164,8 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       const f = { row: lr };
       const d = await detailFor(f.row);
       const subagents = await subagentsFor(who(f.row), d).catch(() => []);
-      return json({ ...detailPayload(f.row, d), subagents, chat: d ? chatSlice(d, { limit: body.limit }) : undefined });
+      // `chat: false`: the page already holds this chat and keeps it fresh with /api/chat.
+      return json({ ...detailPayload(f.row, d, !!body.lite), subagents, chat: d && body.chat !== false ? chatSlice(d, { limit: body.limit }) : undefined });
     }
     case "/api/chat": {
       const lr = localRow(body.key);

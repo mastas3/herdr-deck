@@ -19,8 +19,11 @@ type Deps = {
 
 export function startLive(o: Deps) {
   const { deck, broadcast, auto, game, detailFor } = o;
-  startHistory({ changed: () => broadcast("history", historyStats()) });
-  setInterval(() => broadcast("history", historyStats()), 5_000);
+  // Only when the numbers moved: every event wakes every open page (and takes room in the stream's replay buffer).
+  let histSent = "";
+  const pushHistory = () => { const h = historyStats(), j = JSON.stringify(h); if (j !== histSent) { histSent = j; broadcast("history", h); } };
+  startHistory({ changed: pushHistory });
+  setInterval(pushHistory, 5_000);
 
   // Local files every 20 s; credit balances from the providers every 10 minutes; a node's reading when it sends one.
   let local = localUsage();

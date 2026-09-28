@@ -5,12 +5,13 @@ import { RemoteHost, type Machine, type RemoteConf } from "../federation";
 import { historySession, type HistSession } from "../history";
 import { codexAppInstalled, codexAppRunning } from "../codexapp";
 import type { Deck, Row } from "../deck";
+import { RowFeed } from "../row-feed";
 import type { Graves, HostsFile, Self } from "./config";
 
 type Deps = {
   deck: Deck; self: Self; dataDir: string; hostsConf: HostsFile; graves: Graves; fakeRows: Map<string, Row>;
   // late-bound: they exist once the server has built everything
-  broadcast: (event: string, data: unknown) => void; fullState: () => unknown; scheduleDecisions: () => void; observe: () => void; usageChanged: () => void;
+  broadcast: (event: string, data: unknown) => void; scheduleDecisions: () => void; observe: () => void; usageChanged: () => void;
 };
 
 export function createMachines(o: Deps) {
@@ -24,8 +25,9 @@ export function createMachines(o: Deps) {
   function addRemote(conf: RemoteConf) {
     if (!conf?.id || !conf.ssh || conf.id === SELF.id || remotes.has(conf.id)) return;
     const host = new RemoteHost(conf, {
+      // A machine coming back, or going away, is a patch too (its rows that changed, and the summary): not the whole state.
       patch: (upsert, remove) => { o.broadcast("patch", { upsert, remove, summary: summary() }); o.scheduleDecisions(); o.observe(); },
-      full: () => o.broadcast("full", o.fullState()),
+      procs: (u) => o.broadcast("procs", u),
       graveyard: () => o.broadcast("graveyard", allGraves()),
       notice: (n) => o.broadcast("notice", n),
       usage: () => o.usageChanged(),
@@ -34,6 +36,15 @@ export function createMachines(o: Deps) {
     return host;
   }
   const saveHosts = () => writeFileSync(`${o.dataDir}/hosts.json`, JSON.stringify({ ...o.hostsConf, remotes: [...remotes.values()].map((h) => h.conf) }, null, 2));
+
+  /** DECK_DEV fake rows go out like real ones: only what changed, readings on their own. */
+  const fakeFeed = new RowFeed();
+  function fakeRowsChanged() {
+    const { upsert, remove } = fakeFeed.diff(fakeRows.values());
+    if (upsert.length || remove.length) o.broadcast("patch", { upsert, remove, summary: summary() });
+    const u = fakeFeed.takeUsage(fakeRows.values());
+    if (u) o.broadcast("procs", u);
+  }
 
   const tagLocal = (r: Row): Row => ({ ...r, machine: r.app ? "codex-app" : SELF.id });
   function machines(): Machine[] {
@@ -66,6 +77,6 @@ export function createMachines(o: Deps) {
     return all.sort((a, b) => b.closedAt - a.closedAt).slice(0, 150);
   }
   const machineLabelOf = (id?: string) => machines().find((m) => m.id === id)?.label ?? id;
-  return { remotes, isNode, hubSeen, addRemote, saveHosts, tagLocal, machines, localRow, summary, allRows, allGraves, machineLabelOf };
+  return { remotes, isNode, hubSeen, addRemote, fakeRowsChanged, saveHosts, tagLocal, machines, localRow, summary, allRows, allGraves, machineLabelOf };
 }
 export type Machines = ReturnType<typeof createMachines>;
