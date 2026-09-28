@@ -8,6 +8,9 @@
 .itabs button:hover { color: var(--ink); }
 .itabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
 .itabs .n { font-weight: 400; color: var(--ink-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+/* Five or more tabs in a narrow inspector: the labels stay, the icons go, so every tab stays in sight. */
+.insp { container-type: inline-size; }
+@container (max-width: 560px) { .itabs:has(> :nth-child(5)) button svg { display: none; } .itabs:has(> :nth-child(5)) button { padding-inline: 7px; } }
 .ih #inspClose { align-self: center; margin-bottom: 4px; }
 .ipane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .ipbody { min-height: 100%; display: flex; flex-direction: column; }
