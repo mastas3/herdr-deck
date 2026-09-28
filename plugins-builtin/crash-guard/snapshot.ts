@@ -30,9 +30,11 @@ export function paneOf(r: Row): SnapPane {
 /** What makes two snapshots different: panes, their conversations, folders and names (not status or activity). */
 export const sigOf = (panes: SnapPane[]) => JSON.stringify(panes.map((p) => [p.key, p.sessionId ?? "", p.cwd, p.agent, p.workspace, p.tab]).sort());
 
-/** An agent conversation can be resumed; a plain shell only reopens in its folder; an empty one isn't worth it. */
+/** An agent conversation can be resumed; another program (a dev server) reopens as a shell in its folder; an empty
+ *  shell, or an agent that never started a conversation, has nothing to bring back. */
 export const isAgent = (p: SnapPane) => !!p.resume;
-export const worthRestoring = (p: SnapPane) => isAgent(p) || (!p.empty && p.agent !== "shell");
+const AGENTS = new Set(["claude", "codex", "opencode"]);
+export const worthRestoring = (p: SnapPane) => isAgent(p) || (!p.empty && p.agent !== "shell" && !AGENTS.has(p.agent));
 
 /** Still open now: the same conversation anywhere (panes move and get new ids), or the same pane in the same folder. */
 export function stillOpen(p: SnapPane, now: SnapPane[]) {

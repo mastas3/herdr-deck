@@ -43,7 +43,7 @@ export function activate(host: Host) {
   function recordCrash(before: Snapshot, lost: SnapPane[], reason: Crash["reason"]) {
     const c: Crash = { id: crypto.randomUUID(), machine: selfId(), at: Date.now(), snapshotId: before.id, snapshotAt: before.seenAt, reason, lost: lost.length, total: before.panes.length };
     store.setCrashes([...store.crashes().filter((x) => x.snapshotId !== before.id), c]);
-    host.log(`crash-guard: ${lost.length} sessions vanished (${reason}); snapshot ${before.id} kept for restore`);
+    host.log(`${lost.length} sessions vanished (${reason}); snapshot ${before.id} kept for restore`);
     host.notice({ ok: false, message: `herdr ${reason === "restarted" ? "restarted" : "lost sessions"}: ${lost.length} session${lost.length === 1 ? " was" : "s were"} open. Restore them from the banner.` });
   }
 
@@ -68,7 +68,10 @@ export function activate(host: Host) {
     const worthBefore = last ? last.panes.filter(worthRestoring).length : 0;
     if (last && now - last.seenAt < MAX_AGE && !store.crashes().some((c) => c.snapshotId === last!.id)) {
       const lost = lostPanes(last.panes, cur, closedSince(last.seenAt));
-      const restarted = sawOffline || (cur.length === 0 && herdr.length > 0);
+      // herdr came back as a new server: its socket dropped, every pane went, or nearly every pane id changed at once.
+      const keys = new Set(cur.map((p) => p.key));
+      const gone = last.panes.filter((p) => !keys.has(p.key)).length;
+      const restarted = sawOffline || (cur.length === 0 && herdr.length > 0) || (gone >= 2 && gone >= last.panes.length * 0.8);
       if (looksLikeCrash({ lost: lost.length, before: worthBefore, restarted, minLost: num("minLost", 3) })) {
         // Once more on the next tick: a herdr that blinks for a second isn't a crash.
         if (++pending < 2) return;

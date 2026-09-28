@@ -7,7 +7,7 @@
 //   fake.delay {ms}              how long a new pane's shell takes to draw its prompt (pane.read is empty until then)
 import { existsSync, readFileSync, rmSync } from "node:fs";
 
-export type FakePane = { pane_id: string; workspace_id: string; tab_id: string; cwd: string; agent?: string; agent_status?: string; agent_session?: { value: string }; focused?: boolean; label?: string; terminal_title_stripped?: string };
+export type FakePane = { pane_id: string; workspace_id: string; tab_id: string; cwd: string; command?: string; agent?: string; agent_status?: string; agent_session?: { value: string }; focused?: boolean; label?: string; terminal_title_stripped?: string };
 export type FakeState = {
   version: string; protocol: number; focused_workspace_id?: string; focused_pane_id?: string;
   workspaces: { workspace_id: string; label: string; number: number }[];
@@ -34,7 +34,7 @@ export function startFakeHerdr(socket: string, init: FakeState = freshState()) {
   const subs = new Set<any>();
   let fail: string[] = [], delay = 0, seq = 1000;
   const id = (p: string) => `${p}${++seq}`;
-  const emit = (type: string) => { for (const s of subs) try { s.write(JSON.stringify({ event: { type } }) + "\n"); } catch {} };
+  const emit = (type: string) => { for (const s of subs) try { send(s, { event: { type } }); } catch {} };
   const newTab = (wsId: string, cwd: string, label: string) => {
     const tab = { tab_id: id("t"), workspace_id: wsId, label, number: state.tabs.filter((t) => t.workspace_id === wsId).length + 1, pane_count: 1 };
     const pane: FakePane = { pane_id: id("p"), workspace_id: wsId, tab_id: tab.tab_id, cwd };
@@ -47,7 +47,13 @@ export function startFakeHerdr(socket: string, init: FakeState = freshState()) {
     switch (method) {
       case "session.snapshot": return { type: "session_snapshot", snapshot: state };
       case "events.subscribe": subs.add(conn); return { type: "subscribed" };
-      case "pane.process_info": return err("unsupported", "no process info in the fake");
+      case "pane.process_info": {
+        // The fake's own pid stands in for the shell; an agent pane runs its command (with its flags) in front.
+        const pane = state.panes.find((x) => x.pane_id === p.pane_id);
+        if (!pane) return err("not_found", "no such pane");
+        const fg = pane.agent ? [{ pid: process.pid, name: pane.agent, argv0: pane.agent, cmdline: pane.command ?? pane.agent }] : [];
+        return { type: "process_info", process_info: { shell_pid: process.pid, foreground_processes: fg } };
+      }
       case "pane.read": {
         const b = born.get(p.pane_id);
         return { type: "pane_read", read: { text: b && Date.now() - b < delay ? "" : `${state.panes.find((x) => x.pane_id === p.pane_id)?.cwd ?? ""} $ ` } };
@@ -78,10 +84,17 @@ export function startFakeHerdr(socket: string, init: FakeState = freshState()) {
       }
       case "tab.close": state.panes = state.panes.filter((x) => x.tab_id !== p.tab_id); state.tabs = state.tabs.filter((x) => x.tab_id !== p.tab_id); emit("tab.closed"); return { type: "ok" };
       case "pane.close": state.panes = state.panes.filter((x) => x.pane_id !== p.pane_id); emit("pane.closed"); return { type: "ok" };
+      case "agent.start": {
+        const pane = state.panes.find((x) => x.pane_id === p.pane_id);
+        if (!pane) return err("not_found", "no such pane");
+        pane.agent = p.kind; pane.agent_status = "idle"; emit("pane.agent_detected");
+        return { type: "ok" };
+      }
       case "pane.focus": case "pane.send_keys": case "agent.prompt": return { type: "ok" };
       // ── test controls ──
       case "fake.state": state = structuredClone(p.state); emit("workspace.updated"); return { type: "ok" };
-      case "fake.calls": return { type: "calls", calls: calls.filter((c) => !c.method.startsWith("fake.")) };
+      // The deck polls (snapshots, screen reads) all the time: `skip` leaves those out.
+      case "fake.calls": return { type: "calls", calls: calls.filter((c) => !c.method.startsWith("fake.") && !(p.skip ?? []).includes(c.method)) };
       case "fake.crash": crash(); return { type: "ok" };
       case "fake.fail": fail = [...(p.cwd ?? [])]; return { type: "ok" };
       case "fake.delay": delay = Number(p.ms) || 0; return { type: "ok" };
@@ -96,10 +109,20 @@ export function startFakeHerdr(socket: string, init: FakeState = freshState()) {
   }
 
   if (existsSync(socket)) rmSync(socket);
-  const server = Bun.listen<{ buf: string }>({
+  // Big replies (fake.calls) take several writes: keep what didn't fit and send it when the socket drains.
+  const flush = (s: any) => {
+    while (s.data.out.length) {
+      const n = s.write(s.data.out);
+      if (n <= 0) return;
+      s.data.out = s.data.out.subarray(n);
+    }
+  };
+  const send = (s: any, obj: unknown) => { s.data.out = Buffer.concat([s.data.out, Buffer.from(JSON.stringify(obj) + "\n")]); flush(s); };
+  const server = Bun.listen<{ buf: string; out: Buffer }>({
     unix: socket,
     socket: {
-      open(s) { s.data = { buf: "" }; },
+      open(s) { s.data = { buf: "", out: Buffer.alloc(0) }; },
+      drain(s) { flush(s); },
       data(s, d) {
         s.data.buf += d.toString();
         let nl;
@@ -110,7 +133,7 @@ export function startFakeHerdr(socket: string, init: FakeState = freshState()) {
           try { msg = JSON.parse(line); } catch { continue; }
           calls.push({ at: Date.now(), method: msg.method, params: msg.params ?? {} });
           const out = handle(msg.method, msg.params ?? {}, s);
-          s.write(JSON.stringify(out?.error ? { id: msg.id, error: out.error } : { id: msg.id, result: out }) + "\n");
+          send(s, out?.error ? { id: msg.id, error: out.error } : { id: msg.id, result: out });
         }
       },
       close(s) { subs.delete(s); },

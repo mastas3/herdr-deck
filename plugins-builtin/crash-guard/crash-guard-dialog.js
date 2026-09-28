@@ -3,6 +3,7 @@
 // workspace (agent sessions that aren't open now are ticked; plain processes are not; empty shells are left out), and
 // the same dialog shows the restore as it runs, with Retry for the ones that failed.
 let cgDlg = null; // { el, machine, snap, job }
+const CG_AGENTS = new Set(["claude", "codex", "opencode"]); // an agent pane without a conversation has nothing to resume
 
 function cgDialog(cls) {
   cgDlg?.el.close();
@@ -47,7 +48,7 @@ async function cgOpenRestore(machine, snapId, jobId) {
   try { snap = await cgApi(machine, { op: "snapshot", id: snapId }); } catch (x) { return toast(x.message, true); }
   const el = cgDialog("restore");
   cgDlg = { el, machine, snap, job: jobId ?? null };
-  const panes = snap.panes.filter((p) => p.resume || (!p.empty && p.agent !== "shell"));
+  const panes = snap.panes.filter((p) => p.resume || (!p.empty && p.agent !== "shell" && !CG_AGENTS.has(p.agent)));
   const skipped = snap.panes.length - panes.length;
   const groups = new Map();
   for (const p of panes) groups.set(p.workspace, [...(groups.get(p.workspace) ?? []), p]);
@@ -56,7 +57,7 @@ async function cgOpenRestore(machine, snapId, jobId) {
     <p>From ${esc(DF.format(new Date(snap.seenAt)))}${multiMachine() ? ` on ${esc(machineLabel(machine))}` : ""} (${esc(agoText(snap.seenAt))}). Each opens in a new tab in its workspace and folder, then resumes.</p>
     <div class="cg-list">${[...groups].map(([ws, ps]) => `<fieldset class="cg-ws"><legend><label><input type="checkbox" data-cgall${ps.some(pre) ? " checked" : ""}> Workspace ${esc(ws)}</label> <span class="hint">${cgPlural(ps.length, "session")}</span></legend>
       ${ps.map((p) => cgItemHTML(p, pre(p))).join("")}</fieldset>`).join("")}</div>
-    ${skipped ? `<p class="hint">${cgPlural(skipped, "empty shell")} left out.</p>` : ""}
+    ${skipped ? `<p class="hint">${cgPlural(skipped, "pane")} left out: empty shells and agents that hadn't started a conversation.</p>` : ""}
     <p class="hint cg-rate">Opens ${S.crashGuard?.machines?.[machine]?.atOnce ?? 2} at a time: each waits for its shell before the resume command is typed.</p></div>
     <div class="cg-prog" hidden></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok" data-cgok></button></div></form>`;
