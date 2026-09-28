@@ -1,5 +1,5 @@
 "use strict";
-// Input: the splitters, keyboard shortcuts, right-click / long-press on a session, and phone navigation.
+// Input: the splitters, keyboard shortcuts, and right-click / long-press on a session.
 // Splitters: window-level listeners so fast drags over other panels never drop.
 function drag(el, axisOf, onMove, onEnd) {
   el.addEventListener("pointerdown", (e) => {
@@ -106,49 +106,4 @@ $("rows").addEventListener("contextmenu", (e) => {
   $("rows").addEventListener("touchmove", (e) => { if (Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 8) clearTimeout(t); }, { passive: true });
   $("rows").addEventListener("touchend", (e) => { clearTimeout(t); if (fired) { e.preventDefault(); fired = false; } });
 }
-
-// ── phone navigation: a native-feeling stack (list → chat ⇄ terminal) ─────
-function setMView(v, push) {
-  if (app.dataset.mview === v) return;
-  const from = app.dataset.mview;
-  app.dataset.mview = v;
-  for (const b of document.querySelectorAll(".mbar [data-mv]")) b.setAttribute("aria-selected", b.dataset.mv === v);
-  if (push && isPhone()) history.pushState({ mview: v }, "");
-  if (v === "term") pollTerm(true);
-  if (v === "detail") { chatTick(true); renderDetail(); }
-  if (v === "list" && from !== "list") { S.board = false; requestAnimationFrame(() => rowCache.get(S.sel)?.el.scrollIntoView({ block: "nearest" })); }
-}
-addEventListener("popstate", (e) => setMView(e.state?.mview ?? "list", false));
-$("mBack").onclick = () => (history.state?.mview ? history.back() : setMView("list", false));
-document.querySelector(".mbar .seg2").addEventListener("click", (e) => {
-  const v = e.target.closest("[data-mv]")?.dataset.mv;
-  if (!v || v === app.dataset.mview) return;
-  if (isPhone()) history.replaceState({ mview: v }, "");
-  setMView(v, false);
-});
-// Swipe from the left edge to go back, like iOS.
-{
-  let sx = 0, sy = 0, dx = 0, on = false, panels = [];
-  addEventListener("touchstart", (e) => {
-    if (!isPhone() || app.dataset.mview === "list") return;
-    const t = e.touches[0];
-    if (t.clientX > 28) return;
-    sx = t.clientX; sy = t.clientY; dx = 0; on = true;
-    panels = [app.dataset.mview === "term" ? $("term") : $("detail"), $("mbar")];
-  }, { passive: true });
-  addEventListener("touchmove", (e) => {
-    if (!on) return;
-    const t = e.touches[0];
-    dx = Math.max(0, t.clientX - sx);
-    if (Math.abs(t.clientY - sy) > 40 && dx < 20) { on = false; return; }
-    app.classList.add("swiping");
-    for (const p of panels) p.style.transform = `translateX(${dx}px)`;
-  }, { passive: true });
-  addEventListener("touchend", () => {
-    if (!on) return;
-    on = false;
-    app.classList.remove("swiping");
-    for (const p of panels) p.style.transform = "";
-    if (dx > 80) (history.state?.mview ? history.back() : setMView("list", false));
-  });
-}
+// Phone navigation (the screen stack, back, swipes) is nav.js, nav-anim.js and swipe.js.

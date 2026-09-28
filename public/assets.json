@@ -28,6 +28,9 @@
     "js/events.js",
     "js/code-actions.js",
     "js/input.js",
+    "js/nav-anim.js",
+    "js/nav.js",
+    "js/swipe.js",
     "js/boot.js",
     "js/plugins.js",
     "js/plugins-code.js",
@@ -47,6 +50,7 @@
     "css/notifications.css",
     "css/feedback.css",
     "css/motion.css",
+    "css/nav.css",
     "css/simple.css",
     "css/plugins.css"
   ]
