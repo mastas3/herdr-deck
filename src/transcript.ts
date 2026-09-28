@@ -9,6 +9,7 @@ import { codexTimestamp } from "./codex-turn";
 import { codexReplyHash } from "./codex-fork-point";
 import { codexForkHistory, type CodexHistoryPlan } from "./codex-fork-history";
 import { attachCodexGenerated, readCodexGenerated } from "./codex-generated";
+import { subRunning } from "./subagent-state";
 
 const HOME = homedir();
 
@@ -425,10 +426,11 @@ export type Sub = {
   now?: string; // its latest tool call
   tools: number;
 };
-const subCache = new Map<string, { mtime: number; sub: Sub }>();
+type SubScan = { sub: Sub; ended: boolean; pending: boolean; background: boolean; toolUseId?: string };
+const subCache = new Map<string, { mtime: number; scan: SubScan }>();
 
 /** Subagents live beside the transcript: <session>/subagents/agent-<id>.jsonl (+ .meta.json). */
-export async function claudeSubagents(sessionFile: string, parent?: Detail): Promise<Sub[]> {
+export async function claudeSubagents(sessionFile: string, parent?: Detail, now = Date.now()): Promise<Sub[]> {
   const dir = sessionFile.replace(/\.jsonl$/, "") + "/subagents";
   let names: string[];
   try { names = readdirSync(dir).filter((n) => n.endsWith(".jsonl")); } catch { return []; }
@@ -438,35 +440,44 @@ export async function claudeSubagents(sessionFile: string, parent?: Detail): Pro
     let st;
     try { st = statSync(path); } catch { continue; }
     const hit = subCache.get(path);
-    if (hit && hit.mtime === st.mtimeMs) { out.push({ ...hit.sub, running: Date.now() - st.mtimeMs < 45_000 && hit.sub.running }); continue; }
-    const id = n.replace(/^agent-/, "").replace(/\.jsonl$/, "");
-    let meta: any = {};
-    try { meta = await Bun.file(`${dir}/agent-${id}.meta.json`).json(); } catch {}
-    const tail = await Bun.file(path).slice(Math.max(0, st.size - 48 * 1024), st.size).text();
-    let now: string | undefined, tools = 0, lastAt: number | undefined, ended = false;
-    for (const l of tail.split("\n").slice(1)) {
-      let o: any;
-      try { o = JSON.parse(l); } catch { continue; }
-      if (o.timestamp) lastAt = Date.parse(o.timestamp);
-      if (o.type === "assistant") {
-        const parts = o.message?.content ?? [];
-        const tu = parts.filter?.((p: any) => p?.type === "tool_use") ?? [];
-        tools += tu.length;
-        if (tu.length) { const t = tu[tu.length - 1]; now = `${prettyTool(t.name)}: ${toolSummary(t.name, t.input)}`; ended = false; }
-        else if (parts.some?.((p: any) => p?.type === "text") && o.message?.stop_reason === "end_turn") ended = true;
-      }
-    }
-    const firstLine = await Bun.file(path).slice(0, 4096).text();
-    let startedAt: number | undefined;
-    try { startedAt = Date.parse(JSON.parse(firstLine.split("\n")[0]).timestamp); } catch {}
-    // The parent's Agent call closes when a foreground subagent returns; background ones only go quiet.
-    const call = parent?.messages.find((m) => m.sub === id || (m.tool && /^(agent|task)$/i.test(m.tool) && meta.toolUseId && (m as any)._tid === meta.toolUseId));
-    const running = !ended && Date.now() - st.mtimeMs < 45_000 && call?.state !== "done";
-    const sub: Sub = { id, type: meta.agentType, description: meta.description, model: meta.model, startedAt, lastActiveAt: lastAt ?? st.mtimeMs, running, now, tools };
-    subCache.set(path, { mtime: st.mtimeMs, sub });
-    out.push(sub);
+    const scan = hit && hit.mtime === st.mtimeMs ? hit.scan : await scanSub(dir, n, st.size, st.mtimeMs);
+    if (scan !== hit?.scan) subCache.set(path, { mtime: st.mtimeMs, scan });
+    // The parent's Agent call closes when a foreground subagent returns (a background one's closes at once).
+    const id = scan.sub.id;
+    const call = parent?.messages.find((m) => m.sub === id || (m.tool && /^(agent|task)$/i.test(m.tool) && scan.toolUseId && (m as any)._tid === scan.toolUseId));
+    const running = subRunning({ ended: scan.ended, pending: scan.pending, background: scan.background, callDone: call?.state === "done", quietMs: now - st.mtimeMs });
+    out.push({ ...scan.sub, running });
   }
   return out.sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));
+}
+
+/** One subagent's transcript tail: its latest tool call, whether it wrote its final answer, and whether a call is open. */
+async function scanSub(dir: string, n: string, size: number, mtime: number): Promise<SubScan> {
+  const path = `${dir}/${n}`;
+  const id = n.replace(/^agent-/, "").replace(/\.jsonl$/, "");
+  let meta: any = {};
+  try { meta = await Bun.file(`${dir}/agent-${id}.meta.json`).json(); } catch {}
+  const tail = await Bun.file(path).slice(Math.max(0, size - 48 * 1024), size).text();
+  let now: string | undefined, tools = 0, lastAt: number | undefined, ended = false;
+  const open = new Set<string>();
+  for (const l of tail.split("\n").slice(1)) {
+    let o: any;
+    try { o = JSON.parse(l); } catch { continue; }
+    if (o.timestamp) lastAt = Date.parse(o.timestamp);
+    const parts = Array.isArray(o.message?.content) ? o.message.content : [];
+    if (o.type === "assistant") {
+      const tu = parts.filter((p: any) => p?.type === "tool_use");
+      tools += tu.length;
+      for (const t of tu) if (t.id) open.add(t.id);
+      if (tu.length) { const t = tu[tu.length - 1]; now = `${prettyTool(t.name)}: ${toolSummary(t.name, t.input)}`; ended = false; }
+      else if (parts.some((p: any) => p?.type === "text") && o.message?.stop_reason === "end_turn") ended = true;
+    } else if (o.type === "user") for (const p of parts) if (p?.type === "tool_result") open.delete(p.tool_use_id);
+  }
+  const firstLine = await Bun.file(path).slice(0, 4096).text();
+  let startedAt: number | undefined;
+  try { startedAt = Date.parse(JSON.parse(firstLine.split("\n")[0]).timestamp); } catch {}
+  const sub: Sub = { id, type: meta.agentType, description: meta.description, model: meta.model, startedAt, lastActiveAt: lastAt ?? mtime, running: false, now, tools };
+  return { sub, ended, pending: !ended && open.size > 0, background: meta.requestShape === "background", toolUseId: meta.toolUseId };
 }
 
 export function claudeSubFile(sessionFile: string, id: string) {
