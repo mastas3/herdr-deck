@@ -65,7 +65,7 @@ function backDrag(e) {
     end(cancel) {
       if (!m) return;
       const x = pts.length ? pts[pts.length - 1][1] : 0, v = swipeSpeed(pts);
-      navDragEnd(m, !cancel && (x > innerWidth * SWIPE.commit ? v > -0.2 : v > SWIPE.flick && x > 16), v);
+      navDragEnd(m, !cancel && (x > navW * SWIPE.commit ? v > -0.2 : v > SWIPE.flick && x > 16), v);
     },
   };
 }

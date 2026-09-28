@@ -75,6 +75,8 @@ function navPop(n) {
 }
 /** Where you were on a screen: the list, the pane's scroll, and in a chat the message at the top and whether it was at the end. */
 function navScroll() {
+  // From the list only the list's place matters: measuring the hidden pane would lay it all out for nothing.
+  if (isPhone() && app.dataset.mview === "list") return { list: $("rows").scrollTop };
   const b = $("dbody"), chat = chatOn();
   // Measured, not the pin's last word: a scroll this frame hasn't told the pin yet.
   const stick = chat && b.scrollHeight - b.scrollTop - b.clientHeight < 40;

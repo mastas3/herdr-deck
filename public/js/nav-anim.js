@@ -6,6 +6,10 @@
 const NAV_EASE = "cubic-bezier(.2, .8, .2, 1)";
 const NAV_PAR = 0.28, NAV_DIM = 0.3;
 const navReduced = () => reduceMotion.matches || load("motion", "") === "off";
+// The screen's width, kept current: reading innerWidth mid-change forces a layout, pulling the next frame's work into
+// the tap.
+let navW = innerWidth;
+addEventListener("resize", () => { navW = innerWidth; }, { passive: true });
 
 // ── ghosts: a still copy of a screen, for what a slide reveals or leaves behind ──
 // The session pane is one element, so the screen you left can't stay live under the new one. A copy (ids stripped,
@@ -25,7 +29,23 @@ function navGhost() {
     g.append(c);
   }
   g._sc = [...src.querySelectorAll(NAV_SCROLLS)].map((el) => [el.scrollTop, el.scrollLeft]);
+  if (src === $("detail") && chatOn()) { g._anchor = takeAnchor(); navPrune(g); }
   return g;
+}
+/** A long chat's copy keeps only the messages around the screen, with spacers for the rest: it lays out in a blink,
+ *  and (messages off screen being sized lazily) its place is set by the message you were reading, not a pixel count. */
+function navPrune(g) {
+  const live = chatDom.el, copy = g.querySelector(".dbody > .chat");
+  if (!live || !copy || live.children.length < 30 || copy.children.length !== live.children.length) return;
+  const rs = [...live.children].map((k) => k.getBoundingClientRect()), h = innerHeight, n = rs.length;
+  let i0 = rs.findIndex((r) => r.bottom > -h), i1 = rs.findLastIndex((r) => r.top < 2 * h);
+  if (i0 < 0 || i1 < i0) return;
+  const pad = (px) => Object.assign(document.createElement("div"), { style: `height:${Math.max(0, px)}px;flex:none` });
+  const kids = [...copy.children];
+  for (let i = n - 1; i > i1; i--) kids[i].remove();
+  for (let i = 0; i < i0; i++) kids[i].remove();
+  if (i0 > 0) copy.prepend(pad(rs[i0].top - rs[0].top));
+  if (i1 < n - 1) copy.append(pad(rs[n - 1].bottom - rs[i1].bottom));
 }
 /** Puts a ghost on the page (its scroll positions come back with it): `over` the live screen, or under it. */
 function navGhostShow(g, over) {
@@ -33,6 +53,8 @@ function navGhostShow(g, over) {
   g.classList.remove("rest");
   if (!g.isConnected) app.append(g);
   [...g.querySelectorAll(NAV_SCROLLS)].forEach((el, i) => { const s = g._sc[i]; if (s) { el.scrollTop = s[0]; el.scrollLeft = s[1]; } });
+  const a = g._anchor, body = g.querySelector(".dbody"), el = a && body?.querySelector(`:scope > .chat > [data-b="${CSS.escape(a.key)}"]`);
+  if (el) body.scrollTop += el.getBoundingClientRect().top - body.getBoundingClientRect().top - a.off;
   return g;
 }
 function navShade(cls) {
@@ -50,15 +72,14 @@ let navMove = null;
 function navStage(top, under, shadeCls = "") {
   navSettle();
   const m = { top, under, shade: navShade(shadeCls), anims: [], p: 1, then: null };
-  for (const el of [...top, ...under]) { el.style.visibility = "visible"; el.style.willChange = "transform"; }
+  for (const el of [...top, ...under]) el.style.visibility = "visible";
   for (const el of under) el.style.pointerEvents = "none";
   m.shade.hidden = false;
-  app.classList.add("nav-moving");
   navMove = m;
   return m;
 }
 function navPose(m, p) {
-  const w = innerWidth;
+  const w = navW;
   m.p = p;
   for (const el of m.top) el.style.transform = `translate3d(${(1 - p) * w}px,0,0)`;
   for (const el of m.under) el.style.transform = `translate3d(${-NAV_PAR * w * p}px,0,0)`;
@@ -66,7 +87,7 @@ function navPose(m, p) {
 }
 /** Animates the pose from p0 to p1, then settles (and runs `then` first, while everything is still in place). */
 function navTween(m, p0, p1, dur, then) {
-  const w = innerWidth, o = { duration: dur, easing: NAV_EASE, fill: "forwards" };
+  const w = navW, o = { duration: dur, easing: NAV_EASE, fill: "forwards" };
   const x = (a, b) => [{ transform: `translate3d(${a}px,0,0)` }, { transform: `translate3d(${b}px,0,0)` }];
   m.then = then;
   m.anims = [
@@ -84,10 +105,9 @@ function navSettle() {
   navMove = null;
   try { m.then?.(); } finally {
     for (const a of m.anims) a.cancel();
-    for (const el of [...m.top, ...m.under]) { el.style.transform = ""; el.style.visibility = ""; el.style.willChange = ""; el.style.pointerEvents = ""; }
+    for (const el of [...m.top, ...m.under]) { el.style.transform = ""; el.style.visibility = ""; el.style.pointerEvents = ""; }
     m.shade.hidden = true;
     m.shade.style.opacity = "";
-    app.classList.remove("nav-moving");
     for (const el of [...m.top, ...m.under]) if (el.classList.contains("navghost")) el.classList.contains("over") ? el.remove() : el.classList.add("rest");
   }
 }
@@ -127,12 +147,12 @@ function navDragStart() {
   navPose(m, 1);
   return m;
 }
-const navDragTo = (m, x) => navPose(m, 1 - Math.max(0, x) / innerWidth);
+const navDragTo = (m, x) => navPose(m, 1 - Math.max(0, x) / navW);
 /** Lets go: all the way back (a quick spring whose speed follows the flick) or back into place. */
 function navDragEnd(m, go, v) {
   if (navMove !== m) return;
   const p0 = m.p, p1 = go ? 0 : 1;
-  const dist = Math.abs(p1 - p0) * innerWidth;
+  const dist = Math.abs(p1 - p0) * navW;
   const dur = Math.round(Math.max(120, Math.min(300, dist / Math.max(Math.abs(v), 1.2))));
   navTween(m, p0, p1, dur, go ? () => navBack({ moved: true }) : null);
 }
