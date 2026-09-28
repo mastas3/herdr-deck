@@ -50,7 +50,7 @@ $("cRecipe").onclick = (e) => openToolMenu(e.currentTarget, true);
 $("cSteer").onclick = () => sendMessage($("cText").value.trim(), $("cText"), "steer");
 $("cStop").onclick = () => S.sel && api("/api/keys", { key: S.sel, keys: ["esc"] }).then(() => toast("Sent Esc to interrupt")).catch((x) => toast(x.message, true));
 function focusReply() {
-  if (isPhone()) { if (app.dataset.mview !== "detail") { history.replaceState({ mview: "detail" }, ""); setMView("detail", false); } }
+  if (isPhone()) setMView("detail"); // from the terminal: the same session, so the history entry is replaced (nav.js)
   else if (S.tpos === "tab" && S.main === "term") setMain("chat");
   if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); renderDetail(); }
   S.board = false;

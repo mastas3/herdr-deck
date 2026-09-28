@@ -1,4 +1,4 @@
-// Gallery: an idea, opened. A side panel on a desktop, a bottom sheet on a phone (swipe it down to close). Everything
+// Gallery: an idea, opened. A side panel on a desktop, a bottom sheet on a phone (swipe it down to close: public/js/swipe.js). Everything
 // on the card: who buys and where they gather, their pain in their words with the posts, the offer, the stack mapped
 // to what you own, the pre-mortem, trend signals, missing connectors with one-tap actions, the scores, and the kit.
 S.gal.sheet = null;
@@ -14,7 +14,6 @@ function galOpen(id, lane) {
   S.gal.sheet = { id, lane, dlg };
   dlg.addEventListener("close", () => { dlg.remove(); if (S.gal.sheet?.dlg === dlg) S.gal.sheet = null; S.gal.node?.querySelector(`[data-gid="${CSS.escape(id)}"]`)?.focus({ preventScroll: true }); });
   dlg.addEventListener("click", (e) => galSheetClick(e, dlg));
-  galSwipeClose(dlg);
   galSheetRefresh();
   dlg.showModal();
   dlg.querySelector(".galsh").focus({ preventScroll: true });
@@ -108,12 +107,4 @@ function galSheetClick(e, dlg) {
     return toast(`Added “${sg.name}” to the Studio tray`);
   }
   if (typeof galKitClick === "function") galKitClick(e, s.id);
-}
-/** Phone: drag the sheet's top edge down to close it. */
-function galSwipeClose(dlg) {
-  let y0 = null, dy = 0;
-  const sh = dlg.querySelector(".galsh");
-  dlg.addEventListener("touchstart", (e) => { y0 = sh.scrollTop <= 0 && e.target.closest(".galgrab, .galcov, .galshh") ? e.touches[0].clientY : null; dy = 0; }, { passive: true });
-  dlg.addEventListener("touchmove", (e) => { if (y0 == null) return; dy = Math.max(0, e.touches[0].clientY - y0); sh.style.transform = dy ? `translateY(${dy}px)` : ""; }, { passive: true });
-  dlg.addEventListener("touchend", () => { if (y0 == null) return; sh.style.transform = ""; if (dy > 110) dlg.close(); y0 = null; });
 }

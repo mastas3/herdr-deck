@@ -1,15 +1,11 @@
-/* ── phone: list → session (chat | terminal), sliding like a native stack ── */
+/* ── phone: list → session (chat | terminal), a native stack ── */
 @media (max-width: 760px) {
   body { font-size: 16px; overscroll-behavior: none; }
   .app, .app.list-off, .app.term-off { display: block; height: 100dvh; }
   .split, .keep-mini, #listToggle, .mini, #fitBtn, #termToggle, #termHide, .t-mode, .th .t-title, #keysBtn, #paletteBtn kbd, .th .grip, #layoutBtn, .dh-acts .desk, .tabsbar .seg2 { display: none !important; }
   .list, .detail, .term { position: fixed; inset: 0; }
-  .detail, .term, .mbar { transition: transform .26s var(--ease), visibility 0s linear .26s; will-change: transform; }
-  .app[data-mview="list"] :is(.detail, .term, .mbar) { transform: translateX(104%); visibility: hidden; }
-  .app[data-mview="detail"] .term { transform: translateX(104%); visibility: hidden; }
-  .app:is([data-mview="detail"], [data-mview="term"]) :is(.detail, .mbar) { transform: none; visibility: visible; transition: transform .26s var(--ease), visibility 0s; }
-  .app[data-mview="term"] .term { transform: none; visibility: visible; transition: transform .26s var(--ease), visibility 0s; }
-  .app.swiping :is(.detail, .term, .mbar) { transition: none; }
+  /* Where each screen rests; the slides between them are nav-anim.js (and nav.css). */
+  .app[data-mview="list"] :is(.detail, .term, .mbar), .app[data-mview="detail"] .term { transform: translateX(100%); visibility: hidden; }
   .app.list-off .lh > *, .app.list-off .rows, .app.list-off .lf, .app.list-off .lh-top > * { display: revert; }
   .list { padding-top: env(safe-area-inset-top); }
   .lh { padding: 10px 12px 6px; }
