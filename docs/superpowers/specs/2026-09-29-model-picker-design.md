@@ -39,10 +39,11 @@ payloads and build the same shape in their page code, so **core never imports pl
 Shape (the same on the server and in every page adapter):
 
 ```
-Provider = { id, label, models: Model[] }
-Model    = { v, l?, ctx?, price?: { in, out }, free?, reasoning?, efforts?: string[] }
+Provider = { id, label, models: Model[], off? }
+Model    = { v, l?, ctx?, price?: { in, out }, free?, reasoning?, efforts?: string[], note? }
 ```
 
+- `note` (a short label such as "private") and `off` (a reason the provider cannot be chosen) are set only by page code.
 - `v` is exactly what the agent gets today: `fable` for Claude, a Codex slug, `provider/model` for OpenCode.
 - **OpenCode:** run `opencode models --verbose` and group by `providerID`. The output is one `provider/model` line at
   column 0 followed by a pretty-printed JSON object, 998 records in about 1.1 MB, and it takes about 1.8 s (plain
@@ -51,6 +52,8 @@ Model    = { v, l?, ctx?, price?: { in, out }, free?, reasoning?, efforts?: stri
   4.5 record reads 3 and 15), `capabilities.reasoning`. `free` is both costs being 0. Provider labels come from a small
   map (`openrouter` → OpenRouter, `nano-gpt` → NanoGPT, `opencode` → OpenCode Zen, `abliteration-ai` →
   abliteration.ai) and fall back to the ID with dashes turned into spaces.
+- **IDs:** a line is a model ID when it has no spaces and contains a `/`. Today's filter (`^[\w.-]+\/[\w.:/@-]+$`) drops
+  238 of the 998 models, all OpenRouter's `~anthropic/…-latest` style aliases, so this is also a fix.
 - **Cache:** kept in memory for 10 minutes, and once it is stale the old list is served while a background refresh runs,
   so opening the dialog never waits 1.8 s. The first call after startup is started from `server.ts`'s startup order
   (the `create*` factories build functions only). The process is spawned, never run inline, with the existing 15 s
@@ -62,15 +65,24 @@ Model    = { v, l?, ctx?, price?: { in, out }, free?, reasoning?, efforts?: stri
   `codexChoices()` reads it today.
 - **API:** `/api/new-options` keeps `choices.<kind>.models` (flat, unchanged) and adds `choices.<kind>.providers`.
 
-## Component (page): `public/js/combobox.js` + `public/css/combobox.css`
+## Component (page): `public/js/model-search.js`, `public/js/model-picker.js`, `public/css/model-picker.css`
 
-New core files, each under 400 lines, listed in `public/assets.json` (the script after `js/format.js` so every screen
-can use it, the stylesheet after `css/menus.css` so `phone.css` can override it). No dependencies, no build step, and
-top-level names prefixed `cb`/`model` so `test/assets.test.ts` finds no clash.
+New core files, each under 400 lines, listed in `public/assets.json` (the scripts after `js/format.js` so every screen
+can use them, the stylesheet after `css/menus.css` so `phone.css` can override it). No dependencies, no build step, and
+top-level names prefixed `mp`/`model` so `test/assets.test.ts` finds no clash.
 
-`modelPicker(container, { providers, value, onChange, allowCustom, allowDefault, recentKey, hint })` builds the Provider
-and Model comboboxes, and returns `{ set(value), setProviders(providers), destroy() }`. It knows nothing about any
-screen: it calls `onChange(value)` and the screen does what it did before.
+- `model-search.js` is pure (no DOM): `modelSearch`, `modelMarks`, `modelRecent` and the row formatters. Tests run the
+  whole file through `new Function`.
+- `model-picker.js` is the DOM part. Three of the four screens rebuild their markup with `innerHTML` (Studio's bar is
+  re-patched by `mixPatch`), so the picker is a registry plus a string, not a mounted widget:
+  `modelPickerSet(id, { providers, value, onChange, allowCustom, allowDefault, recentKey, hint })` registers or updates
+  a picker, `modelPickerHTML(id)` returns its markup (the Provider and Model buttons), and one delegated listener on
+  `document` opens the list. When you choose, the picker updates its own buttons in place and calls `onChange(value)`;
+  the screen does what it did before. `modelPickerMount(el, id)` draws one into a screen's slot and redraws in place (keeping keyboard focus) when it is
+  already there, `modelPickerPick(id, v)` chooses a value as a user would, and `modelPickerValue(id)` and
+  `modelPickerDrop(id)` read and remove one.
+- The open list is a `popover="auto"` element (top layer) appended inside the trigger's closest `<dialog>`, or the
+  body, so it is not clipped by a scrolling dialog and is not inert inside a modal one.
 
 - **Behaviour:** the ARIA combobox pattern (`role="combobox"`, `listbox`, `option`, `aria-activedescendant`). ↑ ↓
   move, Home and End jump, Enter picks, Esc closes and restores the shown value, typing filters. Choosing a provider
@@ -88,7 +100,10 @@ screen: it calls `onChange(value)` and the screen does what it did before.
   the deck's existing menu styling. Motion respects `prefers-reduced-motion`.
 - **Phone:** at phone width the open list is a bottom sheet with a 16px search field (so iOS does not zoom) and rows of
   at least 44px. It sits above the keyboard, closes by tapping the scrim, and stays in the visible viewport.
-- **One provider:** the Provider box is replaced by a plain label, so Claude and Codex look like part of the same family.
+- **One provider:** the Provider button is replaced by a plain label, so Claude and Codex look like part of the same family.
+- **Provider change:** picking a provider only filters the Model list (which opens straight away); the value changes only when
+  a model is chosen, so dismissing the list never discards a choice. The Provider button shows the provider of the current
+  value.
 
 ## Screens
 
@@ -96,10 +111,10 @@ Each screen keeps its state and its API. Only the control changes.
 
 | Screen | Today | Change | Custom IDs |
 |---|---|---|---|
-| New session (`public/js/new-session.js`, `index.html`) | `nModel` input, `nModelList` datalist, `nModelSugg` chips | `modelPicker` per agent kind; `renderCmd` and the `opts:<kind>` storage are unchanged | **Yes**, the server passes `-m` through |
-| Codex task settings (`public/js/codex-task-actions.js`) | `<select name="model">` | `modelPicker` (provider OpenAI); the effort list still follows the chosen model | **No**, the server rejects a model outside the installed list; the task's current model stays listed |
-| Research (`plugins-builtin/research/research.js`) | `<select name="model">` (Default, Sonnet, Opus) | `modelPicker` (provider Anthropic; Default, Sonnet, Opus, Haiku, Fable) | **No**, the server accepts only `sonnet`, `opus`, `haiku`, `fable` or empty |
-| Studio engine (`plugins-builtin/discover/js/studio.js`) | `<select data-steng>` | `modelPicker` with providers Claude (Haiku, Sonnet), Ollama (installed models, marked private) and Templates; values stay `claude:haiku`, `ollama:<x>`, `template` | **No** |
+| New session (`public/js/new-session.js`, `index.html`) | `nModel` input, `nModelList` datalist, `nModelSugg` chips | the picker per agent kind; `renderCmd` and the `opts:<kind>` storage are unchanged | **Yes**, the server passes `-m` through |
+| Codex task settings (`public/js/codex-task-actions.js`) | `<select name="model">` | the picker (provider OpenAI); the effort list still follows the chosen model | **No**, the server rejects a model outside the installed list; the task's current model stays listed |
+| Research (`plugins-builtin/research/research.js`) | `<select name="model">` (Default, Sonnet, Opus) | the picker (provider Anthropic; Default, Sonnet, Opus, Haiku, Fable) | **No**, the server accepts only `sonnet`, `opus`, `haiku`, `fable` or empty |
+| Studio engine (`plugins-builtin/discover/js/studio.js`) | `<select data-steng>` | the picker with providers Claude (Haiku, Sonnet), Ollama (installed models, marked private) and Templates; values stay `claude:haiku`, `ollama:<x>`, `template` | **No** |
 
 Studio disables a Claude engine when Claude Code is not installed, and the picker keeps that: the provider shows as
 unavailable with the reason, and its models cannot be chosen.
@@ -117,8 +132,9 @@ unavailable with the reason, and its models cannot be chosen.
 
 - `test/model-catalog.test.ts`: the verbose parser (grouping, labels, price units, Free, missing fields), the fallback to
   plain IDs, the empty result when OpenCode is missing, and the stale-while-revalidate cache with an injected runner.
-- `test/model-picker.test.ts`: `modelSearch` (ranking, word starts, highlights, the 60-row cap) and the recent-list
-  logic, loaded the way `test/keymap.test.ts` loads page code: a marked block of `combobox.js` run through `new Function`.
+- `test/model-picker.test.ts`: `modelSearch` (ranking, word starts, the 60-row cap), `modelMarks` (highlights and escaping),
+  `modelRecent` and the row formatters. `model-search.js` is pure, so the test runs the whole file through `new Function`,
+  as `test/keymap.test.ts` does with a block of `keymap.js`.
 - `bun test` (also checks file sizes and name clashes) must pass before the commit.
 - `bin/ui-snapshot.mjs` before and after: New session, Codex settings, Research and Studio on desktop and phone, with
   `bin/ui-compare.mjs` showing only the intended differences and zero page errors.
@@ -128,8 +144,10 @@ unavailable with the reason, and its models cannot be chosen.
 
 ## Files
 
-- New: `src/model-catalog.ts`, `public/js/combobox.js`, `public/css/combobox.css`, `test/model-catalog.test.ts`,
-  `test/model-picker.test.ts`.
+- New: `src/model-catalog.ts`, `public/js/model-search.js`, `public/js/model-picker.js`, `public/css/model-picker.css`,
+  `test/model-catalog.test.ts`, `test/model-picker.test.ts`.
 - Changed: `src/http/new-session.ts` (uses the catalog), `public/assets.json`, `public/index.html`,
   `public/js/new-session.js`, `public/js/codex-task-actions.js`, `plugins-builtin/research/research.js`,
-  `plugins-builtin/discover/js/studio.js`, and `public/css/menus.css` where the old chips and `select` styles go.
+  `plugins-builtin/discover/js/studio.js`, `plugins-builtin/discover/js/studio-actions.js`,
+  `plugins-builtin/discover/css/studio.css`, `bin/ui-snapshot.mjs` (new views), and `public/css/menus.css` where the old
+  chips and `select` styles go.
