@@ -44,7 +44,7 @@ export function createMixer(deps: MixerDeps) {
   const store: { entries: Record<string, CacheEntry>; daily?: Daily } = { entries: {}, ...read() };
   let saveT: ReturnType<typeof setTimeout> | undefined;
   const save = () => { clearTimeout(saveT); saveT = setTimeout(flush, 300); };
-  function flush() { clearTimeout(saveT); try { mkdirSync(deps.file.replace(/\/[^/]+$/, ""), { recursive: true }); const tmp = `${deps.file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(store)); renameSync(tmp, deps.file); } catch {} }
+  function flush() { clearTimeout(saveT); saveT = undefined; try { mkdirSync(deps.file.replace(/\/[^/]+$/, ""), { recursive: true }); const tmp = `${deps.file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(store)); renameSync(tmp, deps.file); } catch {} }
   const jobs = new Map<string, Job>();
   let modelsCache: { at: number; list: string[] } | undefined;
   async function engines() {
@@ -142,7 +142,7 @@ export function createMixer(deps: MixerDeps) {
       const running = cur?.status === "running" && Date.now() - cur.at < 3 * 60_000;
       return { mixes: cur?.mixes?.length ? cur.mixes : templates, generated: !!cur?.mixes?.length, running, waiting: wait && dailyDue(cur, now), day: cur?.day, engine: cur?.engine, model: cur?.model, note: cur?.note, at: cur?.at };
     },
-    flush,
+    flush: () => { if (saveT) flush(); },
     _store: store,
   };
 }

@@ -52,7 +52,7 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   let cache: Cache = { gems: {}, trend: {}, ideas: {}, ...readJson(CACHE) };
   const saveConf = () => writeJson(CONF, conf);
   let cacheTimer: ReturnType<typeof setTimeout> | undefined;
-  const saveCache = () => { clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { try { writeJson(CACHE, cache); } catch {} }, 400); };
+  const saveCache = () => { clearTimeout(cacheTimer); cacheTimer = setTimeout(() => { cacheTimer = undefined; try { writeJson(CACHE, cache); } catch {} }, 400); };
 
   let connNames: string[] = cache.profile?.connections ?? [];
   let profileBuilding: Promise<Profile> | undefined;
@@ -366,5 +366,6 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   }
   // Leads (the leads plugin) keeps its saved pains and ideas in discover.json too; this is its only door into it.
   const leadsSaved = { get: () => conf.leads ?? [], set: (v: any[]) => { conf.leads = v; saveConf(); } };
-  return { handle, refresh, profile, state, ingredients, mixer, studio, feed, leadsSaved, archive, flush: () => { clearTimeout(cacheTimer); writeJson(CACHE, cache); mixer.flush(); feed.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
+  return { handle, refresh, profile, state, ingredients, mixer, studio, feed, leadsSaved, archive, // On stop: write only what's still waiting to be saved, never a store that failed to load.
+    flush: () => { if (cacheTimer) { clearTimeout(cacheTimer); cacheTimer = undefined; writeJson(CACHE, cache); } mixer.flush(); feed.flush(); }, paths: { conf: CONF, cache: CACHE, ideas: IDEAS } };
 }

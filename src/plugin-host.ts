@@ -106,6 +106,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   }
 
   // ── one plugin's lifetime ──
+  const ACTIVATE_MS = Number(process.env.DECK_PLUGIN_START_MS) || 15_000;
   async function activate(e: Entry) {
     const m = e.manifest!;
     const r: Runtime = { stops: [], timers: new Set(), routes: [], services: [], contribs: [] };
@@ -116,7 +117,10 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
         const rev = e.builtin ? "" : `?v=${st.installed.find((x) => x.id === e.id)?.hash ?? ""}`;
         e.mod ??= await import(join(e.dir, m.server) + rev);
         if (typeof e.mod?.activate !== "function") throw new Error(`${m.server} doesn't export activate(host)`);
-        r.deactivate = (await e.mod.activate(hostFor(e, r))) ?? undefined;
+        // A plugin that never finishes starting must not hold up the deck (it starts before the server listens).
+        let t: ReturnType<typeof setTimeout> | undefined;
+        const slow = new Promise<never>((_, no) => { t = setTimeout(() => no(new Error(`didn't finish starting within ${ACTIVATE_MS / 1000}s`)), ACTIVATE_MS); });
+        try { r.deactivate = (await Promise.race([e.mod.activate(hostFor(e, r)), slow])) ?? undefined; } finally { clearTimeout(t); }
       }
       e.state = "on";
     } catch (err: any) {

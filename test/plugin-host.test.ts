@@ -51,6 +51,23 @@ describe("the plugin host", () => {
     expect(h.active()).toEqual(["ord-0", "ord-b", "ord-a", "ord-c"]);
   });
 
+  test("a plugin that never finishes starting is marked failed and doesn't hold up the others", async () => {
+    process.env.DECK_PLUGIN_START_MS = "150";
+    try {
+      const s = setup();
+      plugin(s.builtin, "hangs", {}, `await new Promise(() => {});`);
+      plugin(s.builtin, "fine", {});
+      const h = s.make();
+      const t0 = Date.now();
+      await h.start();
+      expect(Date.now() - t0).toBeLessThan(2000);
+      const st = Object.fromEntries(h.entries().map((e: any) => [e.id, [e.state, e.error]]));
+      expect(st.hangs[0]).toBe("failed");
+      expect(st.hangs[1]).toContain("didn't finish starting");
+      expect(st.fine[0]).toBe("on");
+    } finally { delete process.env.DECK_PLUGIN_START_MS; }
+  });
+
   test("a failing plugin is marked failed with its error; everything else keeps running", async () => {
     reset();
     const s = setup();

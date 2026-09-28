@@ -213,7 +213,7 @@ export function createLeads(dataDir: string, deps: LeadsDeps = {}) {
   const limits: Limits = { redditUntil: 0, ghRemaining: 30, ghReset: 0, seQuota: 300, seUntil: 0, ...cache.limits };
   let saveT: ReturnType<typeof setTimeout> | undefined;
   function flush() {
-    clearTimeout(saveT);
+    clearTimeout(saveT); saveT = undefined;
     try { mkdirSync(dataDir, { recursive: true }); cache.limits = limits; const tmp = `${FILE}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(cache)); renameSync(tmp, FILE); } catch {}
   }
   const save = () => { clearTimeout(saveT); saveT = setTimeout(flush, 300); (saveT as any).unref?.(); };
@@ -378,5 +378,5 @@ export function createLeads(dataDir: string, deps: LeadsDeps = {}) {
     }
     return undefined;
   }
-  return { handle, search, state, flush, limits, paths: { cache: FILE, leads: LEADS, ideas: IDEAS } };
+  return { handle, search, state, flush: () => { if (saveT) flush(); }, limits, paths: { cache: FILE, leads: LEADS, ideas: IDEAS } };
 }

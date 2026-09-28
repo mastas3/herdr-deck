@@ -69,7 +69,7 @@ export function createFeed(deps: FeedDeps) {
   let store: Store = { ideas: [], cursor: 0, dropped: 0 };
   try { store = { ...store, ...JSON.parse(readFileSync(deps.file, "utf8")) }; } catch {}
   let saveT: ReturnType<typeof setTimeout> | undefined;
-  const flush = () => { clearTimeout(saveT); try { mkdirSync(deps.file.replace(/\/[^/]+$/, ""), { recursive: true }); const tmp = `${deps.file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(store)); renameSync(tmp, deps.file); } catch {} };
+  const flush = () => { clearTimeout(saveT); saveT = undefined; try { mkdirSync(deps.file.replace(/\/[^/]+$/, ""), { recursive: true }); const tmp = `${deps.file}.${process.pid}.tmp`; writeFileSync(tmp, JSON.stringify(store)); renameSync(tmp, deps.file); } catch {} };
   const save = () => { clearTimeout(saveT); saveT = setTimeout(flush, 400); };
   const batches = new Map<string, Batch>();
   const running = () => [...batches.values()].filter((b) => b.status === "running");
@@ -194,7 +194,7 @@ export function createFeed(deps: FeedDeps) {
         errors: [...batches.values()].filter((b) => b.status === "error").map((b) => b.error).slice(-3),
       };
     },
-    flush, _store: () => store, _batches: batches,
+    flush: () => { if (saveT) flush(); }, _store: () => store, _batches: batches,
   };
 }
 export type Feed = ReturnType<typeof createFeed>;
