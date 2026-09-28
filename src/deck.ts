@@ -47,6 +47,7 @@ export type Row = {
   bornAt?: number; // first seen by this deck (only for panes opened while it runs)
   lastActiveAt?: number;
   model?: string;
+  provider?: string;
   ctxTokens?: number;
   ctxWindow?: number;
   cost?: number;
@@ -493,6 +494,7 @@ export class Deck {
           createdAt: meta?.createdAt,
           lastActiveAt,
           model: meta?.model,
+          provider: meta?.provider,
           ctxTokens: meta?.ctxTokens,
           ctxWindow: meta?.ctxWindow,
           cost: meta?.cost,

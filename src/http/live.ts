@@ -1,7 +1,10 @@
-// What the deck keeps current on its own: the history index, plan usage, which dev servers are shared on the
-// tailnet, and proof of done. Started once at startup (src/server.ts), in this order.
+// What the deck keeps current on its own: the history index, AI accounts and their limits (this machine's, merged with
+// the other machines' decks), which dev servers are shared on the tailnet, and proof of done. Started once at startup
+// (src/server.ts), in this order.
 import { startHistory, historyStats } from "../history";
-import { usage } from "../usage";
+import { localUsage, type MachineUsage } from "../usage-accounts";
+import { refreshCredits } from "../usage-credits";
+import { mergeUsage } from "../usage-merge";
 import { servedPorts } from "../share";
 import { claimsDone, onCheck, resultFor, verify } from "../verify";
 import type { Automations } from "../automations";
@@ -11,6 +14,7 @@ import type { Detail } from "../transcript";
 type Deps = {
   deck: Deck; broadcast: (event: string, data: unknown) => void; auto: Automations | undefined;
   game: { onCheck: (root: string, r: any) => void }; detailFor: (row: Row) => Promise<Detail | undefined>;
+  selfId: string; remoteUsage: () => Record<string, MachineUsage | undefined>;
 };
 
 export function startLive(o: Deps) {
@@ -18,11 +22,18 @@ export function startLive(o: Deps) {
   startHistory({ changed: () => broadcast("history", historyStats()) });
   setInterval(() => broadcast("history", historyStats()), 5_000);
 
-  let currentUsage = usage();
-  setInterval(() => {
-    const u = usage();
-    if (JSON.stringify(u) !== JSON.stringify(currentUsage)) { currentUsage = u; broadcast("usage", u); }
-  }, 20_000);
+  // Local files every 20 s; credit balances from the providers every 10 minutes; a node's reading when it sends one.
+  let local = localUsage();
+  const usage = () => mergeUsage(o.selfId, { [o.selfId]: local, ...o.remoteUsage() });
+  const pushUsage = () => broadcast("usage", usage());
+  const readLocal = () => {
+    const u = localUsage();
+    if (JSON.stringify(u.accounts) !== JSON.stringify(local.accounts)) { local = u; pushUsage(); }
+  };
+  setInterval(readLocal, 20_000);
+  const credits = () => refreshCredits().then(readLocal, () => {});
+  credits();
+  setInterval(credits, 10 * 60_000);
 
   async function refreshShared() {
     const m = await servedPorts().catch(() => new Map());
@@ -53,5 +64,5 @@ export function startLive(o: Deps) {
   }
   deck.onPatch((patch) => { for (const r of patch.upsert) maybeVerify(r); });
 
-  return { usage: () => currentUsage, refreshShared };
+  return { usage, pushUsage, refreshShared };
 }

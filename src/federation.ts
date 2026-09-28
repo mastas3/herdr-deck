@@ -3,6 +3,8 @@
 // and forwards actions. Remote keys are "<machine>|<node key>" so one list can hold every machine.
 import type { Subprocess } from "bun";
 import type { Row } from "./deck";
+import type { MachineUsage } from "./usage-accounts";
+import { nodeUsage } from "./usage-merge";
 
 export type RemoteConf = { id: string; label: string; ssh: string; remotePort?: number; localPort?: number };
 export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app" };
@@ -12,12 +14,15 @@ type Listener = {
   full: () => void;
   graveyard: () => void;
   notice: (n: any) => void;
+  usage: () => void;
 };
 
 export class RemoteHost {
   rows = new Map<string, Row>();
   graveyard: any[] = [];
   summary: any = { herdr: [] };
+  /** The node's own AI accounts and limits; kept while it's offline (the page shows how old it is). */
+  usage?: MachineUsage;
   online = false;
   error?: string = "connecting";
   private token?: string;
@@ -156,6 +161,7 @@ export class RemoteHost {
       this.rows = new Map(data.rows.map((r: Row) => { const t = this.tag(r); return [t.key, t]; }));
       this.summary = data.summary;
       this.graveyard = (data.graveyard ?? []).map(this.tagGrave);
+      this.usage = nodeUsage(data.usage) ?? this.usage;
       this.on.full();
     } else if (event === "patch") {
       const upsert = data.upsert.map(this.tag);
@@ -167,6 +173,9 @@ export class RemoteHost {
     } else if (event === "graveyard") {
       this.graveyard = data.map(this.tagGrave);
       this.on.graveyard();
+    } else if (event === "usage") {
+      this.usage = nodeUsage(data) ?? this.usage;
+      this.on.usage();
     } else if (event === "notice") {
       this.on.notice({ ...data, key: data.key ? `${this.conf.id}|${data.key}` : undefined, message: `${this.conf.label}: ${data.message}` });
     }

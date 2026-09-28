@@ -66,6 +66,7 @@ function paletteItems(q) {
     { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
     { t: "History: search every past session", k: "h", run: () => setMode("history") },
     { t: "Tools: what each one does", run: () => setMode("tools") },
+    { t: "Usage: every AI account's limits and balance", run: () => setMode("usage") },
     { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
     ...slot("more"),
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },

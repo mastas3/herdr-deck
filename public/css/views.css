@@ -258,3 +258,30 @@ dialog.ask .hint { max-height: 50vh; overflow: auto; }
 .dtabs { margin-top: 12px; }
 .derr { display: inline-flex; align-items: center; gap: 5px; color: var(--blocked); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .derr svg { width: 14px; height: 14px; flex: none; }
+/* the account a session spends (usage.js), and the Usage view */
+.sl-acct { font: inherit; font-size: 12px; color: var(--ink-2); background: var(--raise); border: 1px solid var(--line-2); border-radius: 99px; padding: 1px 8px; cursor: pointer; }
+.sl-acct:hover, .meter.u:hover { color: var(--ink); }
+.sl-acct.stale, .sl-acct.unknown, .sl-acct.error { border-style: dashed; color: var(--ink-3); }
+.meter.u { cursor: pointer; }
+.meter.stale .mb i { background: repeating-linear-gradient(135deg, var(--ink-3) 0 3px, transparent 3px 6px); }
+.meter.stale b, .meter.unknown b { color: var(--ink-3); }
+.ugrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.ucard { display: flex; flex-direction: column; gap: 7px; border: 1px solid var(--line); background: var(--side); border-radius: 12px; padding: 13px 14px; min-width: 0; }
+.ucard.stale, .ucard.unknown { border-style: dashed; }
+.ucard .uh { display: flex; align-items: center; gap: 8px; }
+.ucard .ulabel { font-size: 12px; color: var(--ink-2); border: 1px solid var(--line-2); border-radius: 99px; padding: 0 7px; }
+.ucard .ust { margin-left: auto; font-size: 11.5px; color: var(--ink-3); }
+.ucard.fresh .ust { color: var(--idle); }
+.ucard.error .ust { color: var(--blocked); }
+.ucard .um, .ucard .uf { font-size: 12.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+.uwin { display: grid; grid-template-columns: 40px minmax(0, 1fr) 42px 8.5em; align-items: center; gap: 8px; font-size: 12.5px; }
+.uwin .ml, .uwin .ur { color: var(--ink-3); }
+.uwin .mb { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.uwin .mb i { display: block; height: 100%; background: var(--working); }
+.uwin.warm .mb i { background: #d9a441; }
+.uwin.hot .mb i { background: var(--blocked); }
+.ucard.stale .uwin .mb i { background: repeating-linear-gradient(135deg, var(--ink-3) 0 3px, transparent 3px 6px); }
+.uwin b { font-variant-numeric: tabular-nums; text-align: right; }
+.ubal { font-size: 13.5px; color: var(--ink-2); }
+.ubal b { font-size: 16px; color: var(--ink); font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) { .ugrid { grid-template-columns: 1fr; } .sl-acct { max-width: 38vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }

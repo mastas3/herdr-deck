@@ -45,6 +45,7 @@ const fakeRows = new Map<string, Row>();
 const hosts = createMachines({
   deck, self: SELF, dataDir: DATA_DIR, hostsConf, graves, fakeRows,
   broadcast, fullState: () => fullState(), scheduleDecisions: () => dec.scheduleDecisions(), observe: () => auto?.observe(),
+  usageChanged: () => live.pushUsage(),
 });
 const { remotes, isNode, machines, summary, allRows, allGraves, tagLocal, machineLabelOf } = hosts;
 /** One-off messages for the page (progress and failures of background work like starting a session). */
@@ -111,7 +112,10 @@ function fullState() {
 deck.onPatch((patch) => { broadcast("patch", { upsert: patch.upsert.map(tagLocal), remove: patch.remove, summary: summary() }); auto?.observe(); });
 // ── history, usage, sharing, proof of done, decisions ─────────────────────
 // Passing checks also count on the quest board (the quests plugin's `game` service), while it's on.
-const live = startLive({ deck, broadcast, auto, game: { onCheck: (root, r) => pluginHost.service("game")?.onCheck(root, r) }, detailFor: chat.detailFor });
+const live = startLive({
+  deck, broadcast, auto, game: { onCheck: (root, r) => pluginHost.service("game")?.onCheck(root, r) }, detailFor: chat.detailFor,
+  selfId: SELF.id, remoteUsage: () => Object.fromEntries([...remotes.values()].map((h) => [h.conf.id, h.usage])),
+});
 const dec = createDecisions({ deck, remotes, allRows, detailFor: chat.detailFor, broadcast, isNode, push, auto, viewing });
 deck.onPatch(dec.scheduleDecisions);
 setInterval(dec.scheduleDecisions, 10_000);

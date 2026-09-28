@@ -10,6 +10,7 @@
     "js/chat.js",
     "js/chat-scroll.js",
     "js/detail.js",
+    "js/usage.js",
     "js/composer.js",
     "js/terminal.js",
     "js/actions.js",

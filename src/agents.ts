@@ -9,6 +9,8 @@ export type AgentMeta = {
   createdAt?: number;
   lastActiveAt?: number;
   model?: string;
+  /** The model's provider (OpenCode: openrouter, nano-gpt…), so the status line can show that account. */
+  provider?: string;
   ctxTokens?: number;
   ctxWindow?: number;
   cost?: number;
@@ -238,10 +240,11 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
       if (ctxTokens !== undefined && lastMessage !== undefined) break outer;
     }
   }
-  let model: string | undefined, ctxWindow: number | undefined;
+  let model: string | undefined, provider: string | undefined, ctxWindow: number | undefined;
   try {
     const m = row.model ? JSON.parse(row.model) : undefined;
     model = m?.id;
+    provider = m?.providerID;
     ctxWindow = contextLimit(ocModels(), m?.providerID, m?.id);
   } catch {}
   const meta: AgentMeta = {
@@ -251,6 +254,7 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
     lastActiveAt: row.time_updated,
     cost: row.cost,
     model,
+    provider,
     ctxTokens,
     ctxWindow,
     lastMessage,

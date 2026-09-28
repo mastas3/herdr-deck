@@ -279,10 +279,10 @@ async function writeBrief(key = S.sel, auto = false) {
   bodySig = ""; renderDetail();
 }
 
-// ── status line: project, context, plan limits ──────────────────────────────
-function meter(pct, label, title, resets, extra) {
+// ── status line: project, context, the account and its limits ──────────────────────────────
+function meter(pct, label, title, resets, extra, more = "") {
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  const cls = p >= 85 ? "hot" : p >= 60 ? "warm" : "";
+  const cls = `${p >= 85 ? "hot" : p >= 60 ? "warm" : ""} ${more}`.trim();
   return `<span class="meter ${cls}" title="${esc(title)}${resets ? ` · resets ${esc(inText(resets))}` : ""}"><span class="ml">${esc(label)}</span><span class="mb"><i style="width:${p}%"></i></span><b>${p}%</b>${extra ? `<span class="mx">${esc(extra)}</span>` : ""}</span>`;
 }
 function inText(t) { const ms = t - Date.now(); if (ms <= 0) return "now"; const h = Math.floor(ms / 3600_000), m = Math.round((ms % 3600_000) / 60_000); return h >= 24 ? `in ${Math.floor(h / 24)}d ${h % 24}h` : h ? `in ${h}h ${m}m` : `in ${m}m`; }
@@ -295,15 +295,8 @@ function renderStatusLine(r) {
   const cx = isAgent(r) ? ctxInfo(r) : null;
   if (cx?.pct != null) parts.push(meter(cx.pct, "context", `${tok(cx.tokens)} of ${tok(cx.window)} tokens in context${cx.guessed ? " (window size guessed from the model)" : ""}`, null, tok(cx.tokens)));
   else if (cx) parts.push(`<span class="meter" title="${esc(`${cx.tokens.toLocaleString()} tokens in context; this model’s window size isn’t known`)}"><span class="ml">context</span><b>${tok(cx.tokens)}</b><span class="mx">tokens</span></span>`);
-  const u = S.usage ?? {};
-  if (r.agent === "claude" && u.claude) {
-    const stale = u.claude.at && Date.now() - u.claude.at > 6 * 3600_000;
-    if (u.claude.fiveHour != null) parts.push(meter(u.claude.fiveHour, "5h", `Claude 5-hour limit${stale ? " (last seen " + agoText(u.claude.at) + ")" : ""}`, u.claude.fiveHourResets));
-    if (u.claude.weekly != null) parts.push(meter(u.claude.weekly, "week", "Claude weekly limit", u.claude.weeklyResets));
-  } else if (r.agent === "codex" && u.codex?.windows?.length) {
-    const stale = u.codex.at && Date.now() - u.codex.at > 6 * 3600_000;
-    for (const w of u.codex.windows) parts.push(meter(w.pct, w.label === "Weekly" ? "week" : w.label, `Codex ${w.label.toLowerCase()} limit${u.codex.plan ? ` (${u.codex.plan} plan)` : ""}${stale ? " (last seen " + agoText(u.codex.at) + ")" : ""}`, w.resets));
-  } else if (r.agent === "opencode" && r.cost) parts.push(`<span class="meter" title="What this OpenCode session has cost so far (OpenCode has no plan limits to show)"><span class="ml">spent</span><b>$${r.cost.toFixed(2)}</b></span>`);
+  parts.push(...usageParts(r)); // usage.js: the account this session spends and its limits
+  if (r.agent === "opencode" && r.cost) parts.push(`<span class="meter" title="What this OpenCode session has cost so far"><span class="ml">spent</span><b>$${r.cost.toFixed(2)}</b></span>`);
   if (r.model) parts.push(`<span class="sl-m">${esc(r.model.replace(/^claude-/, ""))}</span>`);
   if (r.branch) parts.push(`<span class="sl-m">${esc(r.branch)}${r.dirty ? ` · ${r.dirty}±` : ""}</span>`);
   setHTML(el, parts.join(""));
