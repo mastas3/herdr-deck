@@ -7,7 +7,7 @@ import { choiceFromInput, recordOutcome } from "../decisions";
 import { handleMcp } from "../mcp";
 import { MAX_UPLOAD } from "../plugins";
 import { gzipJson, json, send, staticFile } from "./page";
-import { resolveSafe, saveUpload } from "./files";
+import { resolveReal, saveUpload } from "./files";
 import { hubApi } from "./api-hub";
 import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
@@ -57,7 +57,7 @@ export function createRoutes(hub: Hub) {
           const res = await route.remote.get(`/api/file-raw?${new URLSearchParams({ key: route.key, path: url.searchParams.get("path") ?? "" })}`).catch(() => null);
           return res?.ok ? new Response(res.body, { headers: { "content-type": res.headers.get("content-type") ?? "application/octet-stream", "cache-control": "private, max-age=300" } }) : new Response("not found", { status: 404 });
         }
-        const p = resolveSafe(localRow(route.key)?.cwd, url.searchParams.get("path") ?? "");
+        const p = resolveReal(localRow(route.key)?.cwd, url.searchParams.get("path") ?? "");
         const f = p && Bun.file(p);
         if (!f || !(await f.exists())) return new Response("not found", { status: 404 });
         return new Response(f, { headers: { "cache-control": "private, max-age=300" } });

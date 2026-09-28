@@ -69,8 +69,8 @@ describe("the files plugin", () => {
     for (const dir of ["..", "../outside", "/etc", "src/../..", "escape-link", ".git/../.."]) expect((await call(hub, { op: "tree", key: "here", dir })).status).toBe(400);
     const f = await call(hub, { op: "find", key: "here", q: "new" });
     expect(f.data.paths.map((p: any) => p.p)).toEqual(expect.arrayContaining(["src/new.ts", "src/new-name.ts"]));
-    // The viewer's rule hides every .env* file (.env.example included): the filter never finds one.
-    expect((await call(hub, { op: "find", key: "here", q: "env" })).data.paths).toEqual([]);
+    // The viewer's rule hides real .env files; a checked-in template (.env.example) is not a secret and shows.
+    expect((await call(hub, { op: "find", key: "here", q: "env" })).data.paths).toEqual([{ p: ".env.example" }]);
   });
 
   test("changes: every kind of change with counts; a secret listed without its content", async () => {

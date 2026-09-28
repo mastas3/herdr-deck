@@ -9,7 +9,7 @@ import { subagentsFor } from "../insight";
 import { slashCommands } from "../slash";
 import { call } from "../herdr";
 import { json } from "./page";
-import { readFileFor, resolveSafe } from "./files";
+import { readFileFor, resolveReal } from "./files";
 import { listDir } from "./dir";
 import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
@@ -111,7 +111,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
     }
     case "/api/file-open": {
       const lr = localRow(body.key);
-      const p = resolveSafe(lr?.cwd, String(body.path ?? ""));
+      const p = resolveReal(lr?.cwd, String(body.path ?? ""));
       if (!p) return json({ error: "That path isn’t one the deck will open." }, 400);
       if (process.platform !== "darwin") return json({ error: "Opening files only works on a Mac." }, 400);
       Bun.spawn(body.reveal ? ["open", "-R", p] : ["open", p]);
