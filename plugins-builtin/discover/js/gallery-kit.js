@@ -88,9 +88,10 @@ function galKitTab(k, tab) {
   }
   return `<ol class="galquests">${k.quests.map((q) => `<li><b>${esc(q.title)}</b><span class="hint">Verified when ${esc(q.verify)}</span></li>`).join("")}</ol><p class="hint">Play puts this idea on your quest board with a milestone ladder: offer page live, first user, first paying customer, 10 paying, $100 and $1k a month.</p>`;
 }
-/** Text with links in it (a kit's citations of comparable founders): the links become short "watch" links. */
+/** Text with links in it (a kit's citations of comparable founders): the links become short "watch" links (core
+ *  clock(), so they read the same while the Founder Library is off). */
 function galCiteHTML(t) {
-  return String(t ?? "").split(/(https?:\/\/[^\s)]+)/g).map((x, i) => (i % 2 ? `<a class="ltime" href="${esc(x)}" target="_blank" rel="noopener">${ICON.play ?? ""}${esc(/[?&]t=(\d+)s/.test(x) ? lFmt(Number(x.match(/[?&]t=(\d+)s/)[1])) : "video")}</a>` : esc(x))).join("");
+  return String(t ?? "").split(/(https?:\/\/[^\s)]+)/g).map((x, i) => (i % 2 ? `<a class="ltime" href="${esc(x)}" target="_blank" rel="noopener">${ICON.play ?? ""}${esc(/[?&]t=(\d+)s/.test(x) ? clock(Number(x.match(/[?&]t=(\d+)s/)[1]) * 1000) : "video")}</a>` : esc(x))).join("");
 }
 function galKitClick(e, id) {
   const t = e.target, k = S.gal.kits.get(id);

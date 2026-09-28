@@ -14,3 +14,7 @@
 .mrow .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); flex: none; }
 .madd { display: flex; gap: 6px; flex-wrap: wrap; }
 .madd .inp { flex: 1; min-width: 150px; }
+/* A video timestamp link ("▶ 12:04"): the Founder Library's answers and the gallery's kit citations both use it. */
+.ltime { display: inline-flex; align-items: center; gap: 2px; font: 12px var(--mono); color: var(--accent); text-decoration: none; white-space: nowrap; border-radius: 5px; padding: 0 3px; }
+.ltime svg { width: 9px; height: 9px; }
+.ltime:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }

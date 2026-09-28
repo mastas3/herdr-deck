@@ -25,9 +25,6 @@
 .lclaim b { font-weight: 600; color: var(--ink-3); font-size: 12px; }
 .lclaim i { font-style: normal; font-size: 11px; color: var(--working); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
 .llesson { font: italic 14px/1.45 var(--serif); color: var(--ink-2); }
-.ltime { display: inline-flex; align-items: center; gap: 2px; font: 12px var(--mono); color: var(--accent); text-decoration: none; white-space: nowrap; border-radius: 5px; padding: 0 3px; }
-.ltime svg { width: 9px; height: 9px; }
-.ltime:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
 .lstack { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px !important; }
 .lstack span { font: 11.5px var(--mono); color: var(--ink-3); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
 .lfilters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
