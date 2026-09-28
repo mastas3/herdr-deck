@@ -2,8 +2,8 @@
 :root[data-simple] { --happy-1: #ffd166; --happy-2: #ff8fab; --happy-3: #7bdff2; }
 [data-simple] body { font-size: 17px; }
 [data-simple] #machines, [data-simple] #groupSeg, [data-simple] #live, [data-simple] #mini, [data-simple] #selbar, [data-simple] #statusline,
-[data-simple] #term, [data-simple] #splitH, [data-simple] .tabsbar, [data-simple] .dh-meta, [data-simple] .dh-where, [data-simple] .tools.msg,
-[data-simple] .views button[data-view="history"], [data-simple] #paletteBtn, [data-simple] #termToggle, [data-simple] .dh-acts .desk,
+[data-simple] #insp, [data-simple] #splitH, [data-simple] .tabsbar, [data-simple] .dh-meta, [data-simple] .tools.msg, [data-simple] .cmodel,
+[data-simple] .views button[data-view="history"], [data-simple] #paletteBtn, [data-simple] .dh-acts .desk,
 [data-simple] .dh-acts [data-dact="link"], [data-simple] .msg .mt, [data-simple] .sec-h .padd, [data-simple] .brand .conn { display: none !important; }
 [data-simple] .brand { font-size: 20px; }
 [data-simple] .row { padding: 12px 12px 13px; border-radius: 16px; margin-bottom: 4px; gap: 4px 10px; grid-template-columns: 18px minmax(0, 1fr) auto; }
@@ -21,20 +21,19 @@
 [data-simple] .row[data-status="blocked"] { background: color-mix(in srgb, var(--blocked) 9%, transparent); }
 [data-simple] .sec-h { font-size: 16px; padding: 8px 8px; }
 [data-simple] #q { font-size: 17px; padding-top: 9px; padding-bottom: 9px; border-radius: 14px; }
-[data-simple] .views button { font-size: 16px; padding: 8px 14px; border-radius: 14px; }
+[data-simple] .views button { width: auto; height: auto; gap: 6px; display: inline-flex; font-size: 16px; padding: 8px 14px; border-radius: 14px; }
+[data-simple] .views button span { display: inline; }
 [data-simple] .dh-title, [data-simple] .dh h1, [data-simple] .dh h2 { font-size: 28px !important; line-height: 1.2; }
 [data-simple] .msg { font-size: 18px; }
 [data-simple] .msg .md, [data-simple] .msg .body { font-size: 18px; line-height: 1.6; }
 [data-simple] .msg.user .body { border-radius: 20px; }
-[data-simple] .composer { padding: 14px 22px 16px; gap: 8px; }
-[data-simple] .composer textarea { font-size: 18px; min-height: 52px; border-radius: 18px; padding: 13px 16px; }
-[data-simple] .composer .btn, [data-simple] .ctools { height: 52px; border-radius: 16px; font-size: 17px; padding: 0 20px; }
+[data-simple] .dock { border-radius: 20px; }
+[data-simple] .composer { padding: 12px 12px 12px 16px; gap: 8px; }
+[data-simple] .composer textarea { font-size: 18px; min-height: 52px; }
+[data-simple] .composer .btn, [data-simple] .ctools { height: 48px; border-radius: 16px; font-size: 17px; padding: 0 20px; }
 [data-simple] #cSend { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--happy-2))); border: 0; color: var(--accent-ink); font-weight: 700; }
-/* Phone: the message box gets its own full-width row; attach + Tools sit left under it, Stop/Send right. */
+/* Phone: bigger touch targets in the box. */
 @media (max-width: 760px) {
-  .composer, [data-simple] .composer { flex-wrap: wrap; align-items: center; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
-  .composer textarea { order: -1; flex: 1 0 100%; }
-  .composer .ctools { margin-right: auto; }
   [data-simple] .composer .btn, [data-simple] .ctools, [data-simple] #cAttach { height: 46px; }
   [data-simple] #cAttach { width: 46px; }
 }

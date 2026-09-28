@@ -95,8 +95,6 @@ function connect() {
 }
 // Back from the back-forward cache: the stream was cut while the page was frozen; catch up on what it missed.
 window.addEventListener("pageshow", (e) => { if (e.persisted) reconnectSoon(0); });
-setTpos(S.tpos);
-setMain(S.main);
 // The first state, the live stream and the page's own link wait for every script, running plugins' included (they
 // load after this file): their state hooks, SSE events and deep links (/p/<project>, ?quests=1) are registered by then.
 function startPage() {

@@ -9,11 +9,11 @@ const L = new Function(`${src.slice(a, b)}; return { effTab, tabAfterSelect, esc
 
 describe("effective tab", () => {
   test("empty tabs fall back to chat", () => {
-    expect(L.effTab("agents", { subagents: [] })).toBe("chat");
-    expect(L.effTab("agents", undefined)).toBe("chat");
     expect(L.effTab("images", { imagesTotal: 0 })).toBe("chat");
     expect(L.effTab("images", { imagesTotal: 3 })).toBe("images");
-    expect(L.effTab("agents", { subagents: [{}] })).toBe("agents");
+  });
+  test("subagents moved to the inspector: a remembered Subagents tab opens on chat", () => {
+    expect(L.effTab("agents", { subagents: [{}] })).toBe("chat");
   });
   test("about and info always exist; simple mode and junk mean chat", () => {
     expect(L.effTab("about", undefined)).toBe("about");

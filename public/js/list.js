@@ -20,23 +20,34 @@ function renderNow() {
   document.title = (n ? `(${n}) ` : "") + "herdr deck";
   reportPresence();
 }
+/** The machine picker: one compact button in the filter row (1–9 switch too); its menu has the counts. */
 function renderMachines() {
+  const ms = S.summary.machines ?? [], el = $("machines");
+  el.hidden = ms.length < 2;
+  const cur = ms.find((m) => m.id === S.machine), off = ms.some((m) => !m.online);
+  if (!el.hidden) setHTML(el, `${cur ? SRC_ICON[cur.kind === "app" ? "app" : cur.local ? "mac" : "remote"] : SRC_ICON.all}<span>${esc(cur?.label ?? "All")}</span>${off ? '<span class="off" title="A machine is offline"></span>' : ""}${ICON.chev}`);
+  el.setAttribute("aria-label", `Machine: ${cur?.label ?? "all"}`);
+  for (const b of $("groupSeg").children) b.setAttribute("aria-selected", b.dataset.group === S.group);
+}
+function machineMenu(anchor) {
   const ms = S.summary.machines ?? [];
   const count = (id) => [...S.rows.values()].filter((r) => id === "all" || r.machine === id).length;
-  const html = ms.length > 1 ? [["all", "All"], ...ms.map((m) => [m.id, m.label, m])].map(([id, label, m]) =>
-    `<button role="tab" data-machine="${esc(id)}" aria-selected="${S.machine === id}" title="${m && !m.online ? esc(m.kind === "app" ? "The Codex app isn’t running" : "Offline: " + (m.error ?? "")) : ""}">${esc(label)} <span class="n">${count(id)}</span>${m && !m.online ? '<span class="off"></span>' : ""}</button>`).join("") : "";
-  motion.counts($("machines"), ".n", (el) => el.parentElement.dataset.machine, () => setHTML($("machines"), html));
-  for (const b of $("groupSeg").children) b.setAttribute("aria-selected", b.dataset.group === S.group);
+  openMenu(anchor, [["all", "All machines"], ...ms.map((m) => [m.id, m.label, m])].map(([id, label, m], i) => ({
+    html: `${esc(label)}<small>${count(id)} session${count(id) === 1 ? "" : "s"}${m && !m.online ? ` · ${m.kind === "app" ? "not running" : "offline"}` : ""}${i < 9 ? ` · ${i + 1}` : ""}</small>`,
+    on: S.machine === id, title: m && !m.online ? (m.error ?? "") : "", run: () => setMachine(id),
+  })), "Show sessions from");
 }
 function renderLive() {
   const rows = [...S.rows.values()].filter(inScope);
   const working = rows.filter((r) => r.status === "working");
   const blocked = rows.filter((r) => r.status === "blocked");
   const subs = rows.reduce((n, r) => n + (r.subagents ?? []).filter((x) => x.running).length, 0);
+  // The list's title while anything runs: "Running 3 · 1 waiting · 1 subagent"; it opens the live board.
   const el = $("live");
   el.hidden = !working.length && !blocked.length;
   el.setAttribute("aria-pressed", S.board);
-  setHTML(el, `${working.length ? '<span class="spin"></span>' : '<span class="dot" style="--c:var(--blocked)"></span>'}<span><b>${working.length}</b> working${blocked.length ? ` · <b>${blocked.length}</b> waiting` : ""}${subs ? ` · <b>${subs}</b> subagent${subs === 1 ? "" : "s"}` : ""}</span><span class="spacer"></span><span class="dim">${S.board ? "Close board" : "Live board"}</span>`);
+  const head = working.length ? `<span class="spin"></span>Running <b>${working.length}</b>${blocked.length ? `<span class="lvx"> · ${blocked.length} waiting</span>` : ""}` : `<span class="dot" style="--c:var(--blocked)"></span>Waiting <b>${blocked.length}</b>`;
+  setHTML(el, `<span class="lt">${head}${subs ? `<span class="lvx"> · ${subs} subagent${subs === 1 ? "" : "s"}</span>` : ""}</span><span class="spacer"></span><span class="dim">${S.board && !(isPhone() && app.dataset.mview === "list") ? "Close board" : "Live board"}${ICON.chev}</span>`);
 }
 function listGroups(rows) {
   if (S.group === "project") {

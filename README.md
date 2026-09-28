@@ -117,7 +117,8 @@ On Linux, `tailscale serve` needs permission once: `sudo tailscale set --operato
 `bin/install.sh` again.
 
 - On a phone the deck has two screens. The sessions list has search and status chips across the top, with more under Filters.
-  Tapping a session opens it with Story and Terminal tabs, and the system back gesture returns to the list.
+  Tapping a session opens its chat; the top bar's second tab is the inspector (terminal, subagents, servers), and the
+  system back gesture returns to the list.
 - The terminal wraps lines to the screen and has a row of keys (esc, enter, ctrl+c, arrows, 1/2/3, y/n)
   and a message box that sends to the agent.
 - A service worker keeps icons and fonts instant and shows a clear "your computer isn't reachable" page when
@@ -495,11 +496,21 @@ and opens the link.
 Sources: Claude `~/.claude/projects/*.jsonl`, Codex `~/.codex/sessions`, OpenCode `opencode.db`.
 Transcripts are read incrementally: after the first read, only newly appended bytes are parsed.
 
-## Terminal
+## The inspector: terminal, subagents, servers
 
-The bottom panel mirrors the selected pane live, in color, fitted to the pane's width. Click it (or press `t`)
-and your keystrokes go to the pane: letters, Enter, Esc, arrows, Tab, Ctrl/Alt combinations and pasted text.
-Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter, 1/2/3, y/n) in one click.
+The open session's extras live in a column on the right, the **inspector**. Show or hide it with `]` (or `\`), the
+panel button in the session header, or ⌘K; `` ` `` moves to its next tab. Drag its left edge to resize it; each
+device remembers whether it's open, its tab and its width. On the phone it is the screen behind the top bar's second
+tab (swipe back as usual). Its tabs:
+
+- **Terminal** mirrors the pane live, in color, fitted to the pane's width. Click it (or press `t`) and your
+  keystrokes go to the pane: letters, Enter, Esc, arrows, Tab, Ctrl/Alt combinations and pasted text. Click outside
+  or press `Ctrl+]` to stop. **Keys** sends common answers (esc, enter, 1/2/3, y/n) in one click.
+- **Subagents**: every subagent of the session, the running ones first. Open one to read its conversation in the chat.
+- **Servers**: the dev servers the session runs. **Open** it, **Share** it on your tailnet (for your phone), or
+  **Preview** it right in the column. The header's "N servers" chip has the same actions in a menu.
+
+Plugins can add tabs of their own (the `inspector.tabs` point; see `public/js/inspector.js`).
 
 ## Starting and closing sessions
 

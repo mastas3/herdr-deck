@@ -29,7 +29,7 @@ async function chatTick(now) {
   const key = S.sel, sub = S.sub;
   const r = rowOf(key);
   if (!r) return;
-  const visible = chatOn() && (isPhone() ? app.dataset.mview === "detail" : !(S.tpos === "tab" && S.main === "term"));
+  const visible = chatOn() && (!isPhone() || app.dataset.mview === "detail");
   const c = chatOf(chatId(key, sub));
   const live = r.status === "working" || r.status === "blocked" || (r.subagents ?? []).some((x) => x.running) || c.pending.length;
   // Opening a session: its detail, already on the way, brings this chat's first window.

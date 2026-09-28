@@ -17,7 +17,7 @@ addEventListener("resize", () => { navW = innerWidth; }, { passive: true });
 // while it slides away.
 const NAV_SCROLLS = ".dbody, .screen, .dh-meta";
 function navGhost() {
-  const src = app.dataset.mview === "term" ? $("term") : $("detail");
+  const src = app.dataset.mview === "term" ? $("insp") : $("detail");
   const g = document.createElement("div");
   g.className = "navghost";
   g.inert = true;
@@ -66,7 +66,7 @@ function navShade(cls) {
 
 // ── the stack slide ──
 /** The live screen on top: the pane showing (chat or terminal) and the top bar. */
-const navLive = (mv = app.dataset.mview) => [mv === "term" ? $("term") : $("detail"), $("mbar")];
+const navLive = (mv = app.dataset.mview) => [mv === "term" ? $("insp") : $("detail"), $("mbar")];
 let navMove = null;
 /** Readies a slide: `top` covers `under` by p (1: all the way in, 0: gone off to the right). */
 function navStage(top, under, shadeCls = "") {
@@ -129,7 +129,7 @@ function navSlideOut(out, under) {
 /** Chat ⇄ terminal on the phone: the terminal comes in over the chat, or leaves it. */
 function navSwapPane(toTerm) {
   if (navReduced() || !isPhone()) return navSettle();
-  const m = navStage([$("term")], [$("detail")], "mid");
+  const m = navStage([$("insp")], [$("detail")], "mid");
   navPose(m, toTerm ? 0 : 1);
   navTween(m, toTerm ? 0 : 1, toTerm ? 1 : 0, toTerm ? 300 : 240);
 }

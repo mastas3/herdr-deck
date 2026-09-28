@@ -1,15 +1,15 @@
-/* ── phone: list → session (chat | terminal), a native stack ── */
+/* ── phone: list → session (chat | the inspector: terminal, subagents, servers), a native stack ── */
 @media (max-width: 760px) {
   body { font-size: 16px; overscroll-behavior: none; }
-  .app, .app.list-off, .app.term-off { display: block; height: 100dvh; }
-  .split, .keep-mini, #listToggle, .mini, #fitBtn, #termToggle, #termHide, .t-mode, .th .t-title, #keysBtn, #paletteBtn kbd, .th .grip, #layoutBtn, .dh-acts .desk, .tabsbar .seg2 { display: none !important; }
-  .list, .detail, .term { position: fixed; inset: 0; }
+  .app, .app.list-off { display: block; height: 100dvh; }
+  .split, .keep-mini, #listToggle, .mini, #fitBtn, .t-mode, #keysBtn, #paletteBtn kbd, .dh-acts .desk { display: none !important; }
+  .list, .detail, .insp { position: fixed; inset: 0; }
   /* Where each screen rests; the slides between them are nav-anim.js (and nav.css). */
-  .app[data-mview="list"] :is(.detail, .term, .mbar), .app[data-mview="detail"] .term { transform: translateX(100%); visibility: hidden; }
+  .app[data-mview="list"] :is(.detail, .insp, .mbar), .app[data-mview="detail"] .insp { transform: translateX(100%); visibility: hidden; }
   .app.list-off .lh > *, .app.list-off .rows, .app.list-off .lf, .app.list-off .lh-top > * { display: revert; }
   .list { padding-top: env(safe-area-inset-top); }
-  .lh { padding: 10px 12px 6px; }
-  .brand { font-size: 19px; }
+  .lh { padding: 8px 10px 6px; }
+  .brand { font-size: 17px; }
   .find input { font-size: 16px; padding: 9px 0; }
   #paletteBtn { width: 34px !important; }
   #paletteBtn::after { content: "⌘"; font-size: 15px; color: var(--ink-3); }
@@ -27,15 +27,17 @@
   .mbar .back svg { width: 22px; height: 22px; }
   .mbar .m-title { flex: 1; min-width: 0; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 8px; }
   .mbar .seg2 button { padding: 6px 12px; font-size: 15px; }
-  .detail, .term { top: calc(51px + env(safe-area-inset-top)); }
-  .dh { padding: 10px 14px 0; }
-  .dh-title { font-size: 20px; }
-  .dh-meta { font-size: 13px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 10px; margin: 6px -14px 0; padding: 0 14px; mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); }
+  .detail, .insp { top: calc(51px + env(safe-area-inset-top)); }
+  /* The top bar already names the session: the header keeps what it is and the chips, then the tabs. */
+  .dh { padding: 6px 12px 0 14px; }
+  .dh-title { display: none; }
+  .dh-row2 { flex-direction: column; align-items: stretch; margin-top: 0; }
+  .dh-meta { font-size: 13px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 10px; margin: 2px -14px 0; padding: 0 14px 6px; min-height: 0; mask-image: linear-gradient(90deg, #000 calc(100% - 22px), transparent); }
+  .dh-meta:empty { display: none; }
   .dh-meta::-webkit-scrollbar { display: none; }
-  .dh-meta .opt, .dh-meta .ag { display: none; }
-  .dh-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-wrap: pretty; }
+  .dh-meta .opt { display: none; }
   .d-empty { padding: 16px 14px 40px; }
-  .tabsbar { overflow-x: auto; scrollbar-width: none; }
+  .tabsbar { overflow-x: auto; scrollbar-width: none; margin-left: -8px; }
   .tabsbar button { flex: none; }
   .chat { padding: 10px 12px 14px; }
   .msg.user { max-width: 88%; }
@@ -44,10 +46,8 @@
   .fhead #fReveal, .fhead #fOpen { display: none; }
   .dirlist { columns: 1; }
   .pad { padding: 16px 16px 40px; }
-  .nowbar, .askbox { padding-left: 14px; padding-right: 14px; }
+  .askbox { padding-left: 14px; padding-right: 14px; }
   .appbar { padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); }
-  .composer { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
-  .composer textarea { font-size: 16px; }
   .brief .cols { grid-template-columns: 1fr; }
   .gallery { grid-template-columns: repeat(2, 1fr); }
   .facts { grid-template-columns: 1fr; gap: 0; }

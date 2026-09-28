@@ -11,12 +11,12 @@ function load(k, d) { try { const v = localStorage.getItem("deck:" + k); return 
 const rowOf = (k) => S.rows.get(k) ?? S.hrows.get(k);
 
 // ── detail-pane logic (pure: no DOM, no S) ── test/detail.test.ts evaluates this block on its own.
-const TABS = ["chat", "agents", "about", "images", "info"];
+// Subagents live in the inspector (inspector.js); a stored "agents" tab falls back to Chat.
+const TABS = ["chat", "about", "images", "info"];
 /** The tab the detail pane really shows: a tab with nothing in it (and simple mode) falls back to Chat. */
 function effTab(tab, d, simple) {
   if (simple || !TABS.includes(tab)) return "chat";
   if (tab === "images" && !d?.imagesTotal) return "chat";
-  if (tab === "agents" && !d?.subagents?.length) return "chat";
   return tab;
 }
 /** Opening a different session always starts on Chat; re-rendering the same one keeps its tab. */
@@ -70,8 +70,16 @@ const S = {
   tab: load("tab2", "chat"), closedSecs: load("closedSecs", { stale: true, empty: true }), closedProj: load("closedProj", {}),
   notify: false, fit: load("fit", true), autoBrief: load("autoBrief", true),
   details: new Map(), board: false, sub: null,
-  tpos: load("tpos", "bottom"), main: load("main", "chat"),
+  insp: inspState(),
 };
+/** The right-hand inspector on this device: open or not, and which tab. The old terminal places carry over: a
+ *  terminal you kept visible (bottom, right, top) opens the inspector on Terminal; hidden or shared stays closed. */
+function inspState() {
+  const v = load("insp", null);
+  if (v && typeof v === "object") return { open: !!v.open, tab: typeof v.tab === "string" ? v.tab : "term" };
+  const old = load("tpos", null);
+  return { open: ["bottom", "right", "top"].includes(old) && !load("termOff", false), tab: "term" };
+}
 S.notify = load("notify", false) && "Notification" in window && Notification.permission === "granted";
 const THEMES = [
   ["", "System", "Follows your device’s light or dark setting", ["#131a22", "#f6f7f9"]],
@@ -106,13 +114,9 @@ applyTheme(load("theme", ""));
 S.simple = load("simple", false);
 if (S.simple) { document.documentElement.dataset.simple = ""; S.tab = "chat"; }
 const app = $("app");
-app.dataset.tpos = S.tpos;
-app.dataset.main = S.main;
 app.style.setProperty("--lw-open", load("lw", 380) + "px");
-app.style.setProperty("--th-open", load("th", Math.round(innerHeight * 0.34)) + "px");
-app.style.setProperty("--tw-open", load("tw", Math.round(innerWidth * 0.4)) + "px");
+app.style.setProperty("--iw-open", load("iw", 460) + "px");
 app.classList.toggle("list-off", load("listOff", false));
-app.classList.toggle("term-off", load("termOff", false) || load("simple", false));
 const phone = matchMedia("(max-width: 760px)");
 const isPhone = () => phone.matches;
 

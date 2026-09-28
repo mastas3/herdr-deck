@@ -39,7 +39,7 @@ function openFind() {
   const r = rowOf(S.sel);
   if (!r?.sessionId) return;
   if (isPhone() && app.dataset.mview !== "detail") setMView("detail");
-  if (!chatOn()) { S.tab = "chat"; store("tab2", S.tab); if (S.tpos === "tab" && S.main === "term") setMain("chat"); renderDetail(); }
+  if (!chatOn()) { S.tab = "chat"; store("tab2", S.tab); renderDetail(); }
   const el = findEl(), input = el.querySelector("input");
   el.style.top = $("dbody").offsetTop + 8 + "px";
   if (!FIND.open) {
