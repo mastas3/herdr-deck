@@ -67,7 +67,7 @@ function renderJumpBtn() {
   const btn = $("jumpBottom");
   if (!btn) return;
   const show = chatOn() && !scrollPin.stick && !!chatDom.el;
-  btn.hidden = !show;
+  motion.show(btn, show, "pop");
   if (show) btn.style.bottom = Math.max(14, $("detail").getBoundingClientRect().bottom - $("dbody").getBoundingClientRect().bottom + 14) + "px";
   btn.classList.toggle("has-new", scrollPin.unread > 0);
   btn.querySelector(".n").textContent = scrollPin.unread ? (scrollPin.unread > 9 ? "9+" : String(scrollPin.unread)) : "";

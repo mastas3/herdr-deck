@@ -62,8 +62,7 @@ function nextHint() {
   return `Next: ${yesNoOption(d, "yes") ? "y / n · " : ""}${n ? `1–${n} pick · ` : ""}r reply · s skip`;
 }
 function triageToast(msg) {
-  toast(msg);
-  const t = document.querySelector(".toast");
+  const t = toast(msg);
   if (t && !isPhone()) { const h = document.createElement("span"); h.className = "tnext"; h.textContent = nextHint(); t.append(h); }
 }
 async function decide(key, action, fn, choice, sent) {

@@ -22,7 +22,13 @@ async function sendMessage(text, fromEl, how) {
   closeSlash();
   const c = chatOf(chatId(key));
   const p = { role: "user", text, at: Date.now() };
-  if (isAgent(r)) { c.pending.push(p); c.v++; S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight; }
+  if (isAgent(r)) {
+    const from = fromEl.getBoundingClientRect();
+    c.pending.push(p); c.v++; S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight;
+    // What you typed lifts out of the box into the chat.
+    const el = [...$("dbody").querySelectorAll(".msg.user.pending")].pop();
+    if (el) motion.travel(el, from);
+  }
   fromEl.value = ""; autosize(fromEl); S.drafts.delete(key);
   try {
     await api("/api/send", { key, text });
@@ -77,7 +83,8 @@ function renderQueue(r) {
   const el = $("qbar");
   if (!q.length || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
   el.hidden = false;
-  setHTML(el, q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.text.slice(0, 600))}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
+  const html = q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.text.slice(0, 600))}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join("");
+  if (el._h !== html) motion.keyed(el, "data-qid", () => setHTML(el, html), "rise");
 }
 $("qbar").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-qact]");
@@ -121,7 +128,8 @@ function renderPastes() {
   const el = $("cAtt");
   const l = S.sel ? pasteList() : [];
   el.hidden = !l.length;
-  setHTML(el, l.map((p) => { const lines = p.text.split("\n").length; return `<span class="pchip" data-pid="${p.id}"><span class="pk">${esc(p.kind.toUpperCase())}</span><button class="pl" data-pact="view" title="Preview">Pasted text · ${lines.toLocaleString()} lines · ${p.text.length < 1024 * 1024 ? Math.max(1, Math.round(p.text.length / 1024)) + " KB" : (p.text.length / 1048576).toFixed(1) + " MB"}</button><button class="ib" data-pact="inline" title="Put the text in the message instead">${ICON.note}</button><button class="ib" data-pact="remove" title="Remove">${ICON.x}</button></span>`; }).join("") + (l.length ? `<span class="hint">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : ""));
+  const html = l.map((p) => { const lines = p.text.split("\n").length; return `<span class="pchip" data-pid="${p.id}"><span class="pk">${esc(p.kind.toUpperCase())}</span><button class="pl" data-pact="view" title="Preview">Pasted text · ${lines.toLocaleString()} lines · ${p.text.length < 1024 * 1024 ? Math.max(1, Math.round(p.text.length / 1024)) + " KB" : (p.text.length / 1048576).toFixed(1) + " MB"}</button><button class="ib" data-pact="inline" title="Put the text in the message instead">${ICON.note}</button><button class="ib" data-pact="remove" title="Remove">${ICON.x}</button></span>`; }).join("") + (l.length ? `<span class="hint">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : "");
+  if (el._h !== html) motion.keyed(el, "data-pid", () => setHTML(el, html));
 }
 $("cAtt").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pact]");
@@ -133,7 +141,7 @@ $("cAtt").addEventListener("click", (e) => {
   if (b.dataset.pact === "view") {
     const d = document.createElement("dialog"); d.className = "ask wide";
     d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${esc(p.name)} <span class="hint">${p.text.split("\n").length.toLocaleString()} lines</span></h3><pre class="pview">${esc(p.text.slice(0, 200_000))}${p.text.length > 200_000 ? "\n…" : ""}</pre></div><div class="dlg-f"><button class="btn primary" value="ok">Done</button></div></form>`;
-    document.body.append(d); d.addEventListener("close", () => d.remove()); d.showModal();
+    document.body.append(d); d.addEventListener("close", () => motion.drop(d)); d.showModal();
   }
   renderPastes();
 });
@@ -154,7 +162,7 @@ async function fileLongText(r, text, pastes) {
 
 // ── "/" menu: the agent's own commands, plus deck tools ──────────────────
 const slash = { cache: new Map(), open: false, idx: 0, items: [] };
-function closeSlash() { slash.open = false; $("slashPop").hidden = true; }
+function closeSlash() { slash.open = false; motion.show($("slashPop"), false, "popup"); }
 async function slashFor(r) {
   const k = `${r.machine}|${r.agent}|${r.projectRoot ?? r.cwd}`;
   if (!slash.cache.has(k)) slash.cache.set(k, api("/api/slash", { key: r.key }).then((x) => x.commands ?? []).catch(() => []));
@@ -178,8 +186,8 @@ async function updateSlash() {
 }
 function renderSlash(r) {
   const el = $("slashPop");
-  if (!slash.open) { el.hidden = true; return; }
-  el.hidden = false;
+  if (!slash.open) return motion.show(el, false, "popup");
+  motion.show(el, true, "popup");
   const who = r.agent === "claude" ? "Claude Code" : r.agent === "codex" ? "Codex" : "OpenCode";
   let lastType = "";
   el.innerHTML = slash.items.map((it, i) => {

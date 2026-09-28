@@ -126,14 +126,31 @@ async function api(path, body, timeoutMs) {
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
-let toastTimer;
+/** Toasts stack (three at most) and slide. A "…" toast is progress, so what follows replaces it in place. Returns the toast. */
 function toast(msg, err) {
-  let t = document.querySelector(".toast");
-  if (!t) { t = document.createElement("div"); t.setAttribute("role", "status"); document.body.append(t); }
+  let box = document.querySelector(".toasts");
+  if (!box) { box = document.createElement("div"); box.className = "toasts"; document.body.append(box); }
+  const live = [...box.children].filter((x) => !x._out);
+  let t = live[live.length - 1];
+  if (!t || !(t._msg === msg || t._msg.endsWith("…"))) {
+    while (live.length >= 3) toastOut(live.shift());
+    const before = motion.rects(live);
+    t = document.createElement("div"); t.setAttribute("role", "status");
+    box.append(t);
+    motion.flip(before);
+    motion.enter(t, isPhone() ? "rise" : "slide");
+  } else if (t._msg !== msg) motion.enter(t, "fade");
   t.className = "toast" + (err ? " err" : "");
-  t.textContent = msg;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.remove(), err ? 7000 : 2400);
+  t.textContent = t._msg = msg;
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => toastOut(t), err ? 7000 : 2400);
+  return t;
+}
+function toastOut(t) {
+  if (t._out) return;
+  t._out = true; clearTimeout(t._timer);
+  // The stack is anchored at the bottom: only a toast below others makes them move down (then they glide).
+  motion.leave(t, isPhone() ? "fade" : "slide", () => { const below = t.nextElementSibling ? motion.rects([...t.parentElement.children].filter((x) => x !== t)) : null; t.remove(); if (below) motion.flip(below); });
 }
 async function copy(text, what) { try { await navigator.clipboard.writeText(text); toast(`Copied ${what}`); } catch { toast("The browser blocked clipboard access", true); } }
 
@@ -144,7 +161,7 @@ function askDialog({ title, text = "", input, ok = "OK", danger = false, multili
     d.className = "ask";
     d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${esc(title)}</h3>${text ? `<p class="hint" style="white-space:pre-wrap">${esc(text)}</p>` : ""}${input != null ? (multiline ? `<textarea class="inp" rows="4">${esc(input)}</textarea>` : `<input class="inp" value="${esc(input)}">`) : ""}</div><div class="dlg-f"><button class="btn" value="cancel">Cancel</button><button class="btn ${danger ? "danger" : "primary"}" value="ok">${esc(ok)}</button></div></form>`;
     document.body.append(d);
-    d.addEventListener("close", () => { const v = d.returnValue === "ok" ? (input != null ? d.querySelector(".inp").value : true) : null; d.remove(); resolve(v); });
+    d.addEventListener("close", () => { const v = d.returnValue === "ok" ? (input != null ? d.querySelector(".inp").value : true) : null; motion.drop(d); resolve(v); });
     d.showModal();
     if (selectInput) d.querySelector(".inp")?.select?.(); else d.querySelector("button[value=ok]")?.focus();
   });

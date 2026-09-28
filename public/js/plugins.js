@@ -36,7 +36,10 @@ function renderPlugins() {
   else if (S.plug.tab === "code") body = codeList(S.plug.code);
   else if (S.plug.tab === "add") body = plugAdd() + codeAdd();
   else body = plugInstalled(d);
-  modeHTML(head + body);
+  // A part switched on or off: its state chip pops as it changes.
+  const view = $("dbody").querySelector(":scope > .view");
+  if (view && $("dbody")._mode === "plugins") motion.counts(view, ".pstate", (el) => el.closest("[data-cid]")?.dataset.cid, () => modeHTML(head + body));
+  else modeHTML(head + body);
 }
 
 function plugInstalled(d) {

@@ -300,4 +300,5 @@ function renderStatusLine(r) {
   if (r.model) parts.push(`<span class="sl-m">${esc(r.model.replace(/^claude-/, ""))}</span>`);
   if (r.branch) parts.push(`<span class="sl-m">${esc(r.branch)}${r.dirty ? ` · ${r.dirty}±` : ""}</span>`);
   setHTML(el, parts.join(""));
+  motion.bars(el); // meters glide to their new value (and between sessions)
 }

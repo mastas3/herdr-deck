@@ -25,7 +25,7 @@ function renderMachines() {
   const count = (id) => [...S.rows.values()].filter((r) => id === "all" || r.machine === id).length;
   const html = ms.length > 1 ? [["all", "All"], ...ms.map((m) => [m.id, m.label, m])].map(([id, label, m]) =>
     `<button role="tab" data-machine="${esc(id)}" aria-selected="${S.machine === id}" title="${m && !m.online ? esc(m.kind === "app" ? "The Codex app isn’t running" : "Offline: " + (m.error ?? "")) : ""}">${esc(label)} <span class="n">${count(id)}</span>${m && !m.online ? '<span class="off"></span>' : ""}</button>`).join("") : "";
-  setHTML($("machines"), html);
+  motion.counts($("machines"), ".n", (el) => el.parentElement.dataset.machine, () => setHTML($("machines"), html));
   for (const b of $("groupSeg").children) b.setAttribute("aria-selected", b.dataset.group === S.group);
 }
 function renderLive() {
@@ -66,8 +66,6 @@ function releaseSoon() {
   clearTimeout(listHold.timer);
   listHold.timer = setTimeout(() => { listHold.timer = 0; if (!orderFrozen()) render(); }, FREEZE_MS + 20);
 }
-const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
-const EASE = getComputedStyle(document.documentElement).getPropertyValue("--ease").trim() || "cubic-bezier(.2, .8, .2, 1)";
 /** A row whose volatile fields changed within the last second waits; this brings the list back to it. */
 let volTimer = 0, volDue = 0;
 function renderLater(ms) {
@@ -82,19 +80,25 @@ function rowTops(box) {
   for (const el of box.querySelectorAll(".row[data-key]")) { const r = el.getBoundingClientRect(); if (r.height) out.set(el.dataset.key, r.top); }
   return out;
 }
-/** FLIP: every on-screen row that moved starts where it was and glides to its new place (new rows slide in via CSS). */
+/** FLIP: every on-screen row that moved starts where it was and glides to its new place (new rows slide in via CSS).
+ *  A row that was out of sight fades in where it lands; a reshuffle of more than 8 rows just fades the list in. */
 function flipRows(box, before) {
   const b = box.getBoundingClientRect();
-  const moves = [];
+  const moves = [], appear = [];
   for (const el of box.querySelectorAll(".row[data-key]")) {
     const r = el.getBoundingClientRect();
-    if (!r.height || r.bottom < b.top || r.top > b.bottom) continue;
+    if (!r.height || r.bottom < b.top || r.top > b.bottom || el.classList.contains("born")) continue;
     const was = before.get(el.dataset.key);
-    // A row coming from far away enters from the nearest edge instead of flying across the whole list.
-    if (was != null && Math.abs(was - r.top) >= 1) moves.push([el, Math.max(-b.height, Math.min(b.height, was - r.top))]);
+    if (was == null || was + r.height < b.top || was > b.bottom) appear.push(el);
+    else if (Math.abs(was - r.top) >= 1) moves.push([el, was - r.top]);
   }
-  for (const [el, dy] of moves) el.animate([{ transform: `translateY(${dy}px)` }, { transform: "translateY(0)" }], { duration: 200, easing: EASE });
+  if (moves.length > 8) return motion.enter(box, "fade");
+  for (const [el, dy] of moves) motion.run(el, [{ transform: `translateY(${dy}px)` }, { transform: "none" }], { dur: 3 });
+  for (const el of appear) motion.enter(el, "fade");
 }
+/** The rows about to leave the list fade out where they were (motion.ghost), measured before the DOM changes. */
+const leavingRows = (box, keep) => motion.ghost([...box.querySelectorAll(".row[data-key]")].filter((el) => !keep.has(el.dataset.key)), box);
+let selWas = null;
 let lastView = "";
 function renderList() {
   const box = $("rows");
@@ -107,15 +111,24 @@ function renderList() {
   const selHidden = !!S.sel && rows.some((r) => r.key === S.sel) && !rowCache.get(S.sel)?.el.isConnected;
   const force = !lastOrder || box.dataset.view !== "list" || view !== lastView || selHidden || !rows.length || !box.querySelector(".row[data-key]");
   const apply = order !== lastOrder && (force || !orderFrozen());
-  const before = apply && !force && !reduceMotion.matches ? rowTops(box) : null;
+  const animate = !motion.reduced() && !!box.querySelector(".row[data-key]");
+  const before = apply && !force && animate ? rowTops(box) : null;
+  const ghosts = before ? leavingRows(box, new Set(rows.map((r) => r.key))) : null;
+  // The selection glides from the row it was on (measured only when it moves).
+  const oldSel = animate && selWas !== S.sel ? box.querySelector(".row.sel")?.getBoundingClientRect() : null;
+  // Status colours, read once before any DOM write (a read between writes would recalculate styles for every row).
+  const rootCss = animate ? getComputedStyle(document.documentElement) : null, colorOf = (st) => rootCss.getPropertyValue(`--${st in STATUS_NAME ? st : "unknown"}`);
+  const colors = rootCss && Object.fromEntries(Object.keys(STATUS_NAME).concat("unknown").map((st) => [st, colorOf(st)]));
   for (const k of rowCache.keys()) if (!S.rows.has(k)) rowCache.delete(k);
   const now = Date.now();
   const deepOn = S.q && S.deep?.q === S.q;
+  let bornN = 0, flashN = 0, morphN = 0;
   for (const r of rows) {
     let c = rowCache.get(r.key);
     if (!c) {
       const el = document.createElement("div");
-      el.className = "row born"; el.dataset.key = r.key; el.setAttribute("role", "button");
+      // New rows slide in, but not on first paint (the list fades in as a whole) and at most 8 at once.
+      el.className = animate && ++bornN <= 8 ? "row born" : "row"; el.dataset.key = r.key; el.setAttribute("role", "button");
       // Drop the flash once it has played, or re-inserting the row on a reorder would replay it.
       el.addEventListener("animationend", (e) => { if (e.animationName === "flash") el.classList.remove("flash"); });
       c = { el, sig: "", stable: "", at: 0 };
@@ -131,9 +144,14 @@ function renderList() {
       // Only the live bits moved (tool line, todos, tail, subagents, memory): at most one repaint a second per row.
       if (c.sig && c.stable === stable && now - c.at < 1000) renderLater(1000 - (now - c.at) + 16);
       else {
-        const was = c.el.dataset.status;
+        const was = c.el.dataset.status, wasWhy = animate && c.el.querySelector(".why")?.dataset.k;
+        // A status change morphs the dot's colour.
+        const dotWas = colors && was && was !== r.status && morphN++ < 12 ? colors[was] ?? colors.unknown : null;
         c.el.innerHTML = rowHTML(r, byProject, why); c.el.dataset.status = r.status; c.sig = sig; c.stable = stable; c.at = now;
-        if (was && was !== r.status && (r.status === "blocked" || r.status === "done")) { c.el.classList.remove("flash"); void c.el.offsetWidth; c.el.classList.add("flash"); }
+        if (dotWas) { const d = c.el.querySelector(".dot"); if (d) motion.run(d, [{ backgroundColor: dotWas }, {}], { dur: 3 }); }
+        if (wasWhy && wasWhy !== why.k) c.el.querySelector(".why")?.classList.add("chg");
+        // One flash per row that starts needing you; a burst of them (a reconnect, a reshuffle) flashes the first 8 only.
+        if (was && was !== r.status && (r.status === "blocked" || r.status === "done") && flashN++ < 8) { c.el.classList.remove("flash"); void c.el.offsetWidth; c.el.classList.add("flash"); }
       }
     }
     // Selected means "this is the session on the right": not while the board or a view (Inbox, History…) is showing.
@@ -163,9 +181,10 @@ function renderList() {
     }
     // A live reorder glides (FLIP below); only a change you made replays the sections' entrance.
     box.classList.toggle("settled", !force);
-    box.replaceChildren(frag);
+    motion.counts(box, ".sec-h .n", (el) => el.parentElement.dataset.sec, () => box.replaceChildren(frag));
     if (!rows.length) box.innerHTML = `<div class="empty-state">${S.rows.size ? "Nothing matches. Press Esc to clear the filter." : noHerdr() ? "herdr isn’t running on this machine yet. Open a terminal and run <code>herdr</code>, then start your agents inside it; they’ll show up here by themselves. New to herdr? See <a href=\"https://herdr.dev\" target=\"_blank\" rel=\"noopener\">herdr.dev</a>." : "No sessions yet. Press n to start one."}</div>`;
-    if (before) flipRows(box, before);
+    if (before) { flipRows(box, before); ghosts(); }
+    else if (!animate && rows.length && !motion.reduced()) motion.enter(box, "fade");
     const born = box.querySelectorAll(".row.born");
     if (born.length) requestAnimationFrame(() => requestAnimationFrame(() => { for (const el of born) el.classList.remove("born"); }));
     S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
@@ -174,10 +193,16 @@ function renderList() {
     const shown = [...box.querySelectorAll(".row[data-key]")].map((el) => el.dataset.key);
     const { keys } = frozenOrder(shown, rows.map((r) => r.key));
     const keep = new Set(keys);
-    for (const k of shown) if (!keep.has(k)) { box.querySelector(`.row[data-key="${CSS.escape(k)}"]`)?.remove(); lastOrder = "~" + lastOrder; }
+    if (shown.some((k) => !keep.has(k))) {
+      // Rows that went away fade out where they were, and the ones below close the gap smoothly.
+      const tops = animate ? rowTops(box) : null, out = animate ? leavingRows(box, keep) : null;
+      for (const k of shown) if (!keep.has(k)) { box.querySelector(`.row[data-key="${CSS.escape(k)}"]`)?.remove(); lastOrder = "~" + lastOrder; }
+      if (tops) { flipRows(box, tops); out(); }
+    }
     const open = new Set([...box.querySelectorAll(".sec:not(.closed) .row[data-key]")].map((el) => el.dataset.key));
     S.visible = keys.filter((k) => open.has(k)).map((k) => S.rows.get(k)).filter(Boolean);
   } else S.visible = groups.flatMap((g) => (g.closed ? [] : g.rows));
+  if (selWas !== S.sel) { const to = rowCache.get(S.sel)?.el; if (oldSel && to?.classList.contains("sel")) motion.glide(oldSel, to, box); selWas = S.sel; }
   if (app.classList.contains("list-off")) renderRail(rows);
   for (const k of S.picked) if (!S.rows.has(k)) S.picked.delete(k);
   $("selbar").hidden = !S.picked.size;
@@ -221,7 +246,7 @@ function renderFooter() {
     + "\n\nMemory is what the agents’ process trees use right now: each agent plus the builds, tests and servers it started. It rises and falls as they start and stop. The deck itself isn’t counted.";
   const count = S.q ? `<b>${shown.length}</b> of ${all.length} sessions` : `<b>${all.length}</b> session${all.length === 1 ? "" : "s"}`;
   const off = (S.summary.machines ?? []).filter((m) => !m.online);
-  setHTML($("lf"), `<span class="lfn" title="${esc(tip)}">${count} · agents use ${mem(kb(shown))}</span>${off.length ? `<span class="warn" title="${esc(off.map((m) => m.label + ": " + (m.error ?? "")).join("\n"))}">${off.length} offline</span>` : ""}<span class="spacer"></span><button class="link" data-lf="closed">${S.view === "closed" ? "Sessions" : `Closed ${S.graveyard.length}`}</button><button class="link" data-lf="menu">Settings</button>`);
+  motion.counts($("lf"), ".lfn b", () => "n", () => setHTML($("lf"), `<span class="lfn" title="${esc(tip)}">${count} · agents use ${mem(kb(shown))}</span>${off.length ? `<span class="warn" title="${esc(off.map((m) => m.label + ": " + (m.error ?? "")).join("\n"))}">${off.length} offline</span>` : ""}<span class="spacer"></span><button class="link" data-lf="closed">${S.view === "closed" ? "Sessions" : `Closed ${S.graveyard.length}`}</button><button class="link" data-lf="menu">Settings</button>`));
 }
 function renderClosed() {
   const box = $("rows");
@@ -240,6 +265,7 @@ function renderClosed() {
 function setHTML(el, html) { if (el._h !== html) { el.innerHTML = html; el._h = html; } }
 setInterval(() => {
   const now = Date.now();
-  for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (t) el.textContent = el.dataset.why ? reasonLabel(el.dataset.why, t, now) : el.dataset.fmt === "long" ? agoText(t) : ago(t); }
+  // Only labels whose text changed are written: an unchanged write still costs every row a relayout.
+  for (const el of document.querySelectorAll("[data-t]")) { const t = Number(el.dataset.t); if (!t) continue; const v = el.dataset.why ? reasonLabel(el.dataset.why, t, now) : el.dataset.fmt === "long" ? agoText(t) : ago(t); if (el.textContent !== v) el.textContent = v; }
 }, 20000);
 setInterval(() => { for (const el of document.querySelectorAll("[data-since]")) el.textContent = clock(Date.now() - Number(el.dataset.since)); }, 1000);

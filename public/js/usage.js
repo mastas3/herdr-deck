@@ -88,5 +88,6 @@ function renderUsage() {
   modeHTML(`<header class="vh"><h2>${ICON.gauge}Usage</h2><p>Every AI account signed in on your machines, with the limits and balances the tools and providers report. Readings older than 30 minutes are marked stale; nothing read is shown as unknown, never 0%.</p></header>
     ${all.length ? "" : `<p class="hint">No accounts found yet.</p>`}
     ${group("Plans", all.filter((a) => a.kind === "plan"))}${group("Credits", all.filter((a) => a.kind === "credits"))}${group("Signed in, no usage data", all.filter((a) => a.kind === "signin"))}`);
+  motion.bars($("dbody").querySelector(":scope > .view"), true); // bars fill in when the view opens, then glide on updates
 }
 $("statusline").addEventListener("click", (e) => { if (e.target.closest("[data-usage], .meter.u")) setMode("usage"); });
