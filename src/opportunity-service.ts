@@ -7,8 +7,8 @@ import type { OpportunityWebInput } from "./opportunity-web";
 import type { ResearchInput } from "./opportunities";
 import { calculateEconomics } from "./economics";
 import { recommendRevenueStreams } from "./revenue";
-import { runClaude, type RunOpts } from "./mix";
-import { redact, buildCatalog } from "./studio";
+import { runClaude, type RunOpts } from "./model-run";
+import { redact, buildCatalog } from "./ingredients";
 import { repairJson } from "./autoresearch-core";
 import { scrub, type LeadsResult } from "./leads";
 

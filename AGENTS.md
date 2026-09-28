@@ -25,7 +25,8 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - `public/` is the page: `index.html` (markup only), a service worker and a manifest. The code is `public/js/*.js`
   and the styles `public/css/*.css`, all listed in `public/assets.json` and loaded in that order: scripts as classic
   scripts sharing one global scope (`core.js` first: state, helpers, `api`; `registry.js` next; `boot.js` last of the
-  deck's own, then Gallery, Library and Plugins; then running code plugins' files), styles in cascade order. Code that runs at load may only use what earlier files
+  deck's own, then Library and Plugins; then running code plugins' files; startup itself waits for all of them, on
+  DOMContentLoaded), styles in cascade order. Code that runs at load may only use what earlier files
   define (calls inside functions are fine); a later file can take over a function by reassigning it. Put new code in
   the file for its area, or a new one in the right place in the manifest. `src/assets.ts` serves each under a content
   hash with immutable caching and the service worker keeps them the same way. Keep each file under 400 lines;

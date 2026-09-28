@@ -259,8 +259,8 @@ export function tacticsText(r: Comparables | undefined, milestone: string, max =
 }
 
 // ── the deck's library, shared ─────────────────────────────────────────────────────
-// The server hands its one Library to the gallery (src/gallery-server.ts), which shares it here; the quest board,
-// research, project pages and the Studio read comparables through it. Tests pass cards to findComparables directly.
+// The server shares its one Library here when it makes it (src/server.ts); the quest board, research, project pages,
+// the Studio and the gallery read comparables through it. Tests pass cards to findComparables directly.
 type CardSource = { cards: () => { all: () => Card[] } };
 let shared: CardSource | undefined;
 let memo: { at: number; cards: Card[] } | undefined;

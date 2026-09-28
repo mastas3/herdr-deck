@@ -1,0 +1,19 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "discover",
+  "name": "Discover",
+  "version": "1.0.0",
+  "description": "Repos worth forking, the idea lab, the Studio, the ideas feed and the problem gallery. Other plugins add their tabs to it.",
+  "server": "server.ts",
+  "client": [
+    "js/discover.js", "js/mix.js", "js/feed.js", "js/studio.js", "js/studio-actions.js",
+    "js/gallery-core.js", "js/gallery-evidence.js", "js/gallery-cards.js", "js/gallery-nav.js", "js/gallery-detail.js",
+    "js/gallery-kit.js", "js/gallery-play.js", "js/gallery-comparables.js", "js/studio-comparables.js"
+  ],
+  "styles": ["css/discover.css", "css/studio.css", "css/feed.css", "css/gallery.css", "css/gallery-sheet.css", "css/comparables.css", "css/gallery-evidence.css"],
+  "machine": "hub",
+  "uses": ["covers", "library", "connections", "opportunities"],
+  "routes": ["discover", "ideas"],
+  "provides": ["discover", "gallery"]
+}

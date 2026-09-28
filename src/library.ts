@@ -304,10 +304,5 @@ export function createLibrary(deps: LibraryDeps = {}) {
 }
 export type Library = ReturnType<typeof createLibrary>;
 
-/** The ideas feed's rows as a library question (what founders did for that kind of business). */
-const FEED_Q: Record<string, string> = { money: "first paying customers small business pricing", saas: "saas first customers pricing", automations: "automation agency first clients",
-  content: "content creator audience monetization", projects: "side project first revenue", gem: "open source project monetization", weekend: "simple app built in a weekend first revenue", wild: "unusual niche business first customers" };
-export const feedQuery = (rows: string[]) => rows.map((r) => FEED_Q[r] ?? r).join(" ");
-
 /** What research agents (autoresearch, pre-mortems) are told about the library: the MCP tool first, HTTP as backup. */
 export const LIBRARY_AGENT_NOTE = "Founder Library: before judging an idea, look up how real founders did something similar. Call the herdr-deck MCP tool `deck_library` with a question (e.g. \"how did people get first customers for a Telegram bot?\"): it returns founder cards (claimed revenue, price, first-customer tactics) and transcript quotes, each with a YouTube timestamp link. Cite those links; treat numbers as the founders' claims.";

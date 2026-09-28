@@ -89,7 +89,7 @@ describe("hashed client assets", () => {
     const a = createAssets(PUB);
     const m = a.manifest();
     expect(m.scripts.length).toBeGreaterThan(0);
-    expect(m.styles).toContain("css/gallery.css");
+    expect(m.styles).toContain("css/base.css");
     for (const p of [...m.scripts, ...m.styles]) expect(readFileSync(`${PUB}/${p}`, "utf8").split("\n").length).toBeLessThan(400);
     const html = readFileSync(`${PUB}/index.html`, "utf8");
     expect(html).toContain(SCRIPTS);

@@ -5,9 +5,7 @@
 // stream in per source; a deep dive hands the question to an agent with the last30days skill. Server: src/leads.ts.
 // Nothing here contacts anyone or starts a session on its own: every action opens the New session dialog, prefilled.
 ICON.target = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3.2"/><circle cx="8" cy="8" r=".8" fill="currentColor"/></svg>';
-ICON.dice = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2.2" y="2.2" width="11.6" height="11.6" rx="2.6"/><circle cx="5.6" cy="5.6" r=".9" fill="currentColor" stroke="none"/><circle cx="10.4" cy="10.4" r=".9" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r=".9" fill="currentColor" stroke="none"/></svg>';
 ICON.dive = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.6"/><path d="m10.4 10.4 3.6 3.6M5 7h4M7 5v4"/></svg>';
-ICON.ext = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.5h4v4M13.5 2.5 7.5 8.5M12 9.5v3.2a.8.8 0 0 1-.8.8H3.3a.8.8 0 0 1-.8-.8V4.8a.8.8 0 0 1 .8-.8h3.2"/></svg>';
 S.leads = { dir: load("leadsDir", "idea"), text: load("leadsText", ""), res: null, job: null, busy: false, st: null, stLoading: false, seed: 0, open: new Set(), more: false, report: null, reports: new Map(), pendingReport: null, token: 0 };
 const LSRC = { hn: ["HN", "Hacker News"], reddit: ["r/", "Reddit"], github: ["GH", "GitHub"], se: ["SE", "Stack Exchange"], appstore: ["App", "App Store"] };
 const LCAT_HUE = { price: 35, bugs: 5, find: 200, manual: 150, confusing: 280, privacy: 250, trust: 95, missing: 320, signal: 220 };
@@ -256,10 +254,10 @@ async function leadsSaveOp(op, lead) {
   try { const r = await api("/api/leads/save", { op, lead, id: lead.id }); if (S.leads.st) S.leads.st.saved = r.saved; leadsPatch(); }
   catch (e) { toast(e.message, true); }
 }
-// Leads' ⌘K commands in the deck's registry (public/js/registry.js).
+// Leads in the deck's registry (public/js/registry.js): its ⌘K commands, and its tab in Discover (both only while Discover is on).
 deckPlugins.register("leads", {
-  palette: (q) => [
+  palette: (q) => deckPlugins.has("discover") ? [
     { t: "Leads: who needs an idea, or what an audience needs", order: 30, run: () => { leadsFor(""); setTimeout(() => $("dbody").querySelector("[data-lq]")?.focus(), 60); } },
     q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, echo: true, order: 31, run: () => leadsFor(q, "idea") },
-  ],
-});
+  ] : [],
+}).extend("discover.tabs", { key: "leads", label: "Leads", order: 50, render: () => discLeads(), patch: () => lOnScreen() && (leadsPatch(), true) });

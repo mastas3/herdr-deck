@@ -29,6 +29,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   const apiRoutes = new Map<string, { id: string; handler: RouteHandler }>();
   const getRoutes = new Map<string, { id: string; handler: RouteHandler }>();
   const services = new Map<string, { id: string; api: object }>();
+  /** Services the core still owns (e.g. `opportunities` until its plugin exists), lent to plugins under the same name. */
+  const coreServices = new Map<string, object>();
   const contribs = new Map<string, { id: string; c: unknown }[]>();
 
   // ── finding plugins ──
@@ -178,7 +180,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       },
       use<T>(name: string) {
         const p = providerOf(name);
-        if (!p) return undefined;
+        if (!p) return coreServices.get(name) as T | undefined;
         if (p.id !== id && !m.requires.includes(p.id) && !m.uses.includes(p.id)) throw new Error(`${id}: the ${name} service comes from ${p.id}; list it in plugin.json "requires" or "uses"`);
         return services.get(name)?.api as T | undefined;
       },
@@ -257,6 +259,9 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   return {
     start: reconcile, reconcile, setEnabled, setSetting, api, get, isPage, contributions,
     setting: (id: string, key: string) => st.settings[id]?.[key] ?? entries.get(id)?.manifest?.settings[key]?.default,
+    /** Lend plugins a service the core still owns, under its fixed name; a plugin that provides the name takes over.
+     *  Idempotent: providing it again replaces it. */
+    provideCore(name: string, api: object) { coreServices.set(name, api); },
     /** Core's own access to a service (no dependency check): undefined while its plugin is off. */
     service: <T = any>(name: string) => services.get(name)?.api as T | undefined,
     /** Running plugins' page files, in load order (src/assets.ts appends them after the deck's own). */

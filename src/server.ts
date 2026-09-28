@@ -12,10 +12,9 @@ import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { gameForServer } from "./game-server";
 import { Deck, type Row } from "./deck";
-import { createDiscover, gh } from "./discover";
-import { galleryForServer } from "./gallery-server";
 import { createLeads } from "./leads";
-import { createLibrary, feedQuery } from "./library";
+import { createLibrary } from "./library";
+import { shareLibrary } from "./library-strategy";
 import { createJourneys, liveSessions, localHistory, projectSessions } from "./journey";
 import { HISTORY_DB } from "./history-schema";
 import { PushStore } from "./push";
@@ -40,7 +39,7 @@ import { startQueue } from "./http/queue";
 import { createMcp } from "./http/mcp-ctx";
 import { createAuth } from "./http/auth";
 import { createRoutes } from "./http/routes";
-import type { Hub } from "./http/hub";
+import type { DiscoverService, Hub } from "./http/hub";
 
 makeDataDirs();
 const API_TOKEN = loadApiToken();
@@ -72,34 +71,27 @@ const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: cha
 // ideas feed and the MCP tool read it as evidence. Its worker resumes only if you left it running.
 const library = createLibrary();
 if (!process.env.DECK_NO_LIBRARY) library.autostart();
+// The quest board, research, project pages, the Studio and the gallery read comparables from this library.
+shareLibrary(library);
 
-// Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
-const discover = createDiscover(
-  { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
-  {
-    connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name),
-    // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
-    items: async () => { const inv = enrich(await inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
-    rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
-    studio: { evidence: async (text) => (await library.evidence(text, 4, "studio")).text },
-    feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
-  },
-);
+// Discover is a plugin (plugins-builtin/discover): the core parts below that read it ask for its service each time
+// and get nothing while it's off. Leads, Opportunities and Research keep their files in its data folder, as before.
+const DISCOVER_DIR = process.env.DECK_DISCOVER_DIR || DATA_DIR;
+const discover = () => pluginHost.service<DiscoverService>("discover");
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
-const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
+const leads = createLeads(DISCOVER_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
-  saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
+  saved: { get: () => discover()?.leadsSaved.get() ?? [], set: (v) => discover()?.leadsSaved.set(v) },
+  interests: async () => (await discover()?.profile())?.interests ?? [], projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
 });
 const opportunities = createOpportunityService({
-  dir: process.env.DECK_DISCOVER_DIR || DATA_DIR,
-  ingredients: async () => (await discover.ingredients(2500)).list,
-  archive: async () => (await discover.handle("/api/discover/archive", { limit: 500, all: true })).ideas,
+  dir: DISCOVER_DIR,
+  ingredients: async () => (await discover()?.ingredients(2500))?.list ?? [],
+  archive: async () => (await discover()?.handle("/api/discover/archive", { limit: 500, all: true }))?.ideas ?? [],
   research: (query, kind, force) => leads.search(query, kind, force),
   researchStatus: (id) => leads.handle("/api/leads/status", { id }),
   deepResearch: runOpportunityWeb,
 });
-// Discover uses the same evidence and experiment records as Opportunities.
-const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: () => inventory(), gh, recs: () => RECS, library, evidenceStore: opportunities.store });
 // Project pages (journeys): their own module; the server only routes to it.
 const journeyHist = localHistory(HISTORY_DB, SELF.id);
 const journeys = createJourneys(
@@ -111,7 +103,7 @@ const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
 // ── push & automations (only the hub sends; a deck a hub talks to is a node) ──
 const push = await new PushStore(PUSH_DIR, process.env.DECK_PUSH_SUBJECT ?? "mailto:rpsm90@gmail.com").init();
-const game = gameForServer({ dataDir: DATA_DIR, journeys, discover, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
+const game = gameForServer({ dataDir: DATA_DIR, journeys, discover: { leadsSaved: { get: () => discover()?.leadsSaved.get() ?? [] } }, connections: async () => (await inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name), checks: () => deck.checks, push, isNode: () => isNode(), broadcast }); // the quest board (src/game*.ts)
 /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
 const presence = new Map<string, { key: string | null; at: number }>();
 const viewing = (key: string) => [...presence.values()].some((p) => p.key === key && Date.now() - p.at < 70_000);
@@ -128,7 +120,10 @@ const auto: Automations | undefined = new Automations({
   digest: () => [{ title: "Today's quests", pref: "questDigest", lines: game.questLines }, ...pluginHost.contributions("digest.lines")],
 });
 // Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
-const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, discover, machines });
+const research = researchForServer({
+  self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, machines,
+  discover: { profile: async () => (await discover()?.profile()) ?? { projects: [], interests: [] }, paths: { ideas: `${DISCOVER_DIR}/ideas` } },
+});
 
 // Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
@@ -140,6 +135,11 @@ const pluginHost = createPluginHost({
     sessions: { start: (o) => sessions.startSession(o), send: (key, text) => sessions.sendText(key, text), close: (keys, whole = false) => sessions.closeLocal(keys, whole) },
   },
 });
+// What plugins get from parts that are still core: the Founder Library, the connections store, and Opportunities (whose
+// evidence store the gallery shares). Each goes to its own plugin later and keeps its name.
+pluginHost.provideCore("library", library);
+pluginHost.provideCore("connections", { inventory, enrich, recs: () => RECS });
+pluginHost.provideCore("opportunities", opportunities);
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
@@ -173,7 +173,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, discover, gallery, library, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, game, library, leads, research, journeys, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };

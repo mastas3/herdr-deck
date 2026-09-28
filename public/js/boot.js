@@ -1,6 +1,7 @@
 "use strict";
-// Live data (SSE) and startup: the last of the deck's own files, so everything it calls is defined by now. The
-// Gallery and Library files load after it (public/assets.json) and hook into what they need.
+// Live data (SSE) and startup: the last of the deck's core files, so everything it calls is defined by now. A few
+// core files and the running plugins' files load after it; startup waits for them (DOMContentLoaded), so a plugin's
+// views, tabs, links, state and SSE events are registered before the first render and the first full state.
 // ── live data ────────────────────────────────────────────────────────────
 function notifyTransitions(prev, next) {
   if (!S.notify || PUSH.on || !prev || prev.status === next.status) return;
@@ -88,10 +89,10 @@ function connect() {
 }
 setTpos(S.tpos);
 setMain(S.main);
-if (window.__BOOT__) applyFull(window.__BOOT__);
-connect();
-if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").then(() => pushSync()).catch(() => {});
-{
+function bootStart() {
+  if (window.__BOOT__) applyFull(window.__BOOT__);
+  connect();
+  if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").then(() => pushSync()).catch(() => {});
   const params = new URLSearchParams(location.search);
   if (params.get("status") === "blocked") { S.q = "is:blocked"; $("q").value = S.q; render(); }
   if (params.get("new")) setTimeout(openNew, 50);
@@ -100,4 +101,6 @@ if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.reg
   else if ([...params.keys()].length) deckPlugins.each("links", new URL(location.href));
   if ([...params.keys()].length) history.replaceState(history.state, "", deckPlugins.view(S.mode)?.path?.() ?? "/");
 }
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bootStart, { once: true });
+else bootStart();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pollTerm(); chatTick(true); } });
