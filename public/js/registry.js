@@ -9,7 +9,7 @@
 const deckPlugins = (() => {
   /** Keys and views the core owns: a plugin can't take them. */
   const CORE_KEYS = new Set([..."/jkr.ihtg`\\lnfyxsbe[]c?123456789", "Escape", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
-  const CORE_VIEWS = new Set(["inbox", "history", "tools", "plugins"]);
+  const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);
   const points = new Map(), views = new Map(), keys = new Map(), ids = new Set();
   const warn = (id, msg) => console.warn(`deckPlugins: ${id}: ${msg}`);
   function extend(id, point, c) {

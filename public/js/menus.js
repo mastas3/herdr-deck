@@ -110,6 +110,7 @@ function settingsMenu(anchor) {
     { html: `Simple mode: ${S.simple ? "on" : "off"}<small>Big, friendly, only the essentials</small>`, run: () => setSimple(!S.simple) },
     { html: "Machines…<small>Add or remove computers the deck watches</small>", run: openMachines },
     { html: "Tools<small>What each tool does; add your own</small>", run: () => setMode("tools") },
+    { html: "Usage<small>Every AI account’s limits and balance, on every machine</small>", run: () => setMode("usage") },
     ...deckPlugins.contributions("settings.entries"),
     !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
   ].filter(Boolean));

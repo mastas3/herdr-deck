@@ -10,7 +10,7 @@ import type { Graves, HostsFile, Self } from "./config";
 type Deps = {
   deck: Deck; self: Self; dataDir: string; hostsConf: HostsFile; graves: Graves; fakeRows: Map<string, Row>;
   // late-bound: they exist once the server has built everything
-  broadcast: (event: string, data: unknown) => void; fullState: () => unknown; scheduleDecisions: () => void; observe: () => void;
+  broadcast: (event: string, data: unknown) => void; fullState: () => unknown; scheduleDecisions: () => void; observe: () => void; usageChanged: () => void;
 };
 
 export function createMachines(o: Deps) {
@@ -28,6 +28,7 @@ export function createMachines(o: Deps) {
       full: () => o.broadcast("full", o.fullState()),
       graveyard: () => o.broadcast("graveyard", allGraves()),
       notice: (n) => o.broadcast("notice", n),
+      usage: () => o.usageChanged(),
     });
     remotes.set(conf.id, host);
     return host;

@@ -1,5 +1,5 @@
 "use strict";
-// Views that take over the session pane: the core's (Inbox, History, Tools, Plugins) and the ones plugins register
+// Views that take over the session pane: the core's (Inbox, History, Tools, Usage, Plugins) and the ones plugins register
 // (deckPlugins, public/js/registry.js): switching between them.
 function setMode(m) {
   const prev = deckPlugins.view(S.mode);
@@ -37,6 +37,7 @@ function renderMode() {
   if (S.mode === "inbox") renderInbox();
   else if (S.mode === "history") renderHistory();
   else if (S.mode === "tools") renderTools();
+  else if (S.mode === "usage") renderUsage();
   else if (S.mode === "plugins") renderPlugins();
   else deckPlugins.view(S.mode)?.render();
 }
