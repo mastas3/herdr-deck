@@ -33,7 +33,8 @@ export function createCodePluginApi(o: { host: PluginHost; root: string; broadca
       plugins: o.host.entries().map((e) => {
         const m = e.manifest, rec = o.host.installed().find((x) => x.id === e.id);
         return {
-          id: e.id, name: m?.name ?? e.id, version: m?.version ?? "", description: m?.description ?? "", builtin: e.builtin, state: e.state, error: e.error,
+          id: e.id, name: m?.name ?? e.id, version: m?.version ?? "", description: m?.description ?? "", builtin: e.builtin, state: e.state, error: e.error ?? e.problems,
+          fault: e.fault, dev: e.dev ? e.dir : undefined,
           machine: m?.machine ?? "hub", requires: m?.requires ?? [], uses: m?.uses ?? [], timers: o.host.timers(e.id), from: rec?.from,
           offers: m ? { routes: m.routes, pages: m.pages, provides: m.provides, extends: m.extends, client: m.client, styles: m.styles, server: !!m.server } : null,
           settings: m ? Object.entries(m.settings).map(([key, s]) => ({ key, ...s, value: o.host.setting(e.id, key) })) : [],

@@ -194,7 +194,14 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
 
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.
-- **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.
+- **⌘K** searches sessions on every machine, tools, views, projects and commands in one place. Empty, it shows
+  the commands you ran last and what you can do to the selected session; type a project's name to show only it
+  or start a new session in it. Each command shows its key.
+- **Keyboard:** `?` opens every shortcut, searchable (type a key, or what you want to do). The ones worth
+  learning first: `J` jumps to the next session waiting on you, `i` opens Decisions, `r` replies, `x` closes,
+  `A` selects every session shown, `Y` copies the resume command, `U` opens Usage.
+- **Undo:** closing a session, renaming one or skipping a decision shows a toast with **Undo** (or ⌘Z) for a few
+  seconds; a close reopens exactly the panes it closed. Anything that fails says why, with **Retry**.
 - **Reply** (`r`): the message box under the chat. Enter sends it to the agent. Attach files with the paperclip,
   by dropping them on the chat, or by pasting; they're saved on the session's machine and the agent gets the paths.
 - **Send** always delivers right away, even while the agent works (Claude Code takes it at its next step,
@@ -487,7 +494,7 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
   waits for the shell prompt, starts the agent through herdr's API and sends the message. Progress appears
   as notifications, and the new session is selected as soon as its tab exists.
 - **Close** works on one session or a selection. A confirmation lists what will stop, warns about anything
-  still working, and shows the memory it frees.
+  still working, and shows the memory it frees. Afterwards, **Undo** on the toast (or ⌘Z) reopens them.
 - **Closed** keeps closed agent sessions with a **Reopen** button, which resumes them in a new tab.
 - **Close candidates** selects empty sessions, the older copy of each duplicate, and anything untouched for a week.
 - **Jump to pane** (`f`) switches herdr to the pane and brings WezTerm forward (set `DECK_TERMINAL` to change the app).
@@ -549,7 +556,9 @@ Found a security problem? Please report it privately; see [SECURITY.md](SECURITY
 Issues and pull requests are welcome. The code is plain TypeScript run by Bun with no dependencies and no
 build step: `src/` is the server (`src/server.ts` wires the parts in `src/http/`), `public/` is the page (`index.html`
 plus the scripts and styles `public/assets.json` lists). `bun run dev` runs it with reload and `bun test` runs
-the tests. [AGENTS.md](AGENTS.md) has the conventions (it's also what coding agents read).
+the tests. [AGENTS.md](AGENTS.md) has the conventions (it's also what coding agents read), including
+**Write a plugin in 5 minutes**: `bin/new-plugin <id>` scaffolds a working code plugin with a test, and
+`bun run dev:plugins` reloads it live as you edit it.
 
 ## License
 

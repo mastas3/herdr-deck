@@ -113,7 +113,7 @@ function settingsMenu(anchor) {
     { html: "Usage<small>Every AI account’s limits and balance, on every machine</small>", run: () => setMode("usage") },
     ...deckPlugins.contributions("settings.entries"),
     { html: `Reduce motion: ${motion.reduced() ? "on" : "off"}<small>${motion.reduced() ? "Your system asks for less motion" : "Things change at once, without animating"}</small>`, run: () => { motion.setReduced(!motion.reduced()); toast(`Reduce motion ${motion.reduced() ? "on" : "off"}`); } },
-    !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
+    !isPhone() && { html: "Keyboard shortcuts<small>?</small>", run: openKeys },
   ].filter(Boolean));
 }
 function setTheme(name) { motion.swap(() => applyTheme(name)); store("theme", name); }

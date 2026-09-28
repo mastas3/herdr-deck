@@ -36,45 +36,16 @@ new ResizeObserver(() => fitTerm()).observe($("screen"));
 
 document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
+  // ⌘Z outside a text field: the Undo on the toast showing now (a close, a rename, a skip).
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.target.matches("input, textarea, select, [contenteditable]") && toastUndo()) { e.preventDefault(); return; }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return !$("palette").open ? openPalette() : palRoute ? routeBack() : $("palette").close(); } // in the route view: back, like Esc
   if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;
   if (S.mode === "inbox" && inboxKeydown(e)) return;
-  const k = e.key, cur = S.sel && S.rows.has(S.sel) ? S.sel : null;
-  if (k === "/") { e.preventDefault(); if (app.classList.contains("list-off")) $("listToggle").click(); $("q").focus(); $("q").select(); }
-  else if (k === "j" || k === "ArrowDown") { e.preventDefault(); moveSel(1); }
-  else if (k === "k" || k === "ArrowUp") { e.preventDefault(); moveSel(-1); }
-  else if (k === "r" && cur) { e.preventDefault(); focusReply(); }
-  else if (k === "." && (cur || S.picked.size)) { e.preventDefault(); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe")); }
-  else if (k === "i") setMode(S.mode === "inbox" ? null : "inbox");
-  else if (k === "h") setMode(S.mode === "history" ? null : "history");
-  else if (deckPlugins.key(k)) deckPlugins.key(k)(e);
-  else if (k === "t" && cur) { e.preventDefault(); focusTerminal(); }
-  else if (k === "`" && S.tpos === "tab") { e.preventDefault(); setMain(S.main === "chat" ? "term" : "chat"); }
-  else if (k === "\\") { e.preventDefault(); setTpos(TPOS[(TPOS.indexOf(S.tpos) + 1) % TPOS.length]); toast(`Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}`); }
-  else if (k === "g") setGroup(S.group === "project" ? "priority" : "project");
-  else if (k === "l") setBoard(!S.board);
-  else if (k === "n") { e.preventDefault(); openNew(); }
-  else if (k === "f" && cur) rowOf(cur)?.app ? codexAct("codex-open", rowOf(cur)) : focusPane(cur);
-  else if (k === "y" && cur) copy(linkUrl(rowOf(cur)), "link");
-  else if (k === "x" && (S.picked.size || cur)) askClose(targets());
-  else if (k === "s" && cur) togglePick(cur);
-  else if (k === "b" && cur) writeBrief(cur);
-  else if (k === "e" && cur && !rowOf(cur)?.app && !rowOf(cur)?.hist) { e.preventDefault(); renameSession(rowOf(cur)); }
-  else if (k === "[") $("listToggle").click();
-  else if (k === "]") $("termToggle").click();
-  else if (k === "c") { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); }
-  else if (k === "?") $("help").showModal();
-  else if (/^[1-9]$/.test(k)) { const ids = ["all", ...(S.summary.machines ?? []).map((m) => m.id)]; if (ids[k - 1] && ids.length > 2) setMachine(ids[k - 1]); }
-  else if (k === "Escape") {
-    const a = escAction({ chatPicks: chatSel.size, mode: S.mode, sub: S.sub, q: S.q, picked: S.picked.size, sel: S.sel && rowOf(S.sel) ? S.sel : null, board: S.board });
-    if (a === "picks") clearPicks();
-    else if (a === "mode") setMode(null);
-    else if (a === "sub") { S.sub = null; headSig = ""; chatDom.key = null; renderDetail(); chatTick(true); }
-    else if (a === "search") { S.q = ""; S.deep = null; $("q").value = ""; render(); }
-    else if (a === "picked") { S.picked.clear(); render(); }
-    else if (a === "home") goHome();
-  }
+  // The bindings are data (keymap.js): the "?" sheet and ⌘K's hints read the same table.
+  const b = keyBinding(e.key);
+  if (b) { e.preventDefault(); b.run(e); }
+  else if (deckPlugins.key(e.key)) deckPlugins.key(e.key)(e);
 });
 
 // ── right-click (or long-press) a session ────────────────────────────────

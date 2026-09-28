@@ -26,20 +26,48 @@ function askClose(keys) {
   $("cWhole").checked = false;
   $("cOk").textContent = rows.length === 1 ? "Close" : `Close ${rows.length}`;
   d.returnValue = "";
-  d.onclose = async () => {
-    if (d.returnValue !== "ok") return;
-    try {
-      const { results } = await api("/api/close", { keys: rows.map((r) => r.key), wholeTab: $("cWhole").checked });
-      const failed = results.filter((x) => !x.ok);
-      for (const x of results) if (x.ok) S.picked.delete(x.key);
-      toast(failed.length ? `Closed ${results.length - failed.length}; ${failed.length} failed: ${failed[0].error}` : `Closed ${results.length}`, !!failed.length);
-      render();
-    } catch (e) { toast("Close failed: " + e.message, true); }
-  };
+  d.onclose = () => { if (d.returnValue === "ok") closeKeys(rows.map((r) => r.key), $("cWhole").checked); };
   d.showModal();
   $("cOk").focus();
 }
-async function focusPane(key) { try { await api("/api/focus", { key, raise: true }); toast("Switched herdr to this pane"); } catch (e) { toast("Couldn’t switch: " + e.message, true); } }
+/** Closes now: the rows dim at once, the toast says what's happening, and Undo reopens what was closed. */
+async function closeKeys(keys, wholeTab) {
+  const dim = (on) => { for (const k of keys) rowCache.get(k)?.el.classList.toggle("closing", on); };
+  const title = rowOf(keys[0])?.title || rowOf(keys[0])?.agent || "the session"; // before the row goes
+  dim(true);
+  toast(keys.length === 1 ? "Closing…" : `Closing ${keys.length} sessions…`);
+  try {
+    const { results } = await api("/api/close", { keys, wholeTab });
+    const failed = results.filter((x) => !x.ok), graves = results.flatMap((x) => x.graves ?? []);
+    for (const x of results) if (x.ok) S.picked.delete(x.key);
+    for (const x of failed) rowCache.get(x.key)?.el.classList.remove("closing");
+    setTimeout(() => dim(false), 4000); // herdr's next state drops them; a row still here by then isn't dimmed forever
+    const ok = results.length - failed.length;
+    if (failed.length) toast(`Closed ${ok}; ${failed.length} failed: ${failed[0].error}`, true, { label: "Retry", run: () => closeKeys(failed.map((x) => x.key), wholeTab) });
+    else toast(ok === 1 ? `Closed “${title}”` : `Closed ${ok}`, false, graves.length ? { label: "Undo", run: () => reopenGraves(graves) } : undefined);
+    render();
+  } catch (e) { dim(false); toast("Close failed: " + e.message, true, { label: "Retry", run: () => closeKeys(keys, wholeTab) }); }
+}
+async function reopenGraves(ids) {
+  toast(ids.length === 1 ? "Reopening…" : `Reopening ${ids.length} sessions…`);
+  const res = await Promise.allSettled(ids.map((id) => api("/api/reopen", { id })));
+  const bad = res.filter((x) => x.status === "rejected");
+  if (bad.length) toast(`Reopened ${ids.length - bad.length}; ${bad.length} failed: ${bad[0].reason?.message}. They’re in Closed (c).`, true);
+  else toast(ids.length === 1 ? "Reopened" : `Reopened ${ids.length}`);
+}
+async function focusPane(key) { try { await api("/api/focus", { key, raise: true }); toast("Switched herdr to this pane"); } catch (e) { toast("Couldn’t switch: " + e.message, true, { label: "Retry", run: () => focusPane(key) }); } }
+/** One message to every selected agent session (the same path as the message box, one send each). */
+async function messagePicked() {
+  const rows = targets().map(rowOf).filter((r) => r && isAgent(r) && !r.app && !r.hist);
+  if (!rows.length) return toast("None of the selected sessions can take a message", true);
+  const text = (await askDialog({ title: `Message ${rows.length} sessions`, text: rows.map((r) => `• ${r.title || r.agent} (${r.project})`).join("\n"), input: "", ok: "Send", multiline: true }))?.trim();
+  if (!text) return;
+  toast(`Sending to ${rows.length}…`);
+  const res = await Promise.allSettled(rows.map((r) => api("/api/send", { key: r.key, text })));
+  const bad = rows.filter((_, i) => res[i].status === "rejected");
+  if (bad.length) toast(`Sent to ${rows.length - bad.length}; ${bad.length} failed: ${res.find((x) => x.status === "rejected").reason?.message}`, true);
+  else toast(`Sent to ${rows.length} sessions`);
+}
 function togglePick(key) { S.picked.has(key) ? S.picked.delete(key) : S.picked.add(key); render(); }
 function moveSel(d) {
   const rows = S.visible ?? [];
@@ -64,14 +92,25 @@ async function renameSession(r) {
   const agentName = r.agent === "claude" ? "Claude Code" : r.agent === "codex" ? "Codex" : null;
   const label = await askDialog({ title: "Rename session", text: `Renames the herdr pane${r.tabPanes <= 1 ? " and tab" : ""}${agentName ? `, and runs /rename in ${agentName} so its own history shows the name too` : ""}.`, input: r.title || r.tab || "", ok: "Rename" });
   if (label == null || !label.trim()) return;
+  applyRename(r, label.trim(), r.title || r.tab || "");
+}
+/** The new name shows at once; the next state from herdr confirms it. Undo renames it back the same way. */
+async function applyRename(r, label, before) {
+  const agentName = r.agent === "claude" ? "Claude Code" : r.agent === "codex" ? "Codex" : null;
+  const live = () => rowOf(r.key);
+  if (live()) { live().title = label; headSig = ""; render(); if (S.sel === r.key) renderDetail(); }
+  const undo = before && before !== label ? { label: "Undo", run: () => applyRename(live() ?? r, before, label) } : undefined;
   try {
-    const res = await api("/api/rename", { key: r.key, label: label.trim() });
+    const res = await api("/api/rename", { key: r.key, label });
     if (res.slash) {
-      if (res.busy) { await api("/api/queue", { op: "add", key: r.key, text: res.slash }); toast(`Renamed. ${agentName} gets /rename when it finishes this turn.`); }
-      else { await api("/api/send", { key: r.key, text: res.slash }); toast(`Renamed to “${label.trim()}”`); }
-    } else toast(`Renamed to “${label.trim()}”`);
+      if (res.busy) { await api("/api/queue", { op: "add", key: r.key, text: res.slash }); toast(`Renamed to “${label}”. ${agentName} gets /rename when it finishes this turn.`, false, undo); }
+      else { await api("/api/send", { key: r.key, text: res.slash }); toast(`Renamed to “${label}”`, false, undo); }
+    } else toast(`Renamed to “${label}”`, false, undo);
     headSig = "";
-  } catch (x) { toast(x.message, true); }
+  } catch (x) {
+    if (live()) { live().title = before; headSig = ""; render(); }
+    toast("Rename failed: " + x.message, true, { label: "Retry", run: () => applyRename(r, label, before) });
+  }
 }
 
 // ── close candidates, a stand-up, grouping, the terminal ─────────────────

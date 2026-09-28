@@ -46,6 +46,9 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - Keep it private: bind to `127.0.0.1` only, keep the Host check, the per-process action token, and the Tailscale
   login check. Never add `tailscale funnel`. Anything sent off the machine must be opt-in and scrubbed.
 - Match the surrounding code: short, direct comments that explain *why*, and plain-English UI text.
+- A core keyboard shortcut is a line in `public/js/keymap.js`: `input.js` runs it, and the `?` sheet and ⌘K's key hints
+  are generated from it (never hand-write a list of keys). Toasts take one action: `toast(msg, err, { label: "Undo" |
+  "Retry", run })`; offer Undo when an action can be reversed and Retry when one fails.
 - Must work on macOS and Linux. Guard platform-specific calls (`open`, `launchctl`, app paths).
 
 ## Code plugins
@@ -81,6 +84,28 @@ the typed `Host`. Worked example: `plugins-builtin/covers/`.
 - **Migrating**: `git mv` the files, fix imports, remove the wiring from `src/server.ts`, `src/http/routes.ts`,
   `src/http/hub.ts` and the page, and check `test/plugin-guards.test.ts`. Behaviour must not change: prove it with
   the snapshot harness (below) with everything on, then with your plugin off (no requests, timers or errors).
+
+## Write a plugin in 5 minutes
+
+1. **Scaffold**: `bin/new-plugin hello` makes `plugins-builtin/hello/` with `plugin.json`, `server.ts` (`activate` with
+   one route, POST `/api/hello`), `hello.js` (a view and a ⌘K command), `hello.css` and `test/plugin.test.ts` (it runs
+   the plugin through the real host). `--name "Hello"` names it; `--dir ~/deck-plugins` makes a local plugin there
+   instead of a built-in.
+2. **Test**: `bun test plugins-builtin/hello`.
+3. **Run it live**: `DECK_PORT=4760 bun run dev:plugins` (a local plugin: add `DECK_DEV_PLUGINS=~/deck-plugins`).
+   Open `http://127.0.0.1:4760`, ⌘K → "Hello: say hello".
+4. **Edit**: save any of its files. The deck stops just that plugin, drops its modules, starts it again from disk and
+   reloads the page; a toast says "Reloaded hello". A page file (`hello.js`, `hello.css`) only reloads the page. If
+   it throws, the toast and its card in Plugins → Built in say what and where (`server.ts:8:13`); errors from its
+   routes, timers and page scripts show on the card too. Nothing else restarts, and installed plugins are never
+   watched (dev mode is `DECK_DEV` + `DECK_PLUGIN_DEV` only).
+5. **Grow it**: list a route, service or extension point in `plugin.json` first, then register it from `host` (the
+   host refuses anything unlisted). In the page, register views, tabs, keys (`keys: { k: { label, run } }`: the
+   label is its line in the `?` sheet, and the core's keys in `public/js/keymap.js` are refused), palette entries and
+   settings with `deckPlugins.register` (all listed at the top of `public/js/registry.js`). Page scripts share one
+   global scope: prefix top-level names with the plugin's name.
+6. **Ship it**: `bun test` (also checks file sizes and name clashes) and the snapshot harness below. A local plugin
+   goes on your real deck through Plugins → Add a code plugin → Folder, behind the trust screen.
 
 ## UI snapshots (before/after)
 

@@ -29,10 +29,13 @@ export function createSessions(o: Deps) {
     }
     // Closing a whole tab kills its sibling panes too; record every one of them.
     const victims: Row[] = closeTab ? [...deck.rows.values()].filter((r) => r.herdr === row.herdr && r.tabId === row.tabId) : [row];
+    const ids: string[] = []; // the page's Undo reopens exactly these
     for (const v of victims) {
       if (v.empty && !v.resume) continue; // nothing worth remembering
+      const id = crypto.randomUUID();
+      ids.push(id);
       graves.list.unshift({
-        id: crypto.randomUUID(),
+        id,
         closedAt: Date.now(),
         herdr: v.herdr,
         workspaceId: v.workspaceId,
@@ -46,7 +49,7 @@ export function createSessions(o: Deps) {
         lastActiveAt: v.lastActiveAt,
       });
     }
-    return { key, ok: true, closed: closeTab ? "tab" : "pane" };
+    return { key, ok: true, closed: closeTab ? "tab" : "pane", graves: ids };
   }
 
   /** Resolves once the pane shows output that has stopped changing: the shell has drawn its prompt. */

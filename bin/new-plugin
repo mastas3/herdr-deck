@@ -1,0 +1,131 @@
+#!/usr/bin/env bun
+// Scaffolds a working code plugin: plugin.json, server.ts (activate: one API route), a page file that registers a
+// view and a ⌘K command, and a test that runs it through the real plugin host. See "Write a plugin in 5 minutes"
+// in AGENTS.md. Usage: bin/new-plugin <id> [--name "Name"] [--dir <folder>] [--force]
+//   default: plugins-builtin/<id>/ (a built-in; ships with the deck)
+//   --dir:   <folder>/<id>/ (a local plugin: run it with DECK_DEV_PLUGINS=<folder>, or install it from Plugins → Add)
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+import { parseCodeManifest, CORE_API } from "../src/plugin-code-format.ts";
+
+const REPO = resolve(import.meta.dir, "..");
+const HELP = `usage: bin/new-plugin <id> [--name "Name"] [--dir <folder>] [--force]
+  <id>        lowercase letters, digits and dashes, starting with a letter (it is also its /api/<id> route)
+  --name      what the Plugins view calls it (default: from the id)
+  --dir       make a local plugin in <folder>/<id>/ instead of plugins-builtin/<id>/
+  --force     write into an existing folder`;
+
+const o = { force: false };
+const argv = process.argv.slice(2);
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
+  if (a === "--name") o.name = argv[++i];
+  else if (a === "--dir") o.dir = resolve(argv[++i] ?? "");
+  else if (a === "--force") o.force = true;
+  else if (a === "-h" || a === "--help") { console.log(HELP); process.exit(0); }
+  else if (!o.id && !a.startsWith("-")) o.id = a;
+  else fail(`unknown argument ${a}\n${HELP}`);
+}
+function fail(msg) { console.error(`new-plugin: ${msg}`); process.exit(1); }
+if (!o.id) fail(`give the plugin an id\n${HELP}`);
+const id = o.id;
+if (!/^[a-z][a-z0-9-]{1,39}$/.test(id)) fail(`"${id}": use lowercase letters, digits and dashes, starting with a letter (2–40 characters)`);
+const BUILTIN = join(REPO, "plugins-builtin");
+const taken = [...readdirSync(BUILTIN), "inbox", "history", "tools", "usage", "plugins"];
+if (CORE_API.has(id) || (taken.includes(id) && !(o.force && !o.dir))) fail(`"${id}" is taken by the deck or a built-in plugin`);
+const name = o.name ?? id.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+const dir = join(o.dir ?? BUILTIN, id);
+if (existsSync(dir) && !o.force) fail(`${dir} already exists (--force writes into it)`);
+
+// Every page script shares one global scope with the deck's and every other plugin's: prefix top-level names.
+const js = id.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+const local = !!o.dir;
+const src = (p) => (local ? join(REPO, "src", p) : relative(dir, join(REPO, "src", p)));
+const str = (s) => JSON.stringify(s);
+
+const manifest = {
+  deck: 1, kind: "code", id, name, version: "0.1.0",
+  description: `${name}: says hello from its own server side.`,
+  server: "server.ts", client: [`${id}.js`], styles: [`${id}.css`],
+  machine: "hub", routes: [id],
+};
+const check = parseCodeManifest(manifest);
+if (!check.ok) fail(`the manifest wouldn't pass: ${check.problems.map((p) => `${p.path} ${p.message}`).join("; ")}`);
+
+const files = {
+  "plugin.json": JSON.stringify(manifest, null, 1) + "\n",
+  "server.ts": `// ${name}'s server side. activate(host) gets exactly what the deck lends a plugin (src/plugin-api.ts) and may only
+// register what plugin.json lists: here one route, POST /api/${id}. Everything it registers (routes, timers,
+// services) goes away when the plugin is turned off or reloaded, so there's nothing to clean up by hand.
+import type { Host } from ${str(src("plugin-api"))};
+
+export function activate(host: Host) {
+  let count = 0;
+  host.routes(${str(id)}, ({ body }) => {
+    if (body?.op !== "hello") return Response.json({ error: "Unknown op" }, { status: 400 });
+    count++;
+    return { message: \`Hello from \${host.id}\`, count };
+  });
+  // Timers: host.every(ms, fn) / host.after(ms, fn), never setInterval (host timers stop when the plugin does).
+}
+`,
+  [`${id}.js`]: `"use strict";
+// ${name} in the page: a view (⌘K → "${name}") that asks the server side for a hello. This file shares one global
+// scope with the deck's scripts and every other plugin's, so its top-level names start with ${js}.
+const ${js}State = { data: null };
+async function ${js}Load() {
+  try { ${js}State.data = await api(${str(`/api/${id}`)}, { op: "hello" }); } catch (e) { ${js}State.data = { error: e.message }; }
+  if (S.mode === ${str(id)}) ${js}Render();
+}
+function ${js}Render() {
+  const d = ${js}State.data;
+  modeHTML(\`<header class="vh"><h2>${name}</h2><p>\${esc(${str(manifest.description)})}</p></header>
+    \${!d ? '<p class="hint">Asking the server…</p>' : d.error ? \`<p class="derr">\${esc(d.error)}</p>\` : \`<p class="${id}-hello">\${esc(d.message)}</p><p class="hint">Asked \${d.count} time\${d.count === 1 ? "" : "s"} since it started.</p>\`}\`);
+}
+// What it adds to the page (public/js/registry.js lists everything register() takes: tabs, keys, settings, events…).
+deckPlugins.register(${str(id)}, {
+  views: { ${str(id)}: { load: ${js}Load, render: ${js}Render } },
+  palette: () => [{ t: ${str(`${name}: say hello`)}, slot: "views", run: () => setMode(${str(id)}) }],
+});
+`,
+  [`${id}.css`]: `/* ${name}'s styles: loaded after the deck's, only while it's on. Use the deck's tokens (public/css/tokens.css). */
+.${id}-hello { font: 600 20px var(--serif); color: var(--ink); }
+`,
+  "test/plugin.test.ts": `// ${name} as the deck runs it: through the real plugin host, in a scratch folder. \`bun test\` runs this.
+import { afterAll, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createPluginHost } from ${str(local ? join(REPO, "src/plugin-host") : relative(join(dir, "test"), join(REPO, "src/plugin-host")))};
+
+const root = mkdtempSync(\`\${tmpdir()}/deck-${id}-\`);
+afterAll(() => rmSync(root, { recursive: true, force: true }));
+
+test("answers /api/${id} while it's on, and nothing once it's off", async () => {
+  const builtin = join(root, "builtin"), data = join(root, "data");
+  mkdirSync(builtin); mkdirSync(data);
+  symlinkSync(new URL("..", import.meta.url).pathname, join(builtin, ${str(id)}));
+  const host = createPluginHost({
+    builtinDir: builtin, root: data, dataDir: data, log: () => {},
+    core: { rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => false, broadcast: () => {}, notice: () => {}, history: async () => [], checks: () => new Map(), sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}), screen: async () => "", keys: async () => {} } } as any,
+  });
+  await host.start();
+  expect(host.active()).toEqual([${str(id)}]);
+  const post = (body: unknown) => host.api(new Request("http://d/api/${id}", { method: "POST" }), new URL("http://d/api/${id}"), body);
+  expect(await (await post({ op: "hello" }))!.json()).toEqual({ message: "Hello from ${id}", count: 1 });
+  expect((await post({ op: "nope" }))!.status).toBe(400);
+  await host.setEnabled(${str(id)}, false);
+  expect(await post({ op: "hello" })).toBeUndefined();
+});
+`,
+};
+mkdirSync(join(dir, "test"), { recursive: true });
+for (const [f, body] of Object.entries(files)) writeFileSync(join(dir, f), body);
+const rel = [relative(process.cwd(), dir) || ".", dir].sort((a, b) => a.length - b.length)[0];
+console.log(`Made ${name} in ${rel}/: ${Object.keys(files).join(", ")}
+
+Next:
+  1. Its test:     bun test ${rel}
+  2. A dev deck:   ${local ? `DECK_DEV_PLUGINS=${o.dir} ` : ""}DECK_PORT=4760 bun run dev:plugins
+     (edit any of its files and the deck restarts just this plugin and reloads the page)
+  3. In the page:  ⌘K → "${name}: say hello"`);

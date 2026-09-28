@@ -126,8 +126,10 @@ async function api(path, body, timeoutMs) {
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
-/** Toasts stack (three at most) and slide. A "…" toast is progress, so what follows replaces it in place. Returns the toast. */
-function toast(msg, err) {
+/** Toasts stack (three at most) and slide. A "…" toast is progress, so what follows replaces it in place. `act`
+ *  ({ label, run, ms }) adds one button: Undo for what can be reversed, Retry after a failure. The pointer resting on a
+ *  toast holds it open; ⌘Z runs the newest Undo (input.js). Returns the toast. */
+function toast(msg, err, act) {
   let box = document.querySelector(".toasts");
   if (!box) { box = document.createElement("div"); box.className = "toasts"; document.body.append(box); }
   const live = [...box.children].filter((x) => !x._out);
@@ -136,22 +138,32 @@ function toast(msg, err) {
     while (live.length >= 3) toastOut(live.shift());
     const before = motion.rects(live);
     t = document.createElement("div"); t.setAttribute("role", "status");
+    t.addEventListener("pointerenter", () => clearTimeout(t._timer));
+    t.addEventListener("pointerleave", () => armToast(t, 2000));
+    t.addEventListener("click", (e) => { if (e.target.closest(".tact")) runToast(t); });
     box.append(t);
     motion.flip(before);
     motion.enter(t, isPhone() ? "rise" : "slide");
   } else if (t._msg !== msg) motion.enter(t, "fade");
-  t.className = "toast" + (err ? " err" : "");
-  t.textContent = t._msg = msg;
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => toastOut(t), err ? 7000 : 2400);
+  t.className = "toast" + (err ? " err" : "") + (act ? " act" : "");
+  t._act = act ?? null; t._msg = msg;
+  if (act) t.innerHTML = `<span class="tmsg">${esc(msg)}</span><button type="button" class="tact">${esc(act.label)}${act.label === "Undo" && !isPhone() ? "<kbd>⌘Z</kbd>" : ""}</button>`;
+  else t.textContent = msg;
+  armToast(t, act?.ms ?? (act ? 6000 : err ? 7000 : 2400));
   return t;
 }
+function armToast(t, ms) { clearTimeout(t._timer); t._timer = setTimeout(() => toastOut(t), ms); }
 function toastOut(t) {
   if (t._out) return;
-  t._out = true; clearTimeout(t._timer);
+  t._out = true; t._act = null; clearTimeout(t._timer);
   // The stack is anchored at the bottom: only a toast below others makes them move down (then they glide).
   motion.leave(t, isPhone() ? "fade" : "slide", () => { const below = t.nextElementSibling ? motion.rects([...t.parentElement.children].filter((x) => x !== t)) : null; t.remove(); if (below) motion.flip(below); });
 }
+/** The newest toast still offering an action (optionally only an Undo). */
+const toastWithAct = (undoOnly) => [...document.querySelectorAll(".toasts > .toast")].reverse().find((t) => !t._out && t._act && (!undoOnly || t._act.label === "Undo"));
+function runToast(t = toastWithAct()) { const a = t?._act; if (!a) return false; toastOut(t); a.run(); return true; }
+/** ⌘Z: only an Undo, never a Retry. */
+const toastUndo = () => { const t = toastWithAct(true); return t ? runToast(t) : false; };
 async function copy(text, what) { try { await navigator.clipboard.writeText(text); toast(`Copied ${what}`); } catch { toast("The browser blocked clipboard access", true); } }
 
 // ── a small promise-based dialog (no browser pop-ups) ────────────────────

@@ -13,6 +13,7 @@ import { Automations } from "./automations";
 import { createPlugins } from "./plugins";
 import { createPluginHost } from "./plugin-host";
 import { createCodePluginApi } from "./plugin-code-api";
+import { watchPlugins } from "./plugin-dev";
 import { DATA_DIR, DEV, HOST, PORT, PUBLIC_URL, PUSH_DIR, TOKEN, loadApiToken, loadGraves, loadHosts, makeDataDirs } from "./http/config";
 import { createSse } from "./http/sse";
 import { createMachines } from "./http/machines";
@@ -77,8 +78,11 @@ const auto: Automations | undefined = new Automations({
 });
 // Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
+const BUILTIN_DIR = new URL("../plugins-builtin", import.meta.url).pathname;
+// Dev only: folders of plugins you're writing (DECK_DEV_PLUGINS=/a:/b), run like built-ins, never trust-checked.
+const DEV_PLUGIN_DIRS = DEV ? (process.env.DECK_DEV_PLUGINS ?? "").split(":").filter(Boolean) : [];
 const pluginHost = createPluginHost({
-  builtinDir: new URL("../plugins-builtin", import.meta.url).pathname, root: PLUGINS_DIR, dataDir: DATA_DIR,
+  builtinDir: BUILTIN_DIR, root: PLUGINS_DIR, dataDir: DATA_DIR, devDirs: DEV_PLUGIN_DIRS,
   // Built-ins start off: the core stays small until you turn an extra on in Plugins (DECK_PLUGINS_DEFAULT=on for tests/harness).
   builtinsOn: process.env.DECK_PLUGINS_DEFAULT === "on",
   reservedState: ["token", "self", "publicUrl", "rows", "summary", "graveyard", "tools", "toolGroups", "queue", "usage", "history", "decisions", "radar", "jev", "canShare", "auto", "push", "plugins"],
@@ -139,6 +143,8 @@ const hub: Hub = {
 };
 // Plugins start before the port opens, so their routes exist for the first request.
 await pluginHost.start();
+// Plugin dev mode: an edited plugin restarts in place and the page reloads (src/plugin-dev.ts).
+if (DEV && process.env.DECK_PLUGIN_DEV) watchPlugins({ host: pluginHost, dirs: [BUILTIN_DIR, ...DEV_PLUGIN_DIRS], onReload: (dev) => broadcast("plugins", { active: pluginHost.active(), dev }) });
 const serveOptions = { hostname: HOST, port: PORT, idleTimeout: 0, fetch: createRoutes(hub).fetch };
 
 // A restart can race the previous instance for the port. Retry briefly; if it never frees up, exit so

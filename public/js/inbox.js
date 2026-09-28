@@ -61,8 +61,8 @@ function nextHint() {
   const n = Math.min(d.options.length, 9);
   return `Next: ${yesNoOption(d, "yes") ? "y / n · " : ""}${n ? `1–${n} pick · ` : ""}r reply · s skip`;
 }
-function triageToast(msg) {
-  const t = toast(msg);
+function triageToast(msg, act) {
+  const t = toast(msg, false, act);
   if (t && !isPhone()) { const h = document.createElement("span"); h.className = "tnext"; h.textContent = nextHint(); t.append(h); }
 }
 async function decide(key, action, fn, choice, sent) {
@@ -121,7 +121,7 @@ function skipDecision(key) {
   S.skipStack.push(key);
   renderInbox();
   applyInboxFocus(true);
-  triageToast(`Skipped ${rowOf(key)?.project ?? "it"} for now · u brings it back`);
+  triageToast(`Skipped ${rowOf(key)?.project ?? "it"} for now`, { label: "Undo", run: undoSkip });
 }
 function undoSkip() {
   while (S.skipStack.length) {
