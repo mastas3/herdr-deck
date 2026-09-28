@@ -47,4 +47,7 @@
 .ccode { border: 2px solid var(--danger); border-radius: 14px; padding: 12px 16px; }
 .cdanger { display: flex; gap: 8px; align-items: flex-start; color: var(--danger); border: 1px solid var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); border-radius: 10px; padding: 10px 12px; margin: 0; }
 .cdanger b { color: var(--danger); }
+.cdanger svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+.ccode .cadd p { margin: 0; }
+.ccode > .link { align-self: flex-start; }
 .btn.primary.danger { background: var(--danger); border-color: var(--danger); }

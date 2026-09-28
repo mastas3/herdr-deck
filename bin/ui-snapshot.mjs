@@ -20,7 +20,7 @@ const HELP = `usage: bin/ui-snapshot.mjs --out <dir> [options]
   --out <dir>          where the screenshots and JSON go (created; old files overwritten)
   --repo <dir>         the deck source to run (default: this checkout)
   --port <n>           port for the throwaway deck (default 4771; must be free)
-  --views a,b,c        which views (default: all). Known: ${"VIEWS"}
+  --views a,b,c        which views (default: all; "all-but-new" skips the code-plugin views). Known: ${"VIEWS"}
   --viewports d,p      desktop and/or phone (default both)
   --seed <dir>         copy this folder into the scratch HOME first (fixture data)
   --plugins-off a,b    start with these code plugins turned off (writes the deck's plugin state)
@@ -40,8 +40,14 @@ export const VIEWS = {
   quests: `setMode("quests")`,
   projects: `openProjects()`,
   plugins: `setMode("plugins")`,
+  "plugins-builtin": `setMode("plugins"); plugTab("code")`,
+  "plugins-add": `setMode("plugins"); plugTab("add")`,
+  // The red trust screen for a code plugin: a small demo plugin the harness puts in the scratch HOME ($HOME).
+  "plugins-trust": `setMode("plugins"); plugTab("add"); codeInspect({ folder: "$HOME/demo-plugin" })`,
   palette: `openPalette()`,
 };
+/** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {
@@ -75,7 +81,7 @@ function args(argv) {
     if (a === "--out") o.out = resolve(v());
     else if (a === "--repo") o.repo = resolve(v());
     else if (a === "--port") o.port = Number(v());
-    else if (a === "--views") o.views = v().split(",").filter(Boolean);
+    else if (a === "--views") { const x = v(); o.views = x === "all-but-new" ? Object.keys(VIEWS).filter((n) => !NEWER.includes(n)) : x.split(",").filter(Boolean); }
     else if (a === "--viewports") o.viewports = v().split(",").filter(Boolean);
     else if (a === "--seed") o.seed = resolve(v());
     else if (a === "--plugins-off") o.pluginsOff = v().split(",").filter(Boolean);
@@ -128,6 +134,14 @@ function writePluginsOff(home, off) {
   writeFileSync(join(dir, "code-plugins.json"), JSON.stringify({ enabled: Object.fromEntries(off.map((id) => [id, false])), installed: [] }, null, 1));
 }
 
+/** A tiny code plugin to open the trust screen with (it is reviewed, never installed: install is blocked). */
+function demoPlugin(dir) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, "plugin.json"), JSON.stringify({ deck: 1, kind: "code", id: "demo-hello", name: "Hello", version: "0.1.0", description: "Says hello at /api/hello.", server: "server.ts", client: ["hello.js"], routes: ["hello"] }, null, 1));
+  writeFileSync(join(dir, "server.ts"), 'export function activate(host) { host.routes("hello", () => ({ hello: "world" })); }\n');
+  writeFileSync(join(dir, "hello.js"), 'deckPlugins.register("demo-hello", {});\n');
+}
+
 /** Frozen page: fixed Date, seeded Math.random, and an EventSource that opens and then stays silent (state comes from
  *  the page's inlined boot data only), so two runs see the same thing. */
 function freezeScript() {
@@ -173,7 +187,7 @@ async function snap(browser, o, deck, view, vp) {
   };
   await page.goto(`${deck.base}/`, { waitUntil: "load" });
   await settle();
-  if (VIEWS[view]) { try { await page.evaluate(VIEWS[view]); } catch (e) { out.errors.push(`setup: ${e.message}`); } }
+  if (VIEWS[view]) { try { await page.evaluate(VIEWS[view].replaceAll("$HOME", o.home)); } catch (e) { out.errors.push(`setup: ${e.message}`); } }
   await settle();
   const name = `${view}-${vp}`;
   await page.screenshot({ path: join(o.out, `${name}.png`), animations: "disabled", caret: "hide" });
@@ -191,6 +205,8 @@ async function main() {
   rmSync(home, { recursive: true, force: true });
   mkdirSync(home, { recursive: true });
   if (o.seed) cpSync(o.seed, home, { recursive: true });
+  o.home = home;
+  demoPlugin(join(home, "demo-plugin"));
   writePluginsOff(home, o.pluginsOff);
   let deck;
   const stop = () => { try { deck?.child.kill("SIGTERM"); } catch {} };

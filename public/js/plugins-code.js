@@ -60,7 +60,7 @@ function codeReview(r) {
   const can = !r.missing.length && S.plug.tick && !S.plug.busy;
   return `<section class="ptrust ccode">${back}
     <div class="ptop">${plugIcon(m.name)}<div class="pid"><h3>${esc(m.name)} <small>${esc(m.version)}</small></h3><small>from ${src}</small></div></div>
-    <p class="cdanger">${ICON.warn}<b>${esc(r.trust)}</b> It can read and change your files, use your logins and reach the network, like any program you run. Install it only if you trust whoever wrote it.</p>
+    <p class="cdanger">${ICON.warn}<span><b>${esc(r.trust)}</b> It can read and change your files, use your logins and reach the network, like any program you run. Install it only if you trust whoever wrote it.</span></p>
     ${m.description ? `<p class="pauthor"><span>The author says:</span> ${esc(m.description)}</p>` : ""}
     ${r.update ? `<p class="phead">Update from ${esc(r.update.fromVersion)} to ${esc(m.version)}</p>` : ""}
     ${sec("Code that runs", [...(m.server ? [`On this machine: <code>${esc(m.server)}</code>${m.machine === "any" ? " (on every machine)" : " (on the hub)"}`] : []), ...m.client.map((f) => `In the page: <code>${esc(f)}</code>`)])}
