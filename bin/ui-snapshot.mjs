@@ -38,6 +38,8 @@ export const VIEWS = {
   connections: `setMode("connections")`,
   discover: `setMode("discover")`,
   library: `setMode("discover"); discTab("lib")`,
+  // Discover's other tabs (its own, and the ones Leads, Research, Library and Opportunities add to it).
+  ...Object.fromEntries(["evidence", "mix", "lab", "leads", "research", "lib", "ideas", "saved"].map((t) => [`discover-${t}`, `setMode("discover"); discTab("${t}")`])),
   opportunities: `setMode("opportunities")`,
   quests: `setMode("quests")`,
   projects: `openProjects()`,

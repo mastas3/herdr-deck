@@ -226,7 +226,9 @@ $("dbody").addEventListener("click", async (e) => {
     }
   }
 });
-// A research push opens here.
-if (new URLSearchParams(location.search).has("research")) setTimeout(() => { S.disc.tab = "research"; store("discTab", "research"); setMode("discover"); }, 400);
-deckPlugins.register("research", { palette: (q) => rsPalette(q).map((c) => ({ ...c, order: 40 })) });
+// Research in the deck's registry: its ⌘K commands, its tab in Discover, and /?research (a research push) opening it.
+deckPlugins.register("research", {
+  palette: (q) => (deckPlugins.has("discover") ? rsPalette(q).filter(Boolean).map((c) => ({ ...c, order: 40 })) : []),
+  links: (u) => (u.searchParams.has("research") && deckPlugins.has("discover") ? (S.disc.tab = "research", store("discTab", "research"), setMode("discover"), true) : false),
+}).extend("discover.tabs", { key: "research", label: "Research", order: 60, render: () => discResearch(), patch: () => rsOnScreen() && (rsPatch(), true) });
 // ══ end Autoresearch ═════════════════════════════════════════════════════════

@@ -5,7 +5,7 @@
 import type { Host } from "../../src/plugin-api";
 import { createCovers } from "./covers";
 
-/** What other plugins (and the core, until Discover is a plugin) get from `use("covers")`. */
+/** What other plugins (Discover) get from `use("covers")`. */
 export type CoversService = { respond(data: unknown): Response; has(id: string): boolean; coverUrl(id: string): string | undefined };
 
 export function activate(host: Host) {

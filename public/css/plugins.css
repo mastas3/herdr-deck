@@ -51,3 +51,5 @@
 .ccode .cadd p { margin: 0; }
 .ccode > .link { align-self: flex-start; }
 .btn.primary.danger { background: var(--danger); border-color: var(--danger); }
+/* The inset this list always had from Discover's styles (feed.css also has a .plist), so it looks the same with Discover off. */
+.view[data-view="plugins"] .plist { padding-left: 20px; }

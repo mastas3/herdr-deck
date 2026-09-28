@@ -15,7 +15,8 @@
 // user confirms the New session dialog.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { frontmatter, gh as ghDefault, hasTerm, slugify, type GhRes } from "./discover";
+import { gh as ghDefault, type GhRes } from "./gh";
+import { frontmatter, hasTerm, slugify } from "./text";
 
 const HOME = homedir();
 const DAY = 86_400_000;

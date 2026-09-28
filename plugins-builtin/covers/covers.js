@@ -98,16 +98,9 @@ function covGenerate(x, force) {
   const idea = { title: x.title, pitch: x.pitch, row: x.row, customer: x.customer, problem: x.problem, offer: x.offer, how: x.how };
   coversLoad("generate", { id: x.id, force, idea }).then(() => { if (covBusy(x.id)) toast(`Painting a cover for “${x.title}”. About a minute.`); });
 }
-// The plan dialog shows the cover on top, with Generate / Regenerate (when Discover, which opens it, is there).
-if (typeof openPlan === "function") {
-  const open0 = openPlan;
-  openPlan = function (x, from) {
-    const r = open0(x, from);
-    const d = [...document.querySelectorAll("dialog.plandlg")].pop();
-    if (d && x?.id) { d.dataset.covid = x.id; d._covIdea = x; covPut(d, x, true); if (!S.covers.st) coversLoad(); }
-    return r;
-  };
-}
+// The plan dialog shows the cover on top, with Generate / Regenerate: Discover calls "discover.plan" when it opens one
+// (Discover loads after this file, so the hook is its point rather than a wrapper around openPlan).
+deckPlugins.register("covers", {}).extend("discover.plan", (d, x) => { if (x?.id) { d.dataset.covid = x.id; d._covIdea = x; covPut(d, x, true); if (!S.covers.st) coversLoad(); } });
 document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-covpause]"); if (b) coversLoad(b.dataset.covpause); });
 // Status: every 30 s on Discover, every 4 s while a cover is being painted (the clock in the line ticks each second).
 setInterval(() => {

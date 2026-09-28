@@ -13,15 +13,11 @@ import { sessionsApi } from "./api-sessions";
 import type { Hub } from "./hub";
 
 export function createRoutes(hub: Hub) {
-  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, discover, gallery, leads, research, plugins, pluginHost, codePlugins } = hub;
+  const { TOKEN, deck, hosts, push, sse, auth, mcp, decisions, opportunities, leads, research, plugins, pluginHost, codePlugins } = hub;
   const { page, assets, fullState, forwardToMachine } = hub;
   const { imageFor } = hub.chat;
   const { remotes, localRow, isNode, machines } = hosts;
   const { hasApiToken, allowedHost } = auth;
-
-  /** Discover's replies get painted covers from the covers plugin when it's on (a shim until Discover is a plugin
-   *  that uses the service itself); with covers off the page draws each card's placeholder. */
-  const withCovers = (d: unknown) => pluginHost.service<{ respond(d: unknown): Response }>("covers")?.respond(d) ?? json(d);
 
   async function handle(req: Request): Promise<Response> {
     // Host check blocks DNS-rebinding; the token blocks cross-site POSTs.
@@ -109,8 +105,6 @@ export function createRoutes(hub: Hub) {
       }
       { const r = await pluginHost.api(req, url, body); if (r) return r; }
       if (url.pathname.startsWith("/api/opportunities")) { const d = await opportunities.handle(url.pathname, body); if (d !== undefined) return json(d); }
-      if (url.pathname.startsWith("/api/discover")) { const d = await discover.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
-      if (url.pathname.startsWith("/api/ideas")) { const d = await gallery.handle(url.pathname, body); if (d !== undefined) return withCovers(d); }
       if (url.pathname.startsWith("/api/leads")) { const d = await leads.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/research")) { const d = await research.handle(url.pathname, body); if (d !== undefined) return json(d); }
       if (url.pathname.startsWith("/api/plugins/code")) { const d = await codePlugins.handle(url.pathname, body); if (d !== undefined) return json(d); }

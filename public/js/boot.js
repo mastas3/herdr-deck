@@ -1,6 +1,7 @@
 "use strict";
-// Live data (SSE) and startup: the last of the deck's own files, so everything it calls is defined by now. The
-// Gallery and Library files and the running plugins' load after it and hook into what they need; startup waits for them.
+// Live data (SSE) and startup: the last of the deck's core files, so everything it calls is defined by now. A few
+// core files and the running plugins' files load after it; startup waits for them (DOMContentLoaded), so a plugin's
+// views, tabs, links, state and SSE events are registered before the first render and the first full state.
 // ── live data ────────────────────────────────────────────────────────────
 function notifyTransitions(prev, next) {
   if (!S.notify || PUSH.on || !prev || prev.status === next.status) return;

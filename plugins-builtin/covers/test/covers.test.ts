@@ -3,7 +3,17 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync,
 import { tmpdir } from "node:os";
 import { AVOID, categoryOf, codexBusy, coverPrompt, findBin, makeCovers, MAX_BYTES, PALETTES, pngSize } from "../cover-art";
 import { afterRun, createCovers, decide, DEFAULTS, freshState, rollDay, selectCandidates, type CoverState } from "../covers";
-import { openIdeaArchive } from "../../../src/idea-archive";
+import { Database } from "bun:sqlite";
+
+/** Discover's ideas.db (plugins-builtin/discover/idea-archive.ts), written the way it writes it: the covers job only reads it. */
+function ideasDb(file: string, rows: { id: string; title: string; score: number; dropped: boolean; row?: string; data: object }[]) {
+  const db = new Database(file);
+  db.exec(`CREATE TABLE ideas (id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL, row TEXT, score REAL,
+    dropped INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, data TEXT NOT NULL)`);
+  const q = db.prepare(`INSERT INTO ideas VALUES (?, ?, 'feed', ?, ?, ?, ?, ?, ?)`);
+  for (const r of rows) q.run(r.id, r.title, r.row ?? null, r.score, r.dropped ? 1 : 0, Date.now(), Date.now(), JSON.stringify({ id: r.id, title: r.title, ...r.data }));
+  db.close();
+}
 
 const dir = mkdtempSync(`${tmpdir()}/deck-covers-`);
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -145,12 +155,10 @@ describe.skipIf(!FFMPEG)("resize: a 16:9 card cover and a square thumb, small", 
 describe.skipIf(!FFMPEG)("the job end to end (fake painter, real files and routes)", () => {
   const data = `${dir}/data`, cov = `${data}/covers`;
   mkdirSync(cov, { recursive: true });
-  const a = openIdeaArchive(`${data}/ideas.db`);
-  a.put({ id: "hi8", title: "Hebrew Design Reports", source: "feed", row: "automations", pitch: "Reports", offer: "PDF reports" } as any);
-  a.score("hi8", 8, false);
-  a.put({ id: "lo4", title: "Weak", source: "feed", pitch: "meh" } as any);
-  a.score("lo4", 4, true);
-  a.close();
+  ideasDb(`${data}/ideas.db`, [
+    { id: "hi8", title: "Hebrew Design Reports", row: "automations", score: 8, dropped: false, data: { source: "feed", row: "automations", pitch: "Reports", offer: "PDF reports" } },
+    { id: "lo4", title: "Weak", score: 4, dropped: true, data: { source: "feed", pitch: "meh" } },
+  ]);
   writeFileSync(`${data}/discover.json`, JSON.stringify({ mixes: [{ id: "sv1", title: "Saved Clip Courier", pitch: "Clips for creators", savedAt: 5 }] }));
   writeFileSync(`${data}/feed.json`, JSON.stringify({ ideas: [] }));
   let clock = T0, calls: string[] = [], fail = false, busy = false;

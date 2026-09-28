@@ -4,8 +4,7 @@
 // keeps the worker and the date backfill from resuming on start, as before; switching the plugin off stops both, asks
 // the bridge to exit and closes the cards database.
 import type { Host } from "../../src/plugin-api";
-import type { Card } from "../../src/library-card";
-import { comparablesFor, type Comparables, type Target } from "../../src/library-strategy";
+import { comparablesFor, shareLibrary, type Comparables, type Target } from "../../src/library-strategy";
 import { createLibrary, type Library } from "./library";
 
 /** What `use("library")` returns: the library itself, plus comparable founders for a plan from its cards. */
@@ -21,13 +20,11 @@ export const libraryTool = (lib: Pick<Library, "evidence">) => ({
 
 export function activate(host: Host) {
   const lib = createLibrary();
-  // Comparables read every card; a minute-old copy is plenty for matching plans.
-  let memo: { at: number; cards: Card[] } | undefined;
-  const cards = () => {
-    if (!memo || Date.now() - memo.at > 60_000) { try { memo = { at: Date.now(), cards: lib.cards().all() }; } catch { memo = { at: Date.now(), cards: [] }; } }
-    return memo.cards;
-  };
-  host.provide<LibraryService>("library", { ...lib, comparables: (t, k) => comparablesFor(t, { k, cards: cards() }) });
+  // The core's comparables (the Studio, the gallery, research) read the shared library; they find none while this is
+  // off. A minute-old copy of the cards is plenty for matching plans (src/library-strategy.ts).
+  shareLibrary(lib);
+  host.onStop(() => shareLibrary(undefined));
+  host.provide<LibraryService>("library", { ...lib, comparables: (t, k) => comparablesFor(t, { k }) });
   host.routes("library", ({ path, body }) => (path.startsWith("/api/library/") ? lib.handle(path, body) : undefined));
   host.extend("mcp.tools", libraryTool(lib));
   if (!host.env("DECK_NO_LIBRARY")) lib.autostart({ after: host.after, every: host.every });

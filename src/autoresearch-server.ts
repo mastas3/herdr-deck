@@ -6,7 +6,7 @@ import type { Automations } from "./automations";
 import type { Deck, Row } from "./deck";
 import { call } from "./herdr";
 import { jevAskOnce, jevAvailable, jevUsage } from "./jev";
-import { runClaude } from "./mix";
+import { runClaude } from "./model-run";
 import type { PushStore } from "./push";
 import { comparablesFor } from "./library-strategy";
 

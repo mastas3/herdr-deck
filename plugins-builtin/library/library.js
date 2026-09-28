@@ -5,7 +5,6 @@
 // sharing their globals.
 // Every claim on screen links to the moment in the video where it was said; numbers are marked as claims.
 ICON.book = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.5 3.2c1.8-.8 3.8-.8 5.5.5v9.6c-1.7-1.3-3.7-1.3-5.5-.5zM13.5 3.2c-1.8-.8-3.8-.8-5.5.5v9.6c1.7-1.3 3.7-1.3 5.5-.5z"/></svg>';
-ICON.play = '<svg viewBox="0 0 16 16" fill="currentColor"><path d="M5 3.5v9l7-4.5z"/></svg>';
 S.lib = { view: load("libView", "ask"), ask: load("libAsk", {}), q: load("libQ", ""), res: null, busy: false, st: null, stAt: 0, cards: null, cardsBusy: false, f: load("libF", {}), pbs: null, pb: null, pbMd: "", adding: false, tok: 0, err: "" };
 const LVIEWS = [["ask", "Ask"], ["founders", "Founders"], ["playbooks", "Playbooks"], ["sources", "Sources"]];
 const LEXAMPLES = ["How did people get first customers for a Telegram bot?", "Pricing for a mobile app subscription", "Cold email that got the first clients", "What do founders regret building?", "Selling software to local businesses", "Getting users from Reddit without getting banned"];
@@ -288,8 +287,5 @@ $("dbody").addEventListener("keydown", (e) => {
   if (t.matches?.("[data-libq]") && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); libSearch(t.value); }
   if (t.matches?.("[data-liburl]") && e.key === "Enter") { e.preventDefault(); libAdd(); }
 });
-// Discover → Library. Registered for the "discover.tabs" point ({ id, label, after, html, patch, mounted }); until
-// Discover reads that point, discover.js draws its own "lib" tab while this plugin is in the page.
-deckPlugins.register("library", {}).extend("discover.tabs", {
-  id: "lib", label: "Library", after: "research", html: () => discLibrary(), patch: () => libPatch(), mounted: () => !!$("dbody").querySelector(":scope > .view #libroot"),
-});
+// The Library's tab in Discover (the only place it shows; Discover reads the point).
+deckPlugins.register("library", {}).extend("discover.tabs", { key: "lib", label: "Library", order: 70, render: () => discLibrary(), patch: () => lOn() && (libPatch(), true) });

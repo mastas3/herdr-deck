@@ -333,4 +333,4 @@ deckPlugins.register("opportunities", {
   views: { opportunities: { load: () => opportunitiesLoad(), render: () => renderOpportunities(), leave: () => setHTML($("mTitle"), "Live board"), path: () => "/?view=opportunities" } },
   tabs: [{ view: "opportunities", label: "Opportunities", icon: () => ICON.bulb, order: 40 }],
   links: (u) => (u.searchParams.get("view") === "opportunities" ? (setMode("opportunities"), true) : false),
-});
+}).extend("discover.tabs", { key: "evidence", label: "Evidence & tests", order: 20, render: () => opportunitiesView(), patch: () => !!$("opportunities") && (opportunitiesPatch(), true) });

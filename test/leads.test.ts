@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { GhRes } from "../src/discover";
+import type { GhRes } from "../src/gh";
 import {
   analyze, clusterThemes, createLeads, deepPrompt, htmlText, ideaFor, keywordHits, keywordsFor, listReports, painOf, parseAppReviews, parseAppSearch,
   parseGitHubIssues, parseHN, parseRedditAtom, parseSE, planPrompt, scrub, setRedditWait, snippetOf, starters, surprise, toEvidence, whoOf, type Evidence, type FetchLike, type Raw,

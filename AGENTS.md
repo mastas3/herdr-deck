@@ -25,7 +25,8 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - `public/` is the page: `index.html` (markup only), a service worker and a manifest. The code is `public/js/*.js`
   and the styles `public/css/*.css`, all listed in `public/assets.json` and loaded in that order: scripts as classic
   scripts sharing one global scope (`core.js` first: state, helpers, `api`; `registry.js` next; `boot.js` last of the
-  deck's own, then Gallery and Plugins; then running code plugins' files), styles in cascade order. Code that runs at load may only use what earlier files
+  deck's own, then Plugins; then running code plugins' files; startup itself waits for all of them, on
+  DOMContentLoaded), styles in cascade order. Code that runs at load may only use what earlier files
   define (calls inside functions are fine); a later file can take over a function by reassigning it. Put new code in
   the file for its area, or a new one in the right place in the manifest. `src/assets.ts` serves each under a content
   hash with immutable caching and the service worker keeps them the same way. Keep each file under 400 lines;
@@ -68,7 +69,8 @@ the typed `Host`. Worked example: `plugins-builtin/covers/`.
   another plugin's files. The core reaches you only through `pluginHost.service(name)` or a core point
   (`fullState`, `digest.lines`, `mcp.tools`, `tools.entries`). What no plugin owns the core lends with
   `pluginHost.provideCore(name, api)`, and any plugin reads it with `host.use(name)` (nothing to declare): today
-  `remotes` (the other machines' decks) and `data-plugins` (recipes from enabled data plugins).
+  `remotes` (the other machines' decks), `data-plugins` (recipes from enabled data plugins) and, until its plugin
+  exists, `opportunities`.
 - **Page**: move the files from `public/js`/`public/css` and `public/assets.json` into the folder and `client`/`styles`
   (they load after the core's, so code that runs at load may only use core globals and plugins you `require`).
   Register with `deckPlugins.register(id, { views, tabs, palette, keys, settings, events, state, links })` instead of

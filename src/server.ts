@@ -8,10 +8,7 @@ import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
-import { createDiscover, gh } from "./discover";
-import { galleryForServer } from "./gallery-server";
 import { createLeads } from "./leads";
-import { feedQuery, type LibraryReader } from "./library-search";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
 import { researchForServer } from "./autoresearch-server";
@@ -34,7 +31,7 @@ import { startQueue } from "./http/queue";
 import { createMcp } from "./http/mcp-ctx";
 import { createAuth } from "./http/auth";
 import { createRoutes } from "./http/routes";
-import type { Hub } from "./http/hub";
+import type { DiscoverService, Hub } from "./http/hub";
 
 makeDataDirs();
 const API_TOKEN = loadApiToken();
@@ -62,44 +59,24 @@ const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 
-// Connections and the Founder Library are plugins (plugins-builtin/connections, plugins-builtin/library). Discover, the
-// gallery, the Studio, the ideas feed and the quest board still live here and reach them through their services: a
-// shim until those are plugins that use() them. With a plugin off they get no inventory and no evidence, never an error.
-type ConnectionsReader = { inventory(): Promise<{ sections: { id: string; items: any[] }[] }>; enrich<T>(inv: T): T & { categories: { id: string; label: string }[] }; recs(): any[] };
-const connections = () => { const c = pluginHost.service<ConnectionsReader>("connections"); if (!c) throw new Error("Connections is off"); return c; };
-const connectionNames = async () => (await connections().inventory()).sections.filter((s) => ["services", "ai", "custom"].includes(s.id)).flatMap((s) => s.items).filter((i) => i.status !== "off" && !i.hidden).map((i) => i.name);
-const library: LibraryReader = {
-  evidence: async (q, k, use) => (await pluginHost.service<LibraryReader>("library")?.evidence(q, k, use)) ?? { text: "", answers: [] },
-  cards: () => pluginHost.service<LibraryReader>("library")?.cards() ?? { all: () => [] },
-};
-
-// Discover (repos worth forking, idea lab, plans): its own module; the server only routes to it.
-const discover = createDiscover(
-  { dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, wikiDir: process.env.DECK_WIKI_DIR || `${homedir()}/wiki`, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects` },
-  {
-    connections: connectionNames,
-    // The Mixer's ingredients: every store item with its category and state (names and one-line descriptions only).
-    items: async () => { const c = connections(), inv = c.enrich(await c.inventory()); return { items: inv.sections.flatMap((s) => s.items).map(({ id, name, cat, state, detail, kind, hidden }) => ({ id, name, cat, state, detail, kind, hidden })), categories: inv.categories }; },
-    rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
-    studio: { evidence: async (text) => (await library.evidence(text, 4, "studio")).text },
-    feed: { evidence: async (rows) => (await library.evidence(feedQuery(rows), 5, "ideas")).text },
-  },
-);
+// Discover is a plugin (plugins-builtin/discover): the core parts below that read it ask for its service each time
+// and get nothing while it's off. Leads, Opportunities and Research keep their files in its data folder, as before.
+const DISCOVER_DIR = process.env.DECK_DISCOVER_DIR || DATA_DIR;
+const discover = () => pluginHost.service<DiscoverService>("discover");
 // Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
-const leads = createLeads(process.env.DECK_DISCOVER_DIR || DATA_DIR, {
+const leads = createLeads(DISCOVER_DIR, {
   rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
-  saved: discover.leadsSaved, interests: async () => (await discover.profile()).interests, projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
+  saved: { get: () => discover()?.leadsSaved.get() ?? [], set: (v) => discover()?.leadsSaved.set(v) },
+  interests: async () => (await discover()?.profile())?.interests ?? [], projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
 });
 const opportunities = createOpportunityService({
-  dir: process.env.DECK_DISCOVER_DIR || DATA_DIR,
-  ingredients: async () => (await discover.ingredients(2500)).list,
-  archive: async () => (await discover.handle("/api/discover/archive", { limit: 500, all: true })).ideas,
+  dir: DISCOVER_DIR,
+  ingredients: async () => (await discover()?.ingredients(2500))?.list ?? [],
+  archive: async () => (await discover()?.handle("/api/discover/archive", { limit: 500, all: true }))?.ideas ?? [],
   research: (query, kind, force) => leads.search(query, kind, force),
   researchStatus: (id) => leads.handle("/api/leads/status", { id }),
   deepResearch: runOpportunityWeb,
 });
-// Discover uses the same evidence and experiment records as Opportunities.
-const gallery = galleryForServer({ dataDir: process.env.DECK_DISCOVER_DIR || DATA_DIR, discover, connections: async () => connections().inventory(), gh, recs: () => pluginHost.service<ConnectionsReader>("connections")?.recs() ?? [], library, evidenceStore: opportunities.store });
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
 const PLUGINS_DIR = process.env.DECK_PLUGINS_DIR || DATA_DIR;
 const plugins = createPlugins({ dataDir: PLUGINS_DIR, catalogDir: new URL("../plugins-catalog", import.meta.url).pathname });
@@ -120,7 +97,10 @@ const auto: Automations | undefined = new Automations({
   digest: () => pluginHost.contributions("digest.lines"),
 });
 // Autoresearch (Discover → Research): its own modules (src/autoresearch*.ts); the server only lends it its machinery.
-const research = researchForServer({ self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, discover, machines });
+const research = researchForServer({
+  self: SELF.id, dataDir: DATA_DIR, deck, rows: allRows, startSession: sessions.startSession, closeLocal: sessions.closeLocal, sendText: sessions.sendText, screen: (r) => dec.screenOf(r), push, auto: () => auto, isNode, machines,
+  discover: { profile: async () => (await discover()?.profile()) ?? { projects: [], interests: [] }, paths: { ideas: `${DISCOVER_DIR}/ideas` } },
+});
 
 // Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).
@@ -134,11 +114,11 @@ const pluginHost = createPluginHost({
   },
 });
 // What plugins need from the core that no plugin owns: the other machines' decks (the connections plugin reads their
-// inventories) and recipes from enabled data plugins.
+// inventories), recipes from enabled data plugins, and Opportunities (whose evidence store the gallery shares) until
+// it is a plugin itself.
 pluginHost.provideCore("remotes", { get: (id: string) => remotes.get(id), all: () => [...remotes.values()] });
 pluginHost.provideCore("data-plugins", { recipes: () => plugins.recipes() });
-// Discover is still core here; the quest board reads it under its service name until Discover is a plugin.
-pluginHost.provideCore("discover", discover);
+pluginHost.provideCore("opportunities", opportunities);
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
@@ -173,7 +153,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, discover, gallery, leads, research, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, leads, research, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };

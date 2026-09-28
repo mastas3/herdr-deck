@@ -254,3 +254,7 @@ dialog.ask .hint { max-height: 50vh; overflow: auto; }
 .ropt.no:hover { border-color: var(--blocked); background: color-mix(in srgb, var(--blocked) 10%, var(--bg)); }
 .card:has(.rask:active) { transform: none; }
 .card pre { margin: 4px 0 0; font: 11px/1.35 var(--mono); color: var(--term-ink); background: var(--term-bg); border-radius: 7px; padding: 6px 8px; overflow: hidden; white-space: pre; max-height: 5.6em; }
+/* Shared by Discover and the Plugins view: the tab bar under a view's title, and a one-line error with its icon. */
+.dtabs { margin-top: 12px; }
+.derr { display: inline-flex; align-items: center; gap: 5px; color: var(--blocked); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.derr svg { width: 14px; height: 14px; flex: none; }
