@@ -12,7 +12,7 @@
     "js/gallery-kit.js", "js/gallery-play.js", "js/gallery-comparables.js", "js/studio-comparables.js"
   ],
   "styles": ["css/discover.css", "css/studio.css", "css/feed.css", "css/gallery.css", "css/gallery-sheet.css", "css/comparables.css", "css/gallery-evidence.css"],
-  "machine": "hub",
+  "machine": "any",
   "uses": ["covers", "library", "connections", "opportunities"],
   "routes": ["discover", "ideas"],
   "provides": ["discover", "gallery"]

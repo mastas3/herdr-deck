@@ -2,6 +2,7 @@
 // /api/discover*, and the problem gallery at /api/ideas*. Its data stays where it always was: DECK_DISCOVER_DIR or the
 // deck's data folder (discover.json, feed.json, ideas.db, ideas/, studio/, gallery/). Nothing runs on a clock: the
 // daily feed, mixes and gallery start from a page's request, so a deck with Discover off makes no model calls for it.
+// It runs on every machine, as it did in the core: Leads, Opportunities and Research read it on a node too.
 // Other plugins add tabs to Discover's page through the page's "discover.tabs" point (js/discover.js).
 import { homedir } from "node:os";
 import type { Host } from "../../src/plugin-api";
