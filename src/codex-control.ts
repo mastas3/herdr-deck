@@ -4,7 +4,7 @@ import { createCodexDelivery } from "./codex-delivery";
 import { createCodexSettings } from "./codex-settings";
 import { createCodexConversation } from "./codex-conversation";
 
-type Watched = { owner?: string; raw?: any; view?: CodexControlState; revision?: number; checked: number; touched: number; error?: string; signature?: string };
+type Watched = { owner?: string; raw?: any; view?: CodexControlState; revision?: number; checked: number; touched: number; error?: string; connectionIssue?: CodexControlState["connectionIssue"]; signature?: string };
 const unavailable = "Open this task in the Codex app, then reconnect.";
 export function createCodexControl(options: {
   path?: string; receiptsFile?: string; timeoutMs?: number;
@@ -18,14 +18,15 @@ export function createCodexControl(options: {
   let timer: Timer | undefined;
   const state = (id: string): CodexControlState => {
     const w = watched.get(id);
-    return w?.raw && w.owner && w.view ? w.view : { ready: false, requests: [], error: w?.error ?? unavailable };
+    return w?.raw && w.owner && w.view ? w.view : { ready: false, requests: [], error: w?.error ?? unavailable, connectionIssue: w?.connectionIssue ?? "unavailable" };
   };
   const changed = (id: string) => options.changed?.(id, state(id));
-  function invalidate(id: string, error = unavailable) {
+  function invalidate(id: string, error = unavailable, connectionIssue: CodexControlState["connectionIssue"] = "unavailable") {
     const w = watched.get(id);
     if (!w) return;
     w.raw = undefined; w.owner = undefined; w.revision = undefined; w.signature = undefined; w.error = error; w.checked = 0;
-    snapshots.get(id)?.reject(new CodexControlError(error)); changed(id);
+    w.connectionIssue = connectionIssue;
+    snapshots.get(id)?.reject(new CodexControlError(error, "CODEX_UNAVAILABLE", connectionIssue)); changed(id);
   }
   const handlers = {
     disconnected() { for (const id of watched.keys()) invalidate(id); },
@@ -47,7 +48,7 @@ export function createCodexControl(options: {
       if (message.method !== "thread-stream-state-changed" || message.params?.hostId !== "local") return;
       const id = message.params.conversationId, w = watched.get(id), change = message.params.change;
       if (!w || w.owner !== message.sourceClientId) return;
-      if (message.version !== 11) { invalidate(id, "This Codex app version uses a different control protocol."); return; }
+      if (message.version !== 11) { invalidate(id, "This Codex app version uses a different control protocol.", "incompatible"); return; }
       try {
         if (!Number.isInteger(change?.revision) || change.revision < 0) throw new Error("Missing revision");
         if (w.revision != null && change.revision < w.revision) return;
@@ -92,7 +93,7 @@ export function createCodexControl(options: {
           }).finally(() => snapshots.delete(id));
         }
         entry.checked = Date.now(); return state(id);
-      } catch (e: any) { invalidate(id, e.message); entry.checked = Date.now(); return state(id); }
+      } catch (e: any) { invalidate(id, e.message, e.connectionIssue); entry.checked = Date.now(); return state(id); }
       finally { loading.delete(id); }
     })();
     loading.set(id, run); return run;

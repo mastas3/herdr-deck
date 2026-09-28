@@ -25,6 +25,7 @@ export function createCodexRecovery(options: {
       const run = (async () => {
         const current = await options.control.watch(id, true);
         if (current.ready) return current;
+        if (current.connectionIssue === "incompatible") return current;
         if (platform !== "darwin") throw new CodexControlError("Open this task in Codex on its host machine, then reconnect.");
         await open(`codex://threads/${id}`);
         let state = current;

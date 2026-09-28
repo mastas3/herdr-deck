@@ -44,7 +44,19 @@ export const VIEWS = {
     headSig = ""; renderDetail();
     if ($("composer").hidden || $("cSteer").hidden || $("cSend").textContent !== "Queue") throw new Error("Native Codex controls are missing");
     if (!document.querySelector('[data-tab="agents"]')) throw new Error("Codex subagents tab is missing");`,
-  "codex-disconnected": `select("fake:codex", { scroll: true, open: true }); codexViews.set("fake:codex", { ready: false, canOpen: true, requests: [], error: "Open this task in the Codex app, then reconnect." }); renderDetail(); if (!$("composer").hidden) throw new Error("Disconnected composer is enabled"); if (!document.querySelector('[data-dact="codexconnect"]')) throw new Error("Native connection recovery is missing");`,
+  "codex-disconnected": `select("fake:codex", { scroll: true, open: true }); codexViews.set("fake:codex", { ready: false, canOpen: true, requests: [], connectionIssue: "unavailable", error: "The Codex app connection closed. Try sending again." }); renderDetail(); if ($("composer").hidden) throw new Error("Disconnected composer is hidden"); if ($("appbar").querySelectorAll("button").length !== 1) throw new Error("Recovery needs exactly one action");`,
+  "codex-unloaded": `(async () => { select("fake:codex", { open: true }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); renderDetail();
+    if ($("composer").hidden || $("cSend").disabled || $("cSend").textContent !== "Send") throw new Error("Unloaded chat cannot compose a reply");
+    if ($("appbar").querySelector("button") || !$("appbar").textContent.includes("Send a reply")) throw new Error("Unloaded chat shows recovery controls");
+    if (document.querySelectorAll('[data-dact="codexopen"]').length !== 1) throw new Error("Open in Codex is duplicated"); })()`,
+  ...Object.fromEntries(["send", "busy", "failed"].map((scenario) => [`codex-connect-${scenario}`, `(async () => {
+    select("fake:codex", { open: true }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); renderDetail();
+    $("cText").value = "Fixture reconnect reply."; S.drafts.set(S.sel, $("cText").value);
+    const pending = sendMessage($("cText").value, $("cText")); await sendMessage($("cText").value, $("cText")); await pending;
+    if ($("composer").hidden) throw new Error("Connecting hid the composer");
+    if (${scenario === "failed"} ? $("cText").value !== "Fixture reconnect reply." : $("cText").value !== "") throw new Error("Reply draft was lost or not sent");
+    if (${scenario !== "failed"} && !$("appbar").hidden) throw new Error("Connected chat still shows recovery controls");
+  })()`])),
   "codex-approval": `select("fake:codex", { scroll: true, open: true }); rowOf(S.sel).status = "blocked"; codexViews.set(S.sel, { ready: true, status: "blocked", activeTurnId: "synthetic-turn", requests: [{ id: 42, method: "item/commandExecution/requestApproval", params: { command: "bun test", cwd: "/tmp/deck", reason: "Run the project tests", availableDecisions: ["accept", "decline"] } }] }); renderDetail();`,
   "codex-question": `select("fake:codex", { scroll: true, open: true }); rowOf(S.sel).status = "blocked"; codexViews.set(S.sel, { ready: true, status: "blocked", activeTurnId: "synthetic-turn", requests: [{ id: "async:question", method: "deck/asyncQuestion", params: { questions: [{ id: "q0", question: "Which test marker should be used?", options: [{ label: "Marker A" }, { label: "Marker B" }] }] } }] }); renderDetail();`,
   "codex-menu": `(async () => { select("fake:codex", { scroll: true, open: true }); rowOf(S.sel).status = "idle"; codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); renderDetail(); moreMenu(document.querySelector('[data-dact="more"]')); if (!menuEl.textContent.includes("Rename Codex task") || !menuEl.textContent.includes("Edit last message")) throw new Error("Native task actions are missing"); })()`,
@@ -163,7 +175,8 @@ const FAKE_ROWS = [
 
 function nativeFixtureState(view) {
   const capabilities = { settings: true, edit: true, create: true, rename: true, archive: true, archiveLoaded: false, restore: true, fork: true, forkPoint: true };
-  if (view === "codex-disconnected") return { ready: false, canOpen: true, requests: [], capabilities, error: "Open this task in the Codex app, then reconnect." };
+  if (view === "codex-disconnected") return { ready: false, canOpen: true, requests: [], capabilities, connectionIssue: "unavailable", error: "The Codex app connection closed. Try sending again." };
+  if (view === "codex-unloaded" || view.startsWith("codex-connect-")) return { ready: false, canOpen: true, requests: [], capabilities, connectionIssue: "not-loaded", error: "This chat is not loaded in the Codex app." };
   const blocked = ["codex-approval", "codex-question"].includes(view), idle = ["codex-menu", "codex-edit", "codex-settings", "codex-settings-managed", "codex-settings-save", "picker-codex-settings"].includes(view) || view.startsWith("codex-fork-point-") || view.startsWith("codex-archive-");
   return { ready: true, status: blocked ? "blocked" : idle ? "idle" : "working", activeTurnId: idle ? null : "synthetic-turn", capabilities,
     editableTurn: idle ? { turnId: "synthetic-last-turn", text: "Improve Codex support in the deck." } : undefined,
@@ -296,7 +309,8 @@ async function snap(browser, o, deck, view, vp) {
   await page.addInitScript(freezeScript);
   const out = { view, viewport: vp, errors: [], console: [], requests: new Set(), blocked: new Set() };
   const mutationReceipts = [], forkPointReceipts = [], archiveActions = [];
-  let nativeOpenCount = 0;
+  let nativeOpenCount = 0, nativeConnected = false;
+  const connectionCalls = [];
   let inflight = 0, lastNet = Date.now();
   page.on("pageerror", (e) => out.errors.push(String(e.message ?? e)));
   page.on("console", (m) => { if (m.type() === "error") out.console.push(m.text()); });
@@ -308,7 +322,17 @@ async function snap(browser, o, deck, view, vp) {
     let body;
     try { body = req.postDataJSON(); } catch {}
     // Native controls use only synthetic state in this harness, never the real desktop socket.
-    if (path === "/api/codex-state") return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeFixtureState(view)) });
+    const connectedState = { ...nativeFixtureState(view), ready: true, connectionIssue: undefined, error: undefined, status: view.endsWith("busy") ? "working" : "idle" };
+    if (path === "/api/codex-state") return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeConnected ? connectedState : nativeFixtureState(view)) });
+    if (view.startsWith("codex-connect-") && body?.key === "fake:codex" && ["/api/codex-connect", "/api/send", "/api/queue"].includes(path)) {
+      connectionCalls.push(path);
+      if (path === "/api/codex-connect") {
+        nativeConnected = !view.endsWith("failed");
+        return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeConnected ? connectedState : { ready: false, canOpen: true, error: "Fixture connection failed" }) });
+      }
+      if (!nativeConnected || body.text !== "Fixture reconnect reply." || path === "/api/send" && typeof body.requestId !== "string") out.errors.push("Native reply was sent before connecting or changed its content/receipt");
+      return r.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+    }
     if (path === "/api/codex-settings" && body?.expectedVersion == null) return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeFixtureSettings(view.startsWith("codex-settings-managed"))) });
     if (path === "/api/chat" && body?.key === "fake:codex" && view.startsWith("codex-fork-point-")) return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeForkFixtureChat()) });
     if (path === "/api/codex-fork-point" && body?.key === "fake:codex" && view.startsWith("codex-fork-point-")) {
@@ -356,6 +380,10 @@ async function snap(browser, o, deck, view, vp) {
   await settle();
   if (VIEWS[view]) { try { await page.evaluate(VIEWS[view].replaceAll("$HOME", o.home)); } catch (e) { out.errors.push(`setup: ${e.message}`); } }
   await settle();
+  if (view.startsWith("codex-connect-")) {
+    const expected = ["/api/codex-connect", ...(view.endsWith("failed") ? [] : [view.endsWith("busy") ? "/api/queue" : "/api/send"])];
+    if (JSON.stringify(connectionCalls) !== JSON.stringify(expected)) out.errors.push(`Reconnect reply calls: ${JSON.stringify(connectionCalls)}`);
+  }
   if (view === "codex-settings-save" && !out.settingsSaved) out.errors.push("Settings form did not submit");
   if (view === "model-chip-pick" && JSON.stringify(out.modelChip) !== JSON.stringify([["/api/send", "fake:done", "/model sonnet"], ["/api/queue", "fake:working", "/effort max"]])) out.errors.push(`Model chip sent ${JSON.stringify(out.modelChip)}`);
   if (view.startsWith("codex-create-") || view === "codex-fork-retry") {

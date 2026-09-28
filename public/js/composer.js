@@ -6,9 +6,25 @@ function autosize(el) { el.style.height = ""; el.style.height = Math.min(el.scro
 async function sendMessage(text, fromEl, how) {
   const key = S.sel;
   const r = rowOf(key);
-  if (!r) return;
-  if (!codexCanReply(r)) return toast("Reconnect to the Codex app before sending.", true);
-  if (r.app && r.status === "working" && how !== "steer") how = "later";
+  if (!r || r.hist || (!text && !pasteList(key).length)) return;
+  if (!r.app) return sendReadyMessage(r, text, fromEl, how);
+  if (codexSending.has(key)) return;
+  const draft = fromEl.value, pastes = pasteList(key).map((p) => p.id).join();
+  codexSending.add(key); renderDetail();
+  try {
+    if (!codexCanReply(r)) {
+      const state = await connectCodex(r);
+      if (!state.ready) throw new Error(state.error ?? "Could not connect to Codex. Your draft stays here.");
+      // Connecting can take seconds. Never send an edited draft or clear another chat's composer.
+      if (S.sel !== key || fromEl.value !== draft || pasteList(key).map((p) => p.id).join() !== pastes) return toast("Connected to Codex. Your draft is ready when you are.");
+    }
+    await sendReadyMessage(r, text, fromEl, how);
+  } catch (x) { toast(x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim(), fromEl, how); } }); }
+  finally { codexSending.delete(key); renderDetail(); }
+}
+async function sendReadyMessage(r, text, fromEl, how) {
+  const key = r.key, working = r.app ? codexView(r)?.status === "working" : r.status === "working";
+  if (r.app && working && how !== "steer") how = "later";
   const pastes = fromEl === $("cText") ? takePastes(key) : [];
   if (!text && !pastes.length) return;
   // Long text travels as a file: pasted blocks, and anything too big to type into a terminal.
@@ -16,7 +32,7 @@ async function sendMessage(text, fromEl, how) {
     try { text = await fileLongText(r, text, pastes); }
     catch (x) { restorePastes(key, pastes); toast("Couldn’t save the long text: " + x.message, true); return; }
   }
-  if (how === "later" && r.status === "working" && isAgent(r)) {
+  if (how === "later" && working && isAgent(r)) {
     fromEl.value = ""; autosize(fromEl); S.drafts.delete(key); closeSlash();
     try { await api("/api/queue", { op: "add", key, text }); toast("Queued. It goes when the agent finishes this turn."); }
     catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } }); }
@@ -239,13 +255,13 @@ $("cText").addEventListener("blur", () => setTimeout(closeSlash, 120));
 // ── uploads: attach button, drag and drop, paste ─────────────────────────────
 function pickFiles() {
   const r = rowOf(S.sel);
-  if (!r || r.hist || !codexCanReply(r)) return toast("Open a live session to attach files", true);
+  if (!r || r.hist) return toast("Open a live session to attach files", true);
   $("fileIn").value = "";
   $("fileIn").click();
 }
 async function uploadFiles(files) {
   const r = rowOf(S.sel);
-  if (!r || r.hist || !codexCanReply(r)) return toast("Open a live session to attach files", true);
+  if (!r || r.hist) return toast("Open a live session to attach files", true);
   const list = [...files].slice(0, 20);
   if (!list.length) return;
   const ta = $("cText");
@@ -272,14 +288,14 @@ $("fileIn").addEventListener("change", (e) => uploadFiles(e.target.files));
 // (a script-triggered click on a hidden input is ignored by some phones and installed apps).
 $("cAttach").addEventListener("click", (e) => {
   const r = rowOf(S.sel);
-  if (!r || r.hist || !codexCanReply(r)) { e.preventDefault(); return toast("Open a live session to attach files", true); }
+  if (!r || r.hist) { e.preventDefault(); return toast("Open a live session to attach files", true); }
   $("fileIn").value = "";
 });
 $("cAttach").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("cAttach").click(); } });
 {
   let depth = 0;
   const det = $("detail");
-  const canDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files") && !S.mode && rowOf(S.sel) && !rowOf(S.sel).hist && codexCanReply(rowOf(S.sel));
+  const canDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files") && !S.mode && rowOf(S.sel) && !rowOf(S.sel).hist;
   det.addEventListener("dragenter", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth++; det.classList.add("dropping"); });
   det.addEventListener("dragover", (e) => { if (canDrop(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
   det.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) det.classList.remove("dropping"); });
