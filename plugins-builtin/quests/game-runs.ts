@@ -1,8 +1,10 @@
 // The game layer: leads for a project (read-only, from Discover → Leads) and runs (an idea turned into a project with
 // a business milestone ladder). Pure helpers; the service (game.ts) does the writing.
-import type { LadderItem } from "./journey-ai";
 import { hash } from "./game-rules";
 import type { LeadPost } from "./game-quests";
+
+/** A milestone on a project's ladder, as the journeys service's seedLadder takes it (the projects plugin's LadderItem). */
+export type LadderItem = { id: string; title: string; metric: string; unit: string; target: number; source: string; why?: string; tier: number };
 
 const clip = (s: unknown, n: number) => { const t = String(s ?? "").replace(/\s+/g, " ").trim(); return t.length > n ? `${t.slice(0, n - 1).replace(/\s+\S*$/, "")}…` : t; };
 export const slugify = (s: string, n = 40) => String(s ?? "").toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, n).replace(/-+$/, "");

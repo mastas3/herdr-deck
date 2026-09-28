@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   achievements, addDays, appendProofs, bossesFor, dayOf, last30, levelOf, levelReach, proofsFromJourney, score, scoreLines, seasonFor, streak, weekOf, XP,
   type JourneyLike, type Line, type Proof,
-} from "../src/game-rules";
+} from "../game-rules";
 
 const DAY = 86_400_000, H = 3600_000;
 const T0 = Date.UTC(2026, 8, 21, 9); // Monday 2026-09-21, 09:00 UTC

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { arrange, fallbackQuests, generateQuests, genericReason, normalizeQuests, QUEST_XP, vetQuests, type QuestCtx } from "../src/game-quests";
-import { cleanIdea, leadsFor, projectTerms, runFolderOk, runLadder } from "../src/game-runs";
-import { parseJsonLoose } from "../src/journey-ai";
+import { arrange, fallbackQuests, generateQuests, genericReason, normalizeQuests, QUEST_XP, vetQuests, type QuestCtx } from "../game-quests";
+import { cleanIdea, leadsFor, projectTerms, runFolderOk, runLadder } from "../game-runs";
+import { parseJsonLoose } from "../../../src/model-call";
 
 // ── quests: JSON repair and fallback ──────────────────────────────────────────────────
 const qctx = (over: Partial<QuestCtx> = {}): QuestCtx => ({

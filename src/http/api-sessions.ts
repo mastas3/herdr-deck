@@ -14,7 +14,7 @@ import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
 
 export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
-  const { deck, game, graves, broadcastGraves, refreshShared } = hub;
+  const { deck, graves, broadcastGraves, refreshShared, pluginHost } = hub;
   const { remotes, allRows, localRow } = hub.hosts;
   const { reopen, startSession, sendText, sendAny, closeLocal } = hub.sessions;
   const { who, detailFor, chatSlice, chatFor, detailPayload, briefKey, searchLocal } = hub.chat;
@@ -137,7 +137,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
     case "/api/new-options":
       return json(await newSessionOptions(deck, graves));
     case "/api/new":
-      game.mkdirRun(body); // a new run's folder, only now that you confirmed the dialog
+      pluginHost.service<{ mkdirRun(b: unknown): void }>("game")?.mkdirRun(body); // a quest run's new folder, only now that you confirmed the dialog
       return json(await startSession(body));
     case "/api/detail": {
       const lr = localRow(body.key);

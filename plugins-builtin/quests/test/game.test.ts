@@ -1,11 +1,11 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { appendProofs, XP, type JourneyLike } from "../src/game-rules";
-import { QUEST_XP } from "../src/game-quests";
-import { createGame, SWITCH_COOLDOWN } from "../src/game";
-import { cleanPrefs, DEFAULT_PREFS, wants, type Device } from "../src/push";
-import { Automations } from "../src/automations";
+import { appendProofs, XP, type JourneyLike } from "../game-rules";
+import { QUEST_XP } from "../game-quests";
+import { createGame, SWITCH_COOLDOWN } from "../game";
+import { cleanPrefs, DEFAULT_PREFS, wants, type Device } from "../../../src/push";
+import { Automations } from "../../../src/automations";
 
 const root = mkdtempSync(`${tmpdir()}/deck-game-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));
@@ -187,10 +187,13 @@ describe("the quest board service", () => {
 // ── push prefs and the digest ─────────────────────────────────────────────────────────
 describe("quest pushes: the digest by default, the rest only if you ask", () => {
   const dev = (prefs: any): Device => ({ id: "d", endpoint: "https://fcm.googleapis.com/x", keys: { p256dh: "a", auth: "b" }, label: "Phone", prefs: cleanPrefs(prefs), createdAt: 0 });
-  test("defaults: quests in the digest on, quest pushes off", () => {
-    expect(DEFAULT_PREFS).toMatchObject({ questDigest: true, quests: false });
-    expect(cleanPrefs({})).toMatchObject({ questDigest: true, quests: false });
-    const m = { kind: "quest" as const, title: "Quest done", body: "" };
+  test("defaults: quests in the digest on, quest pushes off; the choices are the plugin's, kept by name", () => {
+    expect(DEFAULT_PREFS).not.toHaveProperty("quests");
+    expect(cleanPrefs({ questDigest: false, quests: true })).toMatchObject({ questDigest: false, quests: true });
+    // Saved from a page where the quests plugin is off: the device keeps its earlier choices.
+    expect(cleanPrefs({ needs: false }, cleanPrefs({ quests: true }))).toMatchObject({ needs: false, quests: true });
+    expect(cleanPrefs({ "bad key": true, quiet: true })).not.toHaveProperty("bad key");
+    const m = { kind: "quest", pref: "quests", title: "Quest done", body: "" };
     expect(wants(dev({}), m, new Date())).toBe(false);
     expect(wants(dev({ quests: true }), m, new Date())).toBe(true);
     expect(wants(dev({ quests: true, quiet: { on: true, from: "00:00", to: "23:59" } }), m, new Date(2026, 0, 1, 12))).toBe(false);

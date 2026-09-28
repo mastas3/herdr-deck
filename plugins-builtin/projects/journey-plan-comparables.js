@@ -1,5 +1,5 @@
 // Project pages: "Plan the next milestone" includes what comparable founders did for that kind of milestone (first
-// paying customer, growth, launch), from the Founder Library (src/journey-comparables.ts). The page asks for it when
+// paying customer, growth, launch), from the Founder Library (journey-comparables.ts). The page asks for it when
 // a project opens; a Plan press that beats the answer waits for it (a second at most), so the prompt always has it
 // when the library does. Without a library the prompt is the page's own.
 const jComps = new Map(); // project → { p: Promise, v?: result }

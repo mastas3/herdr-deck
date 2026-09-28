@@ -9,7 +9,7 @@ $("rows").addEventListener("click", async (e) => {
   const newin = e.target.closest('[data-secact="newin"]');
   if (newin) { e.stopPropagation(); return openNew(projectHome(newin.dataset.proj)); }
   const jour = e.target.closest('[data-secact="journey"]');
-  if (jour) { e.stopPropagation(); return openJourney(jour.dataset.proj); }
+  if (jour) { e.stopPropagation(); return projectLink()?.open(jour.dataset.proj); }
   if (e.target.closest("[data-secact]")?.dataset.secact === "closeEmpty") { e.stopPropagation(); return askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)); }
   const sec = e.target.closest("[data-sec]");
   if (sec) {
@@ -113,7 +113,7 @@ $("detail").addEventListener("click", (e) => {
   if (act === "home") return goHome();
   const r = rowOf(S.sel);
   if (!r) return;
-  if (act === "journey") return openJourney(r.project);
+  if (act === "journey") return projectLink()?.open(r.project);
   if (act === "tools") openToolMenu(b);
   if (act === "share") shareRow(r, Number(b.dataset.port));
   if (act === "unshare") unshareRow(r, Number(b.dataset.port));

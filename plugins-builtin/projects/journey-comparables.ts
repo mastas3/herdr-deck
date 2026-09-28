@@ -1,7 +1,7 @@
 // Project pages → Founder Library: what founders most like this project did at the milestone it's working toward.
 // The page's "Plan the next milestone" prompt adds this text (public/js/journey-comparables.js asks for it), so the
 // plan starts from real tactics with links instead of generic advice. Word matching only: instant, no model call.
-import { comparablesFor, milestoneKind, tacticsText, type Comparables, type Target } from "./library-strategy";
+import { comparablesFor, milestoneKind, tacticsText, type Comparables, type Target } from "../../src/library-strategy";
 
 type JourneyLike = { project: string; pitch?: string; tldr?: string; tags?: string[]; milestones: { id: string; title: string; state: string }[]; next: string[] };
 

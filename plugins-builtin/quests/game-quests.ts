@@ -8,7 +8,7 @@
 // are built only from the same real state; when there isn't enough of it, the board shows fewer quests, not filler.
 //
 // Only titles, milestone names, numbers, lead post titles/links, the site's host and product name go to the model.
-import { parseJsonLoose, type Runner } from "./journey-ai";
+import { parseJsonLoose, type Runner } from "../../src/model-call";
 import { hash } from "./game-rules";
 
 export type QuestProof = "sell" | "talk" | "lead" | "ship" | "milestone" | "metric" | "check";

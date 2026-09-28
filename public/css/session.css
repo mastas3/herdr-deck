@@ -10,6 +10,7 @@
 .dh-meta b { color: var(--ink); font-weight: 600; }
 .dh-meta > * { flex: none; white-space: nowrap; }
 .dh-meta .pj { font-size: 14px; max-width: 22ch; overflow: hidden; text-overflow: ellipsis; }
+.dh-meta span.pj { font-weight: inherit; } /* the project name when no project page is on: same look as the link */
 .dh-meta .br { font-size: 12.5px; color: var(--ink-3); max-width: 26ch; overflow: hidden; text-overflow: ellipsis; }
 .dh-meta .portw { display: inline-flex; align-items: center; }
 .dh-meta .chk { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; font-size: 12.5px; font-weight: 600; }

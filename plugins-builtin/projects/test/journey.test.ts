@@ -1,12 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import {
-  branchLabel, chunkCommits, collectGit, collectGumroad, collectNotes, collectWiki, headingDate, mergedBranchName, nameRe, parseGitLog, parseWikiLog, parseWikiPage,
-  productMatches, sessionEvents, worktreeOf, agentMs, type Commit, type SessRec,
-} from "../src/journey-collect";
-import { analyze, closeJson, digest, guardLadder, guessNature, metricName, normalizeAi, parseJsonLoose, ruleBased, templateLadder, type DigestInput } from "../src/journey-ai";
-import { assemble, computeMetrics, createJourneys, cumulative, evaluate, liveSessions, projectSessions, type Evidence } from "../src/journey";
+import { branchLabel, chunkCommits, collectGit, mergedBranchName, nameRe, parseGitLog, type Commit } from "../journey-collect";
+import { collectGumroad, collectNotes, collectWiki, headingDate, parseWikiLog, parseWikiPage, productMatches, sessionEvents, worktreeOf, agentMs, type SessRec } from "../journey-sources";
+import { analyze, closeJson, digest, guardLadder, guessNature, metricName, normalizeAi, parseJsonLoose, ruleBased, templateLadder, type DigestInput } from "../journey-ai";
+import { assemble, computeMetrics, cumulative, evaluate, type Evidence } from "../journey";
+import { createJourneys } from "../journey-service";
+import { liveSessions, projectSessions } from "../journey-sessions";
 
 const root = mkdtempSync(`${tmpdir()}/deck-journey-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));

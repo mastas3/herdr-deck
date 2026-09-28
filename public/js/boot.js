@@ -1,6 +1,6 @@
 "use strict";
 // Live data (SSE) and startup: the last of the deck's own files, so everything it calls is defined by now. The
-// Gallery files, then running plugins' files, load after it (public/assets.json) and hook into what they need.
+// Gallery and Library files and the running plugins' load after it and hook into what they need; startup waits for them.
 // ── live data ────────────────────────────────────────────────────────────
 function notifyTransitions(prev, next) {
   if (!S.notify || PUSH.on || !prev || prev.status === next.status) return;
@@ -88,10 +88,12 @@ function connect() {
 }
 setTpos(S.tpos);
 setMain(S.main);
-if (window.__BOOT__) applyFull(window.__BOOT__);
-connect();
-if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").then(() => pushSync()).catch(() => {});
-{
+// The first state, the live stream and the page's own link wait for every script, running plugins' included (they
+// load after this file): their state hooks, SSE events and deep links (/p/<project>, ?quests=1) are registered by then.
+function startPage() {
+  if (window.__BOOT__) applyFull(window.__BOOT__);
+  connect();
+  if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.register("/sw.js").then(() => pushSync()).catch(() => {});
   const params = new URLSearchParams(location.search);
   if (params.get("status") === "blocked") { S.q = "is:blocked"; $("q").value = S.q; render(); }
   if (params.get("new")) setTimeout(openNew, 50);
@@ -100,4 +102,6 @@ if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.reg
   else if ([...params.keys()].length) deckPlugins.each("links", new URL(location.href));
   if ([...params.keys()].length) history.replaceState(history.state, "", deckPlugins.view(S.mode)?.path?.() ?? "/");
 }
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", startPage, { once: true });
+else startPage();
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pollTerm(); chatTick(true); } });

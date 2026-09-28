@@ -41,6 +41,9 @@ export const VIEWS = {
   opportunities: `setMode("opportunities")`,
   quests: `setMode("quests")`,
   projects: `openProjects()`,
+  // Grouped by project: each project header carries its project page link (the projects plugin's "project.link").
+  "by-project": `setGroup("project"); select("fake:blocked", { scroll: true, open: true })`,
+  "project-page": `openJourney("acme-api")`,
   plugins: `setMode("plugins")`,
   "plugins-builtin": `setMode("plugins"); plugTab("code")`,
   "plugins-add": `setMode("plugins"); plugTab("add")`,

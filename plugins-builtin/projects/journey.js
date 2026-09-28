@@ -1,8 +1,9 @@
 "use strict";
 // ── Project page (journeys) ─────────────────────────────────────────────────── <journey>
 // Every project as a journey: origin → turns → now → where it's heading, with side quests branching off, milestone
-// flags on the line and a ladder of milestones that unlock from evidence. Data comes from /api/journey (src/journey.ts),
-// cached on the server; the graph is one inline SVG drawn from that data (no libraries), re-laid out on pan/zoom.
+// flags on the line and a ladder of milestones that unlock from evidence. Data comes from /api/journey
+// (journey-service.ts), cached on the server; the graph is one inline SVG drawn from that data (no libraries),
+// re-laid out on pan/zoom.
 S.jp = { name: null, data: new Map(), idx: null, q: "", all: false, loading: new Set(), polls: 0, intro: new Set(), card: null };
 const J_ICON = {
   flag: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 14.5V2"/><path d="M3.5 2.5h8l-1.8 3 1.8 3h-8"/></svg>',
@@ -113,7 +114,8 @@ function jTicks(a, b) {
 const J_TRACK = { commits: 0, merge: 0, tag: 0, release: 0, deploy: 0, milestone: 0, session: 1, wiki: -1, log: -1, idea: -1, lead: -1, manual: -1 };
 const J_KIND = { commits: "Commits", merge: "Merge", tag: "Tag", release: "Release", deploy: "Deploy", milestone: "Milestone unlocked", session: "Session", wiki: "Wiki", log: "Wiki log", idea: "Plan", lead: "Leads", manual: "You logged" };
 const jEsc = (s) => esc(s).replace(/\n/g, " ");
-// Project pages in the deck's registry (public/js/registry.js): the two views, their links (/p, /p/<project>) and ⌘K.
+// Project pages in the deck's registry (public/js/registry.js): the two views, their links (/p, /p/<project>), ⌘K,
+// and where project names lead (the list's project headers and the session header).
 deckPlugins.register("projects", {
   views: {
     project: { load: () => loadJourney(S.jp.name, { force: true }), render: () => renderJourney(), path: () => (S.jp?.name ? `/p/${encodeURIComponent(S.jp.name)}` : undefined) }, // cached on the server: instant
@@ -134,4 +136,4 @@ deckPlugins.register("projects", {
     const jp = names.map((p) => ({ p, s: fuzzy(`project ${p}`, q) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 5);
     return [...out, ...jp.map(({ p }) => ({ section: "Project pages", html: `<span class="dot" style="--c:${pc(p)}"></span><span>Project: ${esc(p)}</span><small>journey & milestones</small>`, run: () => openJourney(p) }))];
   },
-});
+}).extend("project.link", { icon: J_ICON.journey, open: openJourney });

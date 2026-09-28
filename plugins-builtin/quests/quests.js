@@ -288,7 +288,8 @@ function qTicker(el, to) {
   const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = qmoney(from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
-// Quests in the deck's registry (public/js/registry.js): view, tab, key, ⌘K, the header chip and live updates.
+// Quests in the deck's registry (public/js/registry.js): view, tab, key, ⌘K, the header chip, live updates and its two
+// choices in the Notifications dialog (the hub keeps them per device as questDigest and quests).
 deckPlugins.register("quests", {
   views: { quests: { load: () => loadQuests({ force: true }), render: () => renderQuests() } },
   tabs: [{ view: "quests", label: "Quests", icon: () => QI.quest, key: "q", order: 50 }],
@@ -300,4 +301,10 @@ deckPlugins.register("quests", {
   state: (data) => { S.game = data.game ?? S.game; renderQChip(); },
   events: { game: (sum) => questsLive(sum) },
   links: (u) => (u.searchParams.get("quests") ? (setMode("quests"), true) : false),
-});
+}).extend("notify.prefs", { title: "Quests", prefs: [
+  { key: "questDigest", label: "Today’s quests in the morning digest", hint: "Your main quest, its boss and today’s three quests", default: true },
+  { key: "quests", label: "Quest wins", hint: "A quest completed, a boss hit or defeated, an achievement, the Sunday review", default: false },
+] });
+// Its key in the Keyboard help, before New session.
+[...(document.querySelector("#help table")?.rows ?? [])].find((tr) => tr.querySelector("kbd")?.textContent === "n")
+  ?.insertAdjacentHTML("beforebegin", "<tr><td><kbd>q</kbd></td><td>Quests: your main quest, today’s quests, bosses and streak</td></tr>");

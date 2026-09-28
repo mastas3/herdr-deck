@@ -21,7 +21,7 @@ export async function activate(host: any) { T.activated.push(host.id); ${body} }
 }
 function core(o: { node?: boolean; events?: [string, unknown][] } = {}): CoreCaps {
   return {
-    rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => !!o.node,
+    rows: () => [], push: {} as any, automations: () => undefined, decisions: () => [], machines: () => [], isNode: () => !!o.node, history: async () => [], checks: () => new Map(),
     broadcast: (e, d) => o.events?.push([e, d]), notice: () => {},
     sessions: { start: async () => ({}), send: async () => {}, close: async () => ({}) },
   };
@@ -161,6 +161,22 @@ describe("the plugin host", () => {
     expect(g.__coreUser.use("remotes")).toEqual({ n: 2 });
     expect(g.__coreUser.use("nobody-lends-this")).toBeUndefined();
     expect(h.service("remotes")).toBeUndefined(); // the core's own lookup is for plugins' services
+  });
+
+  test("provideCore: the core offers a service under a plugin's name until a plugin provides it", async () => {
+    const s = setup();
+    plugin(s.builtin, "core-user", { uses: ["later"] }, `(globalThis as any).__coreUser = host;`);
+    const h = s.make();
+    h.provideCore("parts", { n: 1 });
+    await h.start();
+    expect(g.__coreUser.use("parts")).toEqual({ n: 1 });
+    h.provideCore("parts", { n: 2 }); // again: replaced, not an error
+    expect(g.__coreUser.use("parts")).toEqual({ n: 2 });
+    plugin(s.builtin, "later", { provides: ["parts"] }, `host.provide("parts", { n: "plugin" });`);
+    await h.reconcile();
+    expect(g.__coreUser.use("parts")).toEqual({ n: "plugin" });
+    await h.setEnabled("later", false);
+    expect(g.__coreUser.use("parts")).toBeUndefined(); // its plugin exists and is off: off means off
   });
 
   test("core extension points check what they're given", async () => {

@@ -28,11 +28,6 @@
     "js/leads-events.js",
     "js/research.js",
     "js/menus.js",
-    "js/journey.js",
-    "js/journey-graph.js",
-    "js/journey-page.js",
-    "js/quests.js",
-    "js/quests-actions.js",
     "js/notifications.js",
     "js/palette.js",
     "js/new-session.js",
@@ -50,8 +45,7 @@
     "js/gallery-comparables.js",
     "js/plugins.js",
     "js/plugins-code.js",
-    "js/studio-comparables.js",
-    "js/journey-comparables.js"
+    "js/studio-comparables.js"
   ],
   "styles": [
     "css/tokens.css",
@@ -73,8 +67,6 @@
     "css/feed.css",
     "css/motion.css",
     "css/simple.css",
-    "css/journey.css",
-    "css/quests.css",
     "css/gallery.css",
     "css/gallery-sheet.css",
     "css/plugins.css",
