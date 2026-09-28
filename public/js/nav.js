@@ -107,10 +107,10 @@ for (const ev of ["touchstart", "wheel"]) $("dbody").addEventListener(ev, () => 
 
 // ── recording changes ──
 /** Before a screen change: what you're leaving (a ghost of it on the phone, for the slide and a later swipe back). */
-function navWill(later) {
+function navWill(later, ghost = true) {
   if (NAV.restoring || NAV.pending) return;
   const from = navNow();
-  NAV.pending = { from, url: location.pathname + location.search, sc: navScroll(), ghost: isPhone() && from.mv !== "list" ? navGhost() : null };
+  NAV.pending = { from, url: location.pathname + location.search, sc: navScroll(), ghost: ghost && isPhone() && from.mv !== "list" ? navGhost() : null };
   // Called from a wrapped function: its caller finishes in this task. `later`: from a listener that runs before the
   // one that makes the change (microtasks run between an event's listeners).
   later ? setTimeout(navSync) : queueMicrotask(navSync);
@@ -224,7 +224,7 @@ addEventListener("popstate", (e) => {
 // ── the phone's screens: list → session (chat ⇄ terminal) ──
 function setMView(v) {
   if (app.dataset.mview === v) return;
-  navWill();
+  navWill(false, false); // chat ⇄ terminal and back to the list slide the live panes: no copy needed
   const from = app.dataset.mview;
   app.dataset.mview = v;
   for (const b of document.querySelectorAll(".mbar [data-mv]")) b.setAttribute("aria-selected", b.dataset.mv === v);
