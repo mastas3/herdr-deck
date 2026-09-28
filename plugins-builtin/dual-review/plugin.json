@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "dual-review",
+  "name": "Dual review",
+  "version": "0.1.0",
+  "description": "Claude and Codex review the same change in two sessions you confirm first. The Review view lines their findings up (both found / only one) and sends the ones you pick back to the session that made the change.",
+  "server": "server.ts",
+  "client": ["dual-review.js", "dual-review-start.js"],
+  "styles": ["dual-review.css"],
+  "machine": "hub",
+  "routes": ["dual-review"]
+}
