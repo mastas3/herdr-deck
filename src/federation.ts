@@ -6,6 +6,7 @@ import type { Row } from "./deck";
 import type { MachineUsage } from "./usage-accounts";
 import { nodeUsage } from "./usage-merge";
 import { RowFeed, type Usage } from "./row-feed";
+import { seqStep } from "./http/sse";
 
 export type RemoteConf = { id: string; label: string; ssh: string; remotePort?: number; localPort?: number };
 export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app" };
@@ -18,6 +19,8 @@ type Listener = {
   notice: (n: any) => void;
   usage: () => void;
 };
+/** The node's stream skipped an event: reconnect from the last one applied (it replays the rest). */
+class Gap extends Error {}
 
 export class RemoteHost {
   rows = new Map<string, Row>();
@@ -31,6 +34,8 @@ export class RemoteHost {
   private tunnel?: Subprocess;
   private stopped = false;
   private tunnelUp?: Promise<void>;
+  /** The node's last event applied here ("<boot>.<n>"): a reconnect asks only for what came after. */
+  private seq?: string;
   /** Passes on only what the hub's pages show: an older node still sends rows whose start time jitters. */
   private feed = new RowFeed();
   base = "";
@@ -115,7 +120,7 @@ export class RemoteHost {
       try {
         this.token ??= await this.fetchToken();
         await this.tunnelUp;
-        const res = await fetch(`${this.base}/events`, { headers: this.headers() });
+        const res = await fetch(`${this.base}/events${this.seq ? `?since=${encodeURIComponent(this.seq)}` : ""}`, { headers: this.headers() });
         if (res.status === 401 || res.status === 403) {
           this.token = undefined;
           throw new Error("the node rejected our token");
@@ -125,6 +130,7 @@ export class RemoteHost {
         await this.consume(res.body);
         throw new Error("stream ended");
       } catch (e: any) {
+        if (e instanceof Gap) { await Bun.sleep(200); continue; }
         const msg = e?.code === "ConnectionRefused" || /ECONNREFUSED|Unable to connect/i.test(String(e?.message)) ? "can't reach the node (is herdr-deck running there?)" : String(e?.message ?? e);
         this.setOffline(msg);
         await Bun.sleep(delay);
@@ -135,31 +141,66 @@ export class RemoteHost {
 
   private async consume(body: ReadableStream<Uint8Array>) {
     const reader = body.getReader();
-    const dec = new TextDecoder();
-    let buf = "";
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) return;
-      buf += dec.decode(value, { stream: true });
-      let sep;
-      while ((sep = buf.indexOf("\n\n")) >= 0) {
-        const block = buf.slice(0, sep);
-        buf = buf.slice(sep + 2);
-        let event = "message", data = "";
-        for (const line of block.split("\n")) {
-          if (line.startsWith("event: ")) event = line.slice(7);
-          else if (line.startsWith("data: ")) data += line.slice(6);
+    try {
+      const dec = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) return;
+        buf += dec.decode(value, { stream: true });
+        let sep;
+        while ((sep = buf.indexOf("\n\n")) >= 0) {
+          const block = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          let event = "message", data = "", id = "";
+          for (const line of block.split("\n")) {
+            if (line.startsWith("event: ")) event = line.slice(7);
+            else if (line.startsWith("data: ")) data += line.slice(6);
+            else if (line.startsWith("id: ")) id = line.slice(4);
+          }
+          if (data) await this.receive(event, JSON.parse(data), id);
         }
-        if (data) this.handle(event, JSON.parse(data));
       }
+    } finally {
+      // Leaving early (a gap, a bad event) must close the connection too, not leave it open under a new one.
+      reader.cancel().catch(() => {});
     }
   }
 
   private tag = (r: Row): Row => ({ ...r, key: `${this.conf.id}|${r.key}`, machine: this.conf.id });
   private tagGrave = (g: any) => ({ ...g, id: `${this.conf.id}|${g.id}`, machine: this.conf.id });
 
-  /** The node's whole state (on connect): passed on as the rows that differ from what we had. */
-  private applyState(data: any) {
+  /** One event from the node's stream, in order: numbered ones must follow on from the last applied. */
+  private async receive(event: string, data: any, id: string) {
+    if (event === "full") { this.applyState(data, id || data.seq); return; }
+    if (event === "stale") {
+      // The node no longer has what we missed (it restarted, or we were away long): take its whole state, gzipped.
+      const res = await this.get("/api/state");
+      if (!res.ok) throw new Error(`node answered ${res.status}`);
+      const st = await res.json();
+      this.applyState(st, st.seq);
+      return;
+    }
+    if (event === "ready") { this.goOnline(); return; }
+    if (id) {
+      const step = seqStep(this.seq, id);
+      if (step === "skip") return;
+      if (step === "resync") throw new Gap(`missed events before ${id}`);
+      this.seq = id;
+    }
+    this.handle(event, data);
+  }
+
+  private goOnline() {
+    if (this.online && !this.error) return;
+    this.online = true;
+    this.error = undefined;
+    this.on.patch([], []);
+  }
+
+  /** The node's whole state (on connect, or after `stale`): passed on as the rows that differ from what we had. */
+  private applyState(data: any, seq?: string) {
+    this.seq = seq || undefined;
     this.online = true;
     this.error = undefined;
     this.rows = new Map(data.rows.map((r: Row) => { const t = this.tag(r); return [t.key, t]; }));
@@ -173,9 +214,7 @@ export class RemoteHost {
   }
 
   private handle(event: string, data: any) {
-    if (event === "full") {
-      this.applyState(data);
-    } else if (event === "patch") {
+    if (event === "patch") {
       const upsert = data.upsert.map(this.tag);
       for (const r of upsert) this.rows.set(r.key, r);
       const remove = data.remove.map((k: string) => `${this.conf.id}|${k}`);

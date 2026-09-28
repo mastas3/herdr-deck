@@ -33,6 +33,7 @@
     "js/nav-anim.js",
     "js/nav.js",
     "js/swipe.js",
+    "js/stream.js",
     "js/boot.js",
     "js/plugins.js",
     "js/plugins-code.js",

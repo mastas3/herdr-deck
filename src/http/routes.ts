@@ -30,7 +30,10 @@ export function createRoutes(hub: Hub) {
       // So do a running plugin's page links (e.g. /p, the project pages).
       if (url.pathname === "/" || url.pathname.startsWith("/s/") || pluginHost.isPage(url.pathname)) return send(req, page(), "text/html; charset=utf-8");
       { const a = assets.serve(req, url); if (a) return a; }
-      if (url.pathname === "/events") return sse.stream(fullState);
+      // The browser's own reconnect sends Last-Event-ID; the page's sends ?since= (both "<boot>.<n>").
+      if (url.pathname === "/events") return sse.stream(fullState, req.headers.get("last-event-id") || url.searchParams.get("since"));
+      // The whole state, for a page (or hub) whose missed events are gone: gzipped below, unlike the stream.
+      if (url.pathname === "/api/state") return Response.json(fullState(), { headers: { "cache-control": "no-store" } });
       { const f = await staticFile(url); if (f) return f; }
       if (url.pathname === "/api/image") {
         // <img> can't send headers, so the token rides in the query string.

@@ -35,7 +35,7 @@ export function framesIn(err: unknown, dir: string): string[] {
 }
 
 /** SSE events the page already uses: a plugin can't send these. */
-const CORE_EVENTS = new Set(["full", "patch", "procs", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
+const CORE_EVENTS = new Set(["full", "stale", "ready", "patch", "procs", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
 
 export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void; builtinsOn?: boolean; devDirs?: string[] }) {
   const log = o.log ?? ((s: string) => console.warn(s));

@@ -14,6 +14,7 @@ function notifyTransitions(prev, next) {
   } catch {}
 }
 function applyFull(data) {
+  S.seq = data.seq || null;
   S.token = data.token;
   S.self = data.self;
   S.rows = new Map(data.rows.map((r) => [r.key, r]));
@@ -56,10 +57,12 @@ function reconnectSoon(ms = 1500) {
   reconnectTimer = setTimeout(() => { es?.close(); connect(); }, ms);
 }
 function connect() {
-  es = new EventSource("/events");
-  es.addEventListener("full", (e) => { $("conn").classList.remove("off"); applyFull(JSON.parse(e.data)); });
-  es.addEventListener("patch", (e) => {
-    const p = JSON.parse(e.data);
+  // What the page already has (the inlined state, or the last event applied): the deck sends only what came after.
+  es = new EventSource(S.seq ? "/events?since=" + encodeURIComponent(S.seq) : "/events");
+  const on = (name, fn) => es.addEventListener(name, (e) => liveEvent(fn, e));
+  es.addEventListener("full", (e) => { $("conn").classList.remove("off"); applyFull(JSON.parse(e.data)); if (e.lastEventId) S.seq = e.lastEventId; });
+  es.addEventListener("stale", () => resync());
+  on("patch", (p) => {
     for (const r of p.upsert) { notifyTransitions(rowOf(r.key), r); S.rows.set(r.key, r); }
     for (const k of p.remove) { S.rows.delete(k); S.details.delete(k); }
     S.summary = p.summary;
@@ -70,18 +73,19 @@ function connect() {
     render();
   });
   // Memory, CPU and process counts, apart from the rows: only the footer shows them live.
-  es.addEventListener("procs", (e) => { const u = JSON.parse(e.data); for (const k in u) { const r = S.rows.get(k); if (r) [r.rssKB, r.cpu, r.procs] = u[k]; } renderFooter(); });
-  es.addEventListener("queue", (e) => { S.queue = JSON.parse(e.data); const r = rowOf(S.sel); if (r) renderQueue(r); render(); });
-  es.addEventListener("graveyard", (e) => { S.graveyard = JSON.parse(e.data); render(); });
-  es.addEventListener("history", (e) => { S.hist = JSON.parse(e.data); if (S.mode === "history") renderHistStatus(); });
-  es.addEventListener("usage", (e) => { S.usage = JSON.parse(e.data); const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); if (S.mode === "usage") renderUsage(); });
-  es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
-  es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
-  es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); const cur = S.sel && rowOf(S.sel); if (cur) renderAsk(cur); });
-  es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
-  for (const { event, fn } of deckPlugins.contributions("sse.events")) es.addEventListener(event, (e) => { try { fn(JSON.parse(e.data)); } catch (err) { console.error(err); } });
+  on("procs", (u) => { for (const k in u) { const r = S.rows.get(k); if (r) [r.rssKB, r.cpu, r.procs] = u[k]; } renderFooter(); });
+  on("queue", (q) => { S.queue = q; const r = rowOf(S.sel); if (r) renderQueue(r); render(); });
+  on("graveyard", (g) => { S.graveyard = g; render(); });
+  on("history", (h) => { S.hist = h; if (S.mode === "history") renderHistStatus(); });
+  on("usage", (u) => { S.usage = u; const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); if (S.mode === "usage") renderUsage(); });
+  on("jev", (j) => { S.jev = j; if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
+  on("radar", (r) => { S.radar = r; render(); });
+  on("decisions", (d) => { S.decisions = d; renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); const cur = S.sel && rowOf(S.sel); if (cur) renderAsk(cur); });
+  on("auto", (a) => { S.auto = a; if (S.board) { bodySig = ""; render(); } });
+  for (const { event, fn } of deckPlugins.contributions("sse.events")) on(event, (d) => { try { fn(d); } catch (err) { console.error(err); } });
   // A plugin was turned on or off: its files join or leave the page, so load it again.
-  es.addEventListener("plugins", (e) => { const d = JSON.parse(e.data); if (d.dev) return devReloaded(d.dev); if ((d.active ?? []).join() !== (S.plugins?.active ?? []).join()) location.reload(); });
+  on("plugins", (d) => { if (d.dev) return devReloaded(d.dev); if ((d.active ?? []).join() !== (S.plugins?.active ?? []).join()) location.reload(); });
+  // Notices aren't numbered (a toast of the moment): they skip the bookkeeping.
   es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");
   es.onerror = () => {
@@ -89,6 +93,8 @@ function connect() {
     if (es.readyState === EventSource.CLOSED) reconnectSoon(2000);
   };
 }
+// Back from the back-forward cache: the stream was cut while the page was frozen; catch up on what it missed.
+window.addEventListener("pageshow", (e) => { if (e.persisted) reconnectSoon(0); });
 setTpos(S.tpos);
 setMain(S.main);
 // The first state, the live stream and the page's own link wait for every script, running plugins' included (they
