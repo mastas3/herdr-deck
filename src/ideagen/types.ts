@@ -100,7 +100,9 @@ export type CapNeed = { cap: string; label: string; have: { id: string; name: st
 export type PlayBrief = { quests: { title: string; verify: string }[] };
 export type IdeaCard = {
   id: string; name: string; hook: string; buyer: string; pain: string;
-  evidence: { url: string; snippet: string; source: string }[];
+  evidence: { url: string; snippet: string; source: string; id?: string; title?: string; publishedAt?: number; fetchedAt?: number }[];
+  origin?: "problem-first";
+  unknowns?: string[];
   offer: string; price: string; channel: string; mvp: string;
   stack: StackItem[]; connectors: CapNeed[]; missing: CapNeed[];
   timeToFirstDollarDays: number; difficulty: Difficulty;

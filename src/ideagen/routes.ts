@@ -10,6 +10,7 @@ import type { GhRes } from "../discover";
 import type { IdeaArchive } from "../idea-archive";
 import type { LibrarySearch } from "./library";
 import type { Comparables, Target } from "../library-strategy";
+import { cachedProblems, generateProblems } from "./problem-gallery";
 import { cachedGallery, generateGallery, moreInLane, type GalleryDeps } from "./gallery";
 import { buildStarterKit, judgeKit, slugOf } from "./kit";
 import { materializeKit, KIT_FILES } from "./kit-files";
@@ -22,7 +23,7 @@ export type IdeasDeps = {
   /** A card the page is showing that isn't in today's gallery (yesterday's, the lab's seed, a saved one). */
   card?: (id: string) => IdeaCard | undefined;
   archive?: Pick<IdeaArchive, "put" | "score">; library?: LibrarySearch; comparables?: (t: Target) => Comparables | undefined;
-  recipe?: [StrategyId, number][]; premortems?: number; rubric?: boolean;
+  recipe?: [StrategyId, number][]; premortems?: number; rubric?: boolean; evidenceFirst?: boolean;
   now?: () => number;
 };
 /** The folder Play would write: <projects>/<slug>, or <slug>-2, -3… when that one is taken (never a non-empty folder). */
@@ -52,18 +53,19 @@ export function firstTask(kit: StarterKit, name: string, dir: string) {
 export function createIdeasRoutes(d: IdeasDeps) {
   let running: Promise<Gallery> | undefined;
   const deps = async (): Promise<GalleryDeps> => ({
-    cacheDir: d.cacheDir, inv: await d.inventory(), corpus: await d.corpus(), trends: await d.trends(), claude: d.claude, jev: d.jev, findRepos: createRepoFinder(d.gh),
+    cacheDir: d.cacheDir, inv: await d.inventory(), corpus: await d.corpus(), trends: d.evidenceFirst ? undefined : await d.trends(), claude: d.claude, jev: d.jev, findRepos: createRepoFinder(d.gh),
     archive: d.archive, library: d.library, comparables: d.comparables, recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, now: d.now,
   });
   const today = () => { const t = new Date(d.now?.() ?? Date.now()); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`; };
-  const cardOf = (id: string) => cachedGallery(d.cacheDir, today())?.ideas[id] ?? d.card?.(id);
+  const cardOf = (id: string) => (d.evidenceFirst ? cachedProblems(d.cacheDir, today()) : cachedGallery(d.cacheDir, today()))?.ideas[id] ?? d.card?.(id);
   const kitDeps = async () => ({ inv: await d.inventory(), claude: d.claude, gh: d.gh, cacheDir: d.cacheDir, card: cardOf, comparables: d.comparables });
   /** Today's gallery, generated once; everyone asking meanwhile shares the one run. */
-  const generate = (force = false) => (running ??= deps().then((x) => generateGallery(x, { force })).finally(() => { running = undefined; }));
+  const generate = (force = false) => (running ??= deps().then((x) => d.evidenceFirst ? generateProblems(x, force) : generateGallery(x, { force })).finally(() => { running = undefined; }));
   async function handle(path: string, body: any): Promise<unknown> {
     switch (path) {
       case "/api/ideas": return await generate(!!body?.force);
       case "/api/ideas/more": {
+        if (d.evidenceFirst) throw new Error("Review the current leads before starting another bounded problem search.");
         if (!cachedGallery(d.cacheDir, today())) throw new Error("Today's ideas are still being written; More works once they're in");
         return moreInLane(String(body?.lane ?? ""), await deps(), Math.min(12, Number(body?.n) || 6));
       }

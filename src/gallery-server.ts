@@ -1,15 +1,12 @@
-// The Discover gallery on the server ("For you": a hero and Netflix-style lanes of ideas). It feeds the idea engine
-// (src/ideagen/) from what the deck already knows, runs today's generation in the background with progress, and shows
-// earlier cards meanwhile (yesterday's gallery, else the idea lab's seed in docs/idea-lab/gallery.json).
-// - Generation starts only when Discover asks (ensure), never on a timer. A run the deck's restart cut short starts
-//   again at boot and loses little: every model reply is cached by prompt (llm.ts), and today's inputs (inventory,
-//   trends) are snapshotted per day, the pain corpus per audience, so the same prompts come back as cache hits.
-// - Every card shown goes into the idea archive under a cover-safe id with its quality as score, so covers.ts paints
-//   the best ones; replies carry title/pitch/coverId so covers.respond adds coverUrl.
-// - Model spend has a daily cap (DECK_GALLERY_CLAUDE_MAX / DECK_GALLERY_JEV_MAX) on top of Jev's own.
+// Discover keeps a small set of problem leads and a shared evidence notebook.
+// Opening is passive; only an explicit search collects public posts and asks Claude for suggestions.
+// Legacy generation remains available to the idea lab. Saved and reviewed cards retain their snapshots.
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { createIdeasRoutes, type IdeasDeps } from "./ideagen/routes";
+import { cachedProblems, PROBLEM_VERSION } from "./ideagen/problem-gallery";
+import { createDiscoverEvidence, discoverProof, evidenceLanes } from "./discover-evidence";
+import type { createOpportunities } from "./opportunities";
 import { cachedGallery, targetOf } from "./ideagen/gallery";
 import type { LibrarySearch } from "./ideagen/library";
 import { comparablesFor, shareLibrary, type Comparables, type Target } from "./library-strategy";
@@ -46,6 +43,7 @@ export type GalleryServerDeps = {
   comparables?: (t: Target) => Comparables | undefined;
   /** Tests: the raw model calls (still budgeted and cached by prompt), inputs and the clock. */
   claudeRaw?: Parameters<typeof budgetedClaude>[1]; jevRaw?: Parameters<typeof budgetedJev>[1]; corpus?: () => Promise<PainCorpus>; trends?: () => Promise<TrendSet | undefined>;
+  evidenceFirst?: boolean; evidenceStore?: ReturnType<typeof createOpportunities>;
   now?: () => number; log?: (s: string) => void;
 };
 const readJson = (f: string) => { try { return JSON.parse(readFileSync(f, "utf8")); } catch { return undefined; } };
@@ -67,10 +65,13 @@ export const comparablesView = (r: Comparables | undefined) => (r ? { items: r.c
 
 export function createGalleryServer(d: GalleryServerDeps) {
   const now = d.now ?? Date.now;
+  const evidenceFirst = d.evidenceFirst !== false;
+  const notebook = d.evidenceStore && createDiscoverEvidence(d.evidenceStore, now);
+  const currentGallery = () => evidenceFirst ? cachedProblems(d.dir, today()) : cachedGallery(d.dir, today());
   const today = () => dayOf(now());
   const log = d.log ?? ((s: string) => console.log(`gallery: ${s}`));
   mkdirSync(d.dir, { recursive: true });
-  const JOB = `${d.dir}/job.json`, SAVED = `${d.dir}/saved.json`, PLAYING = `${d.dir}/playing.json`;
+  const JOB = `${d.dir}/job.json`, SAVED = `${d.dir}/saved.json`, PLAYING = `${d.dir}/playing.json`, TRACKED = `${d.dir}/tracked.json`;
   let job: Job | undefined = readJson(JOB);
   if (d.labKits && existsSync(d.labKits)) {
     mkdirSync(`${d.dir}/kits`, { recursive: true });
@@ -167,7 +168,7 @@ export function createGalleryServer(d: GalleryServerDeps) {
 
   const ideas = createIdeasRoutes({
     cacheDir: d.dir, projectsDir: d.projectsDir, inventory, corpus, trends, claude, jev, gh: d.gh, archive, library, comparables,
-    recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, now, card: (id) => cardAnywhere(id),
+    recipe: d.recipe, premortems: d.premortems, rubric: d.rubric, evidenceFirst, now, card: (id) => cardAnywhere(id),
   } satisfies IdeasDeps);
 
   // ── what the page shows: today's gallery, else the latest earlier one, else the lab's seed ──
@@ -178,21 +179,22 @@ export function createGalleryServer(d: GalleryServerDeps) {
     if (lab?.mtime !== m) lab = { mtime: m, g: readJson(d.labFile) };
     return lab.g;
   }
-  const galleryFiles = () => readdirSync(d.dir).filter((f) => /^gallery-\d{4}-\d\d-\d\d\.json$/.test(f)).sort().reverse();
+  const galleryFiles = () => readdirSync(d.dir).filter((f) => /^gallery-(?:evidence-)?\d{4}-\d\d-\d\d\.json$/.test(f)).sort().reverse();
   function shown(): { g: Gallery; source: "today" | "earlier" | "lab" } | undefined {
-    const t = cachedGallery(d.dir, today());
+    const t = currentGallery();
     if (t) return { g: t, source: "today" };
-    const f = galleryFiles()[0];
+    const f = galleryFiles().filter(f => evidenceFirst || !f.includes("-evidence-"))[0];
     const e = f && readJson(`${d.dir}/${f}`);
     if (e) return { g: e, source: "earlier" };
     const l = labGallery();
     return l ? { g: l, source: "lab" } : undefined;
   }
   const saved = (): { card: IdeaCard; at: number }[] => readJson(SAVED) ?? [];
+  const tracked = (): Record<string, IdeaCard> => readJson(TRACKED) ?? {};
   const playing = (): Record<string, { dir: string; slug: string; name: string; at: number }> => readJson(PLAYING) ?? {};
   function cardAnywhere(id: string): IdeaCard | undefined {
     return shown()?.g.ideas[id] ?? saved().find((s) => s.card.id === id)?.card
-      ?? galleryFiles().slice(0, 7).map((f) => readJson(`${d.dir}/${f}`)?.ideas?.[id]).find(Boolean) ?? labGallery()?.ideas[id];
+      ?? tracked()[id] ?? galleryFiles().slice(0, 7).map((f) => readJson(`${d.dir}/${f}`)?.ideas?.[id]).find(Boolean) ?? labGallery()?.ideas[id];
   }
 
   // ── the daily run ──
@@ -206,12 +208,11 @@ export function createGalleryServer(d: GalleryServerDeps) {
         await inventory();
         job!.phase = "evidence"; saveJob();
         await corpus();
-        job!.phase = "trends"; job!.step = undefined; saveJob();
-        await trends();
-        job!.phase = "writing"; job!.done = 0; job!.total = (d.recipe?.length ?? 7); saveJob();
+        if (!evidenceFirst) { job!.phase = "trends"; job!.step = undefined; saveJob(); await trends(); }
+        job!.phase = "writing"; job!.done = 0; job!.total = evidenceFirst ? 1 : (d.recipe?.length ?? 7); saveJob();
         const g = await ideas.generate(force);
         // Nothing passed (no model answered, or everything was gated): don't let an empty day hide the earlier cards.
-        if (!Object.keys(g.ideas).length) { rmSync(`${d.dir}/gallery-${day}.json`, { force: true }); throw new Error(job!.calls.claude ? "no idea passed the quality gate today; check that Claude Code answers (claude -p)" : "no idea was written today"); }
+        if (!evidenceFirst && !Object.keys(g.ideas).length) { rmSync(`${d.dir}/gallery-${day}.json`, { force: true }); throw new Error(job!.calls.claude ? "no idea passed the quality gate today; check that Claude Code answers (claude -p)" : "no idea was written today"); }
         archiveCards(g);
         Object.assign(job!, { status: "done", phase: "done", finishedAt: now(), ideas: Object.keys(g.ideas).length, error: undefined });
         log(`${g.stats.ideas} ideas in ${g.lanes.length} lanes (${Math.round((now() - job!.startedAt) / 1000)} s, ${job!.calls.claude} Claude + ${job!.calls.jev} Jev calls)`);
@@ -224,7 +225,7 @@ export function createGalleryServer(d: GalleryServerDeps) {
   }
   /** Discover opened: today's run starts if it hasn't (a failed one gets one more try after ten minutes). */
   function ensure() {
-    if (active || cachedGallery(d.dir, today())) return;
+    if (evidenceFirst || active || currentGallery()) return;
     if (job?.day === today() && job.status === "error" && (job.attempts >= 2 || now() - (job.finishedAt ?? 0) < 10 * 60_000)) return;
     run();
   }
@@ -239,25 +240,56 @@ export function createGalleryServer(d: GalleryServerDeps) {
     } catch {}
   }
 
+  function proof(c: IdeaCard) { return notebook?.proof(c) ?? discoverProof(undefined, now()); }
+  function view(c: IdeaCard, full = false) {
+    const out: any = full ? fullCard(c) : liteCard(c);
+    if (!evidenceFirst) return out;
+    for (const key of ["quality", "jevP10", "evidenceScore", "rubric", "patterns", "timeToFirstDollarDays"]) delete out[key];
+    const record = notebook?.lookup(c);
+    if (record) Object.assign(out, { name: record.title, title: record.title, hook: record.summary, pitch: record.summary, buyer: record.buyer, pain: record.problem, offer: record.outcome, mvp: record.mechanism });
+    return { ...out, origin: c.origin, proof: discoverProof(record, now()), sourceExcerpt: c.origin === "problem-first" ? c.evidence[0]?.snippet : undefined, unknowns: c.unknowns };
+  }
   function state() {
     const s = shown();
-    if (s) archiveCards(s.g);
+    if (s && !evidenceFirst) archiveCards(s.g);
     const kits = existsSync(`${d.dir}/kits`) ? readdirSync(`${d.dir}/kits`).map((f) => f.replace(/\.json$/, "")) : [];
+    const cards = Object.values(s?.g.ideas ?? {}).filter(c => evidenceFirst || c.quality > 0);
+    // Keep earlier ideas accessible when a new, deliberately small set replaces today's old gallery.
+    if (evidenceFirst && s?.g.version === PROBLEM_VERSION) {
+      const earlier = galleryFiles().filter(f => !f.includes("-evidence-")).slice(0, 1).map(f => readJson(`${d.dir}/${f}`))[0] ?? labGallery();
+      for (const c of Object.values<IdeaCard>(earlier?.ideas ?? {})) if (!cards.some(x => x.id === c.id)) cards.push(c);
+    }
+    for (const card of [...saved().map(x => x.card), ...Object.values(tracked())]) if (!cards.some(c => c.id === card.id)) cards.push(card);
+    const lanes = evidenceFirst ? evidenceLanes(cards.map(c => ({ ...c, proof: proof(c) }))) : s?.g.lanes ?? [];
     return {
-      day: today(), source: s?.source ?? "none", galleryDay: s?.g.day, at: s?.g.at,
-      lanes: s?.g.lanes ?? [], ideas: Object.fromEntries(Object.values(s?.g.ideas ?? {}).filter((c) => c.quality > 0).map((c) => [c.id, liteCard(c)])),
-      saved: saved().map((x) => liteCard(x.card)), playing: playing(), kits,
-      job: job ? { ...job, running: !!active } : undefined,
+      day: today(), source: s?.source ?? "none", galleryDay: s?.g.day, at: s?.g.at, evidenceFirst,
+      lanes, ideas: Object.fromEntries(cards.map(c => [c.id, view(c)])),
+      saved: saved().map(x => view(x.card)), playing: playing(), kits,
+      note: s?.g.version === PROBLEM_VERSION ? s.g.stats.note : undefined,
+      coverage: evidenceFirst ? (readJson(`${d.dir}/pains.json`)?.queries ?? []).filter((q: any) => q.errors?.length).map((q: any) => ({ audience: q.text, errors: q.errors })) : [],
+      job: job ? { ...job, running: !!active, ...(evidenceFirst && job.status === "running" && !active ? { status: "error", error: "Previous search was interrupted. Start a new search when ready." } : {}) } : undefined,
     };
   }
   async function handle(path: string, body: any): Promise<unknown> {
     switch (path) {
-      case "/api/ideas/state": if (body?.ensure) ensure(); return state();
-      case "/api/ideas": run(!!body?.force); return state();
+      case "/api/ideas/state": if (!evidenceFirst && body?.ensure) ensure(); return state();
+      case "/api/ideas": {
+        if (evidenceFirst && body?.consent !== true) throw new Error("Confirm searching public problem reports and sending excerpts to the configured model.");
+        run(!!body?.force); return state();
+      }
+      case "/api/ideas/dossier": {
+        const card = cardAnywhere(String(body?.id ?? ""));
+        if (!card || !notebook) throw new Error("The evidence notebook is unavailable for this idea");
+        const item = notebook.open(card);
+        // A reviewed card must survive daily gallery replacement and cache pruning.
+        const kept = tracked();
+        if (!kept[card.id]) writeJson(TRACKED, { ...kept, [card.id]: card });
+        return { id: item.id };
+      }
       case "/api/ideas/card": {
         const c = cardAnywhere(String(body?.id ?? ""));
         if (!c) throw new Error("That idea isn't in the gallery any more");
-        return { ...fullCard(c), comparables: comparablesView(comparables?.(targetOf(c))) };
+        return { ...view(c, true), comparables: comparablesView(comparables?.(targetOf(c))) };
       }
       case "/api/ideas/save": {
         const c = cardAnywhere(String(body?.id ?? ""));
@@ -265,7 +297,7 @@ export function createGalleryServer(d: GalleryServerDeps) {
         if (body?.op === "unsave") writeJson(SAVED, rest);
         else if (c) writeJson(SAVED, [{ card: c, at: now() }, ...rest].slice(0, 200));
         else throw new Error("That idea isn't in the gallery any more");
-        return { saved: saved().map((x) => liteCard(x.card)) };
+        return { saved: saved().map((x) => view(x.card)) };
       }
       case "/api/ideas/more": { const g = (await ideas.handle(path, body)) as Gallery; archiveCards(g); return state(); }
       case "/api/ideas/play": {
@@ -277,7 +309,7 @@ export function createGalleryServer(d: GalleryServerDeps) {
     return path.startsWith("/api/ideas") ? ideas.handle(path, body) : undefined;
   }
   // A run the last process didn't finish (restart, crash) picks up where its cached replies left off.
-  if (job?.status === "running" && job.day === today() && !cachedGallery(d.dir, today())) { log("resuming today's run"); run(); }
+  if (!evidenceFirst && job?.status === "running" && job.day === today() && !currentGallery()) { log("resuming today's run"); run(); }
   return { handle, ensure, run, state, cardAnywhere, whenIdle: () => active ?? Promise.resolve(), _job: () => job };
 }
 export type GalleryServer = ReturnType<typeof createGalleryServer>;
@@ -288,7 +320,7 @@ export function parseRecipe(s?: string): [StrategyId, number][] | undefined {
   return r.length ? r : undefined;
 }
 /** The server's wiring: Discover's data folder, archive, profile and gems; the connections scan; settings from the env. */
-export function galleryForServer(s: { dataDir: string; discover: { archive: any; profile: () => Promise<{ projects: any[] }>; paths: { cache: string } }; connections: () => Promise<{ sections: { id: string; items: any[] }[] }>; gh: GalleryServerDeps["gh"]; recs: () => any[]; library?: Library }) {
+export function galleryForServer(s: { dataDir: string; discover: { archive: any; profile: () => Promise<{ projects: any[] }>; paths: { cache: string } }; connections: () => Promise<{ sections: { id: string; items: any[] }[] }>; gh: GalleryServerDeps["gh"]; recs: () => any[]; library?: Library; evidenceStore?: ReturnType<typeof createOpportunities> }) {
   const env = process.env;
   // The quest board, research, project pages and the Studio read comparables from the same library (library-strategy.ts).
   shareLibrary(s.library);
@@ -298,7 +330,7 @@ export function galleryForServer(s: { dataDir: string; discover: { archive: any;
     projectsDir: env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
     labFile: env.DECK_GALLERY_SEED ?? new URL("../docs/idea-lab/gallery.json", import.meta.url).pathname,
     labKits: new URL("../docs/idea-lab/kits", import.meta.url).pathname,
-    archive: s.discover.archive,
+    archive: s.discover.archive, evidenceStore: s.evidenceStore,
     sections: async () => (await s.connections()).sections.map((x) => ({ id: x.id, items: x.items.map(({ id, name, state, cat, kind, detail, hidden }: any) => ({ id, name, state, cat, kind, detail, hidden })) })),
     projects: async () => (await s.discover.profile()).projects,
     gems: () => { const c = readJson(s.discover.paths.cache) ?? {}; const all = Object.values<any>({ ...c.gems, ...c.trend }).flatMap((g) => g?.items ?? []); return all.filter((g, i) => all.findIndex((x) => x.full === g.full) === i); },

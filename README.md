@@ -52,9 +52,9 @@ bun test
 
 ## Opportunities
 
-**Opportunities** is a separate workspace alongside Discover. The original Discover feed, saved ideas,
-and generation remain available. Importing from Discover makes an explicit copy and never overwrites
-an existing opportunity.
+**Opportunities** is a workspace alongside Discover. Discover’s **Evidence & tests** tab opens the same
+notebook. Opening evidence for an idea links it once; later opens preserve your edits, reviews and tests.
+Earlier ideas, saved cards and build tools remain available.
 
 - Explore your existing advantages, unrelated markets, or novel product mechanisms across 13 industries.
 - Keep a dossier with buyer/problem hypotheses, sources, counterevidence, alternatives, unknowns, and
@@ -297,26 +297,22 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   `src/recipes.ts`. Each machine writes the full list to `~/.config/herdr-deck/CONNECTIONS.md`; your notes, hidden
   cards and additions live in `~/.config/herdr-deck/connections.json`.
 - **Discover** (`d`, or ⌘K): repos worth forking and ideas worth building.
-  - **For you** opens on the idea gallery: today's top pick (cover, hook, buyer, price, Jev's chance of 10 paying
-    customers in 60 days, quality) and Netflix-style lanes from the idea engine (`src/ideagen/`, recipe and results in
-    `docs/idea-lab/report.md`): Top picks, Hot right now, Just starting to trend, Fastest to first $, Your audience is
-    asking, Built on what you own, Human Design, Weekend-sized, Trending tech, Boring businesses, Moonshots, Wildcards
-    Jev loves, plus Fresh from Studio (the older feed below) and Saved. Only ideas that passed the engine's slop gate are
-    shown. Today's set is written in the background the first time Discover opens that day (never on a timer), with
-    its progress on the page; until it's ready you see the latest earlier set (or the idea lab's). A run cut short by a
-    restart continues at boot, reusing every model reply it already had. **More** on a lane writes a few more for it.
-    Arrow keys move between cards and lanes, Enter opens one; on a phone you swipe. An idea opens as a side panel (a
-    bottom sheet on a phone): who buys and where they gather, their pain in their words with the posts, the offer, the
-    stack mapped to what you own, "why this could fail → how this version fixes it", trend signals, missing connectors
-    (open the service in Connections, the repo on GitHub, or add it to the Studio tray) and the **starter kit** (one
-    Claude call, cached: spec, architecture, a build plan whose tasks carry prompts to paste into an agent, connectors
-    and keys, go-to-market copy for you to send, quests, and a readiness meter). **Play** says exactly what will happen,
-    and only after you confirm writes the kit into `~/Documents/Projects/<slug>` (`DECK_PROJECTS_DIR`), starts a run on
-    the quest board, asks about the main quest and opens the New session dialog with task 1 in that folder. Every card
-    shown goes into the idea archive, so the covers job paints the best ones. Cached in
-    `~/.config/herdr-deck/gallery/`. Settings: `DECK_GALLERY_CLAUDE_MAX` / `DECK_GALLERY_JEV_MAX` (daily model-call
-    caps, 30 / 150), `DECK_GALLERY_RECIPE` (e.g. `C-audience:6,B-pain:6` for a smaller day), `DECK_GALLERY_PREMORTEMS`,
-    `DECK_GALLERY_RUBRIC=0`. Code: `src/gallery-server.ts`, `public/js/gallery-*.js`.
+  - **For you** starts with an evidence shortlist, which can be empty. New problem leads come from dated
+    public excerpts; AI may suggest an offer but cannot certify demand. Stages come from reviewed sources
+    and recorded tests: Untested idea → Problem documented → Buyers interested → Customers paid →
+    Customers returned. Paid stages are owner-reported, not independently verified payments.
+    There are no AI confidence scores, sales forecasts or “fastest to first dollar” rankings.
+    **Find new problem leads** explicitly starts public research and one bounded Claude call for up to six
+    suggestions. Opening Discover does not start generation or external refreshes. Missing, old or undated
+    source material produces fewer leads or an empty result; source failures remain visible.
+    **Review evidence** and **Plan a buyer test** open the shared Opportunities notebook inside Discover.
+    Original excerpts, source dates, unresolved questions and failed tests remain visible. Set the offer,
+    audience and pass/fail conditions before recording results. Earlier generated ideas remain collapsed
+    under **Untested ideas and earlier work**; old scores cannot put them on the shortlist. Saved and
+    reviewed card snapshots survive daily replacement. Build tools and existing starter kits remain in
+    each idea’s detail panel. Data lives in `~/.config/herdr-deck/gallery/`; the daily Claude call cap still
+    applies (`DECK_GALLERY_CLAUDE_MAX`). The old recipe and model-judging settings apply only to the lab.
+    See [Discover evidence rules](docs/discover-evidence.md) for the exact stage and shortlist rules.
     Below the gallery: your interests, read from the wiki (project tags, status and recency, concepts, the last month
     of `log.md`), your local repos (languages, keywords, dependencies) and your connections, as chips you can
     add to or remove. For each one the deck searches GitHub with `gh` for hidden gems: 30–5,000 stars, pushed in
@@ -324,8 +320,8 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
     momentum (stars a month), and each card says which interest and projects it fits. **Fork & explore** opens the
     New session dialog with a prompt to clone it and judge how to build on it; Save and Dismiss are remembered.
     A **Trending in your areas** row shows new repos climbing fast. Results are cached for hours
-    (`~/.config/herdr-deck/discover-cache.json`), refreshed in the background, and marked when stale.
-    **Ideas for you** (near the top): a feed of ready-to-execute businesses, apps and services made from what you
+    (`~/.config/herdr-deck/discover-cache.json`), refreshed on request, and marked when stale.
+    **Ideas** (the legacy tab): an unvalidated feed of businesses, apps and services made from what you
     have, in rows: Make money this month, SaaS for your audience, Automations that sell, Content engines, Built from
     your projects, Remix a gem, Weekend builds, Wild combos. Headless Claude (Haiku) writes it in batches, six calls in
     parallel on the first view of the day, each seeded with different combinations of your things; ideas stream in

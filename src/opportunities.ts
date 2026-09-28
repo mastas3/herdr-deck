@@ -145,12 +145,12 @@ function hostGroup(url: string): string {
   return parts.slice(-(/\.(co|com|org|gov|ac)\.[a-z]{2}$/.test(host) ? 3 : 2)).join(".");
 }
 const normalizeText = (s: string) => s.replace(/\s+/g, " ").trim();
-function sourceCurrent(s: EvidenceSource | undefined, now: number, days = 90): s is EvidenceSource {
+export function sourceCurrent(s: EvidenceSource | undefined, now: number, days = 90): s is EvidenceSource {
   return !!s && s.access === "opened" && !!s.checkedBy && !!s.excerpt && s.fetchedAt <= now + 300_000 && now - s.fetchedAt <= days * DAY &&
     (s.kind !== "customer" || s.publishedAt === null || now - s.publishedAt <= days * DAY);
 }
 /** A syndicated excerpt or repeated publisher counts once, even with different user-supplied groups. */
-function independentGroups(sources: EvidenceSource[]): number {
+export function independentGroups(sources: EvidenceSource[]): number {
   const components = sources.map((_, i) => i);
   const root = (i: number): number => components[i] === i ? i : (components[i] = root(components[i]));
   for (let i = 0; i < sources.length; i++) for (let j = 0; j < i; j++) {

@@ -783,14 +783,14 @@ export function createDiscover(paths: DiscoverPaths, deps: { connections?: () =>
   const feed = createFeed({ file: `${paths.dataDir}/feed.json`, ingredients: async (w) => (await ingredients(w)).list, archive, ...deps.feed });
   const studio = createStudio({ dir: `${paths.dataDir}/studio`, projectsDir: paths.projectsDir, ingredients: async (w) => (await ingredients(w)).list, engines: () => mixer.engines(), archive, ...deps.studio });
 
-  async function state(body: { refresh?: boolean; shuffle?: number } = {}) {
+  async function state(body: { refresh?: boolean; shuffle?: number; passive?: boolean } = {}) {
     const p = await profile(!!body.refresh);
     const ats = p.interests.map((i) => cache.gems[i.id]?.at ?? 0);
     const fetchedAt = ats.length ? Math.min(...ats) : 0;
     const missing = p.interests.filter((i) => !cache.gems[i.id]).length;
     const stale = !fetchedAt || Date.now() - fetchedAt > TTL;
     const retry = p.interests.some((i) => cache.gems[i.id]?.error && Date.now() - cache.gems[i.id].at > 5 * 60_000);
-    if (body.refresh || stale || missing || retry) refresh(!!body.refresh);
+    if (body.refresh || !body.passive && (stale || missing || retry)) refresh(!!body.refresh);
     const { gems, trending } = ranked(p);
     const day = Math.floor(Date.now() / DAY);
     // "Ideas for you" is its own route (/api/discover/feed): generated in batches, at most once a day, only when Discover is open.

@@ -37,7 +37,7 @@ const signal = (id: string, title: string) => ({ id, source: "hn" as const, titl
 const trendSet = async (): Promise<TrendSet> => ({ at: Date.now(), day: dayOf(Date.now()), status: {}, signals: [], trends: [{ id: "t1", label: "human design chart apps", terms: ["human", "design"], signals: [signal("hn:1", "Show HN: offline Human Design chart app"), signal("hn:2", "Human Design readers want offline apps")], sources: ["hn"], heat: 4, earliness: 0.5, newest: Date.now(), topics: ["hd"] }] });
 function deps(dir: string, extra: Partial<GalleryServerDeps> = {}): GalleryServerDeps {
   return {
-    dir, projectsDir: `${dir}/projects`, labFile: LAB,
+    dir, projectsDir: `${dir}/projects`, labFile: LAB, evidenceFirst: false,
     sections: async () => [{ id: "services", items: [{ id: "svc:gumroad", name: "Gumroad", state: "ready", detail: "Sell digital products" }] }, { id: "accounts", items: [{ id: "acct:facebook", name: "Facebook", state: "ready", detail: "Profile, Pages and groups" }] }],
     projects: async () => [{ name: "hd-atlas", status: "active", tags: ["human-design", "rag"], tldr: "Human Design knowledge base with a curated corpus and chart chat.", weight: 5 }],
     gems: () => [], gh: async () => ({ ok: false, error: "offline" }) as any,

@@ -22,8 +22,11 @@ try {
  let item=await submit('create',{title:'A <b>test</b> concept',buyer:'Workshop owner',industry:'manufacturing',mode:'markets',problem:'Manual handoffs cost time',mechanism:'A completion packet'});
  item=await submit('summary',{title:item.title,buyer:item.buyer,industry:item.industry,mode:item.mode,summary:'Summary',problem:item.problem,mechanism:item.mechanism,outcome:'Less admin',unknowns:'Price sensitivity\nReachability',notes:'Local plan'});
  if(item.unknowns.length!==2)throw new Error('unknowns not saved');
- item=await submit('source',{id:'',url:'https://example.org/report',title:'Original report',kind:'customer',access:'opened',excerpt:'Original passage',attest:'on'});
+ item=await submit('source',{id:'',url:'https://example.org/report',title:'Original report',kind:'customer',access:'opened',excerpt:'Original passage',publishedAt:'2026-01-01',error:'Small sample',attest:'on'});
+ if(item.sources[0].publishedAt!==Date.parse('2026-01-01')||item.sources[0].error!=='Small sample')throw new Error('source date or limitation lost');
  const sourceId=item.sources[0].id;
+ item=await submit('source',{id:sourceId,url:'https://example.org/report',title:'Original report',kind:'customer',access:'opened',excerpt:'Original passage',publishedAt:'',error:'Date unknown',attest:'on'});
+ if(item.sources[0].publishedAt!==null)throw new Error('unknown source date was invented');
  item=await submit('claim',{id:'',text:'Owner reports repeated work',dimension:'problem',status:'observed',supportingSourceIds:[sourceId],opposingSourceIds:[],attest:'on'});
  item=await submit('review',{dimension:'problem',sourceIds:[sourceId],notes:'Specific buyer relevance remains narrow',attest:'on'});
  item=await submit('revenue',{valuePattern:'episodic',buyer:'Workshop owner',frequency:'occasional',newMarket:'on'});
