@@ -133,7 +133,7 @@ export function createFiles(o: { rows: () => Row[] }) {
     files.sort((a, b2) => a.path.localeCompare(b2.path));
     const add = files.reduce((n, f) => n + (f.add ?? 0), 0), del = files.reduce((n, f) => n + (f.del ?? 0), 0);
     return {
-      repo: true, root: w.root, cwd: w.cwd, branch: g.branch, base: b.base === EMPTY_TREE ? null : b.base, label: b.label, head: b.head, from: b.from, unknown: b.unknown,
+      repo: true, root: w.root, cwd: w.cwd, branch: g.branch, base: b.base, label: b.label, head: b.head, from: b.from, unknown: b.unknown,
       files: files.slice(0, 2000), more: Math.max(0, files.length - 2000), add, del, truncated: ns.truncated || g.truncated || undefined,
     };
   }

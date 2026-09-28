@@ -1,0 +1,87 @@
+/* Files and Changes tabs (inspector). Tokens only; the git badges reuse the status colours: changed = working,
+   added/new = idle (green), deleted = blocked (red), renamed = done (blue), conflict = danger. */
+.fx, .cx { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.fx-top { display: flex; align-items: center; gap: 6px; padding: 10px 12px 6px; }
+.fx-find { flex: 1; min-width: 0; }
+.fx-find input { padding: 5px 0; font-size: 14px; }
+.fx-meta { padding: 0 14px 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-body, .cx-body { flex: 1; min-height: 0; overflow: auto; padding: 0 6px 16px; overscroll-behavior: contain; }
+.fx-err { padding: 16px 10px; }
+.fx-err p { margin: 0 0 10px; color: var(--ink-2); }
+.fx-none { margin: 4px 0; padding: 4px 10px 4px calc(10px + var(--d, 0) * 14px); }
+.fx-sec { position: sticky; top: 0; z-index: 1; background: var(--side); padding: 8px 4px 4px; }
+.fx-h { display: flex; align-items: center; gap: 5px; border: 0; background: none; padding: 2px 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); text-transform: none; }
+.fx-h svg { width: 12px; height: 12px; transition: transform var(--dur-2) var(--ease-out); }
+.fx-h[aria-expanded="true"] svg { transform: rotate(90deg); }
+span.fx-h { padding-left: 21px; }
+.fx-h .hint { font-weight: 400; margin-left: 4px; }
+
+.fx-r { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 2px 0 calc(4px + var(--d, 0) * 14px); border-radius: 7px; cursor: pointer; font-size: 14px; color: var(--ink); outline: none; }
+.fx-r:hover { background: var(--hover); }
+.fx-r:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.fx-tw { width: 14px; height: 14px; flex: none; color: var(--ink-3); display: grid; place-items: center; }
+.fx-tw svg { width: 12px; height: 12px; transition: transform var(--dur-2) var(--ease-out); }
+.fx-r[aria-expanded="true"] .fx-tw svg { transform: rotate(90deg); }
+.fx-n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); font-size: 12.5px; }
+.fx-r.dir .fx-n { font-family: var(--sans); font-size: 14px; font-weight: 500; }
+.fx-n small { margin-left: 8px; color: var(--ink-3); font-size: 11.5px; }
+.fx-r.touched .fx-n { color: var(--ink); }
+.fx-r.touched { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--accent) 70%, transparent); }
+.fx-r.gone .fx-n { text-decoration: line-through; color: var(--ink-3); }
+.fx-r.blocked { cursor: default; }
+.fx-r.blocked .fx-n { color: var(--ink-3); font-style: italic; }
+.fx-c { font-size: 11px; min-width: 18px; padding: 0 5px; border-radius: 9px; text-align: center; color: var(--working); background: color-mix(in srgb, var(--working) 14%, transparent); }
+.fx-at { font-size: 12px; color: var(--ink-3); flex: none; }
+.fx-b { flex: none; width: 17px; height: 17px; display: inline-grid; place-items: center; border-radius: 4px; font: 600 10.5px/1 var(--mono); color: var(--working); background: color-mix(in srgb, var(--working) 15%, transparent); }
+.fx-b[data-st="A"], .fx-b[data-st="?"] { color: var(--idle); background: color-mix(in srgb, var(--idle) 16%, transparent); }
+.fx-b[data-st="D"] { color: var(--blocked); background: color-mix(in srgb, var(--blocked) 14%, transparent); }
+.fx-b[data-st="R"] { color: var(--done); background: color-mix(in srgb, var(--done) 15%, transparent); }
+.fx-b[data-st="U"] { color: var(--danger); background: color-mix(in srgb, var(--danger) 18%, transparent); }
+.fx-m { width: 26px; height: 26px; opacity: 0; }
+.fx-m svg { width: 14px; height: 14px; }
+.fx-r:hover .fx-m, .fx-r:focus-within .fx-m, .fx-r:focus .fx-m, .cx-hd:hover .fx-m, .fx-m:focus-visible { opacity: 1; }
+.fx-more { display: block; margin: 6px 10px; border: 0; background: none; color: var(--accent); font-size: 13px; padding: 4px 0; }
+@media (hover: none) { .fx-m { opacity: 1; } }
+
+/* Changes */
+.cx-seg button { font-size: 13px; padding: 3px 9px; }
+.cx-a { color: var(--idle); font-family: var(--mono); font-size: 12px; }
+.cx-d { color: var(--blocked); font-family: var(--mono); font-size: 12px; }
+.cx-f { margin: 0 0 6px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); overflow: hidden; }
+.cx-hd { display: flex; align-items: center; position: sticky; top: 0; z-index: 1; background: var(--raise); }
+.cx-h { flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; border: 0; background: none; padding: 7px 8px; text-align: left; color: var(--ink); }
+.cx-h > svg { width: 12px; height: 12px; flex: none; color: var(--ink-3); transition: transform var(--dur-2) var(--ease-out); }
+.cx-h[aria-expanded="true"] > svg { transform: rotate(90deg); }
+.cx-h:disabled { cursor: default; opacity: 1; }
+.cx-p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--mono); direction: ltr; }
+.cx-n { flex: none; display: inline-flex; gap: 6px; }
+.cx-lines { overflow-x: auto; font: 12px/1.5 var(--mono); font-variant-ligatures: none; padding: 2px 0 4px; }
+.dl { display: flex; min-width: max-content; white-space: pre; }
+.dl .dn { flex: none; width: 3.6em; padding-right: 6px; text-align: right; color: var(--ink-3); user-select: none; opacity: .75; }
+.dl .dt { padding: 0 12px 0 6px; flex: 1; }
+.dl[data-k="a"] { background: color-mix(in srgb, var(--idle) 14%, transparent); }
+.dl[data-k="a"] .dt::before { content: "+"; margin-left: -10px; margin-right: 4px; color: var(--idle); }
+.dl[data-k="d"] { background: color-mix(in srgb, var(--blocked) 13%, transparent); }
+.dl[data-k="d"] .dt::before { content: "−"; margin-left: -10px; margin-right: 4px; color: var(--blocked); }
+.dl.dhunk { color: var(--ink-3); background: color-mix(in srgb, var(--done) 8%, transparent); padding: 1px 0 1px 8px; }
+.dl.dnote { color: var(--ink-3); font-style: italic; padding: 2px 8px; font-family: var(--sans); }
+.dl i { font-style: normal; }
+.dl .hc { color: var(--ink-3); font-style: italic; }
+.dl .hs { color: color-mix(in srgb, var(--idle) 80%, var(--ink)); }
+.dl .hn { color: color-mix(in srgb, var(--unknown) 85%, var(--ink)); }
+.dl .hk { color: color-mix(in srgb, var(--done) 85%, var(--ink)); }
+.cx-foot { padding: 8px 4px 0; }
+
+/* STAND-IN, DROP AT MERGE (files-stub.js): a right-side panel until the layout agent's inspector lands. */
+.fstub { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 42vw); z-index: 25; display: flex; flex-direction: column; background: var(--side); border-left: 1px solid var(--line); box-shadow: -12px 0 32px rgb(0 0 0 / .18); }
+.fstub[hidden] { display: none; }
+.fstub-h { display: flex; align-items: center; gap: 4px; padding: 8px 8px 0 10px; border-bottom: 1px solid var(--line); }
+.fstub-tabs { display: flex; gap: 2px; min-width: 0; overflow-x: auto; }
+.fstub-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 7px 10px 8px; font-size: 14px; color: var(--ink-3); border-bottom: 2px solid transparent; }
+.fstub-tabs button svg { width: 15px; height: 15px; }
+.fstub-tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.fstub-tabs .n { font-size: 11px; padding: 0 5px; border-radius: 9px; background: var(--raise); color: var(--ink-2); }
+.fstub-b { flex: 1; min-height: 0; }
+@media (max-width: 760px) {
+  .fstub { width: 100vw; border-left: 0; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+}
