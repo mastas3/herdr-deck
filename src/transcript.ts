@@ -4,6 +4,9 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { codexUserText } from "./agents";
+import { codexHome } from "./codex-store";
+import { codexTimestamp } from "./codex-turn";
 
 const HOME = homedir();
 
@@ -36,6 +39,7 @@ export type Detail = {
   workMs?: number;
   turnStartedAt?: number; // when the current (or last) turn began
   turnOpen?: boolean; // Codex only: a turn started and hasn't completed or been aborted
+  turnId?: string;
   todo?: string; // the task the agent marked in progress, if it keeps a todo list
   todos?: { done: number; total: number }; // progress through that list (Claude/OpenCode todos, Codex plans)
   touch: Map<string, number>; // folder → how much work happened there (edits weigh most)
@@ -124,7 +128,7 @@ export function toolSummary(name: string, input: any): string {
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; tailSig?: string; mtime?: number; used?: number; open: Map<string, Msg> };
+type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; tailSig?: string; mtime?: number; used?: number; open: Map<string, Msg>; items?: Map<string, Msg> };
 const claudeStates = new Map<string, State>();
 
 function claudeAsk(o: any): string | undefined {
@@ -442,19 +446,42 @@ function feedCodex(st: State, line: string, offset: number) {
   const p = o.payload;
   if (o.type === "session_meta") d.startedAt = Date.parse(p?.timestamp ?? o.timestamp);
   if (o.type === "compacted") { d.compactions++; push(d, { role: "note", at, text: "Conversation compacted" }); }
-  if (o.type === "event_msg" && p?.type === "task_started") { d.turnStartedAt = at; d.turnOpen = true; }
-  if (o.type === "event_msg" && (p?.type === "task_complete" || p?.type === "turn_aborted")) d.turnOpen = false;
+  if (o.type === "event_msg" && p?.type === "task_started") { d.turnStartedAt = codexTimestamp(p.started_at) ?? at; d.turnOpen = true; d.turnId = p.turn_id; }
+  if (o.type === "event_msg" && (p?.type === "task_complete" || p?.type === "turn_aborted") && (!p.turn_id || !d.turnId || p.turn_id === d.turnId)) {
+    if (d.turnOpen && d.turnStartedAt && at) d.workMs = (d.workMs ?? 0) + Math.max(0, at - d.turnStartedAt);
+    d.turnOpen = false;
+    for (const m of st.open.values()) m.state = p.type === "turn_aborted" ? "error" : "done";
+    st.open.clear();
+  }
   if (o.type === "event_msg" && p?.type === "turn_aborted") push(d, { role: "note", at, text: "Interrupted" });
+  // Code mode wraps many actual commands/edits in one `exec` call. The completed items expose that work.
+  if (o.type === "event_msg" && p?.type === "item_completed") {
+    const item = p.item;
+    if (item?.type === "CommandExecution" || item?.type === "FileChange") {
+      const edit = item.type === "FileChange";
+      const paths = edit && item.changes && typeof item.changes === "object" ? Object.keys(item.changes) : [];
+      for (const path of paths) touch(d, path, 4);
+      if (item.cwd) touch(d, item.cwd + "/", 2);
+      const summary = edit ? paths.map(home).slice(0, 3).join(", ") : oneLine(Array.isArray(item.command) ? item.command.join(" ") : item.command);
+      const state = item.status === "failed" || item.status === "declined" || (typeof item.exit_code === "number" && item.exit_code !== 0) ? "error" : "done";
+      const items = st.items ??= new Map<string, Msg>();
+      const existing = item.id && items.get(item.id);
+      if (existing) { existing.summary = summary; existing.state = state; st.open.delete(item.id); }
+      else { const m = push(d, { role: "tool", at, tool: edit ? "apply_patch" : "shell", summary, state }); if (item.id) items.set(item.id, m); }
+    }
+  }
   if (o.type !== "response_item") return;
   if (p?.type === "function_call" || p?.type === "custom_tool_call" || p?.type === "local_shell_call") {
     const raw = p.arguments ?? p.input ?? JSON.stringify(p.action ?? {});
     const name = String(p.name ?? "shell");
     const m = push(d, { role: "tool", at, tool: prettyTool(name), summary: codexToolSummary(name, String(raw)), state: "running" });
+    if (p.call_id ?? p.id) (st.items ??= new Map()).set(p.call_id ?? p.id, m);
     if (p.call_id) st.open.set(p.call_id, m);
     let args: any = raw;
     try { args = JSON.parse(raw); } catch {}
-    if (name === "update_plan" && typeof args === "object") trackTodos(d, args?.plan);
-    workFromInput(d, name === "apply_patch" ? "apply_patch" : name, args);
+    const shortName = name.replace(/^(?:functions|collaboration)\./, "");
+    if (shortName === "update_plan" && typeof args === "object") trackTodos(d, args?.plan);
+    workFromInput(d, shortName, args);
     if (typeof args === "string") {
       const wd = args.match(/workdir\s*:\s*["'`]([^"'`]+)/)?.[1];
       if (wd) touch(d, wd + "/", 2);
@@ -478,9 +505,7 @@ function feedCodex(st: State, line: string, offset: number) {
   }
   if (p?.type !== "message") return;
   if (p.role === "user") {
-    const texts = (p.content ?? []).filter((c: any) => c?.type === "input_text").map((c: any) => c.text as string);
-    // Codex injects AGENTS.md and environment context as user messages; they start with markup or a heading.
-    const ask = texts.filter((t: string) => !/^\s*(<|# AGENTS\.md)/.test(t)).join("\n").trim();
+    const ask = codexUserText(p.content);
     let userMsg: Msg | undefined;
     if (ask) {
       st.cur = { at, ask: clean(ask, 900), images: [] };
@@ -522,7 +547,7 @@ export async function codexImage(path: string, id: string) {
  * to the call that made them; each one is attached to the latest message written before the file was.
  */
 export function attachGenerated(d: Detail, threadId: string) {
-  const dir = `${HOME}/.codex/generated_images/${threadId}`;
+  const dir = `${codexHome()}/generated_images/${threadId}`;
   let names: string[];
   try { names = readdirSync(dir).filter((n) => /\.(png|jpe?g|webp|gif)$/i.test(n)); } catch { return; }
   const seen: Set<string> = ((d as any)._generated ??= new Set());
@@ -543,7 +568,7 @@ export function attachGenerated(d: Detail, threadId: string) {
 export function codexGeneratedImage(threadId: string, id: string) {
   const name = id.slice(2);
   if (!/^[\w.-]+$/.test(name) || !/^[\w-]+$/.test(threadId)) return;
-  const f = Bun.file(`${HOME}/.codex/generated_images/${threadId}/${name}`);
+  const f = Bun.file(`${codexHome()}/generated_images/${threadId}/${name}`);
   return f.size ? f.arrayBuffer().then((b) => ({ type: f.type || "image/png", data: new Uint8Array(b) })) : undefined;
 }
 

@@ -396,7 +396,7 @@ export class Deck {
   }
 
   private async refreshGit() {
-    const cwds = new Set<string>();
+    const cwds = new Set<string>(this.appThreads.map((t) => t.cwd));
     for (const s of this.sessions.values()) for (const p of s.snap?.panes ?? []) cwds.add(p.cwd);
     const queue = [...cwds];
     const worker = async () => {
@@ -530,6 +530,7 @@ export class Deck {
         agent: "codex", status: t.status, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
         cwd: t.cwd, project: basename(projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
         now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
+        subagents: ins?.subagents?.length ? ins.subagents : undefined,
         branch: t.branch ?? g?.branch, dirty: g?.dirty, createdAt: t.createdAt ?? meta?.createdAt, lastActiveAt,
         model: meta?.model, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
         rssKB: 0, cpu: 0, procs: 0, sessionId: t.id, resume: resumeCommand("codex", t.id), tail: [],

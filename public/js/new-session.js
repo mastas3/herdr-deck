@@ -17,7 +17,7 @@ async function loadNewOptions() {
 }
 /** Where a project lives: the folder and machine of its most recent session. */
 function projectHome(p) {
-  const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && !r.app && inScope(r)).sort((a, b) => act(b) - act(a))[0];
+  const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && inScope(r)).sort((a, b) => act(b) - act(a))[0];
   return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
 }
 /** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */

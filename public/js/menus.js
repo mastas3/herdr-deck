@@ -78,13 +78,16 @@ function moreMenu(anchor) {
   if (!r) return;
   if (r.app) return openMenu(anchor, [
     { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
-    { html: "Continue in herdr<small>Resume with the Codex CLI in a new tab</small>", run: () => codexAct("codex-resume", r) },
+    r.status !== "working" && r.status !== "blocked" && { html: "Continue in herdr<small>Resume with the Codex CLI to reply from the deck</small>", run: () => codexAct("codex-resume", r) },
+    r.projectRoot && { html: "Verify this project", run: () => verifyRow(r, true) },
+    projectHome(r.project) && { html: `New session in ${esc(r.project)}`, run: () => openNew(projectHome(r.project)) },
+    { html: "Copy folder path", run: () => copy(r.cwd, "path") },
     { html: "Copy link", run: () => copy(linkUrl(r), "link") },
     { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
     { html: briefBusy.has(r.key) ? "Writing brief…" : "Write or rewrite the brief", run: () => writeBrief(r.key) },
     "-",
     { html: "Hide from the deck", run: () => codexAct("codex-hide", r) },
-  ]);
+  ].filter(Boolean));
   openMenu(anchor, [
     isPhone() && { html: "Switch herdr to this pane", run: () => focusPane(r.key) },
     { html: "Copy link", run: () => copy(linkUrl(r), "link") },
