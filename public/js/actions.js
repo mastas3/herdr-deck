@@ -175,6 +175,7 @@ async function runTool(tool, keys = targets()) {
   if (agentRows.length > 1 && !(await askDialog({ title: `${tool.label} on ${agentRows.length} sessions?`, text: agentRows.map((r) => `• ${r.title} (${r.project})`).join("\n"), ok: "Send" }))) return;
   try {
     const { results } = await api("/api/tool", { id: tool.id, keys: agentRows.map((r) => r.key) });
+    for (const x of results) if (x.ok) showSent(x.key, x.text);
     const bad = results.filter((x) => !x.ok);
     toast(bad.length ? `${tool.label}: ${results.length - bad.length} ok, ${bad.length} failed (${bad[0].error})` : tool.kind === "sequence" ? `${tool.label}: step 1 sent; step 2 follows when it’s done` : `${tool.label}: sent${agentRows.length > 1 ? ` to ${agentRows.length} sessions` : ""}`, !!bad.length);
     setTimeout(() => { pollTerm(); chatTick(true); }, 300);

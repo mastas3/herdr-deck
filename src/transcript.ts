@@ -4,7 +4,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { codexUserText } from "./agents";
+import { codexUserText, unwrapPastes } from "./agents";
 import { codexTimestamp } from "./codex-turn";
 import { codexReplyHash } from "./codex-fork-point";
 import { codexForkHistory, type CodexHistoryPlan } from "./codex-fork-history";
@@ -156,9 +156,28 @@ const claudeStates = new Map<string, State>();
 function claudeAsk(o: any): string | undefined {
   if (o.type !== "user" || o.isMeta || o.isCompactSummary) return;
   const c = o.message?.content;
-  const text = typeof c === "string" ? c : Array.isArray(c) ? c.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n") : "";
+  const text = unwrapPastes(typeof c === "string" ? c : Array.isArray(c) ? c.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n") : "");
   if (!text || /^\s*</.test(text) || text.startsWith("Caveat:")) return;
   return text;
+}
+
+/** A command you ran yourself (`!` in Claude Code, a shell command in Codex): your line, then its output as one
+ *  folded Shell line (its first non-empty line; ANSI colours stripped). */
+function shellRun(d: Detail, at: number | undefined, cmd: string) {
+  push(d, { role: "user", at, text: "! " + cmd.trim() });
+}
+function shellOut(d: Detail, at: number | undefined, out: string, failed: boolean) {
+  const first = out.replace(/\x1b\[[0-9;]*m/g, "").split("\n").map((l) => l.trim()).find(Boolean) ?? "no output";
+  push(d, { role: "tool", at, tool: "Shell", summary: oneLine(first), state: failed ? "error" : "done" });
+}
+/** Codex records a shell command you ran as a user message wrapped in <user_shell_command>. */
+function codexShell(content: any): { cmd: string; out: string; failed: boolean } | undefined {
+  const t = Array.isArray(content) ? content.find((c: any) => c?.type === "input_text" && /^\s*<user_shell_command>/.test(c.text ?? ""))?.text : undefined;
+  const cmd = t?.match(/<command>\s*([\s\S]*?)\s*<\/command>/)?.[1];
+  if (!cmd) return;
+  const result = t.match(/<result>([\s\S]*?)<\/result>/)?.[1] ?? "";
+  const code = Number(result.match(/Exit code:\s*(\d+)/)?.[1] ?? 0);
+  return { cmd, out: result.split(/\nOutput:\n/)[1] ?? "", failed: code !== 0 };
 }
 
 function push(d: Detail, m: Omit<Msg, "i">): Msg {
@@ -206,6 +225,12 @@ function feedClaude(st: State, line: string, offset: number) {
       d.started ??= clean(ask, 2400);
       d.turnStartedAt = at;
       userMsg = push(d, { role: "user", at, text: full(ask) });
+    } else if (/^\s*<bash-input>/.test(raw)) {
+      const cmd = raw.match(/<bash-input>([\s\S]*?)<\/bash-input>/)?.[1];
+      if (cmd?.trim()) { shellRun(d, at, cmd); d.turnStartedAt = at; }
+    } else if (/^\s*<bash-std(out|err)>/.test(raw)) {
+      const out = raw.match(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/)?.[1] ?? "", err = raw.match(/<bash-stderr>([\s\S]*?)<\/bash-stderr>/)?.[1] ?? "";
+      shellOut(d, at, out.trim() ? out : err, !out.trim() && !!err.trim());
     } else if (/^\s*<command-name>/.test(raw)) {
       const cmd = raw.match(/<command-name>([^<]+)<\/command-name>/)?.[1];
       const args = raw.match(/<command-args>([^<]*)<\/command-args>/)?.[1];
@@ -545,6 +570,8 @@ function feedCodex(st: State, line: string, offset: number) {
   }
   if (p?.type !== "message") return;
   if (p.role === "user") {
+    const sh = codexShell(p.content);
+    if (sh) { shellRun(d, at, sh.cmd); shellOut(d, at, sh.out, sh.failed); return; }
     const ask = codexUserText(p.content);
     let userMsg: Msg | undefined;
     if (ask) {

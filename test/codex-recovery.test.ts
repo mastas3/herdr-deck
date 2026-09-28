@@ -32,3 +32,10 @@ test("opening does not claim success unless a fresh desktop owner arrives", asyn
     control: { watch: async () => ({ ready: false, requests: [], error: "No owner" }) }, open: async () => {} });
   expect(await recovery.connect("fixture-task")).toMatchObject({ ready: false, error: "No owner" });
 });
+
+test("an incompatible protocol explains the failure without repeatedly opening the app", async () => {
+  let opens = 0;
+  const recovery = createCodexRecovery({ platform: "darwin", control: { watch: async () => ({ ready: false, requests: [], connectionIssue: "incompatible" }) }, open: async () => { opens++; } });
+  expect(await recovery.connect("fixture-task")).toMatchObject({ ready: false, connectionIssue: "incompatible" });
+  expect(opens).toBe(0);
+});

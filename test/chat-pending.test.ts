@@ -40,4 +40,10 @@ describe("a send waiting for its echo", () => {
     const a = { role: "user", text: long, at: 1, after: 0 }, b = { role: "user", text: long, at: 2, after: 0 };
     expect(C.settlePending([a, b], [msg(1, "user", long.slice(0, 250) + "\n\n… (truncated)")])).toEqual([b]);
   });
+
+  test("a command you ran yourself settles on its echo: `!ls` comes back as `! ls`", () => {
+    const p = { role: "user", text: "!ls -la", at: 1, after: 3 };
+    expect(C.sendWords("!ls")).toBe(C.sendWords("! ls"));
+    expect(C.settlePending([p], [msg(4, "user", "! ls -la")])).toEqual([]);
+  });
 });

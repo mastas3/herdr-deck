@@ -23,6 +23,15 @@ function mergeChat(key, slice, sub) {
   c.v++;
   if (S.sel === key && S.sub === (sub ?? null)) renderChat();
 }
+/** Something sent in your name without the composer (a tool, a queued message): shown as yours until the transcript
+ *  echoes it, in the place a send from the composer takes (addPending). */
+function showSent(key, text) {
+  if (!key || !text || !rowOf(key)) return;
+  const c = chatOf(chatId(key));
+  if (c.pending.some((p) => p.text === text)) return;
+  addPending(key, text);
+  if (S.sel === key && !S.sub) renderChat();
+}
 let chatTimer = null;
 async function chatTick(now) {
   clearTimeout(chatTimer);
@@ -89,7 +98,8 @@ async function loadEarlier() {
 
 /* @pure:chat-begin: no globals in here; test/chat-pending.test.ts evaluates this block on its own. */
 /** The same words, whatever the spacing, line endings or Unicode form (Hebrew and accents can arrive either way). */
-const sendWords = (t) => String(t ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
+/** How a send is matched to its echo: any spacing or Unicode form, and `!ls` comes back as `! ls`. */
+const sendWords = (t) => String(t ?? "").normalize("NFC").replace(/\s+/g, " ").trim().replace(/^!\s*/, "! ");
 /** Your sends the transcript now echoes are settled: each user message after a send's place takes the oldest
  *  one with its words (or its start, when the transcript clipped a long one). */
 function settlePending(pending, messages) {

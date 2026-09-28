@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export class CodexControlError extends Error {
-  constructor(message: string, public code = "CODEX_UNAVAILABLE") { super(message); }
+  constructor(message: string, public code = "CODEX_UNAVAILABLE", public connectionIssue?: "not-loaded" | "incompatible" | "unavailable") { super(message); }
 }
 export function ipcFrame(message: unknown) {
   const body = Buffer.from(JSON.stringify(message)), header = Buffer.alloc(4);
@@ -30,7 +30,7 @@ export function createCodexIpc(options: {
   path?: string; timeoutMs?: number; broadcast: (message: any) => void; disconnected: () => void;
 }) {
   let socket: Socket | undefined, connecting: Promise<void> | undefined, clientId = "initializing-client";
-  const pending = new Map<string, { resolve: (m: any) => void; reject: (e: Error) => void; timer: Timer; mutation: boolean }>();
+  const pending = new Map<string, { resolve: (m: any) => void; reject: (e: Error) => void; timer: Timer; mutation: boolean; method: string }>();
   const unavailable = () => new CodexControlError("The Codex app connection closed. Open the task in Codex and reconnect.");
   function lost(s: Socket) {
     if (socket !== s) return;
@@ -55,8 +55,11 @@ export function createCodexIpc(options: {
       if (message.resultType === "success") p.resolve(message);
       else {
         const refused = ["no-client-found", "request-version-mismatch", "no-handler-for-request"].includes(message.error);
-        p.reject(new CodexControlError(refused ? "Open this task in the Codex app, then reconnect." : String(message.error ?? "Codex request failed"),
-          p.mutation && !refused ? "CODEX_DELIVERY_UNKNOWN" : "CODEX_UNAVAILABLE"));
+        const unloaded = message.error === "no-client-found" && p.method === "thread-owner-discovery";
+        const incompatible = ["request-version-mismatch", "no-handler-for-request"].includes(message.error);
+        const error = unloaded ? "This chat is not loaded in the Codex app." : incompatible ? "This Codex app version does not support this connection request." : refused ? "The Codex app is no longer handling this chat." : String(message.error ?? "Codex request failed");
+        p.reject(new CodexControlError(error, p.mutation && !refused ? "CODEX_DELIVERY_UNKNOWN" : "CODEX_UNAVAILABLE",
+          unloaded ? "not-loaded" : incompatible ? "incompatible" : "unavailable"));
       }
     } else if (message.type === "broadcast") options.broadcast(message);
   }
@@ -69,7 +72,7 @@ export function createCodexIpc(options: {
         reject(new CodexControlError(mutation ? "Delivery is unconfirmed. Check the conversation before sending again." : "The Codex app did not respond. Open the task in Codex and reconnect.",
           mutation ? "CODEX_DELIVERY_UNKNOWN" : "CODEX_UNAVAILABLE"));
       }, options.timeoutMs ?? 12_000);
-      pending.set(requestId, { resolve, reject, timer, mutation });
+      pending.set(requestId, { resolve, reject, timer, mutation, method });
       try { write({ type: "request", requestId, method, params, version, targetClientId, timeoutMs: options.timeoutMs ?? 10_000 }); }
       catch (e) { clearTimeout(timer); pending.delete(requestId); reject(e); }
     });

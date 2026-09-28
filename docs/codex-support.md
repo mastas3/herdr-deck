@@ -8,6 +8,9 @@ inspection features, plus native controls while the desktop owns the task.
 
 - Replies and image uploads reach the original desktop task. The owner inherits its model, reasoning,
   permissions, workspace, plugins and app tools. Files and long pastes retain the deck's existing upload flow.
+- The composer remains available for unloaded or disconnected chats. Send connects first and, on macOS,
+  opens the chat in Codex when needed. It waits for verified ownership before sending or queueing; connection
+  failures preserve the draft. Editing the draft or switching chats during connection requires a fresh Send.
 - While working, Queue holds a message in the deck; Steer sends it into the active turn. The queue is owned by
   the deck, so queued drafts are not mirrored into the desktop's separate follow-up queue.
 - Stop includes the observed turn id and uses the desktop's user-stop behavior (including its goal handling).
@@ -44,9 +47,11 @@ inspection features, plus native controls while the desktop owns the task.
 `src/codex-ipc.ts` connects to the same user's `CODEX_HOME/ipc/ipc.sock`; it neither starts another Codex
 backend nor edits Codex's database. `src/codex-control.ts` discovers the current owner and subscribes to its
 versioned snapshots/patches. Only allowlisted actions are exposed through authenticated deck routes. A missing
-owner, disconnect, unknown stream version or missed patch disables controls until a fresh snapshot arrives.
-Use Open & reconnect to open an unloaded task and wait for its owner on macOS. Background reconnects never
-raise the app. Other hosts offer normal reconnect and an instruction to open the task on its own machine.
+owner, disconnect, unknown stream version or missed patch disables live actions until a fresh snapshot arrives.
+An unloaded chat is distinguished from a transport failure or incompatible protocol. Explicit Send or Try again
+can open and connect the chat on macOS; background polling never raises the app. Other hosts require the task
+to be opened on its own machine. Old polling responses cannot overwrite an explicit connection or restart a
+polling loop after navigation. Open in Codex remains in the header; connected chats have no recovery banner.
 
 Lifecycle metadata uses a short-lived bundled `codex app-server --stdio` process initialized as `herdr-deck`.
 Its allowlist excludes turn execution and it refuses all incoming tool/approval requests. New tasks get a
@@ -153,3 +158,9 @@ continuation of the fork after its original task was archived, retaining native 
 confirmed both flattened history references and a fork's own replies. Parser tests cover recursive ancestry,
 moved parents, changed prefixes, bounded image access and
 partial-replay failures. A nanosecond file-stamp regression passed 20 consecutive runs.
+
+The 2026-09-29 reconnect fix passed 1,043 tests across 86 files and 18 desktop/phone UI checks. Regressions
+cover unloaded-chat replies, queueing after connection, failed connections, double taps, draft changes during
+connection, and late poll responses after reconnect/navigation. The unchanged Claude session screenshots
+match the baseline. A live unloaded task opened and acquired its desktop owner through the deployed recovery
+route, remained connected on the next state request, and the original chat was reopened without sending a prompt.

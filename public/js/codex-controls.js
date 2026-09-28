@@ -1,43 +1,63 @@
 "use strict";
 // Native app requests stay attached to their real request and turn ids, even with two pages open.
 const codexViews = new Map();
-let codexPoll = null, codexPollKey = null;
+let codexPoll = null, codexPollKey = null, codexPollGeneration = 0;
+const codexConnecting = new Map(), codexStateVersions = new Map(), codexSending = new Set();
 const codexView = (r) => codexViews.get(r?.key);
 const codexCanReply = (r) => !r?.app || !!codexView(r)?.ready;
+const codexNextVersion = (key) => { const v = (codexStateVersions.get(key) ?? 0) + 1; codexStateVersions.set(key, v); return v; };
 function syncCodexControl(r) {
   const key = r?.app && !S.board && !S.mode ? r.key : null;
   if (key === codexPollKey) return;
   clearTimeout(codexPoll); codexPollKey = key;
+  const generation = ++codexPollGeneration;
   if (!key) return;
   const tick = async () => {
-    try {
-      const value = await api("/api/codex-state", { key });
-      codexViews.set(key, value);
-      if (codexPollKey === key) { renderDetail(); renderQueue(rowOf(key)); }
-    } catch (e) {
-      codexViews.set(key, { ready: false, requests: [], error: e.message });
-      if (codexPollKey === key) renderDetail();
+    if (generation !== codexPollGeneration) return;
+    if (!codexConnecting.has(key)) {
+      const version = codexNextVersion(key);
+      const current = () => generation === codexPollGeneration && version === codexStateVersions.get(key);
+      try {
+        const value = await api("/api/codex-state", { key });
+        if (current()) { codexViews.set(key, value); renderDetail(); renderQueue(rowOf(key)); }
+      } catch (e) {
+        if (current()) { codexViews.set(key, { ...codexViews.get(key), ready: false, requests: [], connectionIssue: "unavailable", error: e.message }); renderDetail(); }
+      }
     }
-    if (codexPollKey === key) codexPoll = setTimeout(tick, 1800);
+    if (generation === codexPollGeneration) codexPoll = setTimeout(tick, 1800);
   };
   codexPoll = setTimeout(tick, 0);
 }
-const codexConnecting = new Set();
+function connectCodex(r, open = true) {
+  if (codexConnecting.has(r.key)) return codexConnecting.get(r.key);
+  const version = codexNextVersion(r.key);
+  const run = (async () => {
+    try {
+      const state = await api(open ? "/api/codex-connect" : "/api/codex-state", { key: r.key, ...(open ? {} : { reconnect: true }) });
+      if (version === codexStateVersions.get(r.key)) codexViews.set(r.key, state);
+      return state;
+    } catch (e) {
+      if (version === codexStateVersions.get(r.key)) codexViews.set(r.key, { ...codexViews.get(r.key), ready: false, requests: [], connectionIssue: "unavailable", error: e.message });
+      throw e;
+    } finally { codexConnecting.delete(r.key); renderDetail(); }
+  })();
+  codexConnecting.set(r.key, run); renderDetail();
+  return run;
+}
 async function reconnectCodex(r, open = false) {
-  if (codexConnecting.has(r.key)) return;
-  codexConnecting.add(r.key); renderDetail();
   try {
-    const state = await api(open ? "/api/codex-connect" : "/api/codex-state", { key: r.key, ...(open ? {} : { reconnect: true }) });
-    codexViews.set(r.key, state);
-    if (state.ready) toast("Connected to the Codex app");
-    else toast(state.error ?? "Codex is still opening. Try reconnecting in a moment.", true);
-  } catch (e) { toast(e.message, true); }
-  finally { codexConnecting.delete(r.key); renderDetail(); }
+    const state = await connectCodex(r, open);
+    if (!state.ready) throw new Error(state.error ?? "Codex is still opening. Try again in a moment.");
+    toast("Connected to the Codex app");
+  } catch (e) { toast(e.message, true, { label: "Retry", run: () => reconnectCodex(r, open) }); }
 }
 function codexConnectionHTML(r) {
   const state = codexView(r), connecting = codexConnecting.has(r.key);
-  const text = state?.ready ? "Connected to the Codex app · replies stay in this conversation" : connecting ? "Connecting to the Codex app…" : state?.error ?? "Connecting to the Codex app…";
-  return `<span role="status">${esc(text)}</span><span class="spacer"></span>${!state?.ready ? `<button class="btn" data-dact="codexreconnect" ${connecting ? "disabled" : ""}>${connecting ? "Connecting…" : "Reconnect"}</button>${state?.canOpen ? `<button class="btn" data-dact="codexconnect" ${connecting ? "disabled" : ""}>Open & reconnect</button>` : ""}` : ""}<button class="btn" data-dact="codexopen">${ICON.jump}Open in Codex</button>`;
+  if (state?.ready && !connecting) return "";
+  const unloaded = state?.connectionIssue === "not-loaded";
+  const text = connecting ? "Connecting to Codex…" : !state ? "Checking Codex…" : unloaded && state.canOpen ? "Send a reply to open this chat in Codex on its host machine." : state.error ?? "Codex is unavailable. Your draft stays here.";
+  const retry = state && !connecting && !unloaded && state.connectionIssue !== "incompatible";
+  return `<span role="status">${esc(text)}</span>${retry ? `<span class="spacer"></span><button class="btn" data-dact="${state.canOpen ? "codexconnect" : "codexreconnect"}">Try again</button>` : ""}`;
 }
 async function stopCodex(r) {
   try {

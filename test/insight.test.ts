@@ -43,6 +43,15 @@ describe("chat messages", () => {
     const d = await claudeDetail(path);
     expect(d.messages.map((m) => m.role)).toEqual(["user", "tool"]);
   });
+
+  test("a message that starts with a paste shows, without the paste tags", async () => {
+    const path = `${tmp()}/s.jsonl`;
+    writeFileSync(path,
+      line({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: '\n\n<pasted_content id="69c7">\nList cool things.\n\nAnd a sigil app.\n</pasted_content id="69c7">\n\nthoughts?' } }) +
+      line({ type: "user", timestamp: "2026-09-20T10:00:01Z", message: { content: "<local-command-stdout>hidden</local-command-stdout>" } }));
+    const d = await claudeDetail(path);
+    expect(d.messages.map((m) => m.text)).toEqual(["List cool things.\n\nAnd a sigil app.\n\nthoughts?"]);
+  });
 });
 
 describe("project inference", () => {

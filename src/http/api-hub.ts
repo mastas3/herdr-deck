@@ -110,7 +110,7 @@ export async function hubApi(hub: Hub, path: string, body: any): Promise<Respons
           try {
             if (route.remote) await route.remote.post("/api/send", { key: route.key, text: rel.text });
             else await sendText(key, rel.text);
-            results.push({ key, ok: true, n: rel.n });
+            results.push({ key, ok: true, n: rel.n, text: rel.text });
           } catch (e: any) { results.push({ key, ok: false, error: e?.message }); }
         }
         return json({ results });
