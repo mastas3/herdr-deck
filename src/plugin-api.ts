@@ -23,6 +23,9 @@ export type RouteHandler = (r: RouteReq) => unknown | Promise<unknown>;
 
 export type Notice = { key?: string; ok: boolean; message: string };
 /** `mode` is the agent's permission mode (e.g. "auto" for Claude's auto mode), as in the New session dialog. */
+/** Where to reopen a session: its herdr server, workspace (by id, else by name; `createWorkspace` makes a missing one),
+ *  folder, tab name and the command that resumes it. The Closed list's Reopen does exactly this. */
+export type ReopenSession = { herdr?: string; workspaceId?: string; workspace?: string; createWorkspace?: boolean; cwd: string; tab?: string; project?: string; resume?: string };
 export type StartSession = { kind: string; cwd: string; prompt?: string; args?: string[]; label?: string; model?: string; effort?: string; mode?: string; focus?: boolean };
 
 /** Extension points the core reads. Plugins may also open their own (e.g. `discover.tabs`): any other name is free. */
@@ -77,6 +80,8 @@ export type Host = {
     screen(key: string): Promise<string>;
     /** Presses keys in a pane on this machine (e.g. ["enter"]); nothing happens when the pane isn't here. */
     keys(key: string, keys: string[]): Promise<void>;
+    /** Opens a new tab on this machine's herdr and resumes a session there (waits for the shell's prompt first). */
+    reopen(o: ReopenSession): Promise<{ key?: string; paneId?: string; workspaceId?: string }>;
   };
   push: PushStore;
   automations(): Automations | undefined;

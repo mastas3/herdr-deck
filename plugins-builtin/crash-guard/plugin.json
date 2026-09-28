@@ -1,0 +1,19 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "crash-guard",
+  "name": "Crash guard",
+  "version": "1.0.0",
+  "description": "Remembers every open pane (folder, agent, conversation, resume command) once a minute. When herdr restarts and sessions vanish, a banner offers to reopen them in the right workspace and resume each one.",
+  "server": "server.ts",
+  "client": ["crash-guard.js", "crash-guard-dialog.js"],
+  "styles": ["crash-guard.css"],
+  "machine": "any",
+  "routes": ["crash-guard"],
+  "extends": ["fullState"],
+  "settings": {
+    "keep": { "label": "Snapshots to keep", "type": "number", "default": 60, "hint": "A new one is saved when your panes change; old ones rotate out" },
+    "atOnce": { "label": "Sessions restored at once", "type": "number", "default": 2, "hint": "Each waits for its shell to start, so keep this small" },
+    "minLost": { "label": "Sessions that must vanish to call it a crash", "type": "number", "default": 3 }
+  }
+}

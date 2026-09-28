@@ -51,6 +51,7 @@
     <button class="jumpbtm" id="jumpBottom" hidden aria-label="Jump to the latest message" title="Jump to the latest (End)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3.5 8.5 8 13l4.5-4.5"/></svg><span class="n"></span></button>
     <div class="askbox" id="askbox" hidden></div>
     <div class="appbar" id="appbar" hidden></div>
+    <div class="pbar" id="pbar" hidden></div>
     <div class="dock" id="dock">
       <div class="cmeta"><div class="nowbar" id="nowbar" hidden></div><div class="statusline" id="statusline" hidden></div></div>
       <div class="qbar" id="qbar" hidden aria-label="Queued messages"></div>
@@ -122,6 +123,7 @@
         <div class="field" id="nModeWrap"><span id="nModeLabel">Permissions</span><div class="seg small" id="nMode"></div></div>
       </div>
       <label class="field" id="nPromptWrap"><span>First message <span class="hint">(optional)</span></span><textarea id="nPrompt" placeholder="What should it work on?"></textarea></label>
+      <div id="nExtras" hidden></div>
       <details class="field" id="nMore"><summary class="hint" style="cursor:pointer">More: extra flags, tab name</summary>
         <label class="field" id="nArgsWrap"><span>Extra flags</span><input id="nArgs" spellcheck="false" autocomplete="off" class="mono" placeholder="none"><div class="sugg" id="nArgsSugg"></div></label>
         <label class="field"><span id="nLabelText">Tab name <span class="hint">(defaults to the folder name)</span></span><input id="nLabel" autocomplete="off"></label>

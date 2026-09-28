@@ -68,11 +68,22 @@ function renderKinds() {
   $("nMore").querySelector("summary").textContent = native ? "More: task name" : "More: extra flags, tab name";
   $("nOk").textContent = native ? "Create Codex task" : "Start session";
   $("nOk").disabled = !newOpts;
+  renderNewExtras();
   nSel = { model: "", effort: "", mode: "", ...load("opts:" + newKind, {}) };
   $("nArgs").value = load("args:" + newKind, "");
   const hints = newOpts?.argHints?.[newKind] ?? [];
   $("nArgsSugg").innerHTML = hints.length ? `<span class="hint">Your other ${esc(newKind)} sessions use:</span>` + hints.map((h) => `<button type="button" data-args="${esc(h)}">${esc(h)}</button>`).join("") : "";
   renderAgentOpts();
+}
+/** Plugins' fields in the dialog ("new.fields": { render(el, { kind, native }), apply(body) }), each in its own box. */
+function renderNewExtras() {
+  const box = $("nExtras"), cs = deckPlugins.contributions("new.fields");
+  box.hidden = !cs.length;
+  cs.forEach((c, i) => {
+    let el = box.children[i];
+    if (!el) { el = document.createElement("div"); box.append(el); }
+    try { c.render?.(el, { kind: newKind, native: newCodexApp() }); } catch (e) { console.error("new.fields:", e); }
+  });
 }
 function renderAgentOpts() {
   if (newCodexApp()) { $("nAgentOpts").hidden = true; renderCmd(); return; }
@@ -121,6 +132,7 @@ $("nPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.me
 async function submitNewSession() {
   const body = { machine: newMachine, kind: newKind, cwd: $("nCwd").value.trim(), ...(newKind === "shell" ? {} : nSel), args: $("nArgs").value.trim(), prompt: newKind === "shell" ? "" : $("nPrompt").value, label: $("nLabel").value.trim(), focus: $("nFocus").checked };
   if (newMkdir && home(newMkdir) === body.cwd) body.mkdir = true; // quests: startRun
+  for (const c of deckPlugins.contributions("new.fields")) try { c.apply?.(body); } catch (e) { console.error("new.fields:", e); }
   store("newCwd:" + newMachine, body.cwd); store("args:" + newKind, body.args); store("newFocus", body.focus);
   try {
     const native = newCodexApp();

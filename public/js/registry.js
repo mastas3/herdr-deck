@@ -5,9 +5,12 @@
 // the keyboard (keys), the Settings menu (settings), the SSE stream (events), each full state (state) and deep links
 // (links). Any plugin can open its own extension point too: others extend("discover.tabs", …), it reads contributions().
 // More the core reads: "project.link" { icon, open(name) } (where a project's name leads), "notify.prefs"
-// { title, prefs: [{ key, label, hint, default }] } (a section of the Notifications dialog; the hub keeps it by key)
-// and "inspector.tabs" { key, label, icon, order, when?, badge?, render, patch?, leave? } (a tab in the session's
-// inspector; the contract is at the top of public/js/inspector.js).
+// { title, prefs: [{ key, label, hint, default }] } (a section of the Notifications dialog; the hub keeps it by key),
+// "row.chips" (row, "list" | "board") => html (small chips at the start of a row's status line and on board cards),
+// "session.bar" (row) => html (a bar above the composer in the session view), "new.fields" { render(el, { kind,
+// native }), apply(body) } (a field in the New session dialog, and what it adds to the request) and "inspector.tabs"
+// { key, label, icon, order, when?, badge?, render, patch?, leave? } (a tab in the session's inspector; the contract is
+// at the top of public/js/inspector.js).
 const deckPlugins = (() => {
   /** Views the core owns: a plugin can't take them. Its keys are keymap.js's coreKeys() (read at register time). */
   const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);
