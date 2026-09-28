@@ -38,6 +38,8 @@ document.addEventListener("keydown", (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "c" && chatSel.size && !getSelection()?.toString()) { e.preventDefault(); copyBlocks([...chatSel]); return clearPicks(); }
   // ⌘Z outside a text field: the Undo on the toast showing now (a close, a rename, a skip).
   if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "z" && !e.target.matches("input, textarea, select, [contenteditable]") && toastUndo()) { e.preventDefault(); return; }
+  // ⌘F / Ctrl+F while the chat has focus searches it; anywhere else it stays the browser's find.
+  if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "f" && (findKeyOn() || findEl().contains(e.target)) && !document.querySelector("dialog[open]")) { e.preventDefault(); return openFind(); }
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); return !$("palette").open ? openPalette() : palRoute ? routeBack() : $("palette").close(); } // in the route view: back, like Esc
   if (e.defaultPrevented || e.target.matches("input, textarea, select, #screen") || document.querySelector("dialog[open]") || menuEl) return;
   if (e.metaKey || e.ctrlKey || e.altKey) return;

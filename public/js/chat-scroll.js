@@ -82,17 +82,17 @@ $("dbody").addEventListener("scroll", () => {
   else if (!mine) scrollPin.stick = gap < 40;
   scrollPin.anchor = scrollPin.stick ? null : takeAnchor();
   if (scrollPin.stick) scrollPin.unread = 0;
-  if (chatOn() && body.scrollTop < 240) loadEarlier();
+  if (chatOn() && body.scrollTop < 240 && !(scrollPin.flying > Date.now())) loadEarlier();
   renderJumpBtn();
 }, { passive: true });
 // Late layout (images, code blocks, fonts): stay pinned, or keep the anchor still.
 new ResizeObserver(() => {
   if (!chatOn() || !chatDom.el) return;
   if (scrollPin.stick) setScroll($("dbody").scrollHeight);
-  else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
+  else if (scrollPin.anchor && !(scrollPin.flying > Date.now())) restoreAnchor(scrollPin.anchor); // a flight to a search match corrects itself
 }).observe($("dbody"));
 const chatSizeObs = new ResizeObserver(() => {
   if (!chatOn() || !chatDom.el) return;
   if (scrollPin.stick) setScroll($("dbody").scrollHeight);
-  else if (scrollPin.anchor) restoreAnchor(scrollPin.anchor);
+  else if (scrollPin.anchor && !(scrollPin.flying > Date.now())) restoreAnchor(scrollPin.anchor); // a flight to a search match corrects itself
 });

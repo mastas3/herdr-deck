@@ -1,0 +1,21 @@
+/* Search in the open chat (chat-find.js): a small box floating over the top of the chat, so opening it and stepping
+   through matches never moves the conversation's layout. Matches are CSS highlights, not wrapped text. */
+.tabsbar .cfind-btn { margin: 0 0 4px auto; align-self: center; border: 0; padding: 0; }
+.tabsbar .seg2 + .cfind-btn { margin-left: 6px; }
+.tabsbar .cfind-btn svg { width: 17px; height: 17px; }
+.cfind { position: absolute; right: 16px; z-index: 7; width: min(400px, calc(100% - 32px)); display: flex; align-items: center; gap: 2px;
+  padding: 4px 4px 4px 11px; border: 1px solid var(--line-2); border-radius: 12px; background: var(--raise); color: var(--ink-2); box-shadow: 0 10px 28px rgba(0, 0, 0, .28); }
+.cfind[hidden] { display: none; }
+.cfind > svg { width: 15px; height: 15px; flex: none; color: var(--ink-3); }
+.cfind input { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: inherit; font-size: 15px; padding: 6px 6px; outline: none; }
+.cfind .cf-n { flex: none; min-width: 5.5ch; text-align: end; font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; padding-inline-end: 4px; }
+.cfind .ib { width: 30px; height: 30px; }
+.cfind .ib:disabled { opacity: .4; pointer-events: none; }
+#dbody .msg.cf-on { content-visibility: visible; }
+::highlight(chatfind) { background-color: color-mix(in srgb, var(--working) 34%, transparent); color: inherit; }
+::highlight(chatfind-cur) { background-color: var(--working); color: #111; }
+@media (max-width: 760px) {
+  .cfind { left: 10px; right: 10px; width: auto; }
+  .cfind input { font-size: 16px; } /* 16px or more: the phone doesn't zoom into the field */
+  .cfind .ib { width: 36px; height: 36px; }
+}

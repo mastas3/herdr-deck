@@ -257,6 +257,7 @@ function renderChat() {
   else if (nearBottom) toBottom();
   else { restoreAnchor(anchor); if (grew) scrollPin.unread++; }
   renderJumpBtn();
+  paintFind();
 }
 /** Only the newest agent message is actionable: its choices become buttons, a closing question gets quick replies. */
 function decorateLatest(wrap, blocks, r) {

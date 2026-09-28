@@ -16,6 +16,7 @@ const DECK_KEYS = [
   { sec: "Anywhere", id: "help", keys: ["?"], label: "Keyboard shortcuts (this list)", run: () => openKeys() },
   { sec: "Anywhere", id: "esc", keys: ["Escape"], label: "Back: picked messages, the view, the filter, the selection, then home", run: () => escBack() },
 
+  { sec: "The selected session", id: "chatfind", keys: ["⌘F"], when: () => cursel(), label: "Search its chat (while the chat has focus): Enter / ⇧Enter step, Esc closes" },
   { sec: "The selected session", id: "reply", keys: ["r"], when: () => cursel(), label: "Write it a message (start with ! to run a shell command)", run: () => focusReply() },
   { sec: "The selected session", id: "tools", keys: ["."], when: () => cursel() || S.picked.size, label: "Tools for it, or for the selection", run: () => openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe")) },
   { sec: "The selected session", id: "term", keys: ["t"], when: () => cursel(), label: "Type straight into its terminal (Ctrl+] to stop)", run: () => focusTerminal() },
