@@ -272,10 +272,6 @@ $("dbody").addEventListener("input", (e) => {
   if (e.target.matches("[data-stq]")) { stGrow(e.target); clearTimeout(S.studio.t.draft); S.studio.t.draft = setTimeout(() => store("studioDraft", e.target.value), 300); }
   else if (e.target.matches("[data-stdq]")) { m.q = e.target.value; clearTimeout(S.studio.t.q); S.studio.t.q = setTimeout(() => mixPatch("drawer"), 60); }
 });
-$("dbody").addEventListener("change", (e) => {
-  if (S.mode !== "discover" || !e.target.matches("[data-steng]")) return;
-  S.studio.engine = e.target.value; store("studioEngine", S.studio.engine);
-});
 $("dbody").addEventListener("keydown", (e) => {
   if (S.mode === "discover" && e.key === "Enter" && e.target.matches?.(".fcard")) { e.preventDefault(); const x = feedIdeas().find((y) => y.id === e.target.dataset.fid); if (x) openPlan(x); return; }
   if (S.mode !== "discover" || S.disc.tab !== "mix") return;
