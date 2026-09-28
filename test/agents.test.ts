@@ -26,6 +26,38 @@ describe("Claude transcripts", () => {
     const t = parseClaudeTail(tail);
     expect(t).toMatchObject({ model: "claude-opus-5-5", ctxTokens: 1100, lastMessage: "Done.", lastActiveAt: Date.parse("2026-09-21T09:00:01Z") });
   });
+
+  test("tail: effort comes from the last reply", () => {
+    const tail = j(
+      { type: "assistant", effort: "medium", timestamp: "2026-09-21T09:00:00Z", message: { model: "claude-opus-5-5", usage: { input_tokens: 4 }, content: [] } },
+      { type: "assistant", effort: "xhigh", timestamp: "2026-09-21T09:01:00Z", message: { model: "claude-opus-5-5", usage: { input_tokens: 4 }, content: [] } },
+    );
+    expect(parseClaudeTail(tail)).toMatchObject({ model: "claude-opus-5-5", effort: "xhigh" });
+    expect(parseClaudeTail(tail).modelName).toBeUndefined();
+  });
+
+  test("tail: a /model or /effort confirmed after the last reply shows before the next reply", () => {
+    const reply = { type: "assistant", effort: "high", timestamp: "2026-09-21T09:00:00Z", message: { model: "claude-opus-5-5", usage: { input_tokens: 4 }, content: [] } };
+    const said = (text: string) => ({ type: "user", timestamp: "2026-09-21T09:02:00Z", message: { role: "user", content: `<local-command-stdout>${text}</local-command-stdout>` } });
+    expect(parseClaudeTail(j(reply, said("Set model to `Fable 5.1` and saved as your default for new sessions")))).toMatchObject({ model: "claude-opus-5-5", modelName: "Fable 5.1", effort: "high" });
+    expect(parseClaudeTail(j(reply, said("Set model to `Sonnet 5.5 (default)` for this session only")))).toMatchObject({ modelName: "Sonnet 5.5" });
+    expect(parseClaudeTail(j(reply, said("Set model to \u001b[1mOpus 5 (1M context)\u001b[22m and saved as your default for new sessions")))).toMatchObject({ modelName: "Opus 5 (1M context)" });
+    expect(parseClaudeTail(j(reply, said("Set effort level to max (this session only): Maximum capability")))).toMatchObject({ effort: "max" });
+    expect(parseClaudeTail(j(reply, said("Effort level set to auto")))).toMatchObject({ effort: "auto" });
+    // Other command output and an unchanged model leave the reply's values alone.
+    expect(parseClaudeTail(j(reply, said("Kept model as `Opus 5.5`")))).toMatchObject({ effort: "high" });
+    expect(parseClaudeTail(j(reply, said("Kept model as `Opus 5.5`"))).modelName).toBeUndefined();
+  });
+
+  test("tail: the next reply replaces a confirmed model name with its real id", () => {
+    const tail = j(
+      { type: "user", timestamp: "2026-09-21T09:00:00Z", message: { content: "<local-command-stdout>Set model to `Fable 5.1` and saved as your default for new sessions</local-command-stdout>" } },
+      { type: "assistant", effort: "high", timestamp: "2026-09-21T09:01:00Z", message: { model: "claude-fable-5-1", usage: { input_tokens: 4 }, content: [] } },
+    );
+    const t = parseClaudeTail(tail);
+    expect(t).toMatchObject({ model: "claude-fable-5-1", effort: "high" });
+    expect(t.modelName).toBeUndefined();
+  });
 });
 
 describe("Codex rollouts", () => {
@@ -60,6 +92,12 @@ describe("Codex rollouts", () => {
     expect(parseCodex(head, tail)).toMatchObject({ model: "gpt-6-astra", ctxTokens: 70000, ctxWindow: 258400 });
     const newer = j({ timestamp: "2026-07-27T00:50:00Z", type: "turn_context", payload: { model: "gpt-6-sol" } });
     expect(parseCodex(head, newer).model).toBe("gpt-6-sol");
+  });
+  test("reasoning effort from the latest turn, falling back to the first", () => {
+    const head = j({ timestamp: "2026-07-26T22:20:54Z", type: "turn_context", payload: { model: "gpt-6-astra", effort: "medium" } });
+    expect(parseCodex(head, []).effort).toBe("medium");
+    const tail = j({ timestamp: "2026-07-27T00:50:00Z", type: "turn_context", payload: { model: "gpt-6-astra", collaboration_mode: { settings: { reasoning_effort: "xhigh" } } } });
+    expect(parseCodex(head, tail).effort).toBe("xhigh");
   });
 });
 
