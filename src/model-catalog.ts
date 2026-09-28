@@ -59,9 +59,10 @@ export const parseOpencodePlain = (text: string): ProviderInfo[] => group(text.s
 const errorText = (e: any) => (e?.code === "ENOENT" || /ENOENT|no such file|not found/i.test(String(e?.message)) ? "OpenCode isn't installed on this machine" : String(e?.message ?? e));
 
 /** Cached like a small stale-while-revalidate store: a stale list is served at once while one refresh runs, and a failure
- *  is not retried for a minute, so a missing or hanging OpenCode never makes the New session dialog wait twice. */
-export function createOpencodeCatalog(o: { run: (args: string[]) => Promise<string>; now?: () => number; ttlMs?: number }) {
-  const ttl = o.ttlMs ?? 10 * 60_000, now = o.now ?? Date.now, RETRY = 60_000;
+ *  is not retried for a minute. A first call waits at most `waitMs` for OpenCode (a cold OpenCode takes 10+ s to answer):
+ *  after that the New session dialog opens without the list, and the refresh finishes for the next call. */
+export function createOpencodeCatalog(o: { run: (args: string[]) => Promise<string>; now?: () => number; ttlMs?: number; waitMs?: number }) {
+  const ttl = o.ttlMs ?? 10 * 60_000, now = o.now ?? Date.now, RETRY = 60_000, waitMs = o.waitMs ?? 2500;
   let cache: { at: number; providers: ProviderInfo[] } | undefined;
   let failed: { at: number; error: string } | undefined;
   let inflight: Promise<OpencodeCatalog> | undefined;
@@ -82,7 +83,9 @@ export function createOpencodeCatalog(o: { run: (args: string[]) => Promise<stri
     async get(): Promise<OpencodeCatalog> {
       if (cache) { if (now() - cache.at > ttl) void refresh(); return { providers: cache.providers }; }
       if (failed && now() - failed.at < RETRY) return { providers: [], error: failed.error };
-      return refresh();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const r = await Promise.race([refresh(), new Promise<null>((ok) => { timer = setTimeout(() => ok(null), waitMs); })]).finally(() => clearTimeout(timer));
+      return r ?? { providers: [], error: "OpenCode is still loading its models" };
     },
     refresh,
   };
@@ -90,8 +93,9 @@ export function createOpencodeCatalog(o: { run: (args: string[]) => Promise<stri
 
 const HOME = homedir();
 const OPENCODE = process.env.DECK_OPENCODE_BIN || [`${HOME}/.opencode/bin`, `${HOME}/.local/bin`, "/opt/homebrew/bin", "/usr/local/bin"].map((d) => `${d}/opencode`).find((p) => existsSync(p)) || "opencode";
-/** Runs the opencode CLI (a service's PATH often lacks ~/.opencode/bin) and returns its text. Never inline: it takes ~2 s. */
-export async function runOpencode(args: string[], timeoutMs = 20_000): Promise<string> {
+/** Runs the opencode CLI (a service's PATH often lacks ~/.opencode/bin) and returns its text. Never inline: it takes ~1 s,
+ *  or 12+ s when OpenCode refreshes its own model cache, and killing that early only makes the next try start over. */
+export async function runOpencode(args: string[], timeoutMs = 60_000): Promise<string> {
   const p = Bun.spawn([OPENCODE, ...args], { stdout: "pipe", stderr: "ignore", env: { ...process.env, NO_COLOR: "1" } });
   let timedOut = false;
   const t = setTimeout(() => { timedOut = true; p.kill(); }, timeoutMs);

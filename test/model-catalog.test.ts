@@ -116,6 +116,20 @@ describe("the OpenCode catalog", () => {
     t = 62_001; await cat.get(); await cat.refresh(); // stale again: one more try (the refresh is already in flight)
     expect(calls.length).toBeGreaterThan(n);
   });
+  test("a first call that would wait on a slow OpenCode gives up after waitMs with a plain reason; the list arrives for the next call", async () => {
+    let release!: (s: string) => void;
+    const slow = new Promise<string>((r) => (release = r));
+    const calls: string[] = [];
+    const cat = createOpencodeCatalog({ run: async (args) => { calls.push(args.join(" ")); return slow; }, waitMs: 10 });
+    const t = Date.now();
+    expect(await cat.get()).toEqual({ providers: [], error: "OpenCode is still loading its models" });
+    expect(Date.now() - t).toBeLessThan(1000);
+    await cat.get(); // still loading: it does not spawn a second process
+    expect(calls).toEqual(["models --verbose"]);
+    release(VERBOSE);
+    await cat.refresh();
+    expect((await cat.get()).providers.length).toBe(3);
+  });
   test("concurrent first calls share one spawn", async () => {
     const f = fake({ "models --verbose": VERBOSE });
     const cat = createOpencodeCatalog({ run: f.run });
