@@ -49,6 +49,7 @@ export type Detail = {
   todo?: string; // the task the agent marked in progress, if it keeps a todo list
   todos?: { done: number; total: number }; // progress through that list (Claude/OpenCode todos, Codex plans)
   touch: Map<string, number>; // folder → how much work happened there (edits weigh most)
+  edits?: Map<string, number>; // file the agent changed (as the tool named it; relative = its folder's) → last change
 };
 
 const TEXT_CAP = 24_000;
@@ -65,7 +66,7 @@ const oneLine = (s: unknown, n = 160) => {
 };
 
 let genCounter = 0;
-const emptyDetail = (): Detail => ({ gen: ++genCounter, turns: [], images: [], messages: [], compactions: 0, asks: 0, touch: new Map() });
+const emptyDetail = (): Detail => ({ gen: ++genCounter, turns: [], images: [], messages: [], compactions: 0, asks: 0, touch: new Map(), edits: new Map() });
 
 // ── where the work happened ─────────────────────────────────────────────────
 
@@ -82,6 +83,19 @@ function touch(d: Detail, rawPath: string, weight: number) {
   const dir = parts.slice(0, Math.min(parts.length, 8)).join("/"); // deep paths collapse, bounding the map
   if (dir === HOME) return;
   d.touch.set(dir, (d.touch.get(dir) ?? 0) + weight);
+}
+/** Remembers a file the agent changed, newest last (the Files view lists them). Bounded like `touch`. */
+function edited(d: Detail, rawPath: string, at?: number) {
+  const p = rawPath.trim();
+  if (!p || p.length > 1024 || !d.edits) return;
+  const prev = d.edits.get(p);
+  d.edits.delete(p);
+  if (d.edits.size < 3000) d.edits.set(p, at ?? prev ?? 0);
+}
+const PATCH_FILES = /^\*\*\* (?:Update|Add|Delete) File: (.+)$|^\*\*\* Move to: (.+)$/gm;
+function editedInPatch(d: Detail, text: string, at?: number) {
+  if (!text.includes("*** ")) return;
+  for (const m of text.matchAll(PATCH_FILES)) edited(d, m[1] ?? m[2], at);
 }
 function touchText(d: Detail, text: string, weight: number) {
   const seen = new Set<string>();
@@ -235,23 +249,25 @@ function feedClaude(st: State, line: string, offset: number) {
         const isAgent = /^(agent|task)$/i.test(name);
         const m = push(d, { role: "tool", at, tool: prettyTool(name), summary: toolSummary(name, p.input), state: "running", ...(isAgent ? { sub: "", subType: p.input?.subagent_type } : {}) });
         if (p.id) { st.open.set(p.id, m); if (isAgent) Object.defineProperty(m, "_tid", { value: p.id, enumerable: false }); }
-        workFromInput(d, name, p.input);
+        workFromInput(d, name, p.input, at);
         if (name.toLowerCase() === "todowrite") trackTodos(d, p.input?.todos);
       }
     }
   }
 }
 
-function workFromInput(d: Detail, name: string, input: any) {
+function workFromInput(d: Detail, name: string, input: any, at?: number) {
   const i = typeof input === "object" && input ? input : {};
-  const w = EDIT_TOOLS.test(name) ? 4 : READ_TOOLS.test(name) ? 1 : 2;
+  const edit = EDIT_TOOLS.test(name);
+  const w = edit ? 4 : READ_TOOLS.test(name) ? 1 : 2;
   const path = i.file_path ?? i.filePath ?? i.notebook_path ?? i.path;
-  if (typeof path === "string") touch(d, path, w);
+  if (typeof path === "string") { touch(d, path, w); if (edit) edited(d, path, at); }
   const cmd = i.command ?? i.cmd;
-  if (typeof cmd === "string") touchText(d, cmd, 2);
-  else if (Array.isArray(cmd)) touchText(d, cmd.join(" "), 2);
+  if (typeof cmd === "string") { touchText(d, cmd, 2); editedInPatch(d, cmd, at); }
+  else if (Array.isArray(cmd)) { touchText(d, cmd.join(" "), 2); editedInPatch(d, cmd.join("\n"), at); }
   if (typeof i.workdir === "string") touch(d, i.workdir + "/", 2);
-  if (typeof input === "string") touchText(d, input, /\*\*\* (Update|Add) File:/.test(input) ? 4 : 2);
+  if (typeof i.input === "string") editedInPatch(d, i.input, at);
+  if (typeof input === "string") { touchText(d, input, /\*\*\* (Update|Add) File:/.test(input) ? 4 : 2); editedInPatch(d, input, at); }
 }
 
 function addImage(st: { detail: Detail; cur?: Turn }, img: Img) {
@@ -482,7 +498,7 @@ function feedCodex(st: State, line: string, offset: number) {
     if (item?.type === "CommandExecution" || item?.type === "FileChange") {
       const edit = item.type === "FileChange";
       const paths = edit && item.changes && typeof item.changes === "object" ? Object.keys(item.changes) : [];
-      for (const path of paths) touch(d, path, 4);
+      for (const path of paths) { touch(d, path, 4); edited(d, path, at); }
       if (item.cwd) touch(d, item.cwd + "/", 2);
       const summary = edit ? paths.map(home).slice(0, 3).join(", ") : oneLine(Array.isArray(item.command) ? item.command.join(" ") : item.command);
       const state = item.status === "failed" || item.status === "declined" || (typeof item.exit_code === "number" && item.exit_code !== 0) ? "error" : "done";
@@ -503,7 +519,7 @@ function feedCodex(st: State, line: string, offset: number) {
     try { args = JSON.parse(raw); } catch {}
     const shortName = name.replace(/^(?:functions|collaboration)\./, "");
     if (shortName === "update_plan" && typeof args === "object") trackTodos(d, args?.plan);
-    workFromInput(d, shortName, args);
+    workFromInput(d, shortName, args, at);
     if (typeof args === "string") {
       const wd = args.match(/workdir\s*:\s*["'`]([^"'`]+)/)?.[1];
       if (wd) touch(d, wd + "/", 2);
@@ -679,7 +695,7 @@ export function opencodeDetail(sessionId: string): Detail | undefined {
           try { input = JSON.parse(p.input ?? "{}"); } catch {}
           const tool = String(p.tool ?? "tool");
           push(d, { role: "tool", at: m.time_created, tool: prettyTool(tool), summary: toolSummary(tool, input), state: p.status === "error" ? "error" : p.status === "completed" ? "done" : "running" });
-          workFromInput(d, tool, input);
+          workFromInput(d, tool, input, m.time_created);
           if (tool === "todowrite") trackTodos(d, input.todos);
         }
       }

@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "files",
+  "name": "Files",
+  "version": "1.0.0",
+  "description": "Files and Changes tabs in a session's inspector: its folder as a tree with git status, the files the agent touched, and the working tree's diff. Read-only.",
+  "server": "server.ts",
+  "client": ["files-view.js", "files-tree.js", "files-changes.js"],
+  "styles": ["files.css"],
+  "machine": "any",
+  "routes": ["files"]
+}
