@@ -112,7 +112,7 @@ function settingsMenu(anchor) {
     { html: "Tools<small>What each tool does; add your own</small>", run: () => setMode("tools") },
     { html: "Usage<small>Every AI account’s limits and balance, on every machine</small>", run: () => setMode("usage") },
     ...deckPlugins.contributions("settings.entries"),
-    !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
+    !isPhone() && { html: "Keyboard shortcuts<small>?</small>", run: openKeys },
   ].filter(Boolean));
 }
 function setTheme(name) { applyTheme(name); store("theme", name); }

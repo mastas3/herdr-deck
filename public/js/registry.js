@@ -7,8 +7,7 @@
 // Two more the core reads: "project.link" { icon, open(name) } (where a project's name leads) and "notify.prefs"
 // { title, prefs: [{ key, label, hint, default }] } (a section of the Notifications dialog; the hub keeps it by key).
 const deckPlugins = (() => {
-  /** Keys and views the core owns: a plugin can't take them. */
-  const CORE_KEYS = new Set([..."/jkr.ihtg`\\lnfyxsbe[]c?123456789", "Escape", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
+  /** Views the core owns: a plugin can't take them. Its keys are keymap.js's coreKeys() (read at register time). */
   const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);
   const points = new Map(), views = new Map(), keys = new Map(), ids = new Set();
   const warn = (id, msg) => console.warn(`deckPlugins: ${id}: ${msg}`);
@@ -22,7 +21,8 @@ const deckPlugins = (() => {
    *   views:    { [mode]: { render(), load?(), leave?(), path?() } }   setMode(mode) shows it; path() is its URL
    *   tabs:     [{ view, label, icon, key?, order }]                    the view tab bar (core: inbox 10, history 20, plugins 90)
    *   palette:  (q, cur) => [{ t, run, k?, echo?, slot?: "views"|"more", order? } | { section, html, run }]
-   *   keys:     { [key]: (event) => void }                              single keys the core doesn't use
+   *   keys:     { [key]: (event) => void | { run(event), label } }     single keys the core doesn't use (keymap.js);
+   *                                                                     label is its "?" line (default: its tab's)
    *   settings: [{ html, run }]                                         Settings menu items (before Keyboard shortcuts)
    *   events:   { [sseEvent]: (data) => void }                          the plugin's server broadcasts
    *   state:    (fullState) => void                                     every full state (page load, reconnect)
@@ -38,9 +38,12 @@ const deckPlugins = (() => {
     }
     for (const t of spec.tabs ?? []) extend(id, "view.tabs", t);
     if (spec.palette) extend(id, "palette.entries", spec.palette);
-    for (const [k, run] of Object.entries(spec.keys ?? {})) {
-      if (CORE_KEYS.has(k) || keys.has(k)) warn(id, `the key ${k} is taken`);
-      else keys.set(k, { id, run });
+    for (const [k, v] of Object.entries(spec.keys ?? {})) {
+      const run = typeof v === "function" ? v : v?.run;
+      const label = v?.label ?? spec.tabs?.find((t) => t.key === k)?.label ?? id;
+      if (coreKeys().has(k) || keys.has(k)) warn(id, `the key ${k} is taken`);
+      else if (typeof run !== "function") warn(id, `the key ${k} has no run()`);
+      else keys.set(k, { id, run, label });
     }
     for (const s of spec.settings ?? []) extend(id, "settings.entries", s);
     for (const [event, fn] of Object.entries(spec.events ?? {})) extend(id, "sse.events", { event, fn });
@@ -59,6 +62,8 @@ const deckPlugins = (() => {
     register, contributions, each,
     view: (mode) => (mode ? views.get(mode) : undefined),
     key: (k) => keys.get(k)?.run,
+    /** Plugins' keys for the "?" sheet: [{ key, label, id }]. */
+    keyList: () => [...keys].map(([key, { id, label }]) => ({ key, label, id })),
     /** Registered in this page (its scripts loaded). */
     has: (id) => ids.has(id),
     /** Running on the deck (its server side is on), from the page's state. */

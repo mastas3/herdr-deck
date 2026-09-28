@@ -16,7 +16,7 @@ async function sendMessage(text, fromEl, how) {
   if (how === "later" && r.status === "working" && isAgent(r)) {
     fromEl.value = ""; autosize(fromEl); S.drafts.delete(key); closeSlash();
     try { await api("/api/queue", { op: "add", key, text }); toast("Queued. It goes when the agent finishes this turn."); }
-    catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true); }
+    catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } }); }
     return;
   }
   closeSlash();
@@ -33,7 +33,7 @@ async function sendMessage(text, fromEl, how) {
     c.v++;
     fromEl.value = text;
     renderChat();
-    toast("Send failed: " + x.message, true);
+    toast("Send failed: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } });
   }
 }
 $("composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("cText").value.trim(), $("cText"), e.submitter?.id === "cSteer" ? "steer" : undefined); });

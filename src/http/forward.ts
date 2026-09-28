@@ -32,7 +32,7 @@ export function createForward(deps: Deps) {
         if (!remote) { results.push(...(await closeLocal(keys, !!body.wholeTab))); continue; }
         try {
           const r = await remote.post(path, { ...body, keys });
-          results.push(...(r.data.results ?? []).map((x: any) => ({ ...x, key: `${remote.conf.id}|${x.key}` })));
+          results.push(...(r.data.results ?? []).map((x: any) => ({ ...x, key: `${remote.conf.id}|${x.key}`, graves: x.graves?.map((g: string) => `${remote.conf.id}|${g}`) })));
         } catch (e: any) { results.push(...keys.map((k) => ({ key: `${remote.conf.id}|${k}`, ok: false, error: e?.message }))); }
       }
       return json({ results });

@@ -21,6 +21,7 @@
     "js/tools-view.js",
     "js/menus.js",
     "js/notifications.js",
+    "js/keymap.js",
     "js/palette.js",
     "js/new-session.js",
     "js/events.js",
@@ -42,6 +43,7 @@
     "css/composer.css",
     "css/controls.css",
     "css/notifications.css",
+    "css/feedback.css",
     "css/motion.css",
     "css/simple.css",
     "css/plugins.css"

@@ -33,7 +33,7 @@ function paletteItems(q) {
     html: `<span class="dot" style="--c:${statusVar(r.status)}"></span><span>${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></span><small>${esc(r.project)}${multiMachine() ? " · " + esc(machineLabel(r.machine)) : ""} · ${esc(ago(r.lastActiveAt) || STATUS_NAME[r.status])}</small>`,
     run: () => { if (!inScope(r)) setMachine("all"); S.view = "inbox"; select(r.key, { scroll: true, open: true }); },
   })));
-  if (n) {
+  if (n && (q || !cur)) {
     const tools = S.tools.filter((t) => t.action !== "upload").map((t) => ({ t, s: fuzzy(`${t.label} ${t.hint ?? ""} tool`, q) })).filter((x) => x.s).slice(0, q ? 6 : 4);
     if (tools.length) out.push({ head: n > 1 ? `Tools for ${n} selected` : `Tools for “${cur?.title ?? "session"}”` }, ...tools.map(({ t }) => ({ html: `<span>${esc(t.label)}</span><small>${esc(t.hint ?? "")}</small>`, run: () => runTool(t) })));
   }
@@ -41,32 +41,38 @@ function paletteItems(q) {
   // (after Plugins); a `section` entry gets a heading of its own below, once you've typed something.
   const plug = deckPlugins.each("palette.entries", q, cur).flat().filter(Boolean);
   const slot = (name) => plug.filter((c) => !c.section && (c.slot ?? "more") === name).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const cmds = [
-    { t: "New session", k: "n", run: () => openNew() },
-    cur && projectHome(cur.project) && { t: `New session in ${cur.project}`, run: () => openNew(projectHome(cur.project)) },
-    { t: "Live board: everything working right now", k: "l", run: () => setBoard(true) },
-    cur && { t: "Message this session", k: "r", run: focusReply },
-    cur && !cur.app && { t: "Jump to this pane in herdr", k: "f", run: () => focusPane(cur.key) },
-    cur?.app && { t: "Open this thread in the Codex app", run: () => codexAct("codex-open", cur) },
-    cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
-    cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
-    cur && !cur.app && !cur.hist && { t: "Rename this session…", k: "e", run: () => renameSession(cur) },
+  // Commands: `id` takes its key hint from keymap.js; `ctx` ones act on the selected session (their own heading).
+  const all = [
+    { t: "New session", id: "new", run: () => openNew() },
+    cur && projectHome(cur.project) && { t: `New session in ${cur.project}`, ctx: true, run: () => openNew(projectHome(cur.project)) },
+    { t: "Next session waiting on you", id: "needs", run: nextNeedsMe },
+    { t: "Live board: everything working right now", id: "board", run: () => setBoard(true) },
+    cur && { t: "Message this session", id: "reply", ctx: true, run: focusReply },
+    cur && !cur.app && { t: "Jump to this pane in herdr", id: "focus", ctx: true, run: () => focusPane(cur.key) },
+    cur?.app && { t: "Open this thread in the Codex app", ctx: true, run: () => codexAct("codex-open", cur) },
+    cur?.app && { t: "Continue this Codex thread in herdr", ctx: true, run: () => codexAct("codex-resume", cur) },
+    cur && { t: "Copy a link to this session", id: "link", ctx: true, run: () => copy(linkUrl(cur), "link") },
+    cur?.resume && { t: "Copy its resume command", id: "resume", ctx: true, run: () => copy(cur.resume, "resume command") },
+    cur && !cur.app && !cur.hist && { t: "Rename this session…", id: "rename", ctx: true, run: () => renameSession(cur) },
     ...slot("views"),
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
-    cur && { t: "Write or rewrite the brief", k: "b", run: () => writeBrief(cur.key) },
-    cur && { t: "Close this session…", k: "x", run: () => askClose([cur.key]) },
+    cur && { t: "Write or rewrite the brief", id: "brief", ctx: true, run: () => writeBrief(cur.key) },
+    cur && { t: "Close this session…", id: "close", ctx: true, run: () => askClose([cur.key]) },
+    { t: "Select every session shown", id: "pickall", run: pickAllShown },
+    n > 1 && { t: `Message ${n} selected sessions…`, run: messagePicked },
     n > 1 && { t: `Close ${n} selected sessions…`, run: () => askClose(targets()) },
-    { t: S.group === "project" ? "Sort the list by priority" : "Group the list by project", k: "g", run: () => setGroup(S.group === "project" ? "priority" : "project") },
+    S.picked.size > 0 && { t: "Clear the selection", run: () => { S.picked.clear(); render(); } },
+    { t: S.group === "project" ? "Sort the list by priority" : "Group the list by project", id: "group", run: () => setGroup(S.group === "project" ? "priority" : "project") },
     ...(!isPhone() ? TPOS.filter((p) => p !== S.tpos).map((p) => ({ t: `Terminal: ${TPOS_NAME[p].toLowerCase()}`, run: () => setTpos(p) })) : []),
     { t: "Standup: ask every idle agent for a status line", run: standup },
     { t: "Select close candidates", run: suggestClose },
     { t: "Close all empty sessions…", run: () => askClose([...S.rows.values()].filter(inScope).filter((r) => r.empty).map((r) => r.key)) },
-    { t: "Show closed sessions", k: "c", run: () => { S.view = "closed"; render(); } },
-    { t: "Decision inbox: everything waiting on you", k: "i", run: () => setMode("inbox") },
-    { t: "History: search every past session", k: "h", run: () => setMode("history") },
+    { t: "Show closed sessions", id: "closed", run: () => { S.view = "closed"; render(); } },
+    { t: "Decision inbox: everything waiting on you", id: "inbox", run: () => setMode("inbox") },
+    { t: "History: search every past session", id: "history", run: () => { setMode("history"); focusHistSearch(); } },
     { t: "Tools: what each one does", run: () => setMode("tools") },
-    { t: "Usage: every AI account's limits and balance", run: () => setMode("usage") },
+    { t: "Usage: every AI account's limits and balance", id: "usage", run: () => setMode("usage") },
     { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
     ...slot("more"),
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
@@ -75,13 +81,29 @@ function paletteItems(q) {
     { t: "Show the morning digest now", run: async () => { try { S.auto = await api("/api/automations", { op: "digest" }); goHome(); render(); } catch (e) { toast(e.message, true); } } },
     { t: "Toggle light / dark", run: toggleTheme },
     ...THEMES.map(([id, label]) => ({ t: `Theme: ${label}`, run: () => setTheme(id) })),
-    !isPhone() && { t: "Keyboard shortcuts", k: "?", run: () => $("help").showModal() },
+    !isPhone() && { t: "Keyboard shortcuts", id: "help", run: openKeys },
     ...(multiMachine() ? [["all", "all machines"], ...S.summary.machines.map((m) => [m.id, m.label])].map(([id, label]) => ({ t: `Show ${label}`, run: () => setMachine(id) })) : []),
-  ].filter(Boolean).map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, q ? 8 : 6);
-  if (cmds.length) out.push({ head: "Commands" }, ...cmds.map((c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, echo: c.echo, run: c.run })));
+  ].filter(Boolean).map((c) => ({ ...c, k: c.k ?? (c.id ? keyOf(c.id) : "") }));
+  const cmdRow = (c) => ({ html: `<span>${esc(c.t)}</span>${c.k && !isPhone() ? `<small><kbd>${esc(c.k)}</kbd></small>` : ""}`, echo: c.echo, run: c.run, t: c.t });
+  if (q) {
+    const cmds = all.map((c) => ({ ...c, s: fuzzy(c.t, q) })).filter((c) => c.s).slice(0, 8);
+    if (cmds.length) out.push({ head: "Commands" }, ...cmds.map(cmdRow));
+  } else {
+    // Empty: what you ran last, then what you can do to the selected session, then the everyday commands.
+    const recent = load("palRecent", []).map((t) => all.find((c) => c.t === t)).filter(Boolean).slice(0, 3);
+    const ctx = all.filter((c) => c.ctx && !recent.includes(c)).slice(0, 6);
+    const rest = all.filter((c) => !c.ctx && !recent.includes(c)).slice(0, cur ? 4 : 6);
+    if (recent.length) out.push({ head: "Recent commands" }, ...recent.map(cmdRow));
+    if (ctx.length) out.push({ head: `“${cur.title || cur.agent}”` }, ...ctx.map(cmdRow));
+    if (rest.length) out.push({ head: "Commands" }, ...rest.map(cmdRow));
+  }
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
-    if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
+    // A project quick switcher: show only it, or start a new session in its folder.
+    if (projects.length) out.push({ head: "Projects" }, ...projects.flatMap(({ p }) => [
+      { html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } },
+      projectHome(p) && { html: `<span class="dot" style="--c:${pc(p)}"></span><span>New session in ${esc(p)}</span><small>${esc(home(projectHome(p).cwd))}</small>`, t: `New session in ${p}`, run: () => openNew(projectHome(p)) },
+    ].filter(Boolean)));
     const heads = [...new Set(plug.filter((c) => c.section).map((c) => c.section))];
     for (const h of heads) out.push({ head: h }, ...plug.filter((c) => c.section === h).map(({ html, run }) => ({ html, run })));
   }
@@ -102,7 +124,13 @@ function palMove(d) {
   for (const b of $("palList").querySelectorAll("[data-p]")) b.classList.toggle("on", Number(b.dataset.p) === palIndex);
   $("palList").querySelector(".on")?.scrollIntoView({ block: "nearest" });
 }
-function palRun(i = palIndex) { const it = palItems[i]; if (!it || it.head) return; if (!it.keep) $("palette").close(); it.run(); }
+function palRun(i = palIndex) {
+  const it = palItems[i];
+  if (!it || it.head) return;
+  if (it.t) store("palRecent", [it.t, ...load("palRecent", []).filter((t) => t !== it.t)].slice(0, 8));
+  if (!it.keep) $("palette").close();
+  it.run();
+}
 $("palQ").addEventListener("input", renderPalette);
 $("palQ").addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown") { e.preventDefault(); palMove(1); }

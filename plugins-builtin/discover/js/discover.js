@@ -291,7 +291,7 @@ $("dbody").addEventListener("keydown", (e) => {
 deckPlugins.register("discover", {
   views: { discover: { load: () => loadDiscover(), render: () => renderDiscover() } },
   tabs: [{ view: "discover", label: "Discover", icon: () => ICON.compass, key: "d", order: 30 }],
-  keys: { d: () => setMode(S.mode === "discover" ? null : "discover") },
+  keys: { d: { label: "Discover: repos worth forking, the idea lab and your plans", run: () => setMode(S.mode === "discover" ? null : "discover") } },
   palette: (q) => [
     { t: "Discover: repos worth forking, picked for you", k: "d", order: 20, run: () => { S.disc.tab = "you"; setMode("discover"); } },
     { t: "Idea lab: research and plan any idea", order: 21, run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },

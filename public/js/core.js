@@ -126,15 +126,27 @@ async function api(path, body, timeoutMs) {
   if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
   return data;
 }
-let toastTimer;
-function toast(msg, err) {
+let toastTimer, toastAct = null;
+/** A short message at the bottom. `act` ({ label, run, ms }) adds one button: Undo for what can be reversed, Retry
+ *  after a failure. The pointer resting on it holds it open; ⌘Z runs an Undo (input.js). */
+function toast(msg, err, act) {
   let t = document.querySelector(".toast");
-  if (!t) { t = document.createElement("div"); t.setAttribute("role", "status"); document.body.append(t); }
-  t.className = "toast" + (err ? " err" : "");
-  t.textContent = msg;
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.remove(), err ? 7000 : 2400);
+  if (!t) {
+    t = document.createElement("div"); t.setAttribute("role", "status"); document.body.append(t);
+    t.addEventListener("pointerenter", () => clearTimeout(toastTimer));
+    t.addEventListener("pointerleave", () => armToast(t, 2000));
+    t.addEventListener("click", (e) => { if (e.target.closest(".tact")) runToast(); });
+  }
+  t.className = "toast" + (err ? " err" : "") + (act ? " act" : "");
+  toastAct = act ?? null;
+  if (act) t.innerHTML = `<span class="tmsg">${esc(msg)}</span><button type="button" class="tact">${esc(act.label)}${act.label === "Undo" && !isPhone() ? "<kbd>⌘Z</kbd>" : ""}</button>`;
+  else t.textContent = msg;
+  armToast(t, act?.ms ?? (act ? 6000 : err ? 7000 : 2400));
 }
+function armToast(t, ms) { clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.remove(); toastAct = null; }, ms); }
+function runToast() { const a = toastAct; if (!a) return false; toastAct = null; clearTimeout(toastTimer); document.querySelector(".toast")?.remove(); a.run(); return true; }
+/** ⌘Z: only an Undo, never a Retry. */
+const toastUndo = () => toastAct?.label === "Undo" && runToast();
 async function copy(text, what) { try { await navigator.clipboard.writeText(text); toast(`Copied ${what}`); } catch { toast("The browser blocked clipboard access", true); } }
 
 // ── a small promise-based dialog (no browser pop-ups) ────────────────────

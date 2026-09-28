@@ -1,0 +1,25 @@
+/* Feedback and the keyboard: toasts with Undo / Retry, rows being closed, the "?" sheet and ⌘K's extras.
+   The motion tokens are shared with public/css/motion.css (same names and values; whichever loads last wins). */
+:root { --ease-out: cubic-bezier(.2,.8,.2,1); --ease-in-out: cubic-bezier(.65,0,.35,1); --ease-spring: cubic-bezier(.34,1.4,.64,1); --dur-1: 90ms; --dur-2: 160ms; --dur-3: 240ms; --dur-4: 360ms; }
+
+/* A toast with one action: the action sits at the end, big enough for a thumb. */
+.toast.act { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-right: 6px; }
+.toast .tmsg { flex: 1; min-width: 0; }
+.toast .tact { flex: none; border: 0; background: none; color: var(--accent); font: 600 14px var(--sans); padding: 7px 10px; margin: -5px 0; border-radius: 7px; cursor: pointer; }
+.toast .tact:hover, .toast .tact:focus-visible { background: var(--hover); }
+.toast .tact kbd { margin-left: 6px; font-weight: 400; color: var(--ink-3); }
+.toast.act .tnext { flex-basis: 100%; }
+
+/* A row being closed dims at once; the list drops it when herdr confirms, or it comes back if the close fails. */
+.row.closing { opacity: .4; pointer-events: none; transition: opacity var(--dur-2) var(--ease-out); }
+
+/* The keyboard sheet: a fixed-height list under its search, so filtering doesn't move the dialog. */
+.help .keysfind { margin: 2px 0 8px; }
+#keysList { height: min(58vh, 540px); overflow: auto; overscroll-behavior: contain; }
+.help h4 { margin: 12px 0 3px; font: 600 14px var(--sans); color: var(--ink-3); }
+.help h4:first-child { margin-top: 2px; }
+.help table { border-collapse: collapse; width: 100%; }
+.help td { padding: 3px 14px 3px 0; font-size: 14px; vertical-align: top; }
+.help td:first-child { white-space: nowrap; width: 1%; }
+
+@media (prefers-reduced-motion: reduce) { .row.closing { transition: none; } }

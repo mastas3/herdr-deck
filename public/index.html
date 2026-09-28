@@ -91,7 +91,7 @@
 <div class="dz" id="dz" aria-hidden="true"><div data-pos="top">Top</div><div data-pos="bottom">Bottom</div><div data-pos="right">Right</div><div data-pos="tab">Swap with chat</div></div>
 
 <dialog id="palette" class="palette" aria-label="Commands and search">
-  <input id="palQ" placeholder="Search sessions, recipes, commands…" autocomplete="off" spellcheck="false">
+  <input id="palQ" placeholder="Search sessions, projects, commands…" autocomplete="off" spellcheck="false">
   <div class="pal-list" id="palList" role="listbox"></div>
   <div class="pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>↵</kbd> run</span><span><kbd>esc</kbd> close</span></div>
 </dialog>
@@ -141,44 +141,10 @@
   <form method="dialog" class="dlg-f"><button class="btn" type="button" id="lbPrev">Previous</button><span id="lbCap"></span><span><button class="btn" type="button" id="lbNext">Next</button> <button class="btn">Close</button></span></form>
 </dialog>
 
-<dialog id="help">
+<dialog id="help" aria-label="Keyboard shortcuts">
   <div class="dlg-b help"><h3>Keyboard</h3>
-    <table>
-      <tr><td><kbd>⌘K</kbd></td><td>Search everything, run a command or recipe</td></tr>
-      <tr><td><kbd>/</kbd></td><td>Filter the list</td></tr>
-      <tr><td><kbd>j</kbd> <kbd>k</kbd></td><td>Next / previous session</td></tr>
-      <tr><td><kbd>r</kbd></td><td>Write a message to the session</td></tr>
-      <tr><td><kbd>.</kbd></td><td>Recipes for the session (or the selection)</td></tr>
-      <tr><td><kbd>t</kbd></td><td>Type straight into the terminal (<kbd>Ctrl</kbd>+<kbd>]</kbd> to stop)</td></tr>
-      <tr><td><kbd>`</kbd></td><td>Switch chat ⇄ terminal (when they share a place)</td></tr>
-      <tr><td><kbd>\</kbd></td><td>Move the terminal: bottom → right → top → shared with chat → hidden</td></tr>
-      <tr><td><kbd>g</kbd></td><td>Group by inbox / project</td></tr>
-      <tr><td><kbd>l</kbd></td><td>Live board of everything working</td></tr>
-      <tr><td><kbd>d</kbd></td><td>Discover: repos worth forking, the idea lab and your plans</td></tr>
-      <tr><td><kbd>n</kbd></td><td>New session</td></tr>
-      <tr><td><kbd>f</kbd></td><td>Switch herdr to this pane (or open a Codex app thread in the app)</td></tr>
-      <tr><td><kbd>y</kbd></td><td>Copy a link to this session</td></tr>
-      <tr><td><kbd>x</kbd></td><td>Close (asks first)</td></tr>
-      <tr><td><kbd>s</kbd> or <kbd>⌘</kbd>-click</td><td>Add to the selection, to send to or close several at once</td></tr>
-      <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Switch machine tab (1 is All)</td></tr>
-      <tr><td><kbd>[</kbd> <kbd>]</kbd></td><td>Collapse the list / the terminal</td></tr>
-      <tr><td><kbd>c</kbd></td><td>Closed sessions</td></tr>
-      <tr><td><kbd>Esc</kbd></td><td>Clear the filter, then the selection</td></tr>
-    </table>
-    <h3>Decisions (<kbd>i</kbd>)</h3>
-    <table>
-      <tr><td><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></td><td>Next / previous decision</td></tr>
-      <tr><td><kbd>1</kbd>–<kbd>9</kbd></td><td>Pick that option on the focused card</td></tr>
-      <tr><td><kbd>y</kbd></td><td>Yes: the allow / yes / recommended option; on finished work, Looks good</td></tr>
-      <tr><td><kbd>n</kbd></td><td>No: the deny / no option; on finished work, Send back (opens the reply, prefilled)</td></tr>
-      <tr><td><kbd>v</kbd></td><td>Verify now (finished work)</td></tr>
-      <tr><td><kbd>r</kbd></td><td>Reply in your own words (<kbd>Enter</kbd> sends, <kbd>Esc</kbd> closes)</td></tr>
-      <tr><td><kbd>o</kbd> or <kbd>Enter</kbd></td><td>Open the session</td></tr>
-      <tr><td><kbd>s</kbd> or <kbd>x</kbd></td><td>Skip it for now without answering</td></tr>
-      <tr><td><kbd>u</kbd></td><td>Bring back the last skipped one</td></tr>
-      <tr><td><kbd>f</kbd> / <kbd>⇧F</kbd></td><td>Next / previous filter (All, Quick ones, Permissions, Questions, Done?)</td></tr>
-      <tr><td><kbd>Esc</kbd></td><td>Close the reply box, then leave Decisions</td></tr>
-    </table>
+    <label class="find keysfind"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></svg><input id="keysQ" type="search" placeholder="Find a shortcut: a key or what it does" autocomplete="off" spellcheck="false" aria-label="Find a shortcut"></label>
+    <div id="keysList"></div>
     <p class="hint">Filter words must all match; <span class="mono">-word</span> excludes. <span class="mono">is:stale</span>, <span class="mono">is:dup</span>, <span class="mono">is:working</span>, <span class="mono">agent:codex</span> also work.</p></div>
   <form method="dialog" class="dlg-f"><button class="btn">Done</button></form>
 </dialog>

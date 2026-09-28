@@ -85,3 +85,12 @@ async function resumeHist(r) {
     if (res.key) pendingSelect = res.key;
   } catch (e) { toast(e.message, true); }
 }
+// Keyboard: ↓ from the search goes into the results, ↑ ↓ (or j k) move between them, Enter opens one, ↑ from the first
+// goes back to the search.
+$("dbody").addEventListener("keydown", (e) => {
+  if (S.mode !== "history" || e.metaKey || e.ctrlKey || e.altKey) return;
+  const items = [...$("dbody").querySelectorAll(".hitem")], i = items.indexOf(e.target);
+  const down = e.key === "ArrowDown" || (i >= 0 && e.key === "j"), up = e.key === "ArrowUp" || (i >= 0 && e.key === "k");
+  if (e.target.id === "hq" && down && items.length) { e.preventDefault(); items[0].focus(); }
+  else if (i >= 0 && (down || up)) { e.preventDefault(); (up && i === 0 ? $("hq") : items[Math.max(0, Math.min(items.length - 1, i + (down ? 1 : -1)))])?.focus(); }
+});

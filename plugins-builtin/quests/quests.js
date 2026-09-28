@@ -293,7 +293,7 @@ function qTicker(el, to) {
 deckPlugins.register("quests", {
   views: { quests: { load: () => loadQuests({ force: true }), render: () => renderQuests() } },
   tabs: [{ view: "quests", label: "Quests", icon: () => QI.quest, key: "q", order: 50 }],
-  keys: { q: () => setMode(S.mode === "quests" ? null : "quests") },
+  keys: { q: { label: "Quests: your main quest, today’s quests, bosses and streak", run: () => setMode(S.mode === "quests" ? null : "quests") } },
   palette: () => [
     { t: "Quests: main quest, today’s quests, bosses, streak", k: "q", slot: "views", order: 10, run: () => setMode("quests") },
     { t: "Quests: log proof (a lead contacted, a conversation, a number)", slot: "views", order: 11, run: async () => { if (!S.qb.data) await loadQuests({ force: true }); qLogWin(); } },
@@ -305,6 +305,3 @@ deckPlugins.register("quests", {
   { key: "questDigest", label: "Today’s quests in the morning digest", hint: "Your main quest, its boss and today’s three quests", default: true },
   { key: "quests", label: "Quest wins", hint: "A quest completed, a boss hit or defeated, an achievement, the Sunday review", default: false },
 ] });
-// Its key in the Keyboard help, before New session.
-[...(document.querySelector("#help table")?.rows ?? [])].find((tr) => tr.querySelector("kbd")?.textContent === "n")
-  ?.insertAdjacentHTML("beforebegin", "<tr><td><kbd>q</kbd></td><td>Quests: your main quest, today’s quests, bosses and streak</td></tr>");
