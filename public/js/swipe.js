@@ -5,13 +5,14 @@
 // animate itself. So the in-app swipe doesn't wait for the edge: any mostly-horizontal drag to the right goes back,
 // locked after 10px so vertical scrolls stay scrolls, and never one that starts in something that scrolls sideways
 // (code blocks, the gallery's lanes, tables, the key bar), in a text field, or over selected text.
-const SWIPE = { slop: 10, edge: 24, commit: 0.35, flick: 0.45 };
-/** Finger speed (px/ms) over the last ~80ms of a drag, from [time, position] samples. */
+const SWIPE = { slop: 10, edge: 24, commit: 0.35, flick: 0.3 };
+/** Finger speed (px/ms) over the last ~80ms of a drag (at least its last two samples), from [time, position] samples. */
 function swipeSpeed(pts) {
-  const last = pts[pts.length - 1];
-  if (!last) return 0;
+  const n = pts.length, last = pts[n - 1];
+  if (n < 2) return 0;
   const first = pts.find((p) => last[0] - p[0] <= 80) ?? last;
-  return last[0] > first[0] ? (last[1] - first[1]) / (last[0] - first[0]) : 0;
+  const a = first === last ? pts[n - 2] : first;
+  return last[0] > a[0] ? (last[1] - a[1]) / (last[0] - a[0]) : 0;
 }
 function swipeScrollsX(el, stop) {
   for (; el && el !== stop; el = el.parentElement) {

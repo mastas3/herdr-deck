@@ -25,7 +25,7 @@ function navKey(s) {
 }
 // ── end pure
 
-const NAV = { pending: null, restoring: 0, skip: 0, ghosts: new Map(), saved: new Map() };
+const NAV = { pending: null, restoring: 0, skip: 0, ghosts: new Map(), saved: new Map(), d: 0, stack: [NAV_LIST] };
 function navNow() {
   const mv = isPhone() ? app.dataset.mview : "detail";
   if (mv === "list") return NAV_LIST;
@@ -36,10 +36,49 @@ function navNow() {
   s.k = navKey(s);
   return s;
 }
-const navTop = () => (history.state?.nav ? history.state : { nav: NAV_LIST, d: 0, below: null });
+// The stack as we've moved it. history.state lags behind a back that is still on its way (history moves are async),
+// so two quick taps on Back must see the first one: each step updates this mirror at once.
+// A reload (the deck updated, a plugin switched on) keeps the whole stack: this tab's copy is in sessionStorage.
+function navKeep() { try { sessionStorage.setItem("deck:nav", JSON.stringify(NAV.stack.slice(0, NAV.d + 1))); } catch {} }
+{
+  const st = history.state;
+  let kept = null;
+  try { kept = JSON.parse(sessionStorage.getItem("deck:nav") ?? "null"); } catch {}
+  if (st?.nav) {
+    NAV.d = st.d;
+    if (Array.isArray(kept) && kept[st.d]?.k === st.nav.k) NAV.stack = kept;
+    NAV.stack[st.d] = st.nav;
+    if (st.below) NAV.stack[st.d - 1] = st.below;
+  }
+}
+const navTop = () => ({ nav: NAV.stack[NAV.d] ?? NAV_LIST, d: NAV.d, below: NAV.d > 0 ? NAV.stack[NAV.d - 1] ?? NAV_LIST : null });
+function navReplace(nav, url) {
+  NAV.stack[NAV.d] = nav;
+  history.replaceState({ nav, d: NAV.d, below: navTop().below }, "", url);
+  navKeep();
+}
+function navPush(nav, url) {
+  NAV.stack.length = NAV.d + 1;
+  NAV.stack.push(nav);
+  NAV.d++;
+  history.pushState({ nav, d: NAV.d, below: NAV.stack[NAV.d - 1] }, "", url);
+  navKeep();
+}
+/** Steps back n entries; the popstate it causes finds the screen already there. */
+function navPop(n) {
+  if (n <= 0 || NAV.d <= 0) return;
+  n = Math.min(n, NAV.d);
+  NAV.d -= n;
+  NAV.skip++;
+  history.go(-n);
+  navKeep();
+}
 /** Where you were on a screen: the list, the pane's scroll, and in a chat the message at the top and whether it was at the end. */
 function navScroll() {
-  return { list: $("rows").scrollTop, top: $("dbody").scrollTop, chat: chatOn(), stick: scrollPin.stick, anchor: chatOn() && !scrollPin.stick ? takeAnchor() : null };
+  const b = $("dbody"), chat = chatOn();
+  // Measured, not the pin's last word: a scroll this frame hasn't told the pin yet.
+  const stick = chat && b.scrollHeight - b.scrollTop - b.clientHeight < 40;
+  return { list: $("rows").scrollTop, top: b.scrollTop, chat, stick, anchor: chat && !stick ? takeAnchor() : null };
 }
 function navUnscroll(sc) {
   if (!sc) return;
@@ -85,21 +124,20 @@ function navSync() {
   const step = navStep(cur, st.nav, st.below, st.d);
   if (step === "none") return;
   if (step === "replace") {
-    history.replaceState({ ...st, nav: cur }, "");
+    navReplace(cur);
     if (cur.k === st.nav.k && cur.mv !== st.nav.mv) navSwapPane(cur.mv === "term");
     return;
   }
   if (step === "root" || step === "back") {
-    NAV.skip++;
-    history.go(step === "root" ? -st.d : -1);
+    navPop(step === "root" ? st.d : 1);
     navGhosts(step === "root" ? 0 : st.d - 1);
     navUnscroll(NAV.saved.get(cur.k));
     return cur.k === "list" ? navSlideOut(navLive(p.from.mv), [$("list")]) : navSlideOut(p.ghost ? [navGhostShow(p.ghost, true)] : [], navLive());
   }
   // push: the entry you leave keeps its own screen and address, the new one gets the new address
   const url = location.pathname + location.search;
-  history.replaceState({ ...st, nav: p.from }, "", st.d === 0 ? "/" : p.url);
-  history.pushState({ nav: cur, d: st.d + 1, below: p.from }, "", url);
+  navReplace(p.from, st.d === 0 ? "/" : p.url);
+  navPush(cur, url);
   if (p.ghost) NAV.ghosts.set(st.d, p.ghost);
   navGhosts(st.d + 1);
   navSlideIn(p.from.mv === "list" ? [$("list")] : p.ghost ? [navGhostShow(p.ghost)] : []);
@@ -152,7 +190,7 @@ function navBack(o = {}) {
   const ghost = !o.moved && from.mv !== "list" && t.k !== "list" ? navGhost() : null;
   NAV.saved.set(from.k, navScroll());
   navRestore(t);
-  if (st.d > 0) { NAV.skip++; history.back(); } else history.replaceState({ nav: NAV_LIST, d: 0, below: null }, "");
+  if (st.d > 0) navPop(1); else navReplace(NAV_LIST);
   navGhosts(Math.max(0, st.d - 1));
   if (o.moved) return;
   if (t.k === "list") navSlideOut(navLive(from.mv), [$("list")]);
@@ -166,6 +204,9 @@ addEventListener("popstate", (e) => {
   navSettle();
   const t = e.state?.nav ?? NAV_LIST, from = navNow();
   const d = e.state?.d ?? 0;
+  NAV.d = d; NAV.stack[d] = t;
+  if (e.state?.below) NAV.stack[d - 1] = e.state.below;
+  navKeep();
   if (t.k === from.k && t.mv === from.mv) return;
   const ghost = !e.hasUAVisualTransition && from.mv !== "list" && t.k !== "list" && t.k !== from.k ? navGhost() : null;
   NAV.saved.set(from.k, navScroll());
@@ -224,9 +265,10 @@ openMenu = ((f) => function (...a) {
   return r;
 })(openMenu);
 closeMenu = ((f) => function () { const w = menuEl?._cw; if (menuEl) menuEl._cw = null; w?.destroy(); return f(); })(closeMenu);
-// A reload (the deck updated, a plugin switched on) comes back to the screen you were on.
-addEventListener("DOMContentLoaded", () => setTimeout(() => {
+// A reload (the deck updated, a plugin switched on) comes back to the screen you were on: the entry's own screen,
+// not its address read as a fresh link (that would open it on top of itself).
+if (isPhone() && history.state?.nav && history.state.nav.k !== "list") {
   const st = history.state;
-  if (!isPhone() || !st?.nav || st.nav.k === "list" || app.dataset.mview !== "list" || location.pathname.startsWith("/s/")) return;
-  navRestore(st.nav);
-}), { once: true });
+  history.replaceState(st, "", "/");
+  addEventListener("DOMContentLoaded", () => setTimeout(() => { if (app.dataset.mview === "list") navRestore(st.nav); }), { once: true });
+}
