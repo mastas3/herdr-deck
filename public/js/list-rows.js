@@ -66,6 +66,30 @@ function frozenOrder(shown, next) {
   const want = new Set(next), have = new Set(shown);
   return { keys: shown.filter((k) => want.has(k)), held: next.filter((k) => !have.has(k)) };
 }
+/** The branch most of these rows are on (the first one seen wins a tie), or "". */
+function commonBranch(rows) {
+  const n = new Map();
+  for (const r of rows) if (r.branch) n.set(r.branch, (n.get(r.branch) ?? 0) + 1);
+  let best = "", most = 0;
+  for (const [b, c] of n) if (c > most) { best = b; most = c; }
+  return best;
+}
+/** One project's rows (already in list order) split by checkout: the main checkout's first, then one sub-section per
+ *  linked worktree, in the order its first row comes. `closed` tells which sub-sections are folded (by key). */
+function splitWorktrees(proj, rows, closed = {}) {
+  const main = [], by = new Map();
+  for (const r of rows) {
+    if (!r.worktree) { main.push(r); continue; }
+    if (!by.has(r.worktree)) by.set(r.worktree, []);
+    by.get(r.worktree).push(r);
+  }
+  const trees = [...by].map(([name, rs]) => {
+    const key = `w:${proj}/${name}`;
+    return { key, name, rows: rs, branch: commonBranch(rs), root: rs.find((r) => r.projectRoot)?.projectRoot, closed: !!closed[key] };
+  });
+  // Display order, and what keyboard navigation walks (folded sub-sections are skipped).
+  return { main, trees, branch: commonBranch(main), rows: main.concat(...trees.map((t) => t.rows)), open: main.concat(...trees.map((t) => (t.closed ? [] : t.rows))) };
+}
 /* @pure:list-end */
 function sectionOf(r) {
   const k = rank(r);
@@ -183,5 +207,7 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   const rc = radarChip(r);
   if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}</span>${agoEl}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
+  // Grouped by project, a worktree has its own sub-section; in the priority list the row says so itself.
+  const wt = r.worktree ? `<span class="via wtag" title="In the worktree ${esc(r.worktree)}${r.branch ? ` (${esc(r.branch)})` : ""}">${ICON.tree}${esc(r.worktree)}</span>` : "";
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${wt}${rc}</span>${agoEl}${title}${srcLine(r)}${line}${subs}${rowAsk(r)}`;
 }

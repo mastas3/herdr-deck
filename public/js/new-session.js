@@ -21,10 +21,11 @@ async function loadNewOptions() {
   $("nCwdSugg").innerHTML = recent.length ? `<span class="hint">Recent:</span>` + recent.map((p) => `<button type="button" data-cwd="${esc(home(p))}" title="${esc(p)}">${esc(p.split("/").pop())}</button>`).join("") : "";
   renderKinds();
 }
-/** Where a project lives: the folder and machine of its most recent session. */
+/** Where a project lives: the folder and machine of its most recent session (a worktree's session: its repo's main
+ *  checkout). `key` is that session, which routes requests about the folder to its machine. */
 function projectHome(p) {
   const r = [...S.rows.values()].filter((r) => r.project === p && r.projectRoot && inScope(r)).sort((a, b) => act(b) - act(a))[0];
-  return r ? { machine: r.machine, cwd: r.projectRoot, project: p } : undefined;
+  return r ? { machine: r.machine, cwd: (r.worktree && r.gitRoot) || r.projectRoot, project: p, key: r.key } : undefined;
 }
 /** `pre` ({ machine, cwd, project }) opens it already pointed at a project folder. */
 /** Discover actions start in a folder of their own under Projects, named after the idea; it's made only when you confirm the dialog. */

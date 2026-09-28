@@ -10,6 +10,7 @@ import { slashCommands } from "../slash";
 import { call } from "../herdr";
 import { json } from "./page";
 import { readFileFor, resolveSafe } from "./files";
+import { listDir } from "./dir";
 import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
 import { codexApi } from "./codex";
@@ -101,6 +102,12 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       const lr = localRow(body.key);
       const r = await readFileFor(lr?.cwd, String(body.path ?? ""));
       return json(r, r.error ? 400 : 200);
+    }
+    case "/api/dir": {
+      // One folder of a project, for the folder window. `key` (any session of the project) only routes it: a project
+      // on another machine is listed by that machine's deck (forward.ts), which gets here with its own key.
+      const r = await listDir(String(body.root ?? ""), String(body.path ?? ""));
+      return json(r, "error" in r ? 400 : 200);
     }
     case "/api/file-open": {
       const lr = localRow(body.key);

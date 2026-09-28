@@ -5,7 +5,7 @@
 // blocked. For each view × viewport it writes <view>-<vp>.png and <view>-<vp>.json (DOM text, page errors, console
 // errors, requests, blocked requests). Compare two runs with bin/ui-compare.mjs. Usage: bin/ui-snapshot.mjs --help
 import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, rmSync, writeFileSync, openSync } from "node:fs";
+import { cpSync, lutimesSync, mkdirSync, rmSync, symlinkSync, utimesSync, writeFileSync, openSync } from "node:fs";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -28,6 +28,11 @@ const HELP = `usage: bin/ui-snapshot.mjs --out <dir> [options]
   --keep               keep the scratch HOME (its path is printed)`;
 
 // ── views: what to do in the page before the snapshot (plain JS run in the page, then the page settles) ──
+/** acme-api lives in $HOME/acme-api (demoProject below) on main, plus one session in its worktree "billing-cache". */
+const WORKTREE_SETUP = `for (const k of ["fake:working", "fake:blocked"]) Object.assign(rowOf(k), { projectRoot: "$HOME/acme-api", gitRoot: "$HOME/acme-api", branch: "main" });
+  S.rows.set("fake:wt", { ...rowOf("fake:working"), key: "fake:wt", paneId: "fake:wt", tabId: "fake:wt", title: "Try a faster billing cache", status: "idle", now: undefined, tail: [],
+    lastActiveAt: Date.now() - 40 * 60_000, worktree: "billing-cache", branch: "feat/billing-cache", projectRoot: "$HOME/acme-api-billing-cache", cwd: "$HOME/acme-api-billing-cache", gitRoot: "$HOME/acme-api" });
+  setGroup("project"); lastOrder = ""; renderNow()`;
 export const VIEWS = {
   home: "",
   session: `select("fake:blocked", { scroll: true, open: true })`,
@@ -92,6 +97,13 @@ export const VIEWS = {
   projects: `openProjects()`,
   // Grouped by project: each project header carries its project page link (the projects plugin's "project.link").
   "by-project": `setGroup("project"); select("fake:blocked", { scroll: true, open: true })`,
+  // Grouped by project with a worktree: acme-api's folder is the demo project in the scratch HOME, one session works
+  // in a linked worktree of it (its own sub-section), and the header offers the folder window.
+  "by-project-worktree": `${WORKTREE_SETUP}; select("fake:blocked", { scroll: true });
+    if (document.querySelectorAll('[data-secact="folder"]').length !== 2 || !document.querySelector('.wt [data-sec="w:acme-api/billing-cache"]')) throw new Error("Folder buttons or the worktree sub-section are missing");`,
+  "folder-view": `${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" })`,
+  "folder-view-filter": `${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" }); setTimeout(() => { const q = document.querySelector(".fv-q"); q.value = "json"; q.dispatchEvent(new Event("input")); }, 300)`,
+  "folder-view-sub": `(async () => { ${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" }); await fvLoad("src"); fvSelect(1); })()`,
   "project-page": `openJourney("acme-api")`,
   plugins: `setMode("plugins")`,
   "plugins-builtin": `setMode("plugins"); plugTab("code")`,
@@ -101,7 +113,7 @@ export const VIEWS = {
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust"];
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {
@@ -224,6 +236,20 @@ function demoPlugin(dir) {
   writeFileSync(join(dir, "hello.js"), 'deckPlugins.register("demo-hello", {});\n');
 }
 
+/** A small project folder for the folder window: folders, dotfiles, files of each kind and a link that leads out of
+ *  it, all dated against the frozen clock so every run lists the same "changed" times. */
+function demoProject(dir) {
+  const at = (p, min) => { const t = (NOW - min * MIN) / 1000; (p.endsWith("-link") ? lutimesSync : utimesSync)(p, t, t); };
+  const files = { ".env": 64, [".git" + "ignore"]: 120, "README.md": 2150, "CHANGELOG.md": 5400, "package.json": 812, "tsconfig.json": 460, "bun.lock": 48_900, "Dockerfile": 300,
+    "server.ts": 9100, "logo.png": 5300, "notes.txt": 90, "release.tar.gz": 2_400_000, "src/index.ts": 1200, "src/billing.ts": 14_800, "src/db.ts": 3100, "src/styles.css": 2000, "src/lib/money.ts": 700 };
+  for (const d of [".cache", ".github", "docs", "node_modules", "src/lib", "test"]) mkdirSync(join(dir, d), { recursive: true });
+  let i = 0;
+  for (const [f, n] of Object.entries(files)) { writeFileSync(join(dir, f), Buffer.alloc(n, 120)); at(join(dir, f), [2, 35, 180, 1500, 4400, 30 * 1440, 90 * 1440][i++ % 7]); }
+  symlinkSync(join(dir, "..", "demo-plugin"), join(dir, "shared-link"));
+  at(join(dir, "shared-link"), 600);
+  for (const [d, min] of [["src/lib", 20], [".cache", 5], [".github", 9000], ["docs", 2880], ["node_modules", 300], ["test", 700], ["src", 3]]) at(join(dir, d), min);
+}
+
 /** Frozen page: fixed Date, seeded Math.random, and an EventSource that opens and then stays silent (state comes from
  *  the page's inlined boot data only), so two runs see the same thing. */
 function freezeScript() {
@@ -338,6 +364,7 @@ async function main() {
   if (o.seed) cpSync(o.seed, home, { recursive: true });
   o.home = home;
   demoPlugin(join(home, "demo-plugin"));
+  demoProject(join(home, "acme-api"));
   writePluginsOff(home, o.pluginsOff);
   let deck;
   const stop = () => { try { deck?.child.kill("SIGTERM"); } catch {} };

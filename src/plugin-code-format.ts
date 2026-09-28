@@ -34,7 +34,7 @@ const NAME = /^[a-z][\w.-]{1,59}$/;
 const RESERVED = new Set(["api", "s", "js", "css", "fonts", "events", "mcp", "health", "plugins", "sw.js", "manifest.webmanifest", "offline.html", "icon"]);
 /** API prefixes the core owns (the deck's own /api/* routes and the plugin system). */
 export const CORE_API = new Set([
-  "plugins", "automations", "brief", "chat", "close", "codex-hide", "codex-open", "codex-resume", "decide", "detail", "dev", "file", "file-open",
+  "plugins", "automations", "brief", "chat", "close", "codex-hide", "codex-open", "codex-resume", "decide", "detail", "dev", "dir", "file", "file-open",
   "file-raw", "focus", "forget", "history", "history-rescan", "history-resume", "history-row", "image", "jev", "keys", "machines", "mcp-info", "new",
   "new-options", "push", "queue", "read", "recipe", "rename", "reopen", "search", "seen", "send", "share", "slash", "tool", "tools", "type", "upload", "verify",
 ]);
