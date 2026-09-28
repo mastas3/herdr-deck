@@ -1,34 +1,34 @@
 "use strict";
-// Views that take over the session pane (Inbox, History, Discover, Quests…): switching between them.
-// ── views: inbox, history, tools, connections ────────────────────────────
+// Views that take over the session pane: the core's (Inbox, History, Tools, Plugins) and the ones plugins register
+// (deckPlugins, public/js/registry.js): switching between them.
 function setMode(m) {
-  const wasOpportunities = S.mode === "opportunities";
-  if (wasOpportunities && m !== "opportunities") setHTML($("mTitle"), "Live board");
+  const prev = deckPlugins.view(S.mode);
+  if (prev && S.mode !== m) prev.leave?.();
   if (m === "inbox" && S.mode !== "inbox") { S.ifocus = null; S.ifocusIdx = 0; } // the first card has the focus ring on open
   S.mode = m;
   S.board = false;
   headSig = ""; bodySig = ""; chatDom.key = null;
   if (m === "history" && !S.histRes) loadHistory();
-  if (m === "connections") loadConnections();
-  if (m === "discover") loadDiscover();
-  if (m === "opportunities") opportunitiesLoad();
   if (m === "plugins") loadPlugins();
-  if (m === "project") loadJourney(S.jp.name, { force: true }); // journey: cached on the server, so this is instant
-  if (m === "projects") loadProjects();
-  if (m === "quests") loadQuests({ force: true }); // quests: the game board
+  const v = deckPlugins.view(m);
+  if (v?.load) { try { v.load(); } catch (e) { console.error(e); } }
   if (m === "inbox" && S.jevOpen) loadJevStats(true);
   if (isPhone() && m) setMView("detail", true);
   render();
   renderDetail();
   renderViews();
-  if (m === "opportunities" || wasOpportunities || m === "project" || m === "projects" || location.pathname.startsWith("/p")) syncUrl(); // journey: /p/<project>
+  if (v?.path || prev?.path) syncUrl(); // a view with its own link (/p/<project>, ?view=…): the address bar follows
 }
 function renderViews() {
   const el = $("views");
   if (!el) return;
   const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
-  const v = [["inbox", "Inbox", ICON.inbox, n], ["history", "History", ICON.history], ["discover", "Discover", ICON.compass], ["opportunities", "Opportunities", ICON.bulb], ["quests", "Quests", QI.quest], ["plugins", "Plugins", ICON.puzzle]];
-  setHTML(el, v.map(([id, label, icon, count]) => `<button data-view="${id}" aria-pressed="${S.mode === id}" title="${label}${id === "inbox" ? " (i)" : id === "history" ? " (h)" : id === "discover" ? " (d)" : id === "quests" ? " (q)" : ""}">${icon}<span>${label}</span>${count ? `<b>${count}</b>` : ""}</button>`).join(""));
+  const core = [{ view: "inbox", label: "Inbox", icon: ICON.inbox, key: "i", count: n, order: 10 }, { view: "history", label: "History", icon: ICON.history, key: "h", order: 20 }, { view: "plugins", label: "Plugins", icon: ICON.puzzle, order: 90 }];
+  const tabs = [...core, ...deckPlugins.contributions("view.tabs")].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+  setHTML(el, tabs.map(({ view, label, icon, key, count }) => {
+    const ic = typeof icon === "function" ? icon() : icon ?? "", c = typeof count === "function" ? count() : count;
+    return `<button data-view="${esc(view)}" aria-pressed="${S.mode === view}" title="${esc(label)}${key ? ` (${esc(key)})` : ""}">${ic}<span>${esc(label)}</span>${c ? `<b>${c}</b>` : ""}</button>`;
+  }).join(""));
 }
 function renderMode() {
   $("dh").hidden = true; $("nowbar").hidden = true; $("askbox").hidden = true; $("composer").hidden = true; $("subcrumb").hidden = true; $("appbar").hidden = true;
@@ -37,13 +37,8 @@ function renderMode() {
   if (S.mode === "inbox") renderInbox();
   else if (S.mode === "history") renderHistory();
   else if (S.mode === "tools") renderTools();
-  else if (S.mode === "connections") renderConnections();
-  else if (S.mode === "discover") renderDiscover();
-  else if (S.mode === "opportunities") renderOpportunities();
   else if (S.mode === "plugins") renderPlugins();
-  else if (S.mode === "project") renderJourney();
-  else if (S.mode === "projects") renderProjects();
-  else if (S.mode === "quests") renderQuests();
+  else deckPlugins.view(S.mode)?.render();
 }
 function modeHTML(html) {
   const box = $("dbody");

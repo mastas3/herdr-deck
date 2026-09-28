@@ -113,3 +113,25 @@ function jTicks(a, b) {
 const J_TRACK = { commits: 0, merge: 0, tag: 0, release: 0, deploy: 0, milestone: 0, session: 1, wiki: -1, log: -1, idea: -1, lead: -1, manual: -1 };
 const J_KIND = { commits: "Commits", merge: "Merge", tag: "Tag", release: "Release", deploy: "Deploy", milestone: "Milestone unlocked", session: "Session", wiki: "Wiki", log: "Wiki log", idea: "Plan", lead: "Leads", manual: "You logged" };
 const jEsc = (s) => esc(s).replace(/\n/g, " ");
+// Project pages in the deck's registry (public/js/registry.js): the two views, their links (/p, /p/<project>) and ⌘K.
+deckPlugins.register("projects", {
+  views: {
+    project: { load: () => loadJourney(S.jp.name, { force: true }), render: () => renderJourney(), path: () => (S.jp?.name ? `/p/${encodeURIComponent(S.jp.name)}` : undefined) }, // cached on the server: instant
+    projects: { load: () => loadProjects(), render: () => renderProjects(), path: () => "/p" },
+  },
+  links: (u) => {
+    if (u.pathname !== "/p" && !u.pathname.startsWith("/p/")) return false;
+    S.board = true; lastOrder = ""; render();
+    const n = decodeURIComponent(u.pathname.slice(3));
+    n ? openJourney(n) : openProjects();
+    return true;
+  },
+  palette: (q, cur) => {
+    const out = [{ t: "Projects: every project’s journey", slot: "views", order: 20, run: openProjects }, cur && { t: `Project page: ${cur.project}`, slot: "views", order: 21, run: () => openJourney(cur.project) }];
+    if (!q) return out;
+    // "Project: <name>" for every known project (live, indexed, or already opened)
+    const names = [...new Set([...S.rows.values()].map((r) => r.project).concat((S.jp.idx?.projects ?? []).map((x) => x.project), [...S.jp.data.keys()]))].filter(Boolean);
+    const jp = names.map((p) => ({ p, s: fuzzy(`project ${p}`, q) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 5);
+    return [...out, ...jp.map(({ p }) => ({ section: "Project pages", html: `<span class="dot" style="--c:${pc(p)}"></span><span>Project: ${esc(p)}</span><small>journey & milestones</small>`, run: () => openJourney(p) }))];
+  },
+});

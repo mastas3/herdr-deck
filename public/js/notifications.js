@@ -184,7 +184,7 @@ document.addEventListener("visibilitychange", reportPresence);
 function openFromPush(url) {
   let u;
   try { u = new URL(url, location.origin); } catch { return goHome(); }
-  if (u.searchParams.get("quests")) return setMode("quests");
+  if (u.pathname !== "/" && !u.pathname.startsWith("/s/") || u.search) { if (deckPlugins.each("links", u).some(Boolean)) return; }
   if (u.pathname.startsWith("/s/")) {
     const hit = resolveLink(u.pathname);
     if (hit?.key) { S.machine = "all"; lastOrder = ""; return select(hit.key, { scroll: true, open: true }); }

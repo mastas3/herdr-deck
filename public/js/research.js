@@ -228,4 +228,5 @@ $("dbody").addEventListener("click", async (e) => {
 });
 // A research push opens here.
 if (new URLSearchParams(location.search).has("research")) setTimeout(() => { S.disc.tab = "research"; store("discTab", "research"); setMode("discover"); }, 400);
+deckPlugins.register("research", { palette: (q) => rsPalette(q).map((c) => ({ ...c, order: 40 })) });
 // ══ end Autoresearch ═════════════════════════════════════════════════════════

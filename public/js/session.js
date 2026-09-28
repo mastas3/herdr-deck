@@ -19,9 +19,9 @@ function resolveLink(path) {
 }
 function syncUrl() {
   const r = rowOf(S.sel);
-  const opportunityRoute = S.mode === "opportunities";
-  const path = opportunityRoute ? "/?view=opportunities" : S.mode === "project" && S.jp?.name ? `/p/${encodeURIComponent(S.jp.name)}` : S.mode === "projects" ? "/p" : S.board || !r ? "/" : linkPath(r);
-  const current = location.pathname + (opportunityRoute || new URLSearchParams(location.search).get("view") === "opportunities" ? location.search : "");
+  const own = deckPlugins.view(S.mode)?.path?.(); // a plugin view's link: /p/<project>, /?view=opportunities…
+  const path = own ?? (S.board || !r ? "/" : linkPath(r));
+  const current = location.pathname + (path.includes("?") || new URLSearchParams(location.search).has("view") ? location.search : "");
   if (current !== path) history.replaceState(history.state, "", path);
 }
 

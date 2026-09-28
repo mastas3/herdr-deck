@@ -48,8 +48,7 @@ document.addEventListener("keydown", (e) => {
   else if (k === "." && (cur || S.picked.size)) { e.preventDefault(); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe")); }
   else if (k === "i") setMode(S.mode === "inbox" ? null : "inbox");
   else if (k === "h") setMode(S.mode === "history" ? null : "history");
-  else if (k === "d") setMode(S.mode === "discover" ? null : "discover");
-  else if (k === "q") setMode(S.mode === "quests" ? null : "quests");
+  else if (deckPlugins.key(k)) deckPlugins.key(k)(e);
   else if (k === "t" && cur) { e.preventDefault(); focusTerminal(); }
   else if (k === "`" && S.tpos === "tab") { e.preventDefault(); setMain(S.main === "chat" ? "term" : "chat"); }
   else if (k === "\\") { e.preventDefault(); setTpos(TPOS[(TPOS.indexOf(S.tpos) + 1) % TPOS.length]); toast(`Terminal: ${TPOS_NAME[S.tpos].toLowerCase()}`); }

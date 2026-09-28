@@ -288,3 +288,16 @@ function qTicker(el, to) {
   const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = qmoney(from + (to - from) * e); if (k < 1) requestAnimationFrame(step); };
   requestAnimationFrame(step);
 }
+// Quests in the deck's registry (public/js/registry.js): view, tab, key, ⌘K, the header chip and live updates.
+deckPlugins.register("quests", {
+  views: { quests: { load: () => loadQuests({ force: true }), render: () => renderQuests() } },
+  tabs: [{ view: "quests", label: "Quests", icon: () => QI.quest, key: "q", order: 50 }],
+  keys: { q: () => setMode(S.mode === "quests" ? null : "quests") },
+  palette: () => [
+    { t: "Quests: main quest, today’s quests, bosses, streak", k: "q", slot: "views", order: 10, run: () => setMode("quests") },
+    { t: "Quests: log proof (a lead contacted, a conversation, a number)", slot: "views", order: 11, run: async () => { if (!S.qb.data) await loadQuests({ force: true }); qLogWin(); } },
+  ],
+  state: (data) => { S.game = data.game ?? S.game; renderQChip(); },
+  events: { game: (sum) => questsLive(sum) },
+  links: (u) => (u.searchParams.get("quests") ? (setMode("quests"), true) : false),
+});

@@ -256,3 +256,10 @@ async function leadsSaveOp(op, lead) {
   try { const r = await api("/api/leads/save", { op, lead, id: lead.id }); if (S.leads.st) S.leads.st.saved = r.saved; leadsPatch(); }
   catch (e) { toast(e.message, true); }
 }
+// Leads' ⌘K commands in the deck's registry (public/js/registry.js).
+deckPlugins.register("leads", {
+  palette: (q) => [
+    { t: "Leads: who needs an idea, or what an audience needs", order: 30, run: () => { leadsFor(""); setTimeout(() => $("dbody").querySelector("[data-lq]")?.focus(), 60); } },
+    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, echo: true, order: 31, run: () => leadsFor(q, "idea") },
+  ],
+});

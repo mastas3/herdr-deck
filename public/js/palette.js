@@ -37,6 +37,10 @@ function paletteItems(q) {
     const tools = S.tools.filter((t) => t.action !== "upload").map((t) => ({ t, s: fuzzy(`${t.label} ${t.hint ?? ""} tool`, q) })).filter((x) => x.s).slice(0, q ? 6 : 4);
     if (tools.length) out.push({ head: n > 1 ? `Tools for ${n} selected` : `Tools for “${cur?.title ?? "session"}”` }, ...tools.map(({ t }) => ({ html: `<span>${esc(t.label)}</span><small>${esc(t.hint ?? "")}</small>`, run: () => runTool(t) })));
   }
+  // Plugins' commands go in the list at two places, "views" (next to the core's go-to commands) and "more"
+  // (after Plugins); a `section` entry gets a heading of its own below, once you've typed something.
+  const plug = deckPlugins.each("palette.entries", q, cur).flat().filter(Boolean);
+  const slot = (name) => plug.filter((c) => !c.section && (c.slot ?? "more") === name).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const cmds = [
     { t: "New session", k: "n", run: () => openNew() },
     cur && projectHome(cur.project) && { t: `New session in ${cur.project}`, run: () => openNew(projectHome(cur.project)) },
@@ -47,11 +51,7 @@ function paletteItems(q) {
     cur?.app && { t: "Continue this Codex thread in herdr", run: () => codexAct("codex-resume", cur) },
     cur && { t: "Copy a link to this session", k: "y", run: () => copy(linkUrl(cur), "link") },
     cur && !cur.app && !cur.hist && { t: "Rename this session…", k: "e", run: () => renameSession(cur) },
-    { t: "Quests: main quest, today’s quests, bosses, streak", k: "q", run: () => setMode("quests") },
-    { t: "Quests: log proof (a lead contacted, a conversation, a number)", run: async () => { if (!S.qb.data) await loadQuests({ force: true }); qLogWin(); } },
-    { t: "Projects: every project’s journey", run: openProjects },
-    cur && { t: `Project page: ${cur.project}`, run: () => openJourney(cur.project) },
-    { t: "Connections: what agents can use", run: () => openConnections(cur?.key) },
+    ...slot("views"),
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
     cur && { t: "Write or rewrite the brief", k: "b", run: () => writeBrief(cur.key) },
@@ -67,15 +67,7 @@ function paletteItems(q) {
     { t: "History: search every past session", k: "h", run: () => setMode("history") },
     { t: "Tools: what each one does", run: () => setMode("tools") },
     { t: "Plugins: add integrations and business packs", run: () => setMode("plugins") },
-    { t: "Connections: everything this setup can reach", run: () => setMode("connections") },
-    { t: "Suggest mega projects from my connections", run: suggestProjects },
-    { t: "Discover: repos worth forking, picked for you", k: "d", run: () => { S.disc.tab = "you"; setMode("discover"); } },
-    { t: "Idea lab: research and plan any idea", run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },
-    { t: "Ideas: plans your agents wrote", run: () => { S.disc.tab = "ideas"; setMode("discover"); } },
-    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, echo: true, run: () => { setMode("discover"); ideaSearch(q); } },
-    { t: "Leads: who needs an idea, or what an audience needs", run: () => { leadsFor(""); setTimeout(() => $("dbody").querySelector("[data-lq]")?.focus(), 60); } },
-    q.length > 14 && { t: `Leads: who needs “${q.slice(0, 60)}”`, echo: true, run: () => leadsFor(q, "idea") },
-    ...rsPalette(q),
+    ...slot("more"),
     { t: `Turn alerts ${S.notify ? "off" : "on"}`, run: toggleAlerts },
     { t: "Notifications on this device…", run: openNotifications },
     { t: "Automations: alerts, morning digest, empty sessions, proof of done", run: openAutomations },
@@ -89,10 +81,8 @@ function paletteItems(q) {
   if (q) {
     const projects = [...new Set([...S.rows.values()].map((r) => r.project))].map((p) => ({ p, s: fuzzy(p, q) })).filter((x) => x.s).slice(0, 4);
     if (projects.length) out.push({ head: "Projects" }, ...projects.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Only show ${esc(p)}</span>`, run: () => { $("q").value = p; S.q = p; S.view = "inbox"; render(); } })));
-    // journey: "Project: <name>" for every known project (live, indexed, or already opened)
-    const names = [...new Set([...S.rows.values()].map((r) => r.project).concat((S.jp.idx?.projects ?? []).map((x) => x.project), [...S.jp.data.keys()]))].filter(Boolean);
-    const jp = names.map((p) => ({ p, s: fuzzy(`project ${p}`, q) })).filter((x) => x.s).sort((a, b) => b.s - a.s).slice(0, 5);
-    if (jp.length) out.push({ head: "Project pages" }, ...jp.map(({ p }) => ({ html: `<span class="dot" style="--c:${pc(p)}"></span><span>Project: ${esc(p)}</span><small>journey & milestones</small>`, run: () => openJourney(p) })));
+    const heads = [...new Set(plug.filter((c) => c.section).map((c) => c.section))];
+    for (const h of heads) out.push({ head: h }, ...plug.filter((c) => c.section === h).map(({ html, run }) => ({ html, run })));
   }
   return out;
 }

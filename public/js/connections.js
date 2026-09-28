@@ -317,3 +317,14 @@ async function suggestProjects() {
   if (!(await askDialog({ title: "Suggest mega projects?", text: "Starts a new Claude session (in ~/wiki if you have one, otherwise your home folder) with the list of everything your machines can reach (names only, no keys), and asks it to propose ambitious projects. It won’t build anything until you pick.", ok: "Start" }))) return;
   try { const r = await api("/api/suggest-projects", {}); toast("Starting a Claude session with your connections…"); if (r.key) pendingSelect = r.key; } catch (e) { toast(e.message, true); }
 }
+// The Connections view in the deck's registry (public/js/registry.js).
+deckPlugins.register("connections", {
+  views: { connections: { load: () => loadConnections(), render: () => renderConnections() } },
+  palette: (q, cur) => [
+    { t: "Connections: what agents can use", slot: "views", order: 30, run: () => openConnections(cur?.key) },
+    { t: "Connections: everything this setup can reach", order: 10, run: () => setMode("connections") },
+    { t: "Suggest mega projects from my connections", order: 11, run: suggestProjects },
+  ],
+  settings: [{ html: "Connections<small>Everything this setup can reach</small>", run: () => openConnections() }],
+  events: { audit: (a) => { S.audit = a; if (S.mode === "connections") renderConnections(); } },
+});

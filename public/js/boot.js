@@ -30,12 +30,10 @@ function applyFull(data) {
   S.publicUrl = data.publicUrl ?? "";
   S.auto = data.auto ?? S.auto;
   S.push = data.push ?? S.push;
-  S.game = data.game ?? S.game; renderQChip(); // quests: the header chip
-  if (!S.linkDone && (location.pathname === "/p" || location.pathname.startsWith("/p/"))) { // journey: a project page link
-    S.linkDone = true; S.board = true; lastOrder = ""; render();
-    const n = decodeURIComponent(location.pathname.slice(3));
-    return n ? openJourney(n) : openProjects();
-  }
+  S.plugins = data.plugins ?? S.plugins;
+  deckPlugins.each("state", data);
+  // A plugin's own link (a project page at /p/<name>…): the plugin opens it.
+  if (!S.linkDone && location.pathname !== "/" && !location.pathname.startsWith("/s/") && deckPlugins.each("links", new URL(location.href)).some(Boolean)) { S.linkDone = true; return; }
   if (!S.linkDone && location.pathname.startsWith("/s/")) {
     S.linkDone = true;
     const hit = resolveLink(location.pathname);
@@ -77,9 +75,10 @@ function connect() {
   es.addEventListener("jev", (e) => { S.jev = JSON.parse(e.data); if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
   es.addEventListener("radar", (e) => { S.radar = JSON.parse(e.data); render(); });
   es.addEventListener("decisions", (e) => { S.decisions = JSON.parse(e.data); renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); });
-  es.addEventListener("game", (e) => questsLive(JSON.parse(e.data)));
   es.addEventListener("auto", (e) => { S.auto = JSON.parse(e.data); if (S.board) { bodySig = ""; render(); } });
-  es.addEventListener("audit", (e) => { S.audit = JSON.parse(e.data); if (S.mode === "connections") renderConnections(); });
+  for (const { event, fn } of deckPlugins.contributions("sse.events")) es.addEventListener(event, (e) => { try { fn(JSON.parse(e.data)); } catch (err) { console.error(err); } });
+  // A plugin was turned on or off: its files join or leave the page, so load it again.
+  es.addEventListener("plugins", (e) => { const a = JSON.parse(e.data).active ?? []; if (a.join() !== (S.plugins?.active ?? []).join()) location.reload(); });
   es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");
   es.onerror = () => {
@@ -97,8 +96,8 @@ if ("serviceWorker" in navigator && isSecureContext) navigator.serviceWorker.reg
   if (params.get("status") === "blocked") { S.q = "is:blocked"; $("q").value = S.q; render(); }
   if (params.get("new")) setTimeout(openNew, 50);
   if (params.get("digest")) { S.sel = null; setBoard(true); }
-  if (params.get("quests")) setMode("quests");
-  if (params.get("view") === "opportunities") setMode("opportunities");
-  if ([...params.keys()].length) history.replaceState(history.state, "", S.mode === "opportunities" ? "/?view=opportunities" : "/");
+  if (params.get("view") && deckPlugins.view(params.get("view"))) setMode(params.get("view"));
+  else if ([...params.keys()].length) deckPlugins.each("links", new URL(location.href));
+  if ([...params.keys()].length) history.replaceState(history.state, "", deckPlugins.view(S.mode)?.path?.() ?? "/");
 }
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { pollTerm(); chatTick(true); } });

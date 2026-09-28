@@ -328,3 +328,9 @@ $('dbody').addEventListener('click', async (e) => {
   }
 });
 // ── end Opportunities ──────────────────────────────────────────────────────
+// Opportunities in the deck's registry (public/js/registry.js): its view (linked at /?view=opportunities) and tab.
+deckPlugins.register("opportunities", {
+  views: { opportunities: { load: () => opportunitiesLoad(), render: () => renderOpportunities(), leave: () => setHTML($("mTitle"), "Live board"), path: () => "/?view=opportunities" } },
+  tabs: [{ view: "opportunities", label: "Opportunities", icon: () => ICON.bulb, order: 40 }],
+  links: (u) => (u.searchParams.get("view") === "opportunities" ? (setMode("opportunities"), true) : false),
+});

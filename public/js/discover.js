@@ -283,3 +283,15 @@ $("dbody").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); ideaResearch(e.target.value); }
   else if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); ideaSearch(e.target.value); }
 });
+// Discover in the deck's registry (public/js/registry.js): its view, tab, key and ⌘K commands.
+deckPlugins.register("discover", {
+  views: { discover: { load: () => loadDiscover(), render: () => renderDiscover() } },
+  tabs: [{ view: "discover", label: "Discover", icon: () => ICON.compass, key: "d", order: 30 }],
+  keys: { d: () => setMode(S.mode === "discover" ? null : "discover") },
+  palette: (q) => [
+    { t: "Discover: repos worth forking, picked for you", k: "d", order: 20, run: () => { S.disc.tab = "you"; setMode("discover"); } },
+    { t: "Idea lab: research and plan any idea", order: 21, run: () => { S.disc.tab = "lab"; setMode("discover"); setTimeout(() => $("dbody").querySelector("[data-didea]")?.focus(), 60); } },
+    { t: "Ideas: plans your agents wrote", order: 22, run: () => { S.disc.tab = "ideas"; setMode("discover"); } },
+    q.length > 14 && { t: `Idea lab: “${q.slice(0, 60)}”`, echo: true, order: 23, run: () => { setMode("discover"); ideaSearch(q); } },
+  ],
+});
