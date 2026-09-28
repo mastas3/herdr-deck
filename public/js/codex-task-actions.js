@@ -24,24 +24,25 @@ function showCodexSettings(r, settings) {
   if (settings.model && !models.some((m) => m.id === settings.model)) models.unshift({ id: settings.model, label: settings.model, efforts: [settings.effort].filter(Boolean) });
   const modes = settings.permissionModes ?? [];
   dlg.innerHTML = `<form><div class="dlg-b"><h3>Codex task settings</h3><p>${esc(r.title || "This task")}</p><p class="hint">Changes apply to the next turn.</p>
-    <label class="field"><span>Model</span><select name="model">${models.map((m) => `<option value="${esc(m.id)}">${esc(m.label || m.id)}</option>`).join("")}</select></label>
+    <div class="field"><span>Model</span><div id="codexModelPick"></div></div>
     <label class="field"><span>Reasoning effort</span><select name="effort"></select></label>
     ${modes.length ? `<label class="field"><span>Permissions</span><select name="permissionMode">${modes.map((m) => `<option value="${esc(m.id)}">${esc(m.label || m.id)}</option>`).join("")}</select><span class="hint" data-permission-help></span></label>` : `<p class="hint">${esc(settings.permissionsNote ?? "This task inherits its managed permission settings from Codex.")}</p>`}
     ${codexPermissionFacts(settings)}${!modes.length ? '<p class="hint">Use the task permission menu to change this profile.</p><button type="button" class="btn" data-settings-open>Open in Codex</button>' : ""}
     <p class="native-form-error" role="alert" hidden></p></div><div class="dlg-f"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save settings</button></div></form>`;
   document.body.append(dlg);
-  const form = dlg.querySelector("form"), model = form.elements.model, effort = form.elements.effort, permission = form.elements.permissionMode;
+  const form = dlg.querySelector("form"), effort = form.elements.effort, permission = form.elements.permissionMode;
   const error = dlg.querySelector('[role="alert"]'), save = dlg.querySelector('[type="submit"]');
-  model.value = settings.model ?? models[0]?.id ?? "";
+  let modelId = settings.model ?? models[0]?.id ?? ""; // the picker's value; the server only takes a model from its own list
   const syncEffort = (preferred) => {
-    const choice = models.find((m) => m.id === model.value), choices = choice?.efforts ?? [];
+    const choice = models.find((m) => m.id === modelId), choices = choice?.efforts ?? [];
     effort.innerHTML = choices.map((e) => `<option value="${esc(e)}">${esc(e)}</option>`).join("");
     effort.disabled = !choices.length;
     effort.value = choices.includes(preferred) ? preferred : choice?.defaultEffort ?? choices[0] ?? "";
     if (!effort.value && choices.length) effort.value = choices[0];
   };
+  modelPickerSet("codex-settings", { label: "Model", value: modelId, providers: [{ id: "openai", label: "OpenAI", models: models.map((m) => ({ v: m.id, ...(m.label && m.label !== m.id ? { l: m.label } : {}), efforts: m.efforts, reasoning: !!m.efforts?.length })) }], onChange: (v) => { modelId = v; syncEffort(effort.value); } });
+  modelPickerMount(dlg.querySelector("#codexModelPick"), "codex-settings");
   syncEffort(settings.effort);
-  model.onchange = () => syncEffort(effort.value);
   if (permission) {
     permission.value = settings.permissionMode ?? "";
     // A managed or custom mode must remain intact unless a user picks a replacement.
@@ -52,11 +53,11 @@ function showCodexSettings(r, settings) {
   }
   dlg.querySelector("[data-cancel]").onclick = () => dlg.close();
   dlg.querySelector("[data-settings-open]")?.addEventListener("click", () => codexAct("codex-open", r));
-  dlg.addEventListener("close", () => dlg.remove());
+  dlg.addEventListener("close", () => { modelPickerDrop("codex-settings"); dlg.remove(); });
   form.onsubmit = async (e) => {
     e.preventDefault();
     const patch = {};
-    if (model.value !== settings.model) patch.model = model.value;
+    if (modelId !== settings.model) patch.model = modelId;
     if (!effort.disabled && effort.value !== settings.effort) patch.effort = effort.value;
     if (permission?.value && !permission.disabled && permission.value !== settings.permissionMode) patch.permissionMode = permission.value;
     if (!Object.keys(patch).length) return dlg.close();
@@ -68,7 +69,7 @@ function showCodexSettings(r, settings) {
     } catch (err) { error.textContent = err.message; error.hidden = false; }
     finally { save.disabled = false; }
   };
-  dlg.showModal(); model.focus();
+  dlg.showModal(); dlg.querySelector('[data-mp-open="model"]')?.focus();
 }
 async function editCodexLastMessage(r) {
   try {
