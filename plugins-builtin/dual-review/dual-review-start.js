@@ -7,13 +7,13 @@ function drConfirm({ title, note = "", blocks = [], ok = "Start", danger = false
   return new Promise((resolve) => {
     const d = document.createElement("dialog");
     d.className = "ask wide drconfirm";
-    d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3>${esc(title)}</h3>${note ? `<p>${esc(note)}</p>` : ""}
+    d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3 tabindex="-1">${esc(title)}</h3>${note ? `<p>${esc(note)}</p>` : ""}
       ${blocks.map((b) => `<div class="drblock"><span class="hint">${esc(b.label)}</span>${b.mono ? `<code class="drcmd">${esc(b.mono)}</code>` : ""}${b.text ? `<pre class="drpre">${esc(b.text)}</pre>` : ""}</div>`).join("")}</div>
       <div class="dlg-f"><button class="btn" value="cancel">Cancel</button><button class="btn ${danger ? "danger" : "primary"}" value="ok">${esc(ok)}</button></div></form>`;
     document.body.append(d);
     d.addEventListener("close", () => { resolve(d.returnValue === "ok"); motion.drop(d); });
     d.showModal();
-    if (!isPhone()) d.querySelector("button[value=ok]")?.focus(); // on a phone the dialog opens at its top
+    (isPhone() ? d.querySelector("h3") : d.querySelector("button[value=ok]"))?.focus(); // on a phone the dialog opens at its top
   });
 }
 
@@ -37,7 +37,7 @@ function drOpenStart(cur) {
     <label class="field" data-drfolder ${rows.length ? "hidden" : ""}><span>Folder</span><input name="cwd" spellcheck="false" autocomplete="off" placeholder="~/Documents/Projects/…"></label>
     <label class="field"><span>Which changes <span class="hint">(blank: uncommitted · main: this branch since main · a..b)</span></span><input name="range" spellcheck="false" autocomplete="off" class="mono" placeholder="uncommitted changes"></label>
     <pre class="drpre drstat hint">…</pre>
-    <label class="field"><span>Anything to look at closely <span class="hint">(optional)</span></span><textarea name="focus" rows="2" placeholder="e.g. the payment retry logic"></textarea></label>
+    <label class="field"><span>Anything to look at closely <span class="hint">(optional)</span></span><textarea name="lookat" rows="2" placeholder="e.g. the payment retry logic"></textarea></label>
     <div class="fields2"><label class="field"><span>Claude model</span><input name="mclaude" spellcheck="false" placeholder="Default" value="${esc(load("drModel:claude", ""))}"></label>
       <label class="field"><span>Codex model</span><input name="mcodex" spellcheck="false" placeholder="Default" value="${esc(load("drModel:codex", ""))}"></label></div></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" value="ok">Next: check the commands</button></div></form>`;
@@ -60,7 +60,7 @@ function drOpenStart(cur) {
   d.addEventListener("close", async () => {
     const ok = d.returnValue === "ok";
     const src = rowOf(f.src.value);
-    const body = { cwd: cwdOf(), range: f.range.value.trim(), focus: f.focus.value, models: { claude: f.mclaude.value.trim(), codex: f.mcodex.value.trim() }, origin: src ? { key: src.key, title: src.title || src.project } : undefined };
+    const body = { cwd: cwdOf(), range: f.range.value.trim(), focus: f.lookat.value, models: { claude: f.mclaude.value.trim(), codex: f.mcodex.value.trim() }, origin: src ? { key: src.key, title: src.title || src.project } : undefined };
     motion.drop(d);
     if (!ok) return;
     store("drModel:claude", body.models.claude); store("drModel:codex", body.models.codex);
