@@ -26,7 +26,7 @@
 .drsev { font: 600 11px var(--mono); text-transform: uppercase; color: var(--ink-3); }
 .drsev.high { color: var(--danger); }
 .drsev.medium { color: var(--blocked); }
-.drt { margin: 4px 0 0; font-weight: 600; font-size: 14.5px; overflow-wrap: anywhere; }
+.drtitle { margin: 4px 0 0; font-weight: 600; font-size: 14.5px; overflow-wrap: anywhere; }
 .drd { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; }
 .drsend { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 0; background: var(--bg); }
 .drsend .spacer { flex: 1; }

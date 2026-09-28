@@ -36,7 +36,7 @@ function drList() {
 const drWhere = (f) => (f.file ? `${f.file}${f.line ? `:${f.line}${f.endLine && f.endLine !== f.line ? `–${f.endLine}` : ""}` : ""}` : "no file");
 function drFinding(f, side) {
   if (!f) return `<div class="drf none"><span class="hint">${DR_SIDE[side]} didn’t flag this</span></div>`;
-  return `<div class="drf"><span class="drsev ${esc(f.severity)}">${esc(f.severity)}</span><span class="drwho">${DR_SIDE[side]}</span><p class="drt">${esc(f.title)}</p>${f.detail ? `<p class="drd">${esc(f.detail)}</p>` : ""}</div>`;
+  return `<div class="drf"><span class="drsev ${esc(f.severity)}">${esc(f.severity)}</span><span class="drwho">${DR_SIDE[side]}</span><p class="drtitle">${esc(f.title)}</p>${f.detail ? `<p class="drd">${esc(f.detail)}</p>` : ""}</div>`;
 }
 function drGroups(c) {
   const shown = c.groups.map((g, i) => [g, i]).filter(([g]) => drS.filter === "all" || g.status === drS.filter);
