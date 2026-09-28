@@ -44,7 +44,9 @@ function takeAnchor() {
   const body = $("dbody"), top = body.getBoundingClientRect().top;
   for (const o of chatDom.blocks ?? []) {
     const r = o.el.getBoundingClientRect();
-    if (r.bottom > top + 8) return { key: o.key, off: r.top - top };
+    // Not a message with only its last line or two showing: one that re-wraps a line shorter later (a font
+    // settling) would slip out of view and the next one would take the top.
+    if (r.bottom > top + 48) return { key: o.key, off: r.top - top };
   }
   return null;
 }

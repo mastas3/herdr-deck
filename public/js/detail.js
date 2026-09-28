@@ -20,7 +20,6 @@ function renderDetail() {
   renderAsk(r);
   $("composer").hidden = !r || S.sub != null || !codexCanReply(r) || !!r.hist;
   $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
-  renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
   else if (r.app) setHTML($("appbar"), codexConnectionHTML(r));
   $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
@@ -32,6 +31,8 @@ function renderDetail() {
   if (r.app && busy) $("cSend").title = "Send after the current turn; Steer sends now";
   renderQueue(r);
   renderPastes();
+  renderStatusLine(r);
+  syncDock(); // the frame's height settles before the chat restores its place (inspector.js)
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? r.app ? "Reply to Codex" : "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
   $("mTitle").innerHTML = `<span class="dot" style="--c:${statusVar(r.status)}"></span><span style="overflow:hidden;text-overflow:ellipsis">${esc(r.title || r.agent)}</span>`;
