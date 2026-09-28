@@ -13,7 +13,7 @@
 .nchk input[type="checkbox"] { margin: 3px 0 0; width: 17px; height: 17px; accent-color: var(--accent); flex: none; }
 .nchk.in { display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; margin-right: 12px; font-size: 14px; color: var(--ink-2); }
 .nchk.in input[type="checkbox"] { margin: 0; }
-dialog.ask .inp.tm { width: auto; display: inline-block; padding: 3px 6px; font: 14px var(--mono); }
+dialog.ask .inp.tm { width: 7ch; display: inline-block; padding: 3px 6px; font: 14px var(--mono); }
 dialog.ask .inp.num { width: 72px; display: inline-block; padding: 3px 6px; }
 .nlog, .alog { min-height: 1.2em; }
 .dlg-f .spacer { flex: 1; }

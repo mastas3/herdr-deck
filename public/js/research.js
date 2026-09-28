@@ -119,7 +119,7 @@ async function rsNew(pre = {}) {
     <div class="fields2"><div class="field"><span>Machine</span><div class="seg" data-machine>${ms.map((m) => `<button type="button" data-m="${esc(m.id)}" aria-pressed="${m.id === st.self}" ${m.ok ? "" : "disabled"} title="${esc(m.why)}">${esc(m.label)}</button>`).join("")}</div></div>
       <div class="field"><span>Agent</span><div class="seg"><button type="button" aria-pressed="true">Claude Code</button></div></div></div>
     <div class="fields2"><label class="field"><span>Model</span><select name="model"><option value="">Default</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option></select></label><label class="field"><span>Time limit per run (min)</span><input name="runMinutes" type="number" min="10" max="120" value="45"></label></div>
-    <div class="field"><span>Quiet hours <span class="hint">(no new runs start)</span></span><span class="rsquiet"><input type="checkbox" name="qon"> from <input name="qfrom" type="time" value="23:00"> to <input name="qto" type="time" value="07:00"></span></div>
+    <div class="field"><span>Quiet hours <span class="hint">(no new runs start)</span></span><span class="rsquiet"><input type="checkbox" name="qon"> from ${time24('name="qfrom"', "23:00")} to ${time24('name="qto"', "07:00")}</span></div>
     <div class="rssum2" hidden></div></div>
     <div class="dlg-f"><button class="btn" value="cancel" formnovalidate>Cancel</button><button class="btn primary" type="button" data-next>Review</button></div></form>`;
   document.body.append(d);

@@ -41,7 +41,7 @@ export async function hubApi(hub: Hub, path: string, body: any): Promise<Respons
     case "/api/push/test": {
       const dev = push.devices.find((d) => d.id === String(body.id ?? ""));
       if (!dev) return json({ error: "This device isn’t subscribed" }, 404);
-      const m: Message = { kind: "test", title: "herdr deck", body: `Push works on “${dev.label}”. ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`, tag: "test", url: body.url ? String(body.url).slice(0, 300) : "/" };
+      const m: Message = { kind: "test", title: "herdr deck", body: `Push works on “${dev.label}”. ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hourCycle: "h23" })}`, tag: "test", url: body.url ? String(body.url).slice(0, 300) : "/" };
       const r = await push.deliver(m, { only: dev.id, ttl: 600, urgency: "high" });
       const res = r.results[0];
       return json({ ok: !!res?.ok, error: res?.error, dropped: r.dropped, devices: push.list() }, res?.ok ? 200 : 502);
