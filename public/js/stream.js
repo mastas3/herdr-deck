@@ -17,6 +17,9 @@ function seqStep(have, id) {
   return n <= hn ? "skip" : n === hn + 1 ? "apply" : "resync";
 }
 /* @pure:stream-end */
+/** How long the state fetch may take: a half-open connection (a phone on a flaky link) would otherwise hold every
+ *  event in `resyncing` for good. Past it the page reopens the stream from what it has, which replays or says stale. */
+const RESYNC_MS = 8000;
 /** Events that arrive while a fresh state is on its way wait here, then go through liveEvent again. */
 let resyncing = null;
 function liveEvent(fn, e) {
@@ -31,7 +34,7 @@ async function resync() {
   if (resyncing) return;
   resyncing = [];
   try {
-    const res = await fetch("/api/state", { cache: "no-store" });
+    const res = await fetch("/api/state", { cache: "no-store", signal: AbortSignal.timeout(RESYNC_MS) });
     if (!res.ok) throw new Error(`state ${res.status}`);
     applyFull(await res.json());
   } catch {

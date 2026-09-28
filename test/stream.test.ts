@@ -106,3 +106,46 @@ describe("live stream", () => {
     recent.close();
   });
 });
+
+describe("page resync", () => {
+  // The page's resync (not pure: it fetches and reconnects), with its globals handed in.
+  const code = src.slice(src.indexOf("/** Events that arrive"));
+  function pageWith(fetchImpl: (url: string, o: any) => Promise<any>, ms = 30) {
+    const calls = { reconnect: [] as number[], applied: [] as any[] };
+    const S: any = { seq: "b.1" };
+    const applyFull = (d: any) => { calls.applied.push(d); S.seq = d.seq; };
+    const reconnectSoon = (n: number) => calls.reconnect.push(n);
+    // The browser's AbortSignal.timeout (Bun 1.2's never fires, so the test brings a faithful one).
+    const Signal = { timeout: (t: number) => { const c = new AbortController(); setTimeout(() => c.abort(new DOMException("timed out", "TimeoutError")), t); return c.signal; } };
+    const p = new Function("S", "fetch", "applyFull", "reconnectSoon", "seqStep", "RESYNC_MS", "AbortSignal", `${code}; return { resync, liveEvent, busy: () => !!resyncing };`)(
+      S, fetchImpl, applyFull, reconnectSoon, page.seqStep, ms, Signal);
+    return { ...p, S, calls };
+  }
+  /** A fetch that never answers, except by rejecting when its signal aborts (like the browser's). */
+  const hang = (_url: string, o: any) => new Promise((_, rej) => o?.signal?.addEventListener("abort", () => rej(o.signal.reason)));
+
+  test("a state fetch that hangs gives up after the timeout and reopens the stream", async () => {
+    const p = pageWith(hang);
+    const done = p.resync();
+    expect(p.busy()).toBe(true);
+    await done;
+    expect(p.calls.reconnect).toEqual([2000]);
+    expect(p.busy()).toBe(false);
+    // Events apply again rather than waiting forever behind the dead fetch.
+    const got: any[] = [];
+    p.liveEvent((d: any) => got.push(d), { lastEventId: "b.2", data: '{"x":1}' });
+    expect(got).toEqual([{ x: 1 }]);
+  });
+  test("a state that comes in time applies, and the events held meanwhile follow it", async () => {
+    let answer!: (v: any) => void;
+    const p = pageWith((_u, o) => { expect(o.signal).toBeDefined(); return new Promise((r) => (answer = r)); }, 1000);
+    const got: any[] = [];
+    p.liveEvent((d: any) => got.push(d), { lastEventId: "b.5", data: '{"n":5}' }); // out of step: resyncs
+    p.liveEvent((d: any) => got.push(d), { lastEventId: "b.6", data: '{"n":6}' }); // held
+    answer({ ok: true, json: async () => ({ seq: "b.4" }) });
+    await Bun.sleep(5);
+    expect(p.calls.applied).toEqual([{ seq: "b.4" }]);
+    expect(got).toEqual([{ n: 5 }, { n: 6 }]);
+    expect(p.calls.reconnect).toEqual([]);
+  });
+});
