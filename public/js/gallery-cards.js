@@ -1,5 +1,5 @@
 // Gallery: the hero, lanes and cards as HTML (gallery-core.js decides what to show). Covers come from the covers job
-// (src/covers.ts) by each idea's coverId; until one is painted a card gets a typographic cover in its category's
+// (the covers plugin) by each idea's coverId; until one is painted a card gets a typographic cover in its category's
 // print colours. Cards show recorded evidence stages; model confidence is never presented as demand.
 const GAL_PAL = { money: ["#00A95C", "#F15060", "#F4EEE2"], saas: ["#0078BF", "#FFD400", "#F4EEE2"], automations: ["#00838A", "#FF6C2F", "#F4EEE2"], content: ["#F15060", "#3D5588", "#F4EEE2"], projects: ["#A75154", "#5EC8E5", "#F4EEE2"], gem: ["#3255A4", "#82D8D5", "#F4EEE2"], weekend: ["#FFB511", "#2E2E2E", "#F4EEE2"], wild: ["#FF48B0", "#00A95C", "#F4EEE2"] };
 const GAL_FIRST_LANE = 10;

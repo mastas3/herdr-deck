@@ -431,6 +431,10 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   prompts), never code. Before anything is installed you get a trust screen built from what the plugin can
   actually do: the exact tools its agents may use, the repos it would clone and the agents it would start.
   Install from the built-in catalog, or drop a `plugin.json` or `.zip` on Plugins → Add.
+  The deck's own extras are **code plugins** you can switch off in Plugins → Built in (Covers first; the rest are
+  moving over): a part that's off stops running and leaves the page. You can also add a code plugin from a folder or
+  a git repo pinned to a commit; its red trust screen says plainly that it runs with your full permissions, and any
+  file changed after you approved it turns it off until you review it again.
 
 ## MCP server
 

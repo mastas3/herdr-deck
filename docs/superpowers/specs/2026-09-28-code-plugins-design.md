@@ -40,29 +40,93 @@ Core must never import plugin code (a test enforces this).
 
 (Exact file lists are the migrating agent's call; the table is the intent.)
 
-## The contract
+## The contract (as built in phase 1)
 
-A code plugin is a folder with `plugin.json` (`"deck": 1, "kind": "code"`, id, name, version, `requires`, `uses`
-(optional deps), `server` entry, `client` scripts, `styles`, `settings`) and code beside it. Built-ins live in
-`plugins-builtin/<id>/` in the repo; installed ones in `~/.config/herdr-deck/plugins/<id>/`.
+### Folder layout
 
-Server entry exports `activate(host): Promise<Deactivate | void>`. The host gives a plugin exactly what the
-composition root lends extras today, nothing wider by accident:
+```
+plugins-builtin/<id>/            built in, trusted by path (repo)
+  plugin.json                    the manifest below
+  server.ts                      exports activate(host)
+  *.ts                           its own server modules (import the core freely, never another plugin's files)
+  *.js, *.css                    page files named in plugin.json
+  test/*.test.ts                 its tests; plain `bun test` runs them
+<data>/plugins/<id>/             installed (<data> = DECK_PLUGINS_DIR or ~/.config/herdr-deck), same shape
+<data>/code-plugins.json         { enabled: {id: bool}, installed: [{id, name, version, from, files: {path: sha256}, hash, approvedAt}], settings: {id: {key: value}} }
+```
 
-- `host.routes(prefix, handler)` — `/api/<prefix>/*` (and page routes like `/p/*` when declared); errors become a 500 for that plugin only.
-- `host.every(ms, fn)`, `host.after(ms, fn)`, `host.onStop(fn)` — all timers/workers stop on deactivate.
-- `host.provide(name, api)` / `host.use(name)` — services; `use` of a disabled optional dependency returns `undefined`.
-- `host.extend(point, contribution)` / `host.contributions(point)` — e.g. `discover.tabs`, `digest.lines`, `mcp.tools`, `palette.entries`, `fullState` slices, `tools.entries`.
-- Core capabilities, typed: rows, sessions (start/send/close), push, automations, decisions, broadcast/notice, machines, `isNode`, dataDir (the plugin's data keeps living where it lives today — **no data migration**), env.
-- Client: plugin scripts load after core scripts, only for enabled plugins, and register with `deckPlugins.register(id, { views, tabs, palette, keys, settings })`; core views/tabs/palette/keys read the registry instead of hard-coded extras.
+### plugin.json (`src/plugin-code-format.ts`)
 
-Lifecycle: load order = dependency order; a missing hard dependency or a thrown `activate` marks the plugin
-**failed** (shown in the Plugins view with the error) and the rest keep running. Disabled plugins are never
-imported. Enable/disable from the Plugins view: server activates/deactivates live; the page reloads to swap assets.
-Nodes (Linux) run only plugins marked `"machine": "any"`; hub-only plugins stay off there.
+| field | meaning |
+|---|---|
+| `deck: 1`, `kind: "code"`, `id`, `name`, `version`, `description?` | `id` = folder name (`[a-z0-9-]`, 2–40) |
+| `requires: string[]` | plugin ids it can't run without: started first; if one is off/failed/missing this one is **failed** ("Needs …") |
+| `uses: string[]` | optional plugin ids: started first when on; `host.use()` of theirs returns `undefined` when off |
+| `server?` | entry file (.ts/.js) exporting `activate(host)` |
+| `client: string[]`, `styles: string[]` | page files, appended after the core's (in plugin load order) at `/plugins/<id>/<file>?v=<hash>` |
+| `machine: "hub" \| "any"` | default `"hub"`: never started on a node (status `hub-only`) |
+| `routes: string[]` | `"covers"` → POST `/api/covers` and `/api/covers/*`; `"/covers/"` → GETs under that path (no token). Core API names and paths are refused |
+| `pages: string[]` | paths that serve the deck page (client-side links such as `/p`) |
+| `provides: string[]` | service names it may `provide` |
+| `extends: string[]` | extension points it may `extend` |
+| `settings: {key: {label, type: boolean\|number\|string, default, hint?}}` | shown and edited in the Plugins view; read with `host.setting(key)` |
 
-Trust: built-ins are trusted by path. Installed code plugins store the approved hash of every file; a changed file
-disables the plugin until re-approved. Data plugins keep their existing trust flow unchanged.
+The host refuses any route, service or point the manifest doesn't list, so the trust screen (built from the manifest
+before any code runs) shows the whole surface.
+
+### Server: `activate(host: Host): Promise<Deactivate | void>` (`src/plugin-api.ts`)
+
+- `host.id`, `host.dir`, `host.dataDir` (the deck's data folder: data stays where it lives today, **no migration**),
+  `host.env(name)`, `host.log(msg)`.
+- `host.routes(prefix, handler)`; `handler({ method, path, url, body, req })` returns a `Response` (sent as is),
+  `undefined` (not mine) or anything else (sent as JSON). A throw becomes `500 {error, plugin}` for that plugin only.
+- `host.every(ms, fn)`, `host.after(ms, fn)` (each returns a cancel function), `host.onStop(fn)`: all stop on deactivate.
+  Errors in timers are logged, never thrown into the deck.
+- `host.provide(name, api)` / `host.use(name)`: `use` throws when the provider isn't in `requires`/`uses`, and returns
+  `undefined` while it is off. Call it when needed; don't keep the result.
+- `host.extend(point, c)` / `host.contributions(point)` (running plugins, in load order). Core points (`CorePoints`):
+  `fullState` `{key, get}` (core keys refused), `digest.lines` `{title, lines(), pref?}` (replaces automations'
+  `questLines`), `mcp.tools` `{name, description, inputSchema, call(args)}` (can't shadow a deck tool),
+  `tools.entries` (a `Tool`, runnable like the built-ins). Any other name is a plugin's own point, e.g. `discover.tabs`.
+- `host.setting(key)`.
+- Core, typed: `host.rows()`, `host.sessions.start/send/close`, `host.push`, `host.automations()`, `host.decisions()`,
+  `host.broadcast(event, data)` (core event names refused), `host.notice({ok, message})`, `host.machines()`, `host.isNode()`.
+- The core reaches a plugin only through `pluginHost.service(name)` (no import; a test enforces that nothing under
+  `src/` imports `plugins-builtin/`).
+
+### Client (`public/js/registry.js`, loaded right after core.js)
+
+`deckPlugins.register(id, spec)` returns `{ extend(point, c) }`. `spec`:
+
+| key | shape | read by |
+|---|---|---|
+| `views` | `{ [mode]: { render(), load?(), leave?(), path?() } }` | `setMode`/`renderMode`; `path()` is the view's URL (`syncUrl`) |
+| `tabs` | `[{ view, label, icon (string or fn), key?, count?, order }]` | the view tab bar (core: Inbox 10, History 20, Plugins 90) |
+| `palette` | `(q, cur) => [{ t, run, k?, echo?, slot: "views"\|"more", order? } \| { section, html, run }]` | ⌘K |
+| `keys` | `{ [key]: (e) => void }` (core keys refused) | the keyboard handler |
+| `settings` | `[{ html, run }]` | the Settings menu |
+| `events` | `{ [sseEvent]: (data) => void }` | the SSE connection |
+| `state` | `(fullState) => void` | every full state |
+| `links` | `(url: URL) => boolean` | deep links on load, `?…` params and push taps |
+
+Plus `deckPlugins.contributions(point)`, `deckPlugins.each(point, ...args)`, `deckPlugins.view(mode)`,
+`deckPlugins.has(id)` (its scripts are in the page) and `deckPlugins.on(id)` (running on the deck, from
+`fullState.plugins.active`). A "plugins" SSE event (something switched) reloads the page.
+
+### Lifecycle
+
+`start()`/`reconcile()` scans, orders by dependencies (built-ins before installed, then by id; a cycle → failed),
+stops (dependents first) whatever may no longer run, then starts what should, in order. Status per plugin: `on`,
+`off`, `failed` (+error), `hub-only`, `changed` (installed files differ from the approved hashes), `invalid` (bad
+manifest). Built-ins default on. Enable/disable is live: `/api/plugins/code/enable` → reconcile → broadcast.
+
+### Trust
+
+Built-ins are trusted by path. Code installs come only from a local folder or a git repo pinned to a 40-char commit:
+`/api/plugins/code/inspect` stages a copy (git: clone, check out, verify HEAD, drop `.git`; symlinks refused), the
+red trust screen lists every file and the manifest's surface and needs a tick, and `/api/plugins/code/install` moves
+exactly the staged bytes (checked by hash) into place and records each file's sha256. Any added, removed or edited
+file → `changed`, off until reviewed again. Data plugins keep their own flow; a name one uses can't be taken.
 
 ## Phases
 

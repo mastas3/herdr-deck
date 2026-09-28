@@ -148,7 +148,7 @@ export function createGalleryServer(d: GalleryServerDeps) {
     return t;
   }
 
-  // ── the archive: what's shown is kept, under the id covers.ts paints it by ──
+  // ── the archive: what's shown is kept, under the id the covers plugin paints it by ──
   const archive = d.archive && {
     put: (x: any) => d.archive!.put({ ...x, id: coverIdOf(x.id), ideaId: x.id, title: x.title ?? x.name, pitch: x.pitch ?? x.hook }),
     score: (id: string, s: number, dropped: boolean) => d.archive!.score(coverIdOf(id), s, dropped),
