@@ -78,6 +78,9 @@ function moreMenu(anchor) {
   if (!r) return;
   if (r.app) return openMenu(anchor, [
     { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
+    codexHasCapability(r, "settings") && { html: "Model, reasoning & permissions…", run: () => openCodexSettings(r) },
+    codexHasCapability(r, "edit") && codexView(r)?.editableTurn && !codexView(r)?.activeTurnId && { html: "Edit last message…", run: () => editCodexLastMessage(r) },
+    ...codexTaskMenu(r),
     codexCanReply(r) && r.status !== "working" && r.status !== "blocked" && { html: "Compact conversation", run: () => compactCodex(r) },
     r.status !== "working" && r.status !== "blocked" && { html: "Continue in herdr<small>Resume with the Codex CLI in a terminal</small>", run: () => codexAct("codex-resume", r) },
     r.projectRoot && { html: "Verify this project", run: () => verifyRow(r, true) },

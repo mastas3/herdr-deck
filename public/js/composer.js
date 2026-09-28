@@ -82,10 +82,11 @@ document.addEventListener("error", (e) => {
 // While an agent works, Enter queues (the hub sends it when the turn ends); Steer (⌘Enter) sends now.
 function renderQueue(r) {
   const q = (S.queue ?? {})[r?.key] ?? [];
+  const native = r?.app && codexView(r)?.ready ? codexView(r)?.nativeQueue?.messages ?? [] : [];
   const el = $("qbar");
-  if (!q.length || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
+  if ((!q.length && !native.length) || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
   el.hidden = false;
-  setHTML(el, q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
+  setHTML(el, native.map((x) => `<div class="qi"><span class="qn">In Codex${x.pausedReason ? " · paused" : ""}</span><span class="qt" title="${esc(x.pausedReason ?? x.text)}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><span class="hint">Manage in Codex</span></div>`).join("") + q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${r.app ? "Deck · " : ""}${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
 }
 $("qbar").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-qact]");

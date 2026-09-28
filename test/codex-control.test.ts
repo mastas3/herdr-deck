@@ -17,7 +17,7 @@ function desktopState(extra = {}) {
 }
 function fixture(initial = desktopState()) {
   let handlers: any, owner = "owner-a", revision = 1, online = true;
-  const sent: any[] = [], updates: any[] = [];
+  const sent: any[] = [], updates: any[] = [], follows: any[] = [];
   const control = createCodexControl({ timeoutMs: 50, changed(id, state) { updates.push({ id, state }); }, transport(h) {
     handlers = h;
     return {
@@ -28,6 +28,7 @@ function fixture(initial = desktopState()) {
         return { result: { result: { turn: { id: "new-turn" } } } };
       },
       follow(id, target, following) {
+        follows.push({ id, target, following });
         if (following) handlers.broadcast({ method: "thread-stream-state-changed", version: 11, sourceClientId: target,
           params: { hostId: "local", conversationId: id, change: { type: "snapshot", revision, conversationState: initial } } });
       },
@@ -36,7 +37,7 @@ function fixture(initial = desktopState()) {
   } });
   const broadcast = (change: any, sourceClientId = owner) => handlers.broadcast({ method: "thread-stream-state-changed", version: 11, sourceClientId,
     params: { hostId: "local", conversationId: thread, change } });
-  return { control, sent, updates, broadcast, replace(s: any) { initial = s; revision++; broadcast({ type: "snapshot", revision, conversationState: s }); },
+  return { control, sent, updates, follows, wire: (message: any) => handlers.broadcast(message), broadcast, replace(s: any) { initial = s; revision++; broadcast({ type: "snapshot", revision, conversationState: s }); },
     offline() { online = false; handlers.disconnected(); }, changeOwner() { owner = "owner-b"; } };
 }
 
@@ -97,6 +98,16 @@ describe("native Codex state and actions", () => {
     f.replace(desktopState());
     await expect(f.control.respond(thread, 12, { decision: "accept" })).rejects.toMatchObject({ code: "CODEX_STALE" });
     expect(f.sent).toHaveLength(1); f.control.close();
+  });
+  test("desktop follower-list recovery only answers its owner and resets require a new snapshot", async () => {
+    const f = fixture(); await f.control.watch(thread);
+    const request = { method: "thread-stream-following-status-requested", version: 1, sourceClientId: "unrelated-client", params: { hostId: "local" } };
+    f.wire(request); expect(f.follows).toHaveLength(1);
+    f.wire({ ...request, sourceClientId: "owner-a" }); expect(f.follows).toHaveLength(2);
+    f.wire({ method: "ipc-connection-reset", version: 1 });
+    expect(f.control.state(thread).ready).toBe(false);
+    await f.control.watch(thread, true); expect(f.control.state(thread).ready).toBe(true);
+    expect(f.follows).toHaveLength(3); f.control.close();
   });
   test("permissions can only grant the requested scope; multi-question answers preserve question ids", async () => {
     const f = fixture(desktopState({ requests: [{ id: "p", method: "item/permissions/requestApproval", params: { permissions: { network: { enabled: true } } } }] }));

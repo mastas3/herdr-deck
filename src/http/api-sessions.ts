@@ -13,8 +13,11 @@ import { readFileFor, resolveSafe } from "./files";
 import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
 import { codexApi } from "./codex";
+import { codexLifecycleApi } from "./codex-lifecycle";
 
 export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
+  const lifecycle = await codexLifecycleApi(hub, path, body);
+  if (lifecycle) return lifecycle;
   const native = await codexApi(hub, path, body);
   if (native) return native;
   const { deck, graves, broadcastGraves, refreshShared, pluginHost } = hub;
@@ -144,7 +147,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       return json(body.hash === hash ? { same: true, hash } : { text, hash });
     }
     case "/api/new-options":
-      return json(await newSessionOptions(deck, graves));
+      return json({ ...await newSessionOptions(deck, graves), codexApp: hub.codexLifecycle?.capabilities() });
     case "/api/new":
       pluginHost.service<{ mkdirRun(b: unknown): void }>("game")?.mkdirRun(body); // a quest run's new folder, only now that you confirmed the dialog
       return json(await startSession(body));

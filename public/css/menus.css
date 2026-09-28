@@ -24,6 +24,12 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
 .field { display: flex; flex-direction: column; gap: 5px; margin: 14px 0 0; font-size: 14px; color: var(--ink-2); }
 .field input, .field textarea, .field select { background: var(--bg); border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; font-size: 15px; color: var(--ink); }
 .field textarea { min-height: 88px; resize: vertical; font: 15.5px/1.5 var(--read); }
+.native-settings { max-height: 90dvh; overflow-y: auto; }
+.native-form-error { color: var(--danger) !important; }
+.native-archives { max-height: 90dvh; overflow-y: auto; }
+.native-archive-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.native-archive-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.native-archive-row small { display: block; color: var(--ink-3); margin-top: 3px; }
 .fields2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .hint { font-size: 13px; color: var(--ink-3); }
 .seg { display: flex; flex-wrap: wrap; gap: 4px; }

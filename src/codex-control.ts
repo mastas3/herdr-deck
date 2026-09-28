@@ -1,6 +1,8 @@
 import { createCodexIpc, CodexControlError, type CodexIpc } from "./codex-ipc";
 import { applyCodexPatches, codexControlState, type CodexControlState } from "./codex-control-state";
 import { createCodexDelivery } from "./codex-delivery";
+import { createCodexSettings } from "./codex-settings";
+import { createCodexConversation } from "./codex-conversation";
 
 type Watched = { owner?: string; raw?: any; view?: CodexControlState; revision?: number; checked: number; touched: number; error?: string; signature?: string };
 const unavailable = "Open this task in the Codex app, then reconnect.";
@@ -28,6 +30,17 @@ export function createCodexControl(options: {
   const handlers = {
     disconnected() { for (const id of watched.keys()) invalidate(id); },
     broadcast(message: any) {
+      if (message.method === "ipc-connection-reset") {
+        for (const id of watched.keys()) invalidate(id);
+        return;
+      }
+      if (message.method === "thread-stream-following-status-requested" && message.params?.hostId === "local") {
+        // The owner can lose its follower list when its connection resets.
+        for (const [id, w] of watched) if (w.owner === message.sourceClientId && (!message.params.conversationId || message.params.conversationId === id)) {
+          try { ipc.follow(id, w.owner, true); } catch { invalidate(id); }
+        }
+        return;
+      }
       if (message.method === "client-status-changed" && message.params?.status === "disconnected") {
         for (const [id, w] of watched) if (w.owner === message.params.clientId) invalidate(id);
       }
@@ -95,8 +108,29 @@ export function createCodexControl(options: {
     const response = await ipc.request(method, { conversationId: id, ...params }, version, w.owner, true);
     return response.result;
   }
+  const access = { current, raw: (id: string) => watched.get(id)?.raw, action };
+  const settings = createCodexSettings(access);
+  const conversation = createCodexConversation(access, { deliver });
+  async function send(id: string, text: string, receipt: string, onlyIdle = false, images: string[] = [], initial = false) {
+    if ((!text.trim() && !images.length) || text.length > 200_000) throw new CodexControlError("Enter a message under 200,000 characters.", "CODEX_INVALID");
+    return deliver(receipt, { id, text, images }, async () => {
+      const s = await current(id), raw = watched.get(id)?.raw;
+      if (initial && ((raw?.turns?.length ?? 0) || Object.keys(raw?.turnHistory?.history?.entitiesByKey ?? {}).length)) {
+        throw new CodexControlError("This task already has a conversation. Check it before sending the initial message again.", "CODEX_STALE");
+      }
+      if (s.status === "blocked" && s.requests.some((r) => r.method !== "deck/asyncQuestion")) throw new CodexControlError("Answer the pending Codex request first.", "CODEX_STALE");
+      if (onlyIdle && (s.activeTurnId || s.status === "working" || s.status === "blocked")) throw new CodexControlError("Codex is still working or waiting for input.", "CODEX_STALE");
+      const input: any[] = [{ type: "text", text, text_elements: [] }, ...images.map((path) => ({ type: "localImage", path }))];
+      const turnStart = { request: { threadId: id, input, clientUserMessageId: receipt }, context: { inheritThreadSettings: true } };
+      const result = s.activeTurnId
+        ? await action(id, "thread-follower-steer-turn", { input, restoreMessage: turnStart, clientUserMessageId: receipt }, 1)
+        : await action(id, "thread-follower-start-turn", { turnStart }, 2);
+      return { ok: true, turnId: result?.result?.turn?.id ?? result?.result?.turnId, delivery: "accepted" };
+    });
+  }
   return {
-    state, watch,
+    state, watch, settings, conversation, send,
+    sendInitial(id: string, text: string, receipt: string) { return send(id, text, receipt, true, [], true); },
     start() {
       if (timer) return;
       timer = setInterval(() => {
@@ -109,19 +143,10 @@ export function createCodexControl(options: {
       }, 15_000);
     },
     close() { clearInterval(timer); timer = undefined; ipc.close(); watched.clear(); },
-    async send(id: string, text: string, receipt: string, onlyIdle = false, images: string[] = []) {
-      if ((!text.trim() && !images.length) || text.length > 200_000) throw new CodexControlError("Enter a message under 200,000 characters.", "CODEX_INVALID");
-      return deliver(receipt, { id, text, images }, async () => {
-        const s = await current(id);
-        if (s.status === "blocked" && s.requests.some((r) => r.method !== "deck/asyncQuestion")) throw new CodexControlError("Answer the pending Codex request first.", "CODEX_STALE");
-        if (onlyIdle && (s.activeTurnId || s.status === "working" || s.status === "blocked")) throw new CodexControlError("Codex is still working or waiting for input.", "CODEX_STALE");
-        const input: any[] = [{ type: "text", text, text_elements: [] }, ...images.map((path) => ({ type: "localImage", path }))];
-        const turnStart = { request: { threadId: id, input, clientUserMessageId: receipt }, context: { inheritThreadSettings: true } };
-        const result = s.activeTurnId
-          ? await action(id, "thread-follower-steer-turn", { input, restoreMessage: turnStart, clientUserMessageId: receipt }, 1)
-          : await action(id, "thread-follower-start-turn", { turnStart }, 2);
-        return { ok: true, turnId: result?.result?.turn?.id ?? result?.result?.turnId, delivery: "accepted" };
-      });
+    forget(id: string) {
+      const w = watched.get(id);
+      if (w?.owner) try { ipc.follow(id, w.owner, false); } catch {}
+      invalidate(id); watched.delete(id);
     },
     async stop(id: string, expectedTurnId: string) {
       const s = await current(id);

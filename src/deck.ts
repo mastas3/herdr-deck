@@ -8,10 +8,12 @@ import { cleanTail, isShellOnly } from "./tail";
 import { insightFor, type Insight } from "./insight";
 import { projectRoot } from "./projects";
 import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
+import { codexStore } from "./codex-store";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
 const HIDDEN_FILE = `${homedir()}/.config/herdr-deck/codex-app-hidden.json`;
+const VISIBLE_APP_FILE = `${homedir()}/.config/herdr-deck/codex-app-visible.json`;
 const SEEN_FILE = `${homedir()}/.config/herdr-deck/seen.json`;
 
 export type Row = {
@@ -104,6 +106,7 @@ export class Deck {
   appThreads: AppThread[] = [];
   appControls = new Map<string, NonNullable<Row["appControl"]>>();
   hiddenApp = new Set<string>((() => { try { return JSON.parse(readFileSync(HIDDEN_FILE, "utf8")); } catch { return []; } })());
+  private visibleApp = new Set<string>((() => { try { return JSON.parse(readFileSync(VISIBLE_APP_FILE, "utf8")); } catch { return []; } })());
   private insightStamp = new Map<string, string>();
   listening: Listen[] = [];
   shared = new Map<number, string>(); // local port → tailnet URL (set by the server from `tailscale serve status`)
@@ -187,7 +190,7 @@ export class Deck {
     if (this.appBusy) return;
     this.appBusy = true;
     try {
-      this.appThreads = await listAppThreads(this.hiddenApp);
+      this.appThreads = await listAppThreads(this.hiddenApp, { include: this.visibleApp });
       await Promise.all(this.appThreads.map((t) => codexMeta(t.id).then((m) => { this.metas.set(`codex-app/${t.id}`, m); }).catch(() => {})));
       this.scheduleRebuild();
     } catch {}
@@ -211,9 +214,23 @@ export class Deck {
   }
 
   hideAppThread(id: string) {
+    this.visibleApp.delete(id);
     this.hiddenApp.add(id);
     try { writeFileSync(HIDDEN_FILE, JSON.stringify([...this.hiddenApp])); } catch {}
     this.appThreads = this.appThreads.filter((t) => t.id !== id);
+    this.rebuildNow();
+  }
+
+  async syncAppThread(id: string, archived = false) {
+    // Restored old tasks must stay visible even outside the recent-task window.
+    if (archived) this.visibleApp.delete(id);
+    else { this.visibleApp.add(id); this.hiddenApp.delete(id); }
+    try {
+      writeFileSync(VISIBLE_APP_FILE, JSON.stringify([...this.visibleApp]));
+      writeFileSync(HIDDEN_FILE, JSON.stringify([...this.hiddenApp]));
+    } catch {}
+    codexStore.close();
+    await this.refreshApp();
     this.rebuildNow();
   }
 
