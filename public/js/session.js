@@ -86,6 +86,8 @@ async function loadDetail(key) {
       if (S.sel === key) { headSig = ""; bodySig = ""; renderDetail(); maybeAutoBrief(key); }
     } catch {}
     inflight.delete(key);
+    // It came back without the chat (no conversation yet, or it failed): the chat asks for itself, as it waited to.
+    if (withChat && S.sel === key && chatOf(chatId(key)).gen == null) chatTick(true);
   })();
   p.withChat = withChat;
   inflight.set(key, p);
