@@ -1,0 +1,15 @@
+/* Limit handoff (limit-handoff.js). Deck tokens only. */
+#lhBar { position: fixed; left: 16px; bottom: 16px; z-index: 40; display: flex; flex-direction: column; gap: 6px; max-width: min(560px, calc(100vw - 32px)); }
+.lhitem { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 9px 10px 9px 12px; border-radius: 12px; background: var(--raise); border: 1px solid color-mix(in srgb, var(--working) 55%, var(--line)); box-shadow: 0 10px 30px rgba(0,0,0,.28); font-size: 14px; }
+.lhitem.hard { border-color: color-mix(in srgb, var(--blocked) 60%, var(--line)); }
+.lhwhy { flex: 1 1 220px; min-width: 0; color: var(--ink-2); overflow-wrap: anywhere; }
+.lhwhy b { color: var(--ink); }
+.lhwhyd { color: var(--ink-2); }
+.lhbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.lhdlg textarea { min-height: 180px; font: 13.5px/1.5 var(--mono); }
+.lhwait { margin: 8px 0 0; }
+@media (max-width: 760px) {
+  #lhBar { left: 8px; right: 8px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: none; }
+  .lhitem .btn { flex: 1; justify-content: center; }
+  .lhitem + .lhitem { display: none; } /* one at a time on a phone: the next shows once this one is handled */
+}
