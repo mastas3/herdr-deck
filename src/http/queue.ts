@@ -28,7 +28,7 @@ export function startQueue(o: { dataDir: string; broadcast: (event: string, data
           await sendAny(key, item.text, { requestId: item.id, onlyIdle: true });
           queues[key] = queues[key].filter((x) => x !== item); saveQueues();
           quietSince.set(key, Date.now() + 12_000); // give it time to start before the next one
-          broadcast("notice", { key, ok: true, message: `Sent your queued message to “${row.title}”` });
+          broadcast("notice", { key, ok: true, message: `Sent your queued message to “${row.title}”`, text: item.text });
         } catch (e: any) {
           if (e.code === "CODEX_STALE") { quietSince.delete(key); continue; }
           item.error = e?.message ?? String(e);

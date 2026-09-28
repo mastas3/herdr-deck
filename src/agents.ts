@@ -199,7 +199,7 @@ export function codexUserText(content: any): string {
   return content.filter((p) => p?.type === "input_text" && typeof p.text === "string").map((p) => {
     if (/^\s*# AGENTS\.md/.test(p.text)) return "";
     return p.text.replace(/<(environment_context|recommended_plugins|permissions instructions|collaboration_mode)>[\s\S]*?<\/\1>/g, "").trim();
-  }).filter((s) => s && !/^\s*<(?:system|developer|INSTRUCTIONS|environment_context)\b/.test(s)).join("\n");
+  }).filter((s) => s && !/^\s*<(?:system|developer|INSTRUCTIONS|environment_context|user_shell_command)\b/.test(s)).join("\n");
 }
 
 export function parseCodex(head: string[], tail: string[]): AgentMeta {

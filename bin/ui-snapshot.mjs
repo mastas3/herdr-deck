@@ -101,6 +101,8 @@ export const VIEWS = {
   // in a linked worktree of it (its own sub-section), and the header offers the folder window.
   "by-project-worktree": `${WORKTREE_SETUP}; select("fake:blocked", { scroll: true });
     if (document.querySelectorAll('[data-secact="folder"]').length !== 2 || !document.querySelector('.wt [data-sec="w:acme-api/billing-cache"]')) throw new Error("Folder buttons or the worktree sub-section are missing");`,
+  // A tool's step sent in your name shows in the chat as yours before the transcript has it.
+  "chat-sent": `select("fake:blocked", { scroll: true, open: true }); setTimeout(() => showSent("fake:blocked", "/compact Keep only what the next steps need."), 200)`,
   "folder-view": `${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" })`,
   "folder-view-filter": `${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" }); setTimeout(() => { const q = document.querySelector(".fv-q"); q.value = "json"; q.dispatchEvent(new Event("input")); }, 300)`,
   "folder-view-sub": `(async () => { ${WORKTREE_SETUP}; openFolderView({ proj: "acme-api" }); await fvLoad("src"); fvSelect(1); })()`,
@@ -113,7 +115,7 @@ export const VIEWS = {
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub"];
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "chat-sent"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {

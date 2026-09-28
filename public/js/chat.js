@@ -18,11 +18,21 @@ function mergeChat(key, slice, sub) {
     c.msgs.set(m.i, m);
     c.first = Math.min(c.first, m.i);
     c.last = Math.max(c.last, m.i);
-    if (m.role === "user" && c.pending.length) c.pending = c.pending.filter((p) => p.text.trim() !== String(m.text ?? "").trim());
+    if (m.role === "user" && c.pending.length) c.pending = c.pending.filter((p) => sameAsk(p.text) !== sameAsk(m.text));
   }
   c.pending = c.pending.filter((p) => Date.now() - p.at < 90_000);
   c.v++;
   if (S.sel === key && S.sub === (sub ?? null)) renderChat();
+}
+/** How a sent message is matched to its echo: `!ls` comes back as `! ls`. */
+const sameAsk = (t) => String(t ?? "").trim().replace(/^!\s*/, "! ");
+/** Something sent in your name without the composer (a tool, a queued message): shown as yours until the transcript echoes it. */
+function showSent(key, text) {
+  if (!key || !text || !rowOf(key)) return;
+  const c = chatOf(chatId(key));
+  if (c.pending.some((p) => p.text === text)) return;
+  c.pending.push({ role: "user", text, at: Date.now() }); c.v++;
+  if (S.sel === key && !S.sub) renderChat();
 }
 let chatTimer = null;
 async function chatTick(now) {
