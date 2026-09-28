@@ -113,7 +113,7 @@ $("keysQ").addEventListener("keydown", (e) => { if (e.key === "Escape" && e.targ
 // ── small power moves ──
 /** The next session with a decision waiting on you (Decisions' order), after the selected one; wraps around. */
 function nextNeedsMe() {
-  const keys = (S.decisions ?? []).map((d) => d.key).filter((k, i, a) => rowOf(k) && !S.done.has(k) && a.indexOf(k) === i);
+  const keys = (S.decisions ?? []).filter((d) => !answered(d)).map((d) => d.key).filter((k, i, a) => rowOf(k) && a.indexOf(k) === i);
   if (!keys.length) return toast("Nothing is waiting on you");
   const k = keys[(keys.indexOf(S.sel) + 1) % keys.length];
   if (S.mode) setMode(null);

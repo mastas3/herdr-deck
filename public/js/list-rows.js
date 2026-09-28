@@ -112,7 +112,10 @@ function visibleRows() {
 const rowCache = new Map();
 const SIMPLE_STATUS = { working: ["Working on it", "✨"], blocked: ["Needs you", "👋"], done: ["Finished", "✅"], idle: ["Resting", "💤"], empty: ["Ready, nothing asked yet", "·"], unknown: ["Status unknown", "?"], history: ["Past session", "🕘"] };
 /** The question an agent is waiting on, answerable right in the list (like Claude on the web and phone). */
-const pendingAsk = (r) => (S.decisions ?? []).find((d) => d.key === r.key && (d.kind === "prompt" || d.kind === "question") && !S.done.has(d.key));
+const pendingAsk = (r) => (S.decisions ?? []).find((d) => d.key === r.key && (d.kind === "prompt" || d.kind === "question") && !answered(d));
+/** You answered this very decision (by its id): it stays hidden until the server moves on, and a new one shows at once. */
+const answered = (d) => S.done.get(d.key)?.id === (d.id ?? d.question);
+function markAnswered(d) { S.done.set(d.key, { id: d.id ?? d.question, t: Date.now() }); }
 function rowAsk(r) {
   const d = pendingAsk(r);
   if (!d) return "";
@@ -122,7 +125,7 @@ function rowAsk(r) {
 async function answerOption(d, o) {
   if (d.kind === "prompt") await api("/api/keys", { key: d.key, keys: o.keys ?? [String(o.id)] });
   else await api("/api/send", { key: d.key, text: o.send ?? o.title });
-  S.done.set(d.key, Date.now());
+  markAnswered(d);
   api("/api/decide", { key: d.key, action: "answer", choice: String(o.id) }).catch(() => {});
   api("/api/seen", { key: d.key }).catch(() => {});
 }

@@ -1,7 +1,7 @@
 // The Inbox's decisions (every session that needs you, as a question with options), rebuilt on each patch, and the
 // stuck-and-drift radar that runs on the same beat.
 import { splitKey, type RemoteHost } from "../federation";
-import { buildDecision, judge, needsYou, type Decision } from "../decisions";
+import { buildDecision, judge, mayAsk, type Decision } from "../decisions";
 import { jevAvailable, jevFeature, jevUsage } from "../jev";
 import { linkPath, type Automations } from "../automations";
 import { call } from "../herdr";
@@ -40,10 +40,12 @@ export function createDecisions(o: Deps) {
   // The radar runs on the same beat but on its own: the decisions rebuild never waits for it.
   const scheduleDecisions = () => { clearTimeout(decTimer); decTimer = setTimeout(() => { rebuildDecisions(); radar.pass(allRows()).catch(() => {}); }, 350); };
   async function rebuildDecisions() {
-    const rows = allRows().filter(needsYou);
+    const rows = allRows().filter((r) => mayAsk(r, decisions.get(r.key)));
     const next = new Map<string, Decision>();
     await Promise.all(rows.map(async (r) => {
-      const d = await buildDecision(r, chatTail, screenOf).catch(() => undefined);
+      const prev = decisions.get(r.key);
+      // A build that throws keeps what's on screen: a card never blinks out because one read failed.
+      const d = await buildDecision(r, chatTail, screenOf, prev).catch(() => prev?.kind !== "prompt" || r.status === "blocked" ? prev : undefined);
       if (!d) return;
       next.set(r.key, d);
       judge(d, r, chatTail, scheduleDecisions).catch(() => {});
