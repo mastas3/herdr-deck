@@ -89,7 +89,7 @@ function inboxPick(key, o) {
   if (!d || !r) return;
   const sent = `Sent “${plain(o.title).slice(0, 60)}” to ${r.project}`;
   if (d.kind === "prompt") return decide(key, "answer", () => api("/api/keys", { key, keys: o.keys ?? [String(o.id)] }), String(o.id), sent);
-  return decide(key, "answer", () => api("/api/send", { key, text: o.send ?? o.title }), String(o.id), sent);
+  return decide(key, "answer", () => sendAnswer(key, o.send ?? o.title), String(o.id), sent);
 }
 function inboxAct(key, act) {
   const card = cardOf(key), r = rowOf(key);

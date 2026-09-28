@@ -124,7 +124,7 @@ function rowAsk(r) {
 }
 async function answerOption(d, o) {
   if (d.kind === "prompt") await api("/api/keys", { key: d.key, keys: o.keys ?? [String(o.id)] });
-  else await api("/api/send", { key: d.key, text: o.send ?? o.title });
+  else await sendAnswer(d.key, o.send ?? o.title);
   markAnswered(d);
   api("/api/decide", { key: d.key, action: "answer", choice: String(o.id) }).catch(() => {});
   api("/api/seen", { key: d.key }).catch(() => {});

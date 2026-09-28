@@ -76,3 +76,20 @@ describe("transcript rewritten in place", () => {
     expect(d.started).toBe("new ask");
   });
 });
+
+describe("a message Claude took in mid-turn", () => {
+  test("shows as your message, between the steps it came between", async () => {
+    const dir = mkdtempSync(`${tmpdir()}/deck-`);
+    const path = `${dir}/q.jsonl`;
+    const asst = (id: string, text: string, ts: string) => line({ type: "assistant", timestamp: ts, message: { id, content: [{ type: "text", text }] } });
+    writeFileSync(path,
+      line({ type: "user", timestamp: "2026-09-28T10:00:00Z", message: { content: "Pick a cache" } }) +
+      asst("m1", "Which one?\n\n(a) Redis\n(b) SQLite", "2026-09-28T10:00:05Z") +
+      line({ type: "queue-operation", operation: "enqueue", timestamp: "2026-09-28T10:00:07Z", content: "(b) SQLite" }) +
+      line({ type: "attachment", timestamp: "2026-09-28T10:00:08Z", attachment: { type: "queued_command", prompt: "(b) SQLite", commandMode: "prompt", timestamp: "2026-09-28T10:00:08Z" } }) +
+      line({ type: "attachment", timestamp: "2026-09-28T10:00:08Z", attachment: { type: "queued_command", prompt: "<task-notification>done</task-notification>", isMeta: true } }) +
+      asst("m2", "SQLite it is.", "2026-09-28T10:00:12Z"));
+    const d = await claudeDetail(path);
+    expect(d.messages.map((m) => `${m.role}:${m.text}`)).toEqual(["user:Pick a cache", "assistant:Which one?\n\n(a) Redis\n(b) SQLite", "user:(b) SQLite", "assistant:SQLite it is."]);
+  });
+});

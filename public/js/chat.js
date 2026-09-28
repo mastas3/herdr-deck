@@ -18,9 +18,8 @@ function mergeChat(key, slice, sub) {
     c.msgs.set(m.i, m);
     c.first = Math.min(c.first, m.i);
     c.last = Math.max(c.last, m.i);
-    if (m.role === "user" && c.pending.length) c.pending = c.pending.filter((p) => p.text.trim() !== String(m.text ?? "").trim());
   }
-  c.pending = c.pending.filter((p) => Date.now() - p.at < 90_000);
+  c.pending = settlePending(c.pending, slice.messages).filter((p) => Date.now() - p.at < 90_000);
   c.v++;
   if (S.sel === key && S.sub === (sub ?? null)) renderChat();
 }
@@ -88,13 +87,32 @@ async function loadEarlier() {
   c.busy = false;
 }
 
-/** Messages → blocks: consecutive tool calls fold into one group; subagent calls get their own card. */
+/* @pure:chat-begin: no globals in here; test/chat-pending.test.ts evaluates this block on its own. */
+/** The same words, whatever the spacing, line endings or Unicode form (Hebrew and accents can arrive either way). */
+const sendWords = (t) => String(t ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
+/** Your sends the transcript now echoes are settled: each user message after a send's place takes the oldest
+ *  one with its words (or its start, when the transcript clipped a long one). */
+function settlePending(pending, messages) {
+  let left = pending;
+  for (const m of messages) {
+    if (m.role !== "user" || !left.length) continue;
+    const t = sendWords(m.text);
+    const hit = left.find((p) => m.i > (p.after ?? -1) && (sendWords(p.text) === t || (t.length > 200 && sendWords(p.text).startsWith(t.slice(0, 200)))));
+    if (hit) left = left.filter((p) => p !== hit);
+  }
+  return left;
+}
+/** Messages → blocks: consecutive tool calls fold into one group; subagent calls get their own card. A send not
+ *  echoed yet sits right after the message that was newest when you sent it, so the agent's reply lands below it. */
 function chatBlocks(c) {
   const ms = [...c.msgs.values()].sort((a, b) => a.i - b.i);
+  const waiting = [...c.pending].sort((a, b) => a.at - b.at);
   const blocks = [];
   let group = null;
   let prevI = null;
+  const flush = (upTo) => { while (waiting.length && (waiting[0].after ?? Infinity) < upTo) { const p = waiting.shift(); group = null; blocks.push({ key: "p" + p.at, kind: "pending", ms: [p] }); } };
   for (const m of ms) {
+    flush(m.i);
     if (prevI != null && m.i - prevI > 1) { group = null; blocks.push({ key: "gap" + prevI, kind: "gap", ms: [{ i: prevI + 1, to: m.i }] }); }
     prevI = m.i;
     const agent = m.role === "tool" && /^(agent|task)$/i.test(m.tool ?? "");
@@ -106,8 +124,29 @@ function chatBlocks(c) {
     group = null;
     blocks.push({ key: "m" + m.i, kind: agent ? "agent" : m.role, ms: [m] });
   }
-  for (const p of c.pending) blocks.push({ key: "p" + p.at, kind: "pending", ms: [p] });
+  flush(Infinity);
+  for (const p of waiting) blocks.push({ key: "p" + p.at, kind: "pending", ms: [p] });
   return blocks;
+}
+/* @pure:chat-end */
+/** Show a send in the chat at once, after the message it answers; it goes when the transcript echoes it. */
+function addPending(key, text) {
+  const c = chatOf(chatId(key));
+  const p = { role: "user", text, at: Date.now(), after: c.gen == null ? undefined : c.last };
+  c.pending.push(p); c.v++;
+  return p;
+}
+/** An answer from a card: in its chat at once, right after the question, and taken back if it fails. */
+async function sendAnswer(key, text) {
+  const p = chats.get(chatId(key))?.gen != null ? addPending(key, text) : null;
+  if (p && S.sel === key && !S.sub) renderChat();
+  try { await api("/api/send", { key, text }); } catch (x) { if (p) dropPending(key, p); throw x; }
+  if (S.sel === key) setTimeout(() => chatTick(true), 250);
+}
+function dropPending(key, p) {
+  const c = chatOf(chatId(key));
+  c.pending = c.pending.filter((q) => q !== p); c.v++;
+  if (S.sel === key && !S.sub) renderChat();
 }
 const expanded = new Set();
 const MSG_TOOLS = `<span class="mt"><button class="ib" data-copy title="Copy" aria-label="Copy">${'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/></svg>'}</button><button class="ib" data-pick title="Select (for copying several)" aria-label="Select"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="m5.5 8 2 2 3-4"/></svg></button></span>`;
@@ -187,7 +226,7 @@ function renderChat() {
   const next = [];
   let prevEl = wrap.querySelector("[data-earlier]");
   // Your message, once the transcript echoes it, takes the pending bubble's place without a second entrance.
-  const echoed = new Set((chatDom.data ?? []).filter((b) => b.kind === "pending" && !blocks.some((x) => x.key === b.key)).map((b) => String(b.ms[0].text ?? "").trim()));
+  const echoed = new Set((chatDom.data ?? []).filter((b) => b.kind === "pending" && !blocks.some((x) => x.key === b.key)).map((b) => sendWords(b.ms[0].text)));
   let entering = 0;
   for (const b of blocks) {
     const sig = JSON.stringify(b.ms) + (b.kind === "agent" ? JSON.stringify(S.details.get(key)?.data?.subagents?.map((x) => [x.id, x.running, x.now, x.tools])) : "") + expanded.has(b.key);
@@ -198,7 +237,7 @@ function renderChat() {
       const el = t.content.firstElementChild;
       el.dataset.b = b.key;
       if (o) o.el.replaceWith(el);
-      else if (chatDom.fresh === id && !(b.kind === "user" && echoed.has(String(b.ms[0].text ?? "").trim())) && entering++ < 8) el.classList.add("enter"); // new while you watch: ease it in
+      else if (chatDom.fresh === id && !(b.kind === "user" && echoed.has(sendWords(b.ms[0].text))) && entering++ < 8) el.classList.add("enter"); // new while you watch: ease it in
       o = { key: b.key, sig, el };
     }
     o.el.classList.toggle("picked", chatSel.has(b.key));

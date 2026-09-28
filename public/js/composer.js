@@ -23,11 +23,10 @@ async function sendMessage(text, fromEl, how) {
     return;
   }
   closeSlash();
-  const c = chatOf(chatId(key));
-  const p = { role: "user", text, at: Date.now() };
+  let p = null;
   if (isAgent(r)) {
     const from = fromEl.getBoundingClientRect();
-    c.pending.push(p); c.v++; S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight;
+    p = addPending(key, text); S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight;
     // What you typed lifts out of the box into the chat.
     const el = [...$("dbody").querySelectorAll(".msg.user.pending")].pop();
     if (el) motion.travel(el, from);
@@ -43,10 +42,8 @@ async function sendMessage(text, fromEl, how) {
     setTimeout(pollTerm, 150);
   } catch (x) {
     if (x.code && x.code !== "CODEX_DELIVERY_UNKNOWN") codexSendReceipts.delete(key);
-    c.pending = c.pending.filter((q) => q !== p);
-    c.v++;
     fromEl.value = text;
-    renderChat();
+    if (p) dropPending(key, p);
     toast("Send failed: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } });
   }
 }
