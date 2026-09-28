@@ -65,7 +65,8 @@ export type Row = {
   duplicate: boolean;
   approx: boolean;
   seen?: boolean; // you opened it (in the deck) since it last changed: a finished session no longer needs you
-  app?: "codex"; // a Codex desktop app thread: no pane, no terminal; open it in the app or resume in herdr
+  app?: "codex"; // a Codex desktop task: controls are forwarded to its app owner
+  appControl?: { ready: boolean; status?: string; activeTurnId?: string; error?: string };
   ports?: { port: number; addr: string; cmd: string; url?: string }[]; // servers this session is running (url: shared on the tailnet)
   check?: any; // proof-of-done result for its project (verify.ts)
   hist?: string; // a past session from the history index: its transcript file
@@ -101,6 +102,7 @@ export class Deck {
   private rebuildTimer?: Timer;
   insights = new Map<string, Insight>();
   appThreads: AppThread[] = [];
+  appControls = new Map<string, NonNullable<Row["appControl"]>>();
   hiddenApp = new Set<string>((() => { try { return JSON.parse(readFileSync(HIDDEN_FILE, "utf8")); } catch { return []; } })());
   private insightStamp = new Map<string, string>();
   listening: Listen[] = [];
@@ -517,6 +519,8 @@ export class Deck {
     }
     for (const t of this.appThreads) {
       const key = `codex-app/${t.id}`;
+      const appControl = this.appControls.get(t.id);
+      const status = appControl?.ready && appControl.status && (appControl.status !== "idle" || t.status !== "done") ? appControl.status : t.status;
       const meta = this.metas.get(key);
       const ins = this.insights.get(key);
       const g = this.git.get(t.cwd);
@@ -527,7 +531,7 @@ export class Deck {
       const lastActiveAt = Math.max(meta?.lastActiveAt ?? 0, t.updatedAt ?? 0) || undefined;
       rows.set(key, {
         key, herdr: "codex-app", workspaceId: "codex-app", workspace: "Codex app", tabId: t.id, tab: "", tabNumber: 0, tabPanes: 1, paneId: t.id,
-        agent: "codex", status: t.status, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
+        agent: "codex", status, appControl, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
         cwd: t.cwd, project: basename(projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
         now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
         subagents: ins?.subagents?.length ? ins.subagents : undefined,

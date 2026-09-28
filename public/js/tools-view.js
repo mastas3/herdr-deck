@@ -3,7 +3,7 @@
 // Tools view ────────────────────────────────────────────────────────────────
 function renderTools() {
   const cur = rowOf(S.sel);
-  const target = cur && !cur.hist && !cur.app && isAgent(cur) ? cur : null;
+  const target = cur && !cur.hist && codexCanReply(cur) && isAgent(cur) ? cur : null;
   const groups = Object.entries(S.toolGroups ?? {});
   const card = (t) => `<div class="tcard" data-tool="${esc(t.id)}"><div class="tt">${toolGlyph(t)}<b>${esc(t.label)}</b>${t.kind === "action" ? '<span class="tk">runs in the deck</span>' : t.kind === "sequence" ? '<span class="tk">2 steps</span>' : ""}</div><p>${esc(t.hint ?? "")}</p>
       ${t.prompt ? `<details><summary>What it sends</summary><pre>${esc(t.prompt)}${t.then ? `\n\n— then, when it’s done —\n\n${esc(t.then)}` : ""}</pre></details>` : ""}

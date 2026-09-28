@@ -225,8 +225,8 @@ function decorateLatest(wrap, blocks, r) {
   for (const el of wrap.querySelectorAll(".msg.live")) el.classList.remove("live");
   const done = () => { quick?.remove(); think?.remove(); };
   if (!r || S.sub) return done();
-  for (const el of wrap.querySelectorAll(".choices")) el.classList.toggle("can", !r.app && isAgent(r));
-  const canSend = !r.app && isAgent(r) && r.status !== "working";
+  for (const el of wrap.querySelectorAll(".choices")) el.classList.toggle("can", codexCanReply(r) && isAgent(r));
+  const canSend = codexCanReply(r) && isAgent(r) && r.status !== "working";
   const lastAsst = [...blocks].reverse().find((b) => b.kind === "assistant");
   const tailBlock = blocks[blocks.length - 1];
   const lastEl = lastAsst && chatDom.blocks.find((o) => o.key === lastAsst.key)?.el;

@@ -43,6 +43,11 @@ kbd { font: 11px var(--mono); border: 1px solid var(--line-2); border-bottom-wid
 .app.term-off:is([data-tpos="bottom"], [data-tpos="top"]) { --th: 38px; }
 .app.term-off[data-tpos="right"] { grid-template-columns: var(--lw) 1px minmax(0, 1fr) 0 0; }
 @media (min-width: 761px) { .app.term-off[data-tpos="right"] :is(.term, .split.h) { display: none; } }
+@media (min-width: 761px) {
+  .app.native-task[data-tpos] { grid-template-columns: var(--lw) 1px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); grid-template-areas: "list vs detail"; }
+  .app.native-task[data-tpos] :is(.term, .split.h) { display: none; }
+  .app.native-task[data-tpos] .detail { display: flex; }
+}
 .split { background: var(--line); position: relative; z-index: 5; touch-action: none; }
 .split::before { content: ""; position: absolute; }
 .split.v { grid-area: vs; cursor: col-resize; }

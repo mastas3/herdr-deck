@@ -32,12 +32,16 @@ export const VIEWS = {
   home: "",
   session: `select("fake:blocked", { scroll: true, open: true })`,
   "codex-session": `S.summary.machines.push({ id: "codex-app", kind: "app", label: "Codex app", local: true, online: true });
+    codexViews.set("fake:codex", { ready: true, status: "working", activeTurnId: "synthetic-turn", requests: [] });
     select("fake:codex", { scroll: true, open: true });
     mergeChat(S.sel, { gen: 1, total: 2, messages: [{ i: 0, role: "user", text: "Improve Codex support in the deck." }, { i: 1, role: "assistant", text: "I’m checking the session index and subagent conversations." }] });
     S.details.set(S.sel, { stamp: rowOf(S.sel).lastActiveAt, data: { asks: 1, subagents: [{ id: "child", description: "Review the API", type: "explorer", running: true, tools: 3 }], turns: [], images: [] } });
     headSig = ""; renderDetail();
-    if (!$("composer").hidden || !document.querySelector('[data-dact="codexresume"]').disabled) throw new Error("Busy Codex controls are unsafe");
+    if ($("composer").hidden || $("cSteer").hidden || $("cSend").textContent !== "Queue") throw new Error("Native Codex controls are missing");
     if (!document.querySelector('[data-tab="agents"]')) throw new Error("Codex subagents tab is missing");`,
+  "codex-disconnected": `select("fake:codex", { scroll: true, open: true }); codexViews.set("fake:codex", { ready: false, requests: [], error: "Open this task in the Codex app, then reconnect." }); renderDetail(); if (!$("composer").hidden) throw new Error("Disconnected composer is enabled");`,
+  "codex-approval": `select("fake:codex", { scroll: true, open: true }); rowOf(S.sel).status = "blocked"; codexViews.set(S.sel, { ready: true, status: "blocked", activeTurnId: "synthetic-turn", requests: [{ id: 42, method: "item/commandExecution/requestApproval", params: { command: "bun test", cwd: "/tmp/deck", reason: "Run the project tests", availableDecisions: ["accept", "decline"] } }] }); renderDetail();`,
+  "codex-question": `select("fake:codex", { scroll: true, open: true }); rowOf(S.sel).status = "blocked"; codexViews.set(S.sel, { ready: true, status: "blocked", activeTurnId: "synthetic-turn", requests: [{ id: "async:question", method: "deck/asyncQuestion", params: { questions: [{ id: "q0", question: "Which test marker should be used?", options: [{ label: "Marker A" }, { label: "Marker B" }] }] } }] }); renderDetail();`,
   "codex-menu": `select("fake:codex", { scroll: true, open: true }); renderDetail(); moreMenu(document.querySelector('[data-dact="more"]'));`,
   "tools-menu": `select("fake:blocked", { scroll: true, open: true }); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe"))`,
   inbox: `setMode("inbox")`,
@@ -192,6 +196,10 @@ async function snap(browser, o, deck, view, vp) {
     const req = r.request(), path = new URL(req.url()).pathname;
     let body;
     try { body = req.postDataJSON(); } catch {}
+    // Native controls use only synthetic state in this harness, never the real desktop socket.
+    if (path === "/api/codex-state") return r.fulfill({ contentType: "application/json", body: JSON.stringify(view === "codex-disconnected"
+      ? { ready: false, requests: [], error: "Open this task in the Codex app, then reconnect." }
+      : { ready: true, status: ["codex-approval", "codex-question"].includes(view) ? "blocked" : "working", activeTurnId: "synthetic-turn", requests: view === "codex-approval" ? [{ id: 42, method: "item/commandExecution/requestApproval", params: { command: "bun test", cwd: "/tmp/deck", reason: "Run the project tests", availableDecisions: ["accept", "decline"] } }] : view === "codex-question" ? [{ id: "async:question", method: "deck/asyncQuestion", params: { questions: [{ id: "q0", question: "Which test marker should be used?", options: [{ label: "Marker A" }, { label: "Marker B" }] }] } }] : [] }) });
     if (!blocked(path, body)) return r.fallback();
     out.blocked.add(`${r.request().method()} ${norm(r.request().url())}`);
     return r.fulfill({ status: 403, contentType: "application/json", body: '{"error":"blocked by ui-snapshot"}' });

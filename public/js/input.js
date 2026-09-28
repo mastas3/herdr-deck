@@ -58,6 +58,7 @@ function rowMenu(r, x, y) {
     live && isAgent(r) && { html: "Message it…", run: () => { select(r.key, { open: true }); focusReply(); } },
     live && !isPhone() && { html: "Jump to it in herdr", run: () => focusPane(r.key) },
     r.app && { html: "Open in the Codex app", run: () => codexAct("codex-open", r) },
+    r.app && codexCanReply(r) && r.status !== "working" && r.status !== "blocked" && { html: "Compact conversation", run: () => compactCodex(r) },
     r.app && { html: "Continue in herdr", run: () => codexAct("codex-resume", r) },
     projectHome(r.project) && { html: `New session in ${esc(r.project)}`, run: () => openNew(projectHome(r.project)) },
     { html: "Copy link", run: () => copy(linkUrl(r), "link") },

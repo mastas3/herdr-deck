@@ -111,7 +111,8 @@ export function createRoutes(hub: Hub) {
       const res = (await hubApi(hub, url.pathname, body)) ?? (await sessionsApi(hub, url.pathname, body));
       if (res) return res;
     } catch (e: any) {
-      return json({ error: e?.message ?? String(e), code: e?.code }, 500);
+      const status = e?.code === "CODEX_INVALID" ? 400 : e?.code === "CODEX_UNAVAILABLE" ? 503 : ["CODEX_STALE", "CODEX_DELIVERY_UNKNOWN"].includes(e?.code) ? 409 : 500;
+      return json({ error: e?.message ?? String(e), code: e?.code }, status);
     }
     return new Response("not found", { status: 404 });
   }

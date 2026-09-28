@@ -12,8 +12,11 @@ import { json } from "./page";
 import { readFileFor, resolveSafe } from "./files";
 import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
+import { codexApi } from "./codex";
 
 export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
+  const native = await codexApi(hub, path, body);
+  if (native) return native;
   const { deck, graves, broadcastGraves, refreshShared, pluginHost } = hub;
   const { remotes, allRows, localRow } = hub.hosts;
   const { reopen, startSession, sendText, sendAny, closeLocal } = hub.sessions;
@@ -47,10 +50,14 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
         if (!text) return json({ error: "empty" }, 400);
         q.push({ id: crypto.randomUUID().slice(0, 8), text: text.slice(0, 200_000), at: Date.now() });
       } else if (body.op === "remove") queues[key] = q.filter((x) => x.id !== body.id);
-      else if (body.op === "update") { const it = q.find((x) => x.id === body.id); if (it) it.text = String(body.text ?? it.text).trim() || it.text; }
+      else if (body.op === "update") { const it = q.find((x) => x.id === body.id); if (it) { it.text = String(body.text ?? it.text).trim() || it.text; it.id = crypto.randomUUID(); delete it.error; } }
       else if (body.op === "now") {
         const it = q.find((x) => x.id === body.id);
-        if (it) { queues[key] = q.filter((x) => x !== it); saveQueues(); await sendAny(key, it.text); return json({ ok: true, queue: queues[key] ?? [] }); }
+        if (it) {
+          try { await sendAny(key, it.text, { requestId: it.id }); }
+          catch (e: any) { it.error = e.message; saveQueues(); throw e; }
+          queues[key] = q.filter((x) => x !== it); saveQueues(); return json({ ok: true, queue: queues[key] ?? [] });
+        }
       } else if (body.op === "clear") delete queues[key];
       saveQueues();
       return json({ ok: true, queue: queues[key] ?? [] });
@@ -183,7 +190,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       return json({ ok: true });
     }
     case "/api/send":
-      await sendText(body.key, String(body.text ?? ""));
+      await sendText(body.key, String(body.text ?? ""), { requestId: body.requestId, onlyIdle: !!body.onlyIdle });
       return json({ ok: true });
     case "/api/keys": {
       const f = deck.find(body.key);

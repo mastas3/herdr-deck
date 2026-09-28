@@ -123,7 +123,7 @@ async function api(path, body, timeoutMs) {
   catch (e) { if (e?.name === "TimeoutError" || e?.name === "AbortError") throw new Error("That took too long. Try again in a moment."); throw e; }
   if (res.status === 403) { reconnectSoon(200); throw new Error("Reconnecting to the deck…"); }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+  if (!res.ok) throw Object.assign(new Error(data.error || `Request failed (${res.status})`), { code: data.code });
   return data;
 }
 /** Toasts stack (three at most) and slide. A "…" toast is progress, so what follows replaces it in place. `act`
