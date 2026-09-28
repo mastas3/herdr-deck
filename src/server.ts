@@ -4,6 +4,7 @@
 import { GROUPS, loadTools } from "./tools";
 import { historyStats, stopHistory } from "./history";
 import { warmSlash } from "./slash";
+import { opencodeCatalog } from "./model-catalog";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
@@ -176,5 +177,7 @@ for (const h of remotes.values()) h.start();
 auto.start();
 // Warm the slow scan so the first "/" is instant (the connections plugin warms its own).
 setTimeout(warmSlash, 8_000);
+// The New session dialog lists every OpenCode model; the first read takes ~2 s, so do it before anyone opens the dialog.
+setTimeout(() => void opencodeCatalog.get(), 3_000);
 
 console.log(`herdr-deck "${SELF.label}" on http://${HOST}:${PORT}  (${deck.rows.size} panes across ${deck.sessions.size} herdr server(s); ${remotes.size} other machine(s))`);
