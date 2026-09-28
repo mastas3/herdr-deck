@@ -209,6 +209,8 @@ export class RemoteHost {
     this.usage = nodeUsage(data.usage) ?? this.usage;
     const { upsert, remove } = this.feed.diff(this.rows.values());
     this.on.patch(upsert, remove);
+    const u = this.feed.flushUsage(this.rows.values());
+    if (u) this.on.procs(u);
     this.on.graveyard();
     this.on.usage();
   }

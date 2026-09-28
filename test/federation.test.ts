@@ -70,6 +70,15 @@ describe("hub mirror of a node", () => {
     } finally { node.stop(true); }
   });
 
+  test("a whole state passes on readings that moved while away, at once (they're not in its patch)", async () => {
+    const { got, recv } = mirror();
+    await recv("full", state([row(), row({ key: "h/2" })]), "b.10");
+    // The node restarted; one session's memory grew meanwhile, the other's didn't.
+    await recv("full", state([row({ rssKB: 900_000 }), row({ key: "h/2" })], "c.3"), "c.3");
+    expect(got.patches[1]).toEqual([[], []]);
+    expect(got.procs).toEqual([{ "linux|h/1": [900_000, 1.5, 4] }]);
+  });
+
   test("going offline and coming back announce the machine only", async () => {
     const { h, got, recv } = mirror();
     await recv("full", state([row()]), "b.10");

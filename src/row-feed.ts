@@ -53,13 +53,21 @@ export class RowFeed {
     this.usageAt = now;
     const every = now - this.allAt >= USAGE_ALL_EVERY;
     if (every) this.allAt = now;
+    return this.moved(rows, every);
+  }
+  /** Every reading that differs from what was sent, now: a whole state just replaced the rows (a node restarted, or
+   *  came back after its missed events were gone), and its readings travel in no patch. */
+  flushUsage(rows: Iterable<Row>): Record<string, Usage> | undefined {
+    return this.moved(rows, true);
+  }
+  private moved(rows: Iterable<Row>, exact: boolean): Record<string, Usage> | undefined {
     const out: Record<string, Usage> = {};
     let any = false;
     for (const r of rows) {
       const was = this.usage.get(r.key);
       if (!was) continue; // not sent yet: its upsert will carry them
       const u = usageOf(r);
-      if (every ? u.join() === was.join() : shown(u) === shown(was)) continue;
+      if (exact ? u.join() === was.join() : shown(u) === shown(was)) continue;
       this.usage.set(r.key, u);
       out[r.key] = u;
       any = true;
