@@ -11,6 +11,8 @@
 // native }), apply(body) } (a field in the New session dialog, and what it adds to the request) and "inspector.tabs"
 // { key, label, icon, order, when?, badge?, render, patch?, leave? } (a tab in the session's inspector; the contract is
 // at the top of public/js/inspector.js).
+// Also "plugins.tabs" { id, label, order?, count?(), render() → html, open?() } (a tab of the Plugins view) and
+// "session.menu" (row, anchor) => [{ html, run, danger? }] (items in a session's ⋯ menu).
 const deckPlugins = (() => {
   /** Views the core owns: a plugin can't take them. Its keys are keymap.js's coreKeys() (read at register time). */
   const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);

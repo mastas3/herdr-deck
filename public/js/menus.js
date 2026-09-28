@@ -103,6 +103,7 @@ function moreMenu(anchor) {
     !isPhone() && { html: "Type into the terminal<small>t</small>", run: () => focusTerminal() },
     { html: "Servers…<small>Open, share or preview what it runs</small>", run: () => openInspector("ports") },
     { html: "Home: what’s running now<small>Esc</small>", run: goHome },
+    ...deckPlugins.each("session.menu", r, anchor).flat(), // plugins' items for this session: { html, run, danger? }
     "-",
     { html: "Close session…", danger: true, run: () => askClose([r.key]) },
   ].filter(Boolean));

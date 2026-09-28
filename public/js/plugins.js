@@ -15,7 +15,10 @@ async function loadPlugins() {
   S.plug.loading = false;
   if (S.mode === "plugins") renderPlugins();
 }
-function plugTab(t) { S.plug.tab = t; S.plug.review = null; S.plug.creview = null; store("plugTab", t); renderPlugins(); $("dbody").scrollTop = 0; }
+function plugTab(t) { S.plug.tab = t; S.plug.review = null; S.plug.creview = null; store("plugTab", t); renderPlugins(); $("dbody").scrollTop = 0; plugExtra(t)?.open?.(); }
+/** Tabs plugins add here ("plugins.tabs": { id, label, order?, count?(), render() → html, open?() }), e.g. herdr plugins. */
+const plugExtras = () => deckPlugins.contributions("plugins.tabs");
+const plugExtra = (id) => plugExtras().find((x) => x.id === id);
 /** The plugin's badge. The colour comes from a stranger, so it's checked again here before it goes into a style. */
 function plugIcon(name, icon) {
   const color = /^#[0-9a-f]{6}$/i.test(icon?.color ?? "") ? icon.color : "var(--accent)";
@@ -25,8 +28,9 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 function renderPlugins() {
   const d = S.plug.data;
-  const count = (id) => (id === "installed" ? d?.plugins?.length : id === "code" ? S.plug.code?.plugins?.length : 0);
-  const tabs = PTABS.map(([id, label]) => `<button data-ptab="${id}" aria-pressed="${S.plug.tab === id && !S.plug.review && !S.plug.creview}">${label}${count(id) ? ` <span class="n">${count(id)}</span>` : ""}</button>`).join("");
+  const count = (id) => (id === "installed" ? d?.plugins?.length : id === "code" ? S.plug.code?.plugins?.length : plugExtra(id)?.count?.() ?? 0);
+  const all = [...PTABS.map(([id, label], i) => [id, label, i * 10]), ...plugExtras().map((x) => [x.id, x.label, x.order ?? 25])].sort((a, b) => a[2] - b[2]);
+  const tabs = all.map(([id, label]) => `<button data-ptab="${id}" aria-pressed="${S.plug.tab === id && !S.plug.review && !S.plug.creview}">${label}${count(id) ? ` <span class="n">${count(id)}</span>` : ""}</button>`).join("");
   const head = `<header class="vh"><h2>${ICON.puzzle}Plugins</h2><p>Turn parts of the deck on and off, and add integrations and whole working setups. Shared plugins are data only, and you see exactly what one may do before it’s installed.</p><nav class="seg dtabs">${tabs}</nav></header>`;
   let body;
   if (S.plug.review) body = plugReview(S.plug.review);
@@ -35,6 +39,7 @@ function renderPlugins() {
   else if (S.plug.tab === "catalog") body = plugCatalog(d);
   else if (S.plug.tab === "code") body = codeList(S.plug.code);
   else if (S.plug.tab === "add") body = plugAdd() + codeAdd();
+  else if (plugExtra(S.plug.tab)) body = plugExtra(S.plug.tab).render();
   else body = plugInstalled(d);
   // A part switched on or off: its state chip pops as it changes.
   const view = $("dbody").querySelector(":scope > .view");

@@ -108,12 +108,14 @@ export const VIEWS = {
   plugins: `setMode("plugins")`,
   "plugins-builtin": `setMode("plugins"); plugTab("code")`,
   "plugins-add": `setMode("plugins"); plugTab("add")`,
+  // herdr's own plugins on this machine (the scratch HOME has none; Browse reads the web, so it isn't snapshotted).
+  "plugins-herdr": `setMode("plugins"); plugTab("herdr")`,
   // The red trust screen for a code plugin: a small demo plugin the harness puts in the scratch HOME ($HOME).
   "plugins-trust": `setMode("plugins"); plugTab("add"); codeInspect({ folder: "$HOME/demo-plugin" })`,
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub"];
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {
@@ -128,7 +130,11 @@ const BLOCK = [
   /^\/api\/history-resume$/, /^\/api\/codex-/,
 ];
 /** Paths that only change something for some ops: the covers job reads its status freely, but never paints. */
-const BLOCK_OPS = { "/api/covers": (b) => (b?.op ?? "status") !== "status" };
+const BLOCK_OPS = {
+  "/api/covers": (b) => (b?.op ?? "status") !== "status",
+  // herdr plugins: reading each machine's herdr is fine; installing, switching or running a plugin never is.
+  "/api/herdr-plugins": (b) => ["enable", "remove", "restore", "install", "invoke"].includes(b?.op),
+};
 const blocked = (path, body) => BLOCK.some((re) => re.test(path)) || !!BLOCK_OPS[path]?.(body);
 
 /** Synthetic sessions, one per status, timed against the frozen clock. */

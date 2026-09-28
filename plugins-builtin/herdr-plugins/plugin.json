@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "herdr-plugins",
+  "name": "herdr plugins",
+  "version": "1.0.0",
+  "description": "herdr's own workflow plugins on every machine: see what's installed, turn them on or off, run their actions for a session, and browse and install from the herdr marketplace behind a trust screen. Runs on every machine, so the hub can manage each one's herdr.",
+  "server": "server.ts",
+  "client": ["herdr-plugins.js", "herdr-plugins-cards.js", "herdr-plugins-trust.js"],
+  "styles": ["herdr-plugins.css"],
+  "machine": "any",
+  "routes": ["herdr-plugins"]
+}
