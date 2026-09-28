@@ -24,6 +24,7 @@ function renderDetail() {
   renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
   else if (r.app) setHTML($("appbar"), codexConnectionHTML(r));
+  renderModelChip(r); // model-chip.js
   $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
   $("cStop").title = r.app ? "Stop this Codex turn" : "Interrupt the agent (Esc in its terminal)";
   const busy = r.status === "working" && isAgent(r);

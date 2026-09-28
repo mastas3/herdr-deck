@@ -53,7 +53,7 @@ function openMenu(anchor, items, heading, cls = "") {
   menuEl = document.createElement("div");
   menuEl.className = "menu " + cls;
   menuEl.setAttribute("role", "menu");
-  menuEl.innerHTML = (heading ? `<div class="mh">${esc(heading)}</div>` : "") + items.map((it, i) => it === "-" ? "<hr>" : `<button role="menuitem" data-i="${i}" class="${it.danger ? "danger" : ""}${it.on ? " on" : ""}"${it.title ? ` title="${esc(it.title)}"` : ""}>${it.html}</button>`).join("");
+  menuEl.innerHTML = (heading ? `<div class="mh">${esc(heading)}</div>` : "") + items.map((it, i) => it === "-" ? "<hr>" : it.label ? `<div class="mh">${esc(it.label)}</div>` : it.note ? `<p class="mnote">${esc(it.note)}</p>` : `<button role="menuitem" data-i="${i}" class="${it.danger ? "danger" : ""}${it.on ? " on" : ""}"${it.title ? ` title="${esc(it.title)}"` : ""}>${it.html}</button>`).join("");
   document.body.append(menuEl);
   const r = anchor.getBoundingClientRect();
   const h = menuEl.offsetHeight, w = menuEl.offsetWidth;

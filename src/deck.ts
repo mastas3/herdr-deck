@@ -52,6 +52,8 @@ export type Row = {
   bornAt?: number; // first seen by this deck (only for panes opened while it runs)
   lastActiveAt?: number;
   model?: string;
+  modelName?: string; // a model Claude Code switched to since its last reply (display name)
+  effort?: string; // reasoning effort, or OpenCode's variant
   provider?: string;
   ctxTokens?: number;
   ctxWindow?: number;
@@ -520,6 +522,8 @@ export class Deck {
           createdAt: meta?.createdAt,
           lastActiveAt,
           model: meta?.model,
+          modelName: meta?.modelName,
+          effort: meta?.effort,
           provider: meta?.provider,
           ctxTokens: meta?.ctxTokens,
           ctxWindow: meta?.ctxWindow,
@@ -562,7 +566,7 @@ export class Deck {
         now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,
         subagents: ins?.subagents?.length ? ins.subagents : undefined,
         branch: t.branch ?? g?.branch, dirty: g?.dirty, createdAt: t.createdAt ?? meta?.createdAt, lastActiveAt,
-        model: meta?.model, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
+        model: meta?.model, effort: meta?.effort, ctxTokens: meta?.ctxTokens, ctxWindow: meta?.ctxWindow, cost: meta?.cost,
         rssKB: 0, cpu: 0, procs: 0, sessionId: t.id, resume: resumeCommand("codex", t.id), tail: [],
         empty: false, stale: !!lastActiveAt && now - lastActiveAt > STALE_MS && t.status === "idle", duplicate: false, approx: false, app: "codex",
         seen: this.isSeen(key, lastActiveAt),

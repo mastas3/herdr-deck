@@ -52,6 +52,19 @@ export const VIEWS = {
   "codex-settings-managed": `(async () => { select("fake:codex", { scroll: true, open: true }); await openCodexSettings(rowOf(S.sel)); if (document.querySelector('.native-settings select[name="permissionMode"]')) throw new Error("Managed permissions can be overwritten"); })()`,
   "codex-settings-save": `(async () => { select("fake:codex", { scroll: true, open: true }); await openCodexSettings(rowOf(S.sel)); const form = document.querySelector('.native-settings form'); form.elements.model.value = "fixture-fast"; form.elements.model.dispatchEvent(new Event("change")); form.elements.effort.value = "low"; form.elements.permissionMode.value = "read-only"; form.requestSubmit(); })()`,
   "codex-edit": `select("fake:codex", { scroll: true, open: true }); void editCodexLastMessage(rowOf(S.sel));`,
+  // The composer's model + effort chip (model-chip.js): Claude's menu, a terminal-only agent's, and a Codex app task's.
+  "model-chip": `select("fake:working", { scroll: true, open: true }); Object.assign(rowOf(S.sel), { model: "claude-opus-5-5", effort: "xhigh" }); headSig = ""; renderDetail();
+    if ($("cModel").hidden || !$("cModel").textContent.includes("Opus 5.5 · xhigh")) throw new Error("Model chip is missing");
+    modelMenu($("cModel"), rowOf(S.sel));`,
+  "model-chip-terminal": `select("fake:idle", { scroll: true, open: true }); Object.assign(rowOf(S.sel), { model: "deepseek/deepseek-v4-flash", effort: "high" }); headSig = ""; renderDetail(); modelMenu($("cModel"), rowOf(S.sel));`,
+  "codex-model-chip": `(async () => { select("fake:codex", { scroll: true, open: true }); Object.assign(rowOf(S.sel), { status: "idle", model: "fixture-reasoner", effort: "high" }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); headSig = ""; renderDetail();
+    if ($("cModel").hidden) throw new Error("Codex model chip is missing"); await modelMenu($("cModel"), rowOf(S.sel)); })()`,
+  // Picking sends /model to an idle Claude pane and queues /effort for a busy one (the fixture route checks both).
+  "model-chip-pick": `(async () => { const pick = (label) => [...document.querySelectorAll(".menu button")].find((b) => b.textContent === label).click();
+    select("fake:done", { scroll: true, open: true }); Object.assign(rowOf(S.sel), { model: "claude-opus-5-5", effort: "high" }); headSig = ""; renderDetail();
+    modelMenu($("cModel"), rowOf(S.sel)); pick("Sonnet"); await new Promise((r) => setTimeout(r, 300));
+    select("fake:working", { scroll: true, open: true }); Object.assign(rowOf(S.sel), { model: "claude-opus-5-5", effort: "high" }); headSig = ""; renderDetail();
+    modelMenu($("cModel"), rowOf(S.sel)); pick("max"); })()`,
   "codex-archives": `openCodexArchives(S.self)`,
   "codex-queue": `(async () => { select("fake:codex", { scroll: true, open: true }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); S.queue[S.sel] = [{ id: "deck-queued", text: "Then summarize the test results." }]; renderDetail(); if (!$("qbar").textContent.includes("In Codex") || !$("qbar").textContent.includes("Deck ·")) throw new Error("The two queues are not distinguished"); })()`,
   "codex-new": `(async () => { newCodexTarget = "app"; await openNew({ kind: "codex", cwd: "/tmp/acme-api", project: "acme-api" }); if (!newCodexApp() || !$("nAgentOpts").hidden || !$("nArgsWrap").hidden) throw new Error("Native creation exposes CLI flags"); })()`,
@@ -304,6 +317,10 @@ async function snap(browser, o, deck, view, vp) {
     if (path === "/api/codex-open" && body?.key === "fake:codex" && (view.startsWith("codex-archive-") || ["codex-settings-managed-open", "codex-queue-open"].includes(view))) {
       nativeOpenCount++; return r.fulfill({ contentType: "application/json", body: '{"ok":true}' });
     }
+    if (view === "model-chip-pick" && (path === "/api/send" || path === "/api/queue")) {
+      (out.modelChip ??= []).push([path, body?.key, body?.text]);
+      return r.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+    }
     // The form test acknowledges a fixture-only write; no mutation reaches a server or real task.
     if (path === "/api/codex-settings" && view === "codex-settings-save" && body?.key === "fake:codex") {
       if (body.expectedVersion !== "fixture-settings-v1" || body.model !== "fixture-fast" || body.effort !== "low" || body.permissionMode !== "read-only") out.errors.push("Settings form sent an incorrect model, effort, permission, or stale-form guard");
@@ -332,6 +349,7 @@ async function snap(browser, o, deck, view, vp) {
   if (VIEWS[view]) { try { await page.evaluate(VIEWS[view].replaceAll("$HOME", o.home)); } catch (e) { out.errors.push(`setup: ${e.message}`); } }
   await settle();
   if (view === "codex-settings-save" && !out.settingsSaved) out.errors.push("Settings form did not submit");
+  if (view === "model-chip-pick" && JSON.stringify(out.modelChip) !== JSON.stringify([["/api/send", "fake:done", "/model sonnet"], ["/api/queue", "fake:working", "/effort max"]])) out.errors.push(`Model chip sent ${JSON.stringify(out.modelChip)}`);
   if (view.startsWith("codex-create-") || view === "codex-fork-retry") {
     if (mutationReceipts.length !== (view.endsWith("retry") ? 2 : 1) || mutationReceipts.some((id) => typeof id !== "string" || id !== mutationReceipts[0])) out.errors.push("Native create/fork did not reuse its receipt after uncertain delivery");
   }

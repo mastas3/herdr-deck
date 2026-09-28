@@ -10,6 +10,10 @@ export type AgentMeta = {
   createdAt?: number;
   lastActiveAt?: number;
   model?: string;
+  /** A model Claude Code confirmed (/model) since its last reply: its display name, until a reply gives the id. */
+  modelName?: string;
+  /** Reasoning effort (Claude Code, Codex) or variant (OpenCode) of the latest turn or change. */
+  effort?: string;
   /** The model's provider (OpenCode: openrouter, nano-gpt…), so the status line can show that account. */
   provider?: string;
   ctxTokens?: number;
@@ -92,26 +96,45 @@ export function parseClaudeHead(lines: string[]): Pick<AgentMeta, "createdAt" | 
   return { createdAt, firstPrompt: clip(firstPrompt) };
 }
 
-export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt" | "model" | "ctxTokens" | "lastMessage" | "title"> {
+/** What Claude Code said after /model or /effort: "Set model to `Fable 5.1` and saved…", "Set effort level to max (…". */
+export function claudeSwitch(content: any): { modelName?: string; effort?: string } | undefined {
+  const text = typeof content === "string" ? content : Array.isArray(content) ? content.find((p: any) => p?.type === "text")?.text : undefined;
+  const out = typeof text === "string" && text.match(/^<local-command-stdout>([\s\S]*?)<\/local-command-stdout>/)?.[1];
+  if (!out) return;
+  const said = out.replace(/\x1b\[[0-9;]*m/g, "");
+  const model = said.match(/^Set model to (?:(`+)(.+?)\1|(.+?)(?= and saved| for this session|$))/m);
+  if (model) return { modelName: (model[2] ?? model[3]).trim().replace(/ \(default\)$/, "") };
+  const effort = said.match(/^Set effort level to (\w+)|^Effort level set to (auto)|set to '(\w+)' instead/m);
+  if (effort) return { effort: effort[1] ?? effort[2] ?? effort[3] };
+}
+
+export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt" | "model" | "modelName" | "effort" | "ctxTokens" | "lastMessage" | "title"> {
   let lastActiveAt: number | undefined, model: string | undefined, ctxTokens: number | undefined;
-  let lastMessage: string | undefined, title: string | undefined;
+  let lastMessage: string | undefined, title: string | undefined, modelName: string | undefined, effort: string | undefined;
   for (const o of jsonLines(lines)) {
     if (o.type === "custom-title" && o.customTitle) title = o.customTitle;
     if (o.type === "summary" && o.summary) title ??= o.summary;
     if (o.type !== "user" && o.type !== "assistant") continue;
     const t = tsOf(o);
     if (!Number.isNaN(t) && (lastActiveAt === undefined || t > lastActiveAt)) lastActiveAt = t;
+    if (o.type === "user") {
+      const sw = claudeSwitch(o.message?.content);
+      if (sw?.modelName) modelName = sw.modelName;
+      if (sw?.effort) effort = sw.effort;
+    }
     if (o.type === "assistant") {
       const u = o.message?.usage;
       if (u && o.message?.model && o.message.model !== "<synthetic>") {
         ctxTokens = (u.input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0);
         model = o.message.model;
+        modelName = undefined; // the reply names the model it really ran on
+        if (typeof o.effort === "string" && o.effort) effort = o.effort;
       }
       const text = o.message?.content?.find?.((p: any) => p?.type === "text")?.text;
       if (text) lastMessage = text;
     }
   }
-  return { lastActiveAt, model, ctxTokens, lastMessage: clip(lastMessage), title };
+  return { lastActiveAt, model, modelName, effort, ctxTokens, lastMessage: clip(lastMessage), title };
 }
 
 /** The context window Claude Code reported for a session. Only its status line is told, so the user's statusline
@@ -204,12 +227,13 @@ export function codexUserText(content: any): string {
 
 export function parseCodex(head: string[], tail: string[]): AgentMeta {
   const meta: AgentMeta = {};
-  let headModel: string | undefined;
+  let headModel: string | undefined, headEffort: string | undefined;
+  const effortOf = (p: any) => p?.effort ?? p?.collaboration_mode?.settings?.reasoning_effort ?? undefined;
   for (const o of jsonLines(head)) {
     if (o.type === "session_meta") meta.createdAt = Date.parse(o.payload?.timestamp ?? o.timestamp);
     if (!meta.firstPrompt && o.type === "event_msg" && o.payload?.type === "user_message") meta.firstPrompt = clip(o.payload.message);
     // Long sessions log turn_context rarely, so the tail may not have one: the first turn's model is the fallback.
-    if (!headModel && o.type === "turn_context" && o.payload?.model) headModel = o.payload.model;
+    if (!headModel && o.type === "turn_context" && o.payload?.model) { headModel = o.payload.model; headEffort = effortOf(o.payload); }
     if (!meta.firstPrompt && o.type === "response_item" && o.payload?.type === "message" && o.payload.role === "user") {
       meta.firstPrompt = clip(codexUserText(o.payload.content));
     }
@@ -218,7 +242,7 @@ export function parseCodex(head: string[], tail: string[]): AgentMeta {
   for (const o of jsonLines(tail)) {
     const t = tsOf(o);
     if (!Number.isNaN(t)) meta.lastActiveAt = Math.max(meta.lastActiveAt ?? 0, t);
-    if (o.type === "turn_context" && o.payload?.model) meta.model = o.payload.model;
+    if (o.type === "turn_context" && o.payload?.model) { meta.model = o.payload.model; meta.effort = effortOf(o.payload); }
     if (o.type === "event_msg") {
       const p = o.payload;
       if (p?.type === "token_count" && p.info) {
@@ -232,7 +256,7 @@ export function parseCodex(head: string[], tail: string[]): AgentMeta {
       if (text) meta.lastMessage = clip(text);
     }
   }
-  meta.model ??= headModel;
+  if (!meta.model) { meta.model = headModel; meta.effort = headEffort; }
   meta.empty = !meta.firstPrompt && !meta.lastMessage && !meta.ctxTokens;
   return meta;
 }
@@ -279,11 +303,12 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
       if (ctxTokens !== undefined && lastMessage !== undefined) break outer;
     }
   }
-  let model: string | undefined, provider: string | undefined, ctxWindow: number | undefined;
+  let model: string | undefined, provider: string | undefined, ctxWindow: number | undefined, effort: string | undefined;
   try {
     const m = row.model ? JSON.parse(row.model) : undefined;
     model = m?.id;
     provider = m?.providerID;
+    effort = typeof m?.variant === "string" ? m.variant : undefined;
     ctxWindow = contextLimit(ocModels(), m?.providerID, m?.id);
   } catch {}
   const meta: AgentMeta = {
@@ -293,6 +318,7 @@ function ocDetails(row: OcRow, approx: boolean): AgentMeta {
     lastActiveAt: row.time_updated,
     cost: row.cost,
     model,
+    effort,
     provider,
     ctxTokens,
     ctxWindow,

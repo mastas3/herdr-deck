@@ -28,6 +28,7 @@
 [data-simple] .msg.user .body { border-radius: 20px; }
 [data-simple] .composer { padding: 14px 22px 16px; gap: 8px; }
 [data-simple] .composer textarea { font-size: 18px; min-height: 52px; border-radius: 18px; padding: 13px 16px; }
+[data-simple] .mchip { height: 52px; border-radius: 16px; font-size: 15px; padding: 0 12px 0 16px; }
 [data-simple] .composer .btn, [data-simple] .ctools { height: 52px; border-radius: 16px; font-size: 17px; padding: 0 20px; }
 [data-simple] #cSend { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, var(--happy-2))); border: 0; color: var(--accent-ink); font-weight: 700; }
 /* Phone: the message box gets its own full-width row; attach + Tools sit left under it, Stop/Send right. */
@@ -35,7 +36,7 @@
   .composer, [data-simple] .composer { flex-wrap: wrap; align-items: center; padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
   .composer textarea { order: -1; flex: 1 0 100%; }
   .composer .ctools { margin-right: auto; }
-  [data-simple] .composer .btn, [data-simple] .ctools, [data-simple] #cAttach { height: 46px; }
+  [data-simple] .composer .btn, [data-simple] .ctools, [data-simple] .mchip, [data-simple] #cAttach { height: 46px; }
   [data-simple] #cAttach { width: 46px; }
 }
 [data-simple] .btn { border-radius: 14px; }
