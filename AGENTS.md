@@ -53,8 +53,8 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 
 ## Code plugins
 
-Every extra (Covers, then Discover, Library, Connections, Leads, Opportunities, Research, project pages, Quests) is a
-code plugin that can be switched off in Plugins → Built in. The contract is in the design doc; `src/plugin-api.ts` is
+Every extra (Covers, then Discover, Library, Connections, Leads, Opportunities, Research, project pages, Quests, Report
+back, Crash guard) is a code plugin that can be switched off in Plugins → Built in. The contract is in the design doc; `src/plugin-api.ts` is
 the typed `Host`. Worked example: `plugins-builtin/covers/`.
 
 - **Folder**: `plugins-builtin/<id>/plugin.json`, `server.ts` (`export function activate(host)`), the modules it owns,

@@ -172,7 +172,7 @@ export function activate(host: Host) {
   host.extend("fullState", { key: "reports", get: cards });
   host.extend("digest.lines", { title: "Finished in the last day", lines: digestLines });
   host.extend("tools.entries", {
-    id: "report-back", label: "Ask for a report", group: "session", icon: "note", kind: "prompt", agents: ["claude", "codex", "opencode"],
+    id: "report-back", label: "Ask for a report", group: "session", icon: "note", kind: "prompt", builtin: true, agents: ["claude", "codex", "opencode"],
     hint: "The agent writes REPORT.md (what changed, checks and results, what's left, what it needs from you) and a DONE marker",
     prompt: REPORT_PROMPT,
   });
