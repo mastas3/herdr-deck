@@ -8,6 +8,8 @@ import type { Machine } from "./federation";
 import type { PushStore } from "./push";
 import type { Automations } from "./automations";
 import type { Tool } from "./tools";
+import type { CheckResult } from "./verify";
+import type { HistSession } from "./history";
 
 /** What a plugin's server entry exports. The returned function (if any) runs first when the plugin is turned off. */
 export type Deactivate = () => void | Promise<void>;
@@ -77,6 +79,10 @@ export type Host = {
   /** A toast on every open page. */
   notice(n: Notice): void;
   machines(): Machine[];
+  /** Past sessions on every machine (the History view's search): by words (`q`), by project, newest first. */
+  history(o: { q?: string; project?: string; agent?: string; limit?: number }): Promise<(HistSession & { machine?: string })[]>;
+  /** Proof of done: the latest check result per project root the deck has seen. */
+  checks(): ReadonlyMap<string, CheckResult>;
   /** True when a hub talks to this deck. Hub-only plugins never start on a node; this is for work that should pause. */
   isNode(): boolean;
 };

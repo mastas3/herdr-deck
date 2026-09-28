@@ -11,7 +11,7 @@ import type { Activate, Contribution, Deactivate, Host, PointName, RouteHandler 
 
 export type PluginStatus = "on" | "off" | "failed" | "hub-only" | "changed" | "invalid";
 /** The core as the composition root lends it: everything on Host that isn't per-plugin. */
-export type CoreCaps = Pick<Host, "rows" | "sessions" | "push" | "automations" | "decisions" | "broadcast" | "notice" | "machines" | "isNode">;
+export type CoreCaps = Pick<Host, "rows" | "sessions" | "push" | "automations" | "decisions" | "broadcast" | "notice" | "machines" | "history" | "checks" | "isNode">;
 type Runtime = {
   deactivate?: Deactivate; stops: (() => unknown)[]; timers: Set<ReturnType<typeof setTimeout>>;
   routes: string[]; services: string[]; contribs: { point: string; c: unknown }[];
@@ -19,7 +19,7 @@ type Runtime = {
 export type Entry = { id: string; dir: string; builtin: boolean; manifest?: CodeManifest; problems?: string; state: PluginStatus; error?: string; run?: Runtime; mod?: { activate?: Activate } };
 
 /** SSE events the page already uses: a plugin can't send these. */
-const CORE_EVENTS = new Set(["full", "patch", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins", "game"]);
+const CORE_EVENTS = new Set(["full", "patch", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
 
 export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void }) {
   const log = o.log ?? ((s: string) => console.warn(s));
@@ -30,6 +30,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   const getRoutes = new Map<string, { id: string; handler: RouteHandler }>();
   const services = new Map<string, { id: string; api: object }>();
   const contribs = new Map<string, { id: string; c: unknown }[]>();
+  /** Services the core still offers itself under a plugin's service name, until that plugin exists (see provideCore). */
+  const coreServices = new Map<string, object>();
 
   // ── finding plugins ──
   function readEntry(id: string, dir: string, builtin: boolean): Entry {
@@ -178,7 +180,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       },
       use<T>(name: string) {
         const p = providerOf(name);
-        if (!p) return undefined;
+        if (!p) return coreServices.get(name) as T | undefined;
         if (p.id !== id && !m.requires.includes(p.id) && !m.uses.includes(p.id)) throw new Error(`${id}: the ${name} service comes from ${p.id}; list it in plugin.json "requires" or "uses"`);
         return services.get(name)?.api as T | undefined;
       },
@@ -193,7 +195,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       setting: <T>(key: string) => (st.settings[id]?.[key] ?? m.settings[key]?.default) as T,
       rows: () => o.core.rows(), sessions: o.core.sessions, push: o.core.push, automations: () => o.core.automations(), decisions: () => o.core.decisions(),
       broadcast(event, data) { if (CORE_EVENTS.has(event)) throw new Error(`${id}: "${event}" is one of the deck's own events`); o.core.broadcast(event, data); },
-      notice: (n) => o.core.notice(n), machines: () => o.core.machines(), isNode: () => o.core.isNode(),
+      notice: (n) => o.core.notice(n), machines: () => o.core.machines(),
+      history: (q) => o.core.history(q), checks: () => o.core.checks(), isNode: () => o.core.isNode(),
     };
   }
   function checkContribution(id: string, point: string, c: any) {
@@ -257,6 +260,9 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   return {
     start: reconcile, reconcile, setEnabled, setSetting, api, get, isPage, contributions,
     setting: (id: string, key: string) => st.settings[id]?.[key] ?? entries.get(id)?.manifest?.settings[key]?.default,
+    /** The core offering a service itself, under the name its plugin will provide it by, while that part is still core
+     *  (e.g. `discover` before Discover is a plugin). A plugin that provides the name wins; calling it again replaces it. */
+    provideCore: (name: string, api: object) => { coreServices.set(name, api); },
     /** Core's own access to a service (no dependency check): undefined while its plugin is off. */
     service: <T = any>(name: string) => services.get(name)?.api as T | undefined,
     /** Running plugins' page files, in load order (src/assets.ts appends them after the deck's own). */
