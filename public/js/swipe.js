@@ -14,9 +14,15 @@ function swipeSpeed(pts) {
   const a = first === last ? pts[n - 2] : first;
   return last[0] > a[0] ? (last[1] - a[1]) / (last[0] - a[0]) : 0;
 }
+/** True when el (or an ancestor below stop) scrolls sideways, so a horizontal drag there belongs to it. Code, tables
+ *  and terminal output always keep the drag (you're reading them); a row of cards already at its start can't scroll
+ *  under a rightward drag, so a swipe back starts there (right-to-left rows always keep the drag). */
 function swipeScrollsX(el, stop) {
   for (; el && el !== stop; el = el.parentElement) {
-    if (el.scrollWidth > el.clientWidth + 1 && /auto|scroll/.test(getComputedStyle(el).overflowX)) return true;
+    if (el.scrollWidth <= el.clientWidth + 1) continue;
+    const cs = getComputedStyle(el);
+    if (!/auto|scroll/.test(cs.overflowX)) continue;
+    if (el.matches("pre, table, code, .dterm, #nCmd") || cs.direction === "rtl" || el.scrollLeft > 1) return true;
   }
   return false;
 }
