@@ -9,6 +9,7 @@
     "js/session.js",
     "js/chat.js",
     "js/chat-scroll.js",
+    "js/codex-controls.js",
     "js/detail.js",
     "js/usage.js",
     "js/composer.js",

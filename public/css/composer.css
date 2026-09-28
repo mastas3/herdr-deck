@@ -79,3 +79,8 @@ dialog.ask.wide { width: min(820px, calc(100vw - 24px)); }
 .menu.grid button:hover .tg { transform: scale(1.08) rotate(-4deg); }
 .menu.grid .tl2 { font-size: 14px; line-height: 1.2; }
 .menu.up { animation-name: popup; }
+.native-request { padding: 10px 12px; min-width: 0; }
+.native-request + .native-request { border-top: 1px solid var(--line-2); }
+.native-request pre { max-height: 220px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.native-question { display: grid; gap: 8px; margin: 0 0 12px; }
+.native-question input, .native-question select, .native-request textarea { width: 100%; min-width: 0; padding: 8px; }

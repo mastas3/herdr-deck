@@ -7,10 +7,15 @@ import { agentArgs } from "../args";
 import type { Deck, Row } from "../deck";
 import type { Graves } from "./config";
 import { AGENT_KINDS } from "./new-session";
+import type { CodexControl } from "../codex-control";
+import { codexUploadImages } from "./codex";
+
+type SendOptions = { requestId?: string; onlyIdle?: boolean };
 
 type Deps = {
   deck: Deck; graves: Graves; remotes: Map<string, RemoteHost>; broadcastGraves: () => void;
   notice: (data: { key?: string; ok: boolean; message: string }) => void;
+  codex?: CodexControl;
 };
 
 export function createSessions(o: Deps) {
@@ -157,7 +162,14 @@ export function createSessions(o: Deps) {
     return { key, paneId };
   }
 
-  async function sendText(key: string, text: string) {
+  async function sendText(key: string, text: string, options: SendOptions = {}) {
+    const row = deck.rows.get(key);
+    if (row?.app && row.sessionId) {
+      if (!o.codex) throw new Error("Codex app controls are unavailable");
+      if (text.trim() === "/compact") { await o.codex.compact(row.sessionId); return; }
+      await o.codex.send(row.sessionId, text, options.requestId ?? crypto.randomUUID(), options.onlyIdle, codexUploadImages(text));
+      return;
+    }
     const f = deck.find(key);
     if (!f) throw new Error("that session is gone");
     if (["claude", "codex", "opencode"].includes(f.row.agent)) await call(f.sess.socket, "agent.prompt", { target: f.row.paneId, text });
@@ -165,12 +177,12 @@ export function createSessions(o: Deps) {
   }
 
   /** Send to a session on any machine. */
-  async function sendAny(key: string, text: string) {
+  async function sendAny(key: string, text: string, options: SendOptions = {}) {
     const route = splitKey(key, remotes);
     if (route.remote) {
-      const r = await route.remote.post("/api/send", { key: route.key, text });
-      if (r.status >= 300) throw new Error(r.data?.error ?? "send failed");
-    } else await sendText(key, text);
+      const r = await route.remote.post("/api/send", { key: route.key, text, ...options });
+      if (r.status >= 300) throw Object.assign(new Error(r.data?.error ?? "send failed"), { code: r.data?.code });
+    } else await sendText(key, text, options);
   }
 
   async function closeLocal(keys: string[], wholeTab: boolean) {

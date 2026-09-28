@@ -4,6 +4,8 @@
 let headSig = "", bodySig = "";
 function renderDetail() {
   const r = rowOf(S.sel);
+  syncCodexControl(r);
+  app.classList.toggle("native-task", !!r?.app && !S.board && !S.mode);
   const d = S.details.get(S.sel)?.data;
   $("mTitle").nextElementSibling.hidden = !!r?.app && !S.board && !S.mode;
   if (S.mode) return renderMode();
@@ -17,19 +19,21 @@ function renderDetail() {
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
   renderNowbar(r, d);
   renderAsk(r);
-  $("composer").hidden = !r || S.sub != null || !!r.app || !!r.hist;
+  $("composer").hidden = !r || S.sub != null || !codexCanReply(r) || !!r.hist;
   $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
   renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
-  else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "Read-only here · reply in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" ${r.status === "working" || r.status === "blocked" ? "disabled" : ""} title="Finish or stop the app turn first, then resume with the Codex CLI to reply from the deck">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
-  $("cStop").hidden = !(r.status === "working" && isAgent(r));
+  else if (r.app) setHTML($("appbar"), `<span>${codexView(r)?.ready ? "Connected to the Codex app · replies stay in this conversation" : esc(codexView(r)?.error ?? "Connecting to the Codex app…")}</span><span class="spacer"></span>${!codexView(r)?.ready ? '<button class="btn" data-dact="codexreconnect">Reconnect</button>' : ""}<button class="btn" data-dact="codexopen">${ICON.jump}Open in Codex</button>`);
+  $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
+  $("cStop").title = r.app ? "Stop this Codex turn" : "Interrupt the agent (Esc in its terminal)";
   const busy = r.status === "working" && isAgent(r);
-  $("cSend").textContent = "Send";
+  $("cSend").textContent = r.app && busy ? "Queue" : "Send";
   $("cSend").title = busy ? "Send now; the agent picks it up while it works (⌥Enter: hold it until it finishes)" : "Send (Enter)";
-  $("cSteer").hidden = true;
+  $("cSteer").hidden = !(r.app && busy);
+  if (r.app && busy) $("cSend").title = "Send after the current turn; Steer sends now";
   renderQueue(r);
   renderPastes();
-  $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
+  $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? r.app ? "Reply to Codex" : "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
   $("replyText").placeholder = $("cText").placeholder;
   $("tTitle").textContent = r.title || r.agent;
   $("mTitle").innerHTML = `<span class="dot" style="--c:${statusVar(r.status)}"></span><span style="overflow:hidden;text-overflow:ellipsis">${esc(r.title || r.agent)}</span>`;
@@ -92,6 +96,8 @@ function renderNowbar(r, d) {
 }
 let askTimer = null, askHash = "";
 async function renderAsk(r) {
+  if (r.app) return renderCodexRequests(r);
+  $("askbox")._codexSig = null;
   const el = $("askbox");
   const on = r.status === "blocked" && !S.sub && !S.board && (!isPhone() || app.dataset.mview === "detail");
   if (!on) { el.hidden = true; clearTimeout(askTimer); askHash = ""; return; }
@@ -118,6 +124,7 @@ $("appbar").addEventListener("click", (e) => {
   if (act === "backhist") return setMode("history");
   if (act === "codexopen") codexAct("codex-open", r);
   if (act === "codexresume") codexAct("codex-resume", r);
+  if (act === "codexreconnect") reconnectCodex(r);
   if (act === "codexhide") codexAct("codex-hide", r);
 });
 async function codexAct(what, r) {

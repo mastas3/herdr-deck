@@ -7,6 +7,7 @@ import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
+import { createCodexControl } from "./codex-control";
 import { call } from "./herdr";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
@@ -52,7 +53,13 @@ const { remotes, isNode, machines, summary, allRows, allGraves, tagLocal, machin
 const notice = (data: { key?: string; ok: boolean; message: string }) => { if (!data.ok) console.warn(`notice: ${data.key ?? ""} ${data.message}`); broadcast("notice", data); };
 const broadcastGraves = () => broadcast("graveyard", allGraves());
 const chat = createChat({ deck, selfId: SELF.id });
-const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice });
+const codex = createCodexControl({ receiptsFile: `${DATA_DIR}/codex-delivery.json`,
+  activeThreads: () => deck.appThreads.filter((t) => t.status === "working" || t.status === "done").map((t) => t.id), changed: (id, state) => {
+  deck.appControls.set(id, { ready: state.ready, status: state.status, activeTurnId: state.activeTurnId, error: state.error });
+  deck.refresh();
+} });
+codex.start();
+const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice, codex });
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 
@@ -99,7 +106,7 @@ pluginHost.provideCore("data-plugins", { recipes: () => plugins.recipes() });
 const codePlugins = createCodePluginApi({ host: pluginHost, root: PLUGINS_DIR, broadcast, dataPluginIds: () => plugins.list().plugins.map((p) => p.id) });
 
 (hostsConf.remotes ?? []).forEach((conf) => hosts.addRemote(conf));
-for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { for (const h of remotes.values()) h.stop(); stopHistory(); await Promise.race([pluginHost.stop(), Bun.sleep(2000)]); process.exit(0); });
+for (const sig of ["SIGINT", "SIGTERM"] as const) process.on(sig, async () => { codex.close(); for (const h of remotes.values()) h.stop(); stopHistory(); await Promise.race([pluginHost.stop(), Bun.sleep(2000)]); process.exit(0); });
 
 /** What a page starts from: inlined into the HTML, and sent first on every SSE connection. */
 function fullState() {
@@ -135,7 +142,7 @@ const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: 
 const hub: Hub = {
   DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
-  sessions, chat, tools, queue, mcp, auth, forwardToMachine,
+  sessions, chat, tools, queue, mcp, auth, forwardToMachine, codex,
 };
 // Plugins start before the port opens, so their routes exist for the first request.
 await pluginHost.start();

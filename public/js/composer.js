@@ -1,11 +1,14 @@
 "use strict";
 // The composer: sending, queued messages, long pastes as chips, the "/" menu and file uploads.
 // ── sending ──────────────────────────────────────────────────────────────
+const codexSendReceipts = new Map();
 function autosize(el) { el.style.height = ""; el.style.height = Math.min(el.scrollHeight, innerHeight * 0.34) + "px"; }
 async function sendMessage(text, fromEl, how) {
   const key = S.sel;
   const r = rowOf(key);
   if (!r) return;
+  if (!codexCanReply(r)) return toast("Reconnect to the Codex app before sending.", true);
+  if (r.app && r.status === "working" && how !== "steer") how = "later";
   const pastes = fromEl === $("cText") ? takePastes(key) : [];
   if (!text && !pastes.length) return;
   // Long text travels as a file: pasted blocks, and anything too big to type into a terminal.
@@ -25,10 +28,15 @@ async function sendMessage(text, fromEl, how) {
   if (isAgent(r)) { c.pending.push(p); c.v++; S.sub = null; if (S.tab !== "chat") { S.tab = "chat"; store("tab2", S.tab); } renderDetail(); $("dbody").scrollTop = $("dbody").scrollHeight; }
   fromEl.value = ""; autosize(fromEl); S.drafts.delete(key);
   try {
-    await api("/api/send", { key, text });
+    const previous = codexSendReceipts.get(key);
+    const receipt = r.app && previous?.text === text ? previous : { text, id: crypto.randomUUID() };
+    if (r.app) codexSendReceipts.set(key, receipt);
+    await api("/api/send", { key, text, requestId: receipt.id });
+    codexSendReceipts.delete(key);
     setTimeout(() => chatTick(true), 250);
     setTimeout(pollTerm, 150);
   } catch (x) {
+    if (x.code && x.code !== "CODEX_DELIVERY_UNKNOWN") codexSendReceipts.delete(key);
     c.pending = c.pending.filter((q) => q !== p);
     c.v++;
     fromEl.value = text;
@@ -48,7 +56,7 @@ for (const [id, form] of [["cText", "composer"], ["replyText", "reply"]]) {
 }
 $("cRecipe").onclick = (e) => openToolMenu(e.currentTarget, true);
 $("cSteer").onclick = () => sendMessage($("cText").value.trim(), $("cText"), "steer");
-$("cStop").onclick = () => S.sel && api("/api/keys", { key: S.sel, keys: ["esc"] }).then(() => toast("Sent Esc to interrupt")).catch((x) => toast(x.message, true));
+$("cStop").onclick = () => rowOf(S.sel)?.app ? stopCodex(rowOf(S.sel)) : S.sel && api("/api/keys", { key: S.sel, keys: ["esc"] }).then(() => toast("Sent Esc to interrupt")).catch((x) => toast(x.message, true));
 function focusReply() {
   if (isPhone()) { if (app.dataset.mview !== "detail") { history.replaceState({ mview: "detail" }, ""); setMView("detail", false); } }
   else if (S.tpos === "tab" && S.main === "term") setMain("chat");
@@ -77,7 +85,7 @@ function renderQueue(r) {
   const el = $("qbar");
   if (!q.length || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
   el.hidden = false;
-  setHTML(el, q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.text.slice(0, 600))}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
+  setHTML(el, q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join(""));
 }
 $("qbar").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-qact]");
@@ -220,13 +228,13 @@ $("cText").addEventListener("blur", () => setTimeout(closeSlash, 120));
 // ── uploads: attach button, drag and drop, paste ─────────────────────────────
 function pickFiles() {
   const r = rowOf(S.sel);
-  if (!r || r.hist || r.app) return toast("Open a live session to attach files", true);
+  if (!r || r.hist || !codexCanReply(r)) return toast("Open a live session to attach files", true);
   $("fileIn").value = "";
   $("fileIn").click();
 }
 async function uploadFiles(files) {
   const r = rowOf(S.sel);
-  if (!r || r.hist || r.app) return toast("Open a live session to attach files", true);
+  if (!r || r.hist || !codexCanReply(r)) return toast("Open a live session to attach files", true);
   const list = [...files].slice(0, 20);
   if (!list.length) return;
   const ta = $("cText");
@@ -253,14 +261,14 @@ $("fileIn").addEventListener("change", (e) => uploadFiles(e.target.files));
 // (a script-triggered click on a hidden input is ignored by some phones and installed apps).
 $("cAttach").addEventListener("click", (e) => {
   const r = rowOf(S.sel);
-  if (!r || r.hist || r.app) { e.preventDefault(); return toast("Open a live session to attach files", true); }
+  if (!r || r.hist || !codexCanReply(r)) { e.preventDefault(); return toast("Open a live session to attach files", true); }
   $("fileIn").value = "";
 });
 $("cAttach").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("cAttach").click(); } });
 {
   let depth = 0;
   const det = $("detail");
-  const canDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files") && !S.mode && rowOf(S.sel) && !rowOf(S.sel).hist && !rowOf(S.sel).app;
+  const canDrop = (e) => [...(e.dataTransfer?.types ?? [])].includes("Files") && !S.mode && rowOf(S.sel) && !rowOf(S.sel).hist && codexCanReply(rowOf(S.sel));
   det.addEventListener("dragenter", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth++; det.classList.add("dropping"); });
   det.addEventListener("dragover", (e) => { if (canDrop(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
   det.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) det.classList.remove("dropping"); });

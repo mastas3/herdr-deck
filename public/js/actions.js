@@ -131,10 +131,10 @@ const toolGlyph = (t) => ICON[TOOL_ICON[t.icon] ?? "star"] ?? ICON.star;
 async function runTool(tool, keys = targets()) {
   if (tool.action === "upload") return pickFiles();
   const rows = keys.map((k) => rowOf(k)).filter((r) => r && !r.hist);
-  const agentRows = rows.filter((r) => !r.app && isAgent(r) && (!tool.agents || tool.agents.includes(r.agent)));
+  const agentRows = rows.filter((r) => codexCanReply(r) && isAgent(r) && (!tool.agents || tool.agents.includes(r.agent)));
   if (tool.action === "share") { const r = rows[0]; return r ? shareRow(r) : toast("Pick a session first", true); }
   if (tool.action === "verify") { const r = rows[0]; return r ? verifyRow(r, true) : toast("Pick a session first", true); }
-  if (!agentRows.length) return toast(rows.some((r) => r.app) ? "Codex app threads can’t take messages from the deck" : "No agent session to use that on", true);
+  if (!agentRows.length) return toast(rows.some((r) => r.app) ? "Reconnect to the Codex app first" : "No agent session to use that on", true);
   if (agentRows.length > 1 && !(await askDialog({ title: `${tool.label} on ${agentRows.length} sessions?`, text: agentRows.map((r) => `• ${r.title} (${r.project})`).join("\n"), ok: "Send" }))) return;
   try {
     const { results } = await api("/api/tool", { id: tool.id, keys: agentRows.map((r) => r.key) });

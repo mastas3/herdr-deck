@@ -194,9 +194,12 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
 
 - **Codex desktop threads** show their chat, nested commands and edits, subagents and their conversations,
   project changes, context usage and completion state. The deck reads Codex's state index (including moved
-  transcripts and archive status), respecting `CODEX_HOME`. Desktop threads are read-only: use **Open in Codex**
-  to reply there, or **Continue in herdr** for the Codex CLI and the deck's message box. Finish or stop the app's
-  current turn before continuing. Direct desktop messaging, approvals and stopping are not connected yet.
+  transcripts and archive status), respecting `CODEX_HOME`. Connected desktop tasks accept replies, image/file
+  attachments, **Steer**, **Stop**, approvals and questions directly in the deck. While working, **Queue** holds
+  your message until the turn ends; **Steer** sends it now. The desktop keeps its model, permissions, plugins and
+  app tools. If the task has no live owner, use **Open in Codex**, then **Reconnect**. Native controls use a private,
+  versioned desktop interface; unsupported versions stay read-only. Task creation, renaming, archiving, forking
+  and model selection still use Codex itself. See [Codex support](docs/codex-support.md) for the exact scope.
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.
 - **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.

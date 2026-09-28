@@ -2,9 +2,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { Row } from "../deck";
 
-type Queued = { id: string; text: string; at: number };
+type Queued = { id: string; text: string; at: number; error?: string };
 
-export function startQueue(o: { dataDir: string; broadcast: (event: string, data: unknown) => void; allRows: () => Row[]; sendAny: (key: string, text: string) => Promise<void> }) {
+export function startQueue(o: { dataDir: string; broadcast: (event: string, data: unknown) => void; allRows: () => Row[]; sendAny: (key: string, text: string, options?: { requestId?: string; onlyIdle?: boolean }) => Promise<void> }) {
   const { broadcast, allRows, sendAny } = o;
   const QUEUE_FILE = `${o.dataDir}/queue.json`;
   let queues: Record<string, Queued[]> = {};
@@ -19,18 +19,19 @@ export function startQueue(o: { dataDir: string; broadcast: (event: string, data
       const rows = new Map(allRows().map((r) => [r.key, r]));
       for (const key of Object.keys(queues)) {
         const row = rows.get(key);
-        if (!row || !queues[key]?.length) continue;
+        if (!row || !queues[key]?.length || queues[key][0].error) continue;
         if (row.status === "working" || row.status === "blocked") { quietSince.delete(key); continue; }
         if (!quietSince.has(key)) quietSince.set(key, Date.now());
         if (Date.now() - quietSince.get(key)! < 2500) continue; // quiet for a moment: the turn really ended
-        const item = queues[key].shift()!;
-        saveQueues();
+        const item = queues[key][0];
         try {
-          await sendAny(key, item.text);
+          await sendAny(key, item.text, { requestId: item.id, onlyIdle: true });
+          queues[key] = queues[key].filter((x) => x !== item); saveQueues();
           quietSince.set(key, Date.now() + 12_000); // give it time to start before the next one
           broadcast("notice", { key, ok: true, message: `Sent your queued message to “${row.title}”` });
         } catch (e: any) {
-          queues[key] = [item, ...(queues[key] ?? [])];
+          if (e.code === "CODEX_STALE") { quietSince.delete(key); continue; }
+          item.error = e?.message ?? String(e);
           saveQueues();
           broadcast("notice", { key, ok: false, message: `Couldn’t send the queued message: ${e?.message ?? e}` });
         }
