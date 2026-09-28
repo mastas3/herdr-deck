@@ -23,7 +23,7 @@ function renderDetail() {
   $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
   renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
-  else if (r.app) setHTML($("appbar"), `<span>${codexView(r)?.ready ? "Connected to the Codex app · replies stay in this conversation" : esc(codexView(r)?.error ?? "Connecting to the Codex app…")}</span><span class="spacer"></span>${!codexView(r)?.ready ? '<button class="btn" data-dact="codexreconnect">Reconnect</button>' : ""}<button class="btn" data-dact="codexopen">${ICON.jump}Open in Codex</button>`);
+  else if (r.app) setHTML($("appbar"), codexConnectionHTML(r));
   $("cStop").hidden = !((r.status === "working" || r.app && r.status === "blocked") && isAgent(r));
   $("cStop").title = r.app ? "Stop this Codex turn" : "Interrupt the agent (Esc in its terminal)";
   const busy = r.status === "working" && isAgent(r);
@@ -150,6 +150,7 @@ $("appbar").addEventListener("click", (e) => {
   if (act === "codexopen") codexAct("codex-open", r);
   if (act === "codexresume") codexAct("codex-resume", r);
   if (act === "codexreconnect") reconnectCodex(r);
+  if (act === "codexconnect") reconnectCodex(r, true);
   if (act === "codexhide") codexAct("codex-hide", r);
 });
 async function codexAct(what, r) {

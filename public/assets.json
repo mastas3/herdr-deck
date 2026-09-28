@@ -11,6 +11,7 @@
     "js/chat.js",
     "js/chat-scroll.js",
     "js/codex-controls.js",
+    "js/codex-task-actions.js",
     "js/detail.js",
     "js/usage.js",
     "js/composer.js",

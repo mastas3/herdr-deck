@@ -15,6 +15,8 @@ import type { Sessions } from "./sessions";
 import type { Chat } from "./chat";
 import type { ToolRuns } from "./run-tools";
 import type { CodexControl } from "../codex-control";
+import type { createCodexRecovery } from "../codex-recovery";
+import type { createCodexLifecycle } from "../codex-lifecycle";
 
 export type Hub = {
   DEV: boolean; TOKEN: string; PORT: number; SELF: Self;
@@ -27,6 +29,8 @@ export type Hub = {
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
   decisions: Map<string, Decision>; scheduleDecisions: () => void; broadcastGraves: () => void; refreshShared: () => Promise<void>;
   codex: CodexControl;
+  codexRecovery: ReturnType<typeof createCodexRecovery>;
+  codexLifecycle: ReturnType<typeof createCodexLifecycle>;
   sessions: Sessions; chat: Chat; tools: ToolRuns; queue: { queues: Record<string, { id: string; text: string; at: number; error?: string }[]>; saveQueues: () => void };
   mcp: { token: string; ctx: McpCtx }; auth: { hasApiToken: (req: Request) => boolean; allowedHost: (req: Request) => boolean };
   forwardToMachine: (path: string, body: any) => Promise<Response | undefined>;

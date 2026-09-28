@@ -64,6 +64,7 @@ export function _setRunningProbe(fn: () => Promise<boolean>) { probe = fn; runni
 export async function listAppThreads(hidden: Set<string>, options: {
   catalog?: Database | null; store?: typeof codexStore; running?: boolean; now?: number;
   findFile?: (id: string) => string | undefined;
+  include?: Set<string>;
 } = {}): Promise<AppThread[]> {
   const d = options.catalog === undefined ? open() : options.catalog;
   const store = options.store ?? codexStore, now = options.now ?? Date.now();
@@ -76,6 +77,10 @@ export async function listAppThreads(hidden: Set<string>, options: {
       where host_id = 'local' and source_kind = 'vscode' order by source_updated_at desc limit 300`).all() as CatalogRow[] ?? [];
   } catch {}
   const indexed = new Map<string, CodexThread>(store.recentApp(since).map((r) => [r.id, r]));
+  for (const id of options.include ?? []) {
+    const task = store.get(id);
+    if (task?.source === "vscode" && !task.archived) indexed.set(id, task);
+  }
   const known = new Set(rows.map((r) => r.thread_id));
   for (const r of indexed.values()) if (!known.has(r.id)) rows.push({ thread_id: r.id, display_title: r.title ?? null,
     cwd: r.cwd ?? null, git_branch: r.git_branch ?? null, source_created_at: r.created_at ?? null, source_updated_at: r.updated_at ?? null });
@@ -90,7 +95,7 @@ export async function listAppThreads(hidden: Set<string>, options: {
     try { if (file) lastWriteAt = statSync(file).mtimeMs; } catch {}
     const updatedAt = Math.max((core?.updated_at ?? 0) * 1000, (r.source_updated_at ?? 0) * 1000, lastWriteAt ?? 0);
     // An old file cannot have a fresh active turn. Avoid scanning months of old rollouts at startup.
-    if (updatedAt < since * 1000 && (!lastWriteAt || now - lastWriteAt >= STALL_MS)) continue;
+    if (!options.include?.has(r.thread_id) && updatedAt < since * 1000 && (!lastWriteAt || now - lastWriteAt >= STALL_MS)) continue;
     if (file) {
       try {
         const t = await turnState(file);
@@ -99,7 +104,7 @@ export async function listAppThreads(hidden: Set<string>, options: {
         else if (!t.open && !t.interrupted && t.endedAt && now - t.endedAt < DONE_FRESH_MS) status = "done";
       } catch {}
     }
-    if (updatedAt < since * 1000 && status !== "working") continue;
+    if (!options.include?.has(r.thread_id) && updatedAt < since * 1000 && status !== "working") continue;
     out.push({
       id: r.thread_id, title: core?.name?.trim() || r.display_title?.trim() || core?.title?.trim() || "Codex thread",
       cwd: core?.cwd || r.cwd || homedir(), branch: core?.git_branch ?? r.git_branch ?? undefined,

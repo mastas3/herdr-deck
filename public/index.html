@@ -110,6 +110,7 @@
       <h3>New session</h3>
       <div class="field" id="nMachineWrap"><span>Machine</span><div class="seg" id="nMachine"></div></div>
       <div class="field"><span>Agent</span><div class="seg" id="nKind"></div></div>
+      <div class="field" id="nCodexTargetWrap" hidden><span>Run Codex in</span><div class="seg" id="nCodexTarget"><button type="button" data-codex-target="app">Codex app</button><button type="button" data-codex-target="cli">herdr terminal</button></div><span class="hint" id="nCodexTargetHelp"></span><button type="button" class="btn ghost" id="nCodexArchives" hidden>Archived Codex tasks…</button></div>
       <label class="field"><span>Folder</span><input id="nCwd" list="nCwdList" required spellcheck="false" autocomplete="off" placeholder="~/Documents/Projects/…"><datalist id="nCwdList"></datalist><div class="sugg" id="nCwdSugg"></div></label>
       <div id="nAgentOpts">
         <div class="fields2">
@@ -121,7 +122,7 @@
       <label class="field" id="nPromptWrap"><span>First message <span class="hint">(optional)</span></span><textarea id="nPrompt" placeholder="What should it work on?"></textarea></label>
       <details class="field" id="nMore"><summary class="hint" style="cursor:pointer">More: extra flags, tab name</summary>
         <label class="field" id="nArgsWrap"><span>Extra flags</span><input id="nArgs" spellcheck="false" autocomplete="off" class="mono" placeholder="none"><div class="sugg" id="nArgsSugg"></div></label>
-        <label class="field"><span>Tab name <span class="hint">(defaults to the folder name)</span></span><input id="nLabel" autocomplete="off"></label>
+        <label class="field"><span id="nLabelText">Tab name <span class="hint">(defaults to the folder name)</span></span><input id="nLabel" autocomplete="off"></label>
         <label class="hint" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="nFocus"> Also switch herdr to it</label>
       </details>
       <div id="nCmd" title="The command that will run"></div>

@@ -96,6 +96,14 @@ describe("Codex index and desktop inventory", () => {
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => r.status === "idle")).toBe(true);
   });
+  test("explicitly restored old desktop tasks remain visible without revealing archived or unrelated tasks", async () => {
+    const f = fixture(), old = Date.now() / 1000 - 30 * 86400;
+    f.add("restored", "", { updated: old }); f.add("old", "", { updated: old });
+    f.add("archived", "", { updated: old, archived: 1 }); f.add("cli", "", { updated: old, source: "cli" });
+    const rows = await listAppThreads(new Set(), { catalog: null, store: f.store, running: false, findFile: () => undefined,
+      include: new Set(["restored", "archived", "cli"]) });
+    expect(rows.map((r) => r.id)).toEqual(["restored"]);
+  });
   test("missing databases and older schemas degrade without writes", () => {
     const f = fixture(); f.db.exec("drop table thread_spawn_edges");
     expect(f.store.subagents("parent")).toEqual([]);

@@ -8,6 +8,8 @@ import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
 import { createCodexControl } from "./codex-control";
+import { createCodexRecovery } from "./codex-recovery";
+import { createCodexLifecycle } from "./codex-lifecycle";
 import { call } from "./herdr";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
@@ -60,6 +62,8 @@ const codex = createCodexControl({ receiptsFile: `${DATA_DIR}/codex-delivery.jso
   deck.refresh();
 } });
 codex.start();
+const codexRecovery = createCodexRecovery({ control: codex });
+const codexLifecycle = createCodexLifecycle({ receiptsFile: `${DATA_DIR}/codex-lifecycle-delivery.json` });
 const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice, codex });
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
@@ -146,7 +150,7 @@ const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: 
 const hub: Hub = {
   DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
-  sessions, chat, tools, queue, mcp, auth, forwardToMachine, codex,
+  sessions, chat, tools, queue, mcp, auth, forwardToMachine, codex, codexRecovery, codexLifecycle,
 };
 // Plugins start before the port opens, so their routes exist for the first request.
 await pluginHost.start();

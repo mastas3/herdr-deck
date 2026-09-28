@@ -22,10 +22,22 @@ function syncCodexControl(r) {
   };
   codexPoll = setTimeout(tick, 0);
 }
-async function reconnectCodex(r) {
-  toast("Connecting to the Codex app…");
-  try { codexViews.set(r.key, await api("/api/codex-state", { key: r.key, reconnect: true })); renderDetail(); }
-  catch (e) { toast(e.message, true); }
+const codexConnecting = new Set();
+async function reconnectCodex(r, open = false) {
+  if (codexConnecting.has(r.key)) return;
+  codexConnecting.add(r.key); renderDetail();
+  try {
+    const state = await api(open ? "/api/codex-connect" : "/api/codex-state", { key: r.key, ...(open ? {} : { reconnect: true }) });
+    codexViews.set(r.key, state);
+    if (state.ready) toast("Connected to the Codex app");
+    else toast(state.error ?? "Codex is still opening. Try reconnecting in a moment.", true);
+  } catch (e) { toast(e.message, true); }
+  finally { codexConnecting.delete(r.key); renderDetail(); }
+}
+function codexConnectionHTML(r) {
+  const state = codexView(r), connecting = codexConnecting.has(r.key);
+  const text = state?.ready ? "Connected to the Codex app · replies stay in this conversation" : connecting ? "Connecting to the Codex app…" : state?.error ?? "Connecting to the Codex app…";
+  return `<span role="status">${esc(text)}</span><span class="spacer"></span>${!state?.ready ? `<button class="btn" data-dact="codexreconnect" ${connecting ? "disabled" : ""}>${connecting ? "Connecting…" : "Reconnect"}</button>${state?.canOpen ? `<button class="btn" data-dact="codexconnect" ${connecting ? "disabled" : ""}>Open & reconnect</button>` : ""}` : ""}<button class="btn" data-dact="codexopen">${ICON.jump}Open in Codex</button>`;
 }
 async function stopCodex(r) {
   try {

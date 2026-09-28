@@ -4,8 +4,14 @@
 const KINDS = [["claude", "Claude Code"], ["codex", "Codex"], ["opencode", "OpenCode"], ["shell", "Shell"]];
 let newOpts = null, newKind = load("newKind", "claude"), newMachine = null, pendingSelect = null, newMkdir = null;
 let nSel = { model: "", effort: "", mode: "" };
+let newCodexTarget = load("newCodexTarget", "app"), newOptionsSeq = 0;
+let newCodexReceipt = null;
+const newCodexApp = () => newKind === "codex" && newCodexTarget === "app" && !!newOpts?.codexApp?.create;
 async function loadNewOptions() {
-  try { newOpts = await api("/api/new-options", { machine: newMachine }); } catch (e) { newOpts = { recent: [], projects: [], argHints: {}, choices: {} }; toast(e.message, true); }
+  const seq = ++newOptionsSeq;
+  newOpts = null; renderKinds();
+  try { const opts = await api("/api/new-options", { machine: newMachine }); if (seq !== newOptionsSeq) return; newOpts = opts; }
+  catch (e) { if (seq !== newOptionsSeq) return; newOpts = { recent: [], projects: [], argHints: {}, choices: {} }; toast(e.message, true); }
   const cur = rowOf(S.sel);
   const saved = load("newCwd:" + newMachine, "");
   $("nCwd").value = saved || (cur && cur.machine === newMachine ? home(cur.projectRoot ?? cur.cwd) : "") || home(newOpts.recent[0] ?? "");
@@ -50,8 +56,17 @@ async function openNew(pre) {
 }
 function renderKinds() {
   $("nKind").innerHTML = KINDS.map(([k, label]) => `<button type="button" data-kind="${k}" aria-pressed="${newKind === k}">${label}</button>`).join("");
-  const shell = newKind === "shell";
-  $("nPromptWrap").hidden = shell; $("nArgsWrap").hidden = shell; $("nAgentOpts").hidden = shell;
+  const shell = newKind === "shell", native = newCodexApp();
+  $("nCodexTargetWrap").hidden = newKind !== "codex";
+  $("nCodexArchives").hidden = !newOpts?.codexApp?.restore;
+  for (const b of $("nCodexTarget").children) { b.disabled = b.dataset.codexTarget === "app" && !newOpts?.codexApp?.create; b.setAttribute("aria-pressed", (native ? "app" : "cli") === b.dataset.codexTarget); }
+  $("nCodexTargetHelp").textContent = !newOpts ? "Checking Codex support on this machine…" : native ? "A native Codex task with direct replies and app tools. Model and permissions inherit from Codex; change them in the task’s menu." : newOpts?.codexApp?.create ? "Starts the Codex CLI in a herdr terminal." : newOpts?.codexApp?.error ?? "Native Codex tasks are unavailable on this machine. The CLI runs in a herdr terminal.";
+  $("nPromptWrap").hidden = shell; $("nArgsWrap").hidden = shell || native; $("nAgentOpts").hidden = shell || native;
+  $("nFocus").closest("label").hidden = native;
+  $("nLabelText").textContent = native ? "Task name (optional)" : "Tab name (defaults to the folder name)";
+  $("nMore").querySelector("summary").textContent = native ? "More: task name" : "More: extra flags, tab name";
+  $("nOk").textContent = native ? "Create Codex task" : "Start session";
+  $("nOk").disabled = !newOpts;
   nSel = { model: "", effort: "", mode: "", ...load("opts:" + newKind, {}) };
   $("nArgs").value = load("args:" + newKind, "");
   const hints = newOpts?.argHints?.[newKind] ?? [];
@@ -59,6 +74,7 @@ function renderKinds() {
   renderAgentOpts();
 }
 function renderAgentOpts() {
+  if (newCodexApp()) { $("nAgentOpts").hidden = true; renderCmd(); return; }
   const ch = newOpts?.choices?.[newKind];
   if (!ch) { $("nAgentOpts").hidden = true; renderCmd(); return; }
   $("nAgentOpts").hidden = newKind === "shell";
@@ -76,6 +92,7 @@ function renderAgentOpts() {
 }
 /** Mirrors the server's agentArgs so you see exactly what will run. */
 function renderCmd() {
+  if (newCodexApp()) { $("nCmd").textContent = `Codex app task in ${$("nCwd").value || "…"}`; return; }
   if (newKind === "shell") { $("nCmd").textContent = `a shell in ${$("nCwd").value || "…"}`; return; }
   const a = [newKind];
   const { model, effort, mode } = nSel;
@@ -88,6 +105,8 @@ function renderCmd() {
 function saveOpts() { store("opts:" + newKind, nSel); renderAgentOpts(); }
 $("nMachine").addEventListener("click", (e) => { const b = e.target.closest("[data-m]"); if (!b || b.disabled) return; newMachine = b.dataset.m; for (const x of $("nMachine").children) x.setAttribute("aria-pressed", x.dataset.m === newMachine); loadNewOptions(); });
 $("nKind").addEventListener("click", (e) => { const b = e.target.closest("[data-kind]"); if (b) { newKind = b.dataset.kind; store("newKind", newKind); renderKinds(); } });
+$("nCodexTarget").addEventListener("click", (e) => { const b = e.target.closest("[data-codex-target]"); if (!b || b.disabled) return; newCodexTarget = b.dataset.codexTarget; store("newCodexTarget", newCodexTarget); renderKinds(); });
+$("nCodexArchives").onclick = () => { $("newDlg").close("cancel"); openCodexArchives(newMachine); };
 $("nModelSugg").addEventListener("click", (e) => { const b = e.target.closest("[data-model]"); if (b) { nSel.model = b.dataset.model; saveOpts(); } });
 $("nModel").addEventListener("change", (e) => { nSel.model = e.target.value.trim(); saveOpts(); });
 $("nModel").addEventListener("input", (e) => { nSel.model = e.target.value.trim(); store("opts:" + newKind, nSel); renderCmd(); });
@@ -98,15 +117,22 @@ $("nCwd").addEventListener("input", renderCmd);
 $("nArgsSugg").addEventListener("click", (e) => { const b = e.target.closest("[data-args]"); if (b) { $("nArgs").value = b.dataset.args; renderCmd(); } });
 $("nCwdSugg").addEventListener("click", (e) => { const b = e.target.closest("[data-cwd]"); if (b) { $("nCwd").value = b.dataset.cwd; renderCmd(); } });
 $("nPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $("nOk").click(); } });
-$("newDlg").addEventListener("close", async () => {
-  if ($("newDlg").returnValue !== "ok") return;
+async function submitNewSession() {
   const body = { machine: newMachine, kind: newKind, cwd: $("nCwd").value.trim(), ...(newKind === "shell" ? {} : nSel), args: $("nArgs").value.trim(), prompt: newKind === "shell" ? "" : $("nPrompt").value, label: $("nLabel").value.trim(), focus: $("nFocus").checked };
   if (newMkdir && home(newMkdir) === body.cwd) body.mkdir = true; // quests: startRun
   store("newCwd:" + newMachine, body.cwd); store("args:" + newKind, body.args); store("newFocus", body.focus);
   try {
-    const { key } = await api("/api/new", body);
+    const native = newCodexApp();
+    const nativeBody = { machine: body.machine, cwd: body.cwd, title: body.label, prompt: body.prompt, mkdir: body.mkdir };
+    const signature = JSON.stringify(nativeBody);
+    if (native && newCodexReceipt?.signature !== signature) newCodexReceipt = { signature, id: crypto.randomUUID() };
+    const result = native ? await api("/api/codex-create", { ...nativeBody, requestId: newCodexReceipt.id }) : await api("/api/new", body);
+    if (native) newCodexReceipt = null;
+    const { key } = result;
+    if (native && key && result.promptSent === false && result.canRetryPrompt !== false && !result.deliveryUnknown && !result.promptPersisted && body.prompt) S.drafts.set(key, body.prompt);
     pendingSelect = key;
     if (S.rows.has(key)) { pendingSelect = null; select(key, { scroll: true, open: true }); }
-    toast(newKind === "shell" ? "Opened a shell" : `Starting ${newKind}…`);
-  } catch (e) { toast("Couldn’t start: " + e.message, true); }
-});
+    toast(native && result.deliveryUnknown ? "Task created. First-message delivery is uncertain; check its conversation before sending again." : native && result.canRetryPrompt === false ? `Task created; its conversation has changed. ${result.error ?? "Open it in Codex to continue."}` : native && result.promptSent === false && body.prompt ? `Task created; first message ${result.promptPersisted ? "saved in Codex" : "kept as a draft"}. ${result.error ?? "Reconnect to continue."}` : native ? "Created a Codex app task" : newKind === "shell" ? "Opened a shell" : `Starting ${newKind}…`, !!(native && (result.error || result.deliveryUnknown)));
+  } catch (e) { if (e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") newCodexReceipt = null; toast("Couldn’t start: " + e.message, true); }
+}
+$("newDlg").addEventListener("close", () => { if ($("newDlg").returnValue === "ok") void submitNewSession(); });

@@ -161,6 +161,7 @@ Put settings in `~/.config/herdr-deck/env`, one `NAME=value` per line, then rest
 | `DECK_WIKI_DIR` | `~/wiki` | Where `[[page]]` links in agent replies point, if you keep a Markdown wiki |
 | `DECK_TS_USERS` | this machine's Tailscale owner | Comma-separated Tailscale logins allowed in through the tailnet |
 | `DECK_CODEX_APP_DAYS` | `3` | How many days of Codex desktop app threads to show |
+| `DECK_CODEX_APP_BINARY` | auto-detected desktop bundle | Absolute path to the installed Codex binary for native task metadata operations |
 | `DECK_NO_HISTORY` | | Set to `1` to turn off the History index |
 | `DECK_CHECK_TIMEOUT_MS` | `600000` | Time limit for "proof of done" checks |
 
@@ -197,9 +198,11 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   transcripts and archive status), respecting `CODEX_HOME`. Connected desktop tasks accept replies, image/file
   attachments, **Steer**, **Stop**, approvals and questions directly in the deck. While working, **Queue** holds
   your message until the turn ends; **Steer** sends it now. The desktop keeps its model, permissions, plugins and
-  app tools. If the task has no live owner, use **Open in Codex**, then **Reconnect**. Native controls use a private,
-  versioned desktop interface; unsupported versions stay read-only. Task creation, renaming, archiving, forking
-  and model selection still use Codex itself. See [Codex support](docs/codex-support.md) for the exact scope.
+  app tools. **Open & reconnect** recovers an unloaded task on its host Mac. Native tasks can be created,
+  renamed, forked and restored; More actions also offers settings and editing the last message. Archive works
+  when the desktop has released the task; otherwise archive it in Codex. Model/effort and supported per-task
+  permissions apply to the next turn. The desktop's queue is visible separately. Native controls use a private,
+  versioned interface; unsupported versions stay read-only. See [Codex support](docs/codex-support.md).
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.
 - **⌘K** searches sessions on every machine, tools, views, projects and commands in one place. Empty, it shows
@@ -499,7 +502,9 @@ Click outside or press `Ctrl+]` to stop. Buttons send common answers (esc, enter
 ## Starting and closing sessions
 
 - **New** (`n`): choose Claude Code, Codex, OpenCode or a plain shell, a folder (recent folders and
-  your project folders are suggested; see `DECK_PROJECT_DIRS`), optional flags and an optional first message. It opens a herdr tab,
+  your project folders are suggested; see `DECK_PROJECT_DIRS`), optional flags and an optional first message.
+  Codex offers **Codex app** or **CLI in herdr** when the native integration is installed on that host.
+  Native tasks open in Codex; CLI sessions open a herdr tab,
   waits for the shell prompt, starts the agent through herdr's API and sends the message. Progress appears
   as notifications, and the new session is selected as soon as its tab exists.
 - **Close** works on one session or a selection. A confirmation lists what will stop, warns about anything

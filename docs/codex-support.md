@@ -17,6 +17,18 @@ inspection features, plus native controls while the desktop owns the task.
   permissions for the current turn. No approval is answered automatically.
 - Prompt tools, quick replies and native compaction work on connected tasks. The terminal is hidden because
   desktop tasks have no herdr pane.
+- New → Codex offers a native desktop task or a CLI session. Native creation accepts an optional first message;
+  its normal desktop turn keeps app tools and is protected against duplicate creation/delivery retries.
+- More actions offers rename, fork, archive and an archived-task list with restore. Restored old tasks remain
+  visible even outside the normal recent-task window. Archive respects Codex's writer ownership: if the desktop
+  still has a task loaded, use Archive in Codex itself. The deck does not bypass that lock.
+- Task settings offers models and reasoning efforts from the local Codex catalog. Read-only/workspace permission
+  changes apply to the next turn and preserve the reviewer. Managed/custom profiles remain in Codex.
+- Edit last message replaces the latest user turn and reruns it after an explicit confirmation. Earlier turns
+  cannot be edited through the follower protocol. Stale turn ids and repeated receipts cannot run another edit.
+- The desktop's queued messages are visible alongside the deck queue. Native queue writes remain in Codex:
+  its current follower API replaces the whole array without a conflict precondition, so concurrent edits could
+  overwrite a draft. The deck never writes its private queue file.
 - Active tasks are followed in the background for status and questions. Opening a task follows its live state;
   unused subscriptions expire. The existing incremental transcript reader still supplies chat history/output.
 
@@ -24,7 +36,16 @@ inspection features, plus native controls while the desktop owns the task.
 backend nor edits Codex's database. `src/codex-control.ts` discovers the current owner and subscribes to its
 versioned snapshots/patches. Only allowlisted actions are exposed through authenticated deck routes. A missing
 owner, disconnect, unknown stream version or missed patch disables controls until a fresh snapshot arrives.
-Open the task in the desktop and use Reconnect when the app has unloaded its owner.
+Use Open & reconnect to open an unloaded task and wait for its owner on macOS. Background reconnects never
+raise the app. Other hosts offer normal reconnect and an instruction to open the task on its own machine.
+
+Lifecycle metadata uses a short-lived bundled `codex app-server --stdio` process initialized as `herdr-deck`.
+Its allowlist excludes turn execution and it refuses all incoming tool/approval requests. New tasks get a
+neutral canonical initialization item so their rollout exists before desktop hydration; all real user messages
+and model execution still go through the desktop owner. The adapter never writes Codex's database directly.
+The archived list reads the index because this desktop version's `thread/list` omits some paginated tasks.
+`DECK_CODEX_APP_BINARY` can select an installed host binary explicitly; a bare CLI install is not advertised as
+a native desktop integration.
 
 Message receipts in `~/.config/herdr-deck/codex-delivery.json` record a hash and delivery result, not prompt
 text. They are saved before sending; uncertain delivery cannot be automatically retried after a restart.
@@ -59,10 +80,10 @@ that app tools were retained. The cause of the earlier discovery failures was no
 The bridge is a compatibility adapter for the installed private desktop IPC, not a stable public OpenAI API.
 Its frame/stream versions and method versions are checked and tested. App updates may require an adapter
 update. It currently controls locally owned desktop tasks; remote desktop hosts need a deck on their host.
-Creating, renaming, archiving, forking, editing old messages, and changing model/permission settings remain in
-Codex itself. Those lifecycle/settings operations are not exposed by this adapter. The public app-server API
-does not by itself attach a second server to a desktop-owned task. The gated shared-daemon path in the installed
-app is not enabled or required by this change.
+Remaining limitations are archiving a desktop-loaded task, editing earlier user turns, writing Codex's native
+queue atomically, and changing managed/custom permission profiles. The public app-server API does not attach
+a second execution server to a desktop-owned task; its metadata operations obey writer locks. The gated
+shared-daemon path in the installed app is not enabled or required by this change.
 
 Resuming into a separate CLI remains an explicit user action; the deck refuses it while the app row is working
 or blocked. No changes to desktop startup, sandbox policy or tailnet configuration are needed.
@@ -82,3 +103,14 @@ integration task verified replies, retained app tools, steering, interruption, a
 input and queued delivery. Repeating a message receipt through the running deck returned the original result
 without a second message. Command/file/permission approvals and MCP forms are covered by protocol fixtures;
 they were not exercised against a real privileged action.
+
+The follow-up passed 936 tests. Live checks verified native creation with exactly one visible user prompt,
+retained app tools, rename readback in Codex, forked history, inactive-task archive/list/restore, model/effort
+and task permission changes with restoration, and a latest-message edit with no duplicate on receipt retry.
+Creation replay tests also cover a task started manually in the desktop before the first-send retry. UI fixtures
+cover management, settings, editing, both queues, reconnect and uncertain-delivery cases on desktop/phone;
+four existing home/session snapshots match the prior commit.
+
+The final running-deck HTTP smoke also checked blank creation without a model turn, open/reconnect after
+restore, loaded-task archive refusal, model-effort save/restore, and repeated create/edit/fork receipts.
+All disposable verification tasks were archived afterward.
