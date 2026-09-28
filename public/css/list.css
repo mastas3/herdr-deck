@@ -11,12 +11,12 @@
 @keyframes blink { 50% { opacity: .2; } }
 /* The filter row: search, the machine picker, grouping. */
 .lh-row { display: flex; align-items: center; gap: 6px; }
-.mpick { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 42%; height: 33px; padding: 0 6px 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--raise); color: var(--ink-2); font-size: 13.5px; white-space: nowrap; }
-.mpick:hover { color: var(--ink); border-color: var(--line-2); }
-.mpick svg { width: 14px; height: 14px; flex: none; }
-.mpick .chev { width: 12px; height: 12px; opacity: .7; }
-.mpick span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.mpick .off { width: 6px; height: 6px; border-radius: 50%; background: var(--blocked); flex: none; }
+.machpick { display: inline-flex; align-items: center; gap: 5px; flex: 0 1 auto; min-width: 0; max-width: 42%; height: 33px; padding: 0 6px 0 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--raise); color: var(--ink-2); font-size: 13.5px; white-space: nowrap; }
+.machpick:hover { color: var(--ink); border-color: var(--line-2); }
+.machpick svg { width: 14px; height: 14px; flex: none; }
+.machpick .chev { width: 12px; height: 12px; opacity: .7; }
+.machpick span { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.machpick .off { width: 6px; height: 6px; border-radius: 50%; background: var(--blocked); flex: none; }
 .gseg button { padding: 3px 7px; display: grid; place-items: center; }
 .gseg svg { width: 15px; height: 15px; }
 .find { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; background: var(--raise); border: 1px solid var(--line); border-radius: 9px; padding: 0 6px 0 9px; }
@@ -27,7 +27,7 @@
 .livebar { display: flex; align-items: center; gap: 8px; border: 0; background: none; border-radius: 7px; margin: 0 6px; padding: 5px 8px; font-size: 13.5px; font-weight: 600; text-align: left; color: var(--ink-2); flex: none; }
 .livebar .lt { display: inline-flex; align-items: center; gap: 7px; min-width: 0; white-space: nowrap; overflow: hidden; }
 .livebar b { color: var(--working); font-variant-numeric: tabular-nums; }
-.livebar .lx { color: var(--ink-3); font-weight: 400; }
+.livebar .lvx { color: var(--ink-3); font-weight: 400; }
 .livebar .spin { width: 10px; height: 10px; border-width: 1.5px; }
 .livebar .dim { display: inline-flex; align-items: center; gap: 2px; color: var(--ink-3); font-weight: 400; font-size: 12.5px; }
 .livebar .dim .chev { width: 12px; height: 12px; transform: rotate(-90deg); }
@@ -68,10 +68,10 @@
 .pj { color: var(--pc); font-weight: 700; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 70%; }
 .row .pl .pj { flex: 0 1 auto; min-width: 3ch; }
 /* Where it runs (an icon; the name on hover) and its running subagents, after the project. */
-.row .rm { flex: none; display: inline-grid; place-items: center; color: var(--ink-3); align-self: center; }
-.row .rm svg { width: 13px; height: 13px; }
-.row .sb { flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center; font-size: 11.5px; font-weight: 600; color: var(--working); }
-.row .sb .spin { width: 9px; height: 9px; border-width: 1.5px; }
+.row .rmach { flex: none; display: inline-grid; place-items: center; color: var(--ink-3); align-self: center; }
+.row .rmach svg { width: 13px; height: 13px; }
+.row .rsub { flex: none; display: inline-flex; align-items: center; gap: 4px; align-self: center; font-size: 11.5px; font-weight: 600; color: var(--working); }
+.row .rsub .spin { width: 9px; height: 9px; border-width: 1.5px; }
 .via { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
 .mach { flex: none; font-size: 11.5px; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; line-height: 1.3; }
 .row .ago { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }

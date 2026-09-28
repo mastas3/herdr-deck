@@ -46,8 +46,8 @@ function renderLive() {
   const el = $("live");
   el.hidden = !working.length && !blocked.length;
   el.setAttribute("aria-pressed", S.board);
-  const head = working.length ? `<span class="spin"></span>Running <b>${working.length}</b>${blocked.length ? `<span class="lx"> · ${blocked.length} waiting</span>` : ""}` : `<span class="dot" style="--c:var(--blocked)"></span>Waiting <b>${blocked.length}</b>`;
-  setHTML(el, `<span class="lt">${head}${subs ? `<span class="lx"> · ${subs} subagent${subs === 1 ? "" : "s"}</span>` : ""}</span><span class="spacer"></span><span class="dim">${S.board && !(isPhone() && app.dataset.mview === "list") ? "Close board" : "Live board"}${ICON.chev}</span>`);
+  const head = working.length ? `<span class="spin"></span>Running <b>${working.length}</b>${blocked.length ? `<span class="lvx"> · ${blocked.length} waiting</span>` : ""}` : `<span class="dot" style="--c:var(--blocked)"></span>Waiting <b>${blocked.length}</b>`;
+  setHTML(el, `<span class="lt">${head}${subs ? `<span class="lvx"> · ${subs} subagent${subs === 1 ? "" : "s"}</span>` : ""}</span><span class="spacer"></span><span class="dim">${S.board && !(isPhone() && app.dataset.mview === "list") ? "Close board" : "Live board"}${ICON.chev}</span>`);
 }
 function listGroups(rows) {
   if (S.group === "project") {

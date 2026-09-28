@@ -140,7 +140,7 @@ function machIcon(r) {
   const m = (S.summary.machines ?? []).find((x) => x.id === r.machine);
   const icon = r.app ? SRC_ICON.app : m && !m.local ? SRC_ICON.remote : SRC_ICON.mac;
   const where = r.app ? "Codex app" : `${machineLabel(r.machine)}${r.workspace ? ` · ${r.workspace}` : ""}${r.hist ? " · history" : ""}`;
-  return `<span class="rm" title="Runs on ${esc(where)}">${icon}</span>`;
+  return `<span class="rmach" title="Runs on ${esc(where)}">${icon}</span>`;
 }
 function srcLine(r) {
   const m = (S.summary.machines ?? []).find((x) => x.id === r.machine);
@@ -189,7 +189,7 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   if (!line && !pendingAsk(r)) { const last = plain(r.lastMessage); line = last ? `<span class="ln last">${esc(last)}</span>` : `<span class="ln ph" aria-hidden="true">&nbsp;</span>`; }
   // Three lines at most: project (where it runs, its subagents) and why it's here · the title · one live line.
   const running = (r.subagents ?? []).filter((x) => x.running);
-  const subs = running.length ? `<span class="sb" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span>${running.length}</span>` : "";
+  const subs = running.length ? `<span class="rsub" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span>${running.length}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   const rc = radarChip(r);
   if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}${machIcon(r)}${subs}</span>${agoEl}${line}${rowAsk(r)}`;
