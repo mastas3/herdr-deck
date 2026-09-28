@@ -1,0 +1,18 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "ship-tracker",
+  "name": "Ship tracker",
+  "version": "0.1.0",
+  "description": "Started versus shipped, per project: reads the wiki's project pages (status, path), each repo's git (commits, newest release tag) and the session history, all read-only. The Shipped view lists projects by days since they last shipped and flags busy ones that haven't; a line in Monday's digest.",
+  "server": "server.ts",
+  "client": ["ship-tracker.js"],
+  "styles": ["ship-tracker.css"],
+  "machine": "hub",
+  "routes": ["ship-tracker"],
+  "extends": ["digest.lines"],
+  "settings": {
+    "busyAt": { "label": "Busy at (agent sessions in 14 days)", "type": "number", "default": 5 },
+    "staleDays": { "label": "Not shipping after (days since the last release)", "type": "number", "default": 30 }
+  }
+}

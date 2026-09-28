@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "worker-fanout",
+  "name": "Worker fan-out",
+  "version": "0.1.0",
+  "description": "One brief to several workers (folders or worktrees, agent and model each), started only after you check every command. Each writes REPORT.md and a DONE marker; the Workers board tracks them, and Collect merges the reports into one message for a session you pick.",
+  "server": "server.ts",
+  "client": ["worker-fanout.js", "worker-fanout-new.js"],
+  "styles": ["worker-fanout.css"],
+  "machine": "hub",
+  "routes": ["worker-fanout"]
+}

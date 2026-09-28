@@ -1,0 +1,12 @@
+/* Private sessions (private-session.js). Deck tokens only. */
+.pvfiles { margin: 10px 0; padding: 8px 10px 8px 26px; max-height: 40vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; }
+.pvfiles li { margin: 2px 0; overflow-wrap: anywhere; }
+.pvline { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; color: var(--ink-2); }
+.pvline input { flex: none; margin-top: 3px; }
+.pvline .mono { overflow-wrap: anywhere; }
+.pvdlg h3:focus { outline: none; }
+.pvlist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pvrow { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); background: var(--raise); border-radius: 12px; padding: 10px 12px; }
+.pvrow > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.pvrow b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pvrow.gone { opacity: .65; }

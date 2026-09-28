@@ -94,6 +94,11 @@ export const VIEWS = {
   ...Object.fromEntries(["evidence", "mix", "lab", "leads", "research", "lib", "ideas", "saved"].map((t) => [`discover-${t}`, `setMode("discover"); discTab("${t}")`])),
   opportunities: `setMode("opportunities")`,
   quests: `setMode("quests")`,
+  review: `setMode("review")`,
+  workers: `setMode("workers")`,
+  releases: `setMode("releases")`,
+  shipped: `setMode("shipped")`,
+  private: `setMode("private")`,
   projects: `openProjects()`,
   // Grouped by project: each project header carries its project page link (the projects plugin's "project.link").
   "by-project": `setGroup("project"); select("fake:blocked", { scroll: true, open: true })`,
@@ -115,7 +120,7 @@ export const VIEWS = {
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr"];
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr", "review", "workers", "releases", "shipped", "private"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {

@@ -457,6 +457,20 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   moving over): a part that's off stops running and leaves the page. You can also add a code plugin from a folder or
   a git repo pinned to a commit; its red trust screen says plainly that it runs with your full permissions, and any
   file changed after you approved it turns it off until you review it again.
+- **Operator plugins** (built in, off until you switch them on in Plugins → Built in). Anything that starts a
+  session, sends a message or deletes a file shows exactly what it will do and waits for your OK.
+  - **Dual review** (Review): Claude and Codex review the same diff in two sessions; the Review view lines up
+    their findings (both found / only one) and sends the ones you pick back to the session that made the change.
+  - **Worker fan-out** (Workers): one brief to several workers, each writing `REPORT.md` and a `DONE` marker; the
+    board tracks them and Collect merges the reports into one message.
+  - **Limit handoff**: when an account passes 90% of a 5-hour or weekly limit (or an agent prints its limit
+    line), offers to continue in Codex or another agent with a handoff note, in a prefilled New session dialog.
+  - **Release train** (Releases): QA → staging → production per repo: what each stage is at, what's waiting,
+    health; Promote starts an agent session with a deploy brief (the deck never deploys by itself).
+  - **Private sessions** (⌘K): a throwaway folder kept out of History and search; when it closes you can delete
+    its transcript files, listed one by one first.
+  - **Ship tracker** (Shipped): started versus shipped per project from the wiki's project pages, git tags and
+    session history, with busy-but-not-shipping projects on top and a line in Monday's digest.
 
 ## MCP server
 

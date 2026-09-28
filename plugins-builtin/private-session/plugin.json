@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "private-session",
+  "name": "Private sessions",
+  "version": "0.1.0",
+  "description": "New private session: runs in a throwaway folder that History and search leave out. When it closes you're offered to delete its transcript (Claude's and Codex's files, and its lines in the prompt history), with every file listed before anything goes.",
+  "server": "server.ts",
+  "client": ["private-session.js"],
+  "styles": ["private-session.css"],
+  "machine": "hub",
+  "routes": ["private-session"]
+}

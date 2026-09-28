@@ -1,0 +1,15 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "limit-handoff",
+  "name": "Limit handoff",
+  "version": "0.1.0",
+  "description": "When a session's account passes a limit threshold, or the agent prints its limit message, offers to continue in Codex (or another agent): gets a handoff note from the agent if it can still answer, else from its transcript, and opens the New session dialog with it. Never switches by itself.",
+  "server": "server.ts",
+  "client": ["limit-handoff.js"],
+  "styles": ["limit-handoff.css"],
+  "machine": "hub",
+  "routes": ["limit-handoff"],
+  "extends": ["fullState"],
+  "settings": { "threshold": { "label": "Offer a handoff at (% of a 5-hour or weekly limit)", "type": "number", "default": 90, "hint": "50 to 100" } }
+}

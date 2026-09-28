@@ -1,0 +1,13 @@
+/* Ship tracker (ship-tracker.js). Deck tokens only. */
+.shpweek { margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); font-size: 14.5px; line-height: 1.45; }
+.shpbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.shpfilter { flex-wrap: wrap; }
+.shplist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.shprow { border: 1px solid var(--line); border-radius: 10px; background: var(--raise); padding: 9px 12px; display: flex; flex-direction: column; gap: 4px; animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(var(--i) * 18ms); }
+.shprow.busy { border-color: color-mix(in srgb, var(--working) 55%, var(--line)); }
+.shpname { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.shpname b { font-size: 15px; }
+.shppill { font: 600 11px/1 var(--sans); letter-spacing: .03em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); padding: 4px 7px; border-radius: 999px; }
+.shpflag { font-size: 12.5px; font-weight: 600; color: var(--working); }
+.shpfacts { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 13px; color: var(--ink-2); }
+.shpfacts code { font: 12.5px var(--mono); }
