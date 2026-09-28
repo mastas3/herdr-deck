@@ -7,7 +7,8 @@ import type { Deck, Row } from "../deck";
 
 type Deps = {
   deck: Deck; remotes: Map<string, RemoteHost>; selfId: string;
-  sendText: (key: string, text: string) => Promise<void>; notice: (data: { key?: string; ok: boolean; message: string }) => void;
+  // `text` is what was sent in your name, so the page can show it as your message at once.
+  sendText: (key: string, text: string) => Promise<void>; notice: (data: { key?: string; ok: boolean; message: string; text?: string }) => void;
   /** Tools running plugins add (the "tools.entries" extension point). */
   extraTools: () => Tool[];
 };
@@ -41,15 +42,16 @@ export function createToolRuns(deps: Deps) {
       if (!row) { results.push({ key, ok: false, error: "gone" }); continue; }
       if (tool.agents && !tool.agents.includes(row.agent)) { results.push({ key, ok: false, error: `not for ${row.agent}` }); continue; }
       try {
-        await sendText(key, fillTool(tool.prompt ?? "", row, extra));
+        const text = fillTool(tool.prompt ?? "", row, extra);
+        await sendText(key, text);
         if (tool.kind === "sequence" && tool.then) {
           const then = row.agent === "claude" ? fillTool(tool.then, row, extra) : "/compact"; // only Claude's /compact takes instructions
           (async () => {
-            if (await afterTurn(key)) { await sendText(key, then).catch(() => {}); notice({ key, ok: true, message: `${tool.label}: step 2 sent` }); }
+            if (await afterTurn(key)) { await sendText(key, then).catch(() => {}); notice({ key, ok: true, message: `${tool.label}: step 2 sent`, text: then }); }
             else notice({ key, ok: false, message: `${tool.label}: the agent didn’t finish step 1, so step 2 wasn’t sent` });
           })();
         }
-        results.push({ key, ok: true });
+        results.push({ key, ok: true, text });
       } catch (e: any) { results.push({ key, ok: false, error: e?.message ?? String(e) }); }
     }
     return results;

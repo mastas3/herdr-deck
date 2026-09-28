@@ -80,7 +80,7 @@ function connect() {
   for (const { event, fn } of deckPlugins.contributions("sse.events")) es.addEventListener(event, (e) => { try { fn(JSON.parse(e.data)); } catch (err) { console.error(err); } });
   // A plugin was turned on or off: its files join or leave the page, so load it again.
   es.addEventListener("plugins", (e) => { const d = JSON.parse(e.data); if (d.dev) return devReloaded(d.dev); if ((d.active ?? []).join() !== (S.plugins?.active ?? []).join()) location.reload(); });
-  es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.key && n.key === S.sel) loadDetail(n.key); });
+  es.addEventListener("notice", (e) => { const n = JSON.parse(e.data); toast(n.message, !n.ok); if (n.ok && n.text) showSent(n.key, n.text); if (n.key && n.key === S.sel) loadDetail(n.key); });
   es.onopen = () => $("conn").classList.remove("off");
   es.onerror = () => {
     $("conn").classList.add("off");
