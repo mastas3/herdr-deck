@@ -4,7 +4,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { codexUserText } from "./agents";
+import { codexUserText, unwrapPastes } from "./agents";
 import { codexTimestamp } from "./codex-turn";
 import { codexReplyHash } from "./codex-fork-point";
 import { codexForkHistory, type CodexHistoryPlan } from "./codex-fork-history";
@@ -142,7 +142,7 @@ const claudeStates = new Map<string, State>();
 function claudeAsk(o: any): string | undefined {
   if (o.type !== "user" || o.isMeta || o.isCompactSummary) return;
   const c = o.message?.content;
-  const text = typeof c === "string" ? c : Array.isArray(c) ? c.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n") : "";
+  const text = unwrapPastes(typeof c === "string" ? c : Array.isArray(c) ? c.filter((p: any) => p?.type === "text").map((p: any) => p.text).join("\n") : "");
   if (!text || /^\s*</.test(text) || text.startsWith("Caveat:")) return;
   return text;
 }

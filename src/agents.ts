@@ -76,10 +76,16 @@ async function cachedParse(path: string, parse: (size: number) => Promise<AgentM
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
+/** Claude Code wraps pasted text in <pasted_content> tags; keep what was pasted. Unwrapped first, a message that
+ *  starts with a paste isn't mistaken for Claude Code's own tagged messages (command output, notifications). */
+export const unwrapPastes = (s: string) =>
+  s.replace(/<pasted_content\b[^>]*>\n?([\s\S]*?)\n?<\/pasted_content\b[^>]*>/g, "$1").trim();
+
 function userText(o: any): string | undefined {
   if (o?.type !== "user" || o.isMeta) return;
   const c = o.message?.content;
-  const text = typeof c === "string" ? c : Array.isArray(c) ? c.find((p: any) => p?.type === "text")?.text : undefined;
+  const raw = typeof c === "string" ? c : Array.isArray(c) ? c.find((p: any) => p?.type === "text")?.text : undefined;
+  const text = raw && unwrapPastes(raw);
   if (!text || text.startsWith("<") || text.startsWith("Caveat:")) return;
   return text;
 }

@@ -17,6 +17,11 @@ describe("Claude transcripts", () => {
     expect(h.firstPrompt).toBe("Build the deck");
   });
 
+  test("head: a first prompt that starts with a paste still counts", () => {
+    const h = parseClaudeHead(j({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: '<pasted_content id="69c7">\nMake sigils\n</pasted_content id="69c7">' } }));
+    expect(h.firstPrompt).toBe("Make sigils");
+  });
+
   test("tail: last activity, model, context from the last real assistant turn", () => {
     const tail = j(
       { type: "assistant", timestamp: "2026-09-21T09:00:00Z", message: { model: "claude-opus-5-5", usage: { input_tokens: 4, cache_read_input_tokens: 1000, cache_creation_input_tokens: 96 }, content: [{ type: "text", text: "Done." }] } },
