@@ -82,6 +82,7 @@ export function createMarket(o: { fetch?: Fetch; now?: () => number } = {}) {
 
   /** The commit an install would pin: date, author and message (through `gh`; empty when it can't say). */
   function commit(fullName: string, sha: string): Promise<Commit> {
+    if (!/^[\w.-]+\/[\w.-]+$/.test(fullName) || !/^[0-9a-f]{40}$/.test(sha)) return Promise.resolve({ sha });
     const k = `${fullName}@${sha}`;
     if (!commits.has(k)) {
       const p = gh([`repos/${fullName}/commits/${sha}`]).then((r) => ({ sha, date: r.data?.commit?.committer?.date, message: r.data?.commit?.message?.split("\n")[0], author: r.data?.commit?.author?.name ?? r.data?.author?.login }));
@@ -104,7 +105,8 @@ export function createMarket(o: { fetch?: Fetch; now?: () => number } = {}) {
       const d = details[i];
       if (!d || out.length >= n) return;
       const runs = d.build.length + d.startup.length + d.events.length;
-      if (d.lines > 160 || d.build.length > 2 || runs > 8) return;
+      // Readable means what runs is in the repo: a build that pipes a download into a shell hides it.
+      if (d.lines > 160 || d.build.length > 2 || runs > 8 || [...d.build, ...d.startup, ...d.events.map((e) => e.command)].some(pipesDownload)) return;
       const why = [
         `${r.stars.toLocaleString("en")} stars${r.starsDelta30d ? `, ${r.starsDelta30d} of them this month` : ""}`,
         `last push ${ago(r.pushedAt!, now())}`,
@@ -134,6 +136,8 @@ export function parseManifest(text: string): Detail {
   };
 }
 
+/** `curl … | sh` and the like: the code that runs isn't in the repo, so nobody can read it first. */
+export const pipesDownload = (argv: string[]) => /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/.test(argv.join(" "));
 const time = (s?: string) => (s ? Date.parse(s) || 0 : 0);
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 const score = (r: Repo) => Math.log10(r.stars + 1) * 2 + Math.log10((r.starsDelta30d ?? 0) + 1);

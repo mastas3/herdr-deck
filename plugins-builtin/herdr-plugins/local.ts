@@ -72,12 +72,14 @@ export function createLocal(cli: Cli, rows: () => Row[]) {
   }
   /** Undo of a remove. A reinstall runs the plugin's build commands again, as the first install did. */
   async function restore(u: Undo) {
-    if (u.kind === "link") {
-      const r = await cli.run(["plugin", "link", u.path, u.enabled ? "--enabled" : "--disabled"], { timeoutMs: 30_000 });
+    if (u?.kind === "link") {
+      if (typeof u.path !== "string" || !u.path.startsWith("/")) throw new Error("That isn't a plugin folder");
+      const r = await cli.run(["plugin", "link", u.path, ...(u.enabled ? [] : ["--disabled"])], { timeoutMs: 30_000 });
       if (r.code !== 0) throw new Error(lastLine(r.err || r.out) || "Couldn't link it again");
       return;
     }
-    const job = install(u.spec, u.ref);
+    if (u?.kind !== "install") throw new Error("Nothing to put back");
+    const job = install(String(u.spec), String(u.ref));
     const done = await waitJob(job.id);
     if (done.state !== "done") throw new Error(done.error ?? "Couldn't install it again");
     if (!u.enabled && done.plugin) await setEnabled(done.plugin.id, false);

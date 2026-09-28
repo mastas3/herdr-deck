@@ -7,7 +7,7 @@
 .hp-h { margin-top: 20px; }
 .hp-desc { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .hp-acts { display: flex; flex-wrap: wrap; gap: 6px; }
-.hp-act { font-size: 13px; padding: 4px 10px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-act { font-size: 13px; padding: 4px 10px; border: 1px solid var(--line-2); border-radius: 999px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hp-act small { color: var(--accent); margin-left: 2px; }
 .hp-auto { font-size: 13px; color: var(--ink-2); }
 .hp-auto ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; }
@@ -28,7 +28,11 @@
 .hp-manh small { color: var(--ink-3); }
 .hp-fit { display: flex; flex-wrap: wrap; gap: 4px; }
 .hp-trust pre, .hp-job pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 260px; overflow: auto; margin: 4px 0 0; }
+.hp-trust p { margin: 0; }
+.hp-trust h4 + p.hint { margin-top: -4px; }
 .hp-commit code { font-size: 12px; overflow-wrap: anywhere; }
+.hp-fold > summary { font-weight: 600; font-size: 14px; margin-top: 10px; cursor: pointer; }
+.hp-fold > h4 { display: none; }
 .hp-picks { display: flex; flex-direction: column; gap: 6px; }
 .hp-pick { display: flex; gap: 8px; align-items: baseline; }
 .hp-pick small { color: var(--ink-3); }

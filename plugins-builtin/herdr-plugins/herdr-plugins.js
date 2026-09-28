@@ -14,6 +14,7 @@ function herdrPlugRedraw() {
   if (!herdrPlugOn()) return;
   const a = document.activeElement, keep = a?.matches?.("[data-hp-q]") ? a.selectionStart : null;
   renderPlugins();
+  for (const p of $("dbody").querySelectorAll(".hp-job pre")) p.scrollTop = p.scrollHeight; // install logs: newest line in view
   if (keep != null) { const q = $("dbody").querySelector("[data-hp-q]"); q?.focus(); q?.setSelectionRange(keep, keep); }
 }
 

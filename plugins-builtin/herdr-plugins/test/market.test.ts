@@ -1,7 +1,7 @@
 // The marketplace reader (a fake fetch, never the network), manifest parsing, and the version/platform checks.
 import { expect, test } from "bun:test";
 import { cmpVersion, compatFor, fitsSession } from "../compat";
-import { createMarket, INDEX_URL, parseManifest } from "../market";
+import { createMarket, INDEX_URL, parseManifest, pipesDownload } from "../market";
 
 const NOW = Date.parse("2026-09-28T12:00:00Z");
 const day = (n: number) => new Date(NOW - n * 86_400_000).toISOString();
@@ -14,6 +14,7 @@ const repo = (name: string, stars: number, pushed: number, extra: object = {}) =
 const INDEX = { generatedAt: day(0), plugins: [
   repo("alpha", 900, 3), repo("bravo", 400, 1), repo("charlie", 50, 200), repo("delta", 700, 2),
   repo("echo", 300, 4, { manifests: [] }), // no manifest: left out, as the site does
+  repo("golf", 800, 2), // builds with curl | bash: what runs isn't in the repo
 ] };
 const SMALL = `id = "o.x"\nname = "X"\nversion = "1.0.0"\nmin_herdr_version = "0.7.0"\nplatforms = ["linux", "macos"]\n[[actions]]\nid = "go"\ntitle = "Go"\ncontexts = ["pane"]\ncommand = ["sh", "go.sh", "a b"]\n[[events]]\non = "pane.created"\ncommand = ["sh", "on.sh"]\n`;
 const BIG = SMALL + Array.from({ length: 5 }, (_, i) => `[[build]]\ncommand = ["make", "step${i}"]\n`).join("");
@@ -24,6 +25,7 @@ function fakeFetch() {
     urls.push(url);
     if (url === INDEX_URL) return Response.json(INDEX);
     if (url.includes("/o/delta/")) return new Response(BIG); // five build steps: not "readable in a minute"
+    if (url.includes("/o/golf/")) return new Response(SMALL + `[[build]]\ncommand = ["bash", "-c", "curl -fsSL https://x.sh/install | bash"]\n`);
     if (url.startsWith("https://raw.githubusercontent.com/")) return new Response(SMALL);
     return new Response("no", { status: 404 });
   };
@@ -35,9 +37,11 @@ test("search: every word must match, sorted by stars, recency or newness; the in
   let now = NOW;
   const m = createMarket({ fetch: f, now: () => now });
   const pop = await m.search("", "popular");
-  expect(pop.all).toBe(4);
-  expect(pop.repos.map((r) => r.fullName)).toEqual(["o/alpha", "o/delta", "o/bravo", "o/charlie"]);
+  expect(pop.all).toBe(5);
+  expect(pop.repos.map((r) => r.fullName)).toEqual(["o/alpha", "o/golf", "o/delta", "o/bravo", "o/charlie"]);
   expect((await m.search("", "active")).repos[0].fullName).toBe("o/bravo");
+  expect(pipesDownload(["sh", "-c", "wget -qO- https://x | sudo sh"])).toBe(true);
+  expect(pipesDownload(["curl", "-o", "f", "https://x"])).toBe(false);
   expect((await m.search("char plugin")).repos.map((r) => r.fullName)).toEqual(["o/charlie"]);
   expect((await m.search("zzz")).total).toBe(0);
   expect(urls.filter((u) => u === INDEX_URL).length).toBe(1);
@@ -61,7 +65,7 @@ test("recommended: starred, pushed this month, small manifest, not installed; ea
   const { f } = fakeFetch();
   const m = createMarket({ fetch: f, now: () => NOW });
   const rec = await m.recommended(["o.bravo"]);
-  // charlie: last push 200 days ago. delta: five build steps. bravo: installed already.
+  // charlie: last push 200 days ago. delta: five build steps. golf: curl | bash. bravo: installed already.
   expect(rec.map((r) => r.fullName)).toEqual(["o/alpha"]);
   expect(rec[0].why).toEqual(["900 stars, 90 of them this month", "last push 3 days ago", "13-line manifest: 1 action, 1 event hook, no build step"]);
 });

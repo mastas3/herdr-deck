@@ -24,6 +24,17 @@ function herdrPlugPickable(m) {
   const { man } = herdrPlug.review;
   return m.version && !m.error && herdrPlugFit(man, m).ok && !m.plugins.some((p) => p.id === man.id);
 }
+/** What to look at twice in a command: code fetched at run time (not in the repo), admin rights, deleting. */
+function herdrPlugFlags(argv) {
+  const s = argv.join(" ");
+  return [
+    /\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/.test(s) && "downloads a script and runs it",
+    /\bsudo\b/.test(s) && "asks for admin rights",
+    /\brm\s+-\w*r/.test(s) && "deletes files",
+  ].filter(Boolean);
+}
+/** A long list folds away (actions only run when picked; what runs by itself always shows). */
+const herdrPlugFold = (fold, summary, html) => (fold ? `<details class="hp-fold"><summary>${esc(summary)}</summary>${html}</details>` : html);
 const herdrPlugSpec = (repo, man) => [repo.fullName, man.path.split("/").slice(0, -1).join("/")].filter(Boolean).join("/");
 
 function herdrPlugTrustView() {
@@ -32,7 +43,7 @@ function herdrPlugTrustView() {
   const back = `<button class="link" data-hp-back>← Back</button>`;
   if (loading || !d) return `<section class="ptrust ccode hp-trust">${back}<h3>${esc(man.name)}</h3><p class="hint">Reading its manifest at ${esc(repo.headCommit?.slice(0, 7) ?? "")}…</p></section>`;
   const owner = repo.fullName.split("/")[0], sub = man.path.split("/").slice(0, -1).join("/");
-  const cmd = (argv) => `<code title="${esc(JSON.stringify(argv))}">${esc(herdrPlugArgv(argv))}</code>`;
+  const cmd = (argv) => `<code title="${esc(JSON.stringify(argv))}">${esc(herdrPlugArgv(argv))}</code>${herdrPlugFlags(argv).map((f) => ` <span class="ptag pw">${f}</span>`).join("")}`;
   const sec = (title, items, none) => `<h4>${title}</h4>${items.length ? `<ul>${items.map((x) => `<li>${x}</li>`).join("")}</ul>` : `<p class="hint">${none}</p>`}`;
   const machines = herdrPlugMachines().map((m) => {
     const ok = herdrPlugPickable(m), has = m.plugins.some((p) => p.id === man.id), fit = herdrPlugFit(man, m);
@@ -49,7 +60,7 @@ function herdrPlugTrustView() {
     ${sec("Runs while it installs", d.build.map(cmd), "Nothing: it has no build step.")}
     ${sec("Runs every time herdr starts", d.startup.map(cmd), "Nothing.")}
     ${sec("Runs on its own when something happens in herdr", d.events.map((e) => `on <b>${esc(e.on)}</b>: ${cmd(e.command)}`), "Nothing: it has no event hooks.")}
-    ${sec("Actions (run only when you pick them)", d.actions.map((a) => `<b>${esc(a.title)}</b>${a.contexts?.length ? ` <span class="hint">(${esc(a.contexts.join(", "))})</span>` : ""}: ${cmd(a.command)}`), "None.")}
+    ${herdrPlugFold(d.actions.length > 4, `Actions (${d.actions.length}, run only when you pick them)`, sec("Actions (run only when you pick them)", d.actions.map((a) => `<b>${esc(a.title)}</b>${a.contexts?.length ? ` <span class="hint">(${esc(a.contexts.join(", "))})</span>` : ""}: ${cmd(a.command)}`), "None."))}
     ${d.panes.length ? sec("Panes it can open", d.panes.map((p) => `<b>${esc(p.title)}</b>: ${cmd(p.command)}`), "") : ""}
     ${d.linkHandlers.length ? sec("Links it takes over (Ctrl-click in herdr)", d.linkHandlers.map((l) => `<b>${esc(l.title)}</b>: <code>${esc(l.pattern)}</code>`), "") : ""}
     <p class="hint">These run from the plugin’s folder. The scripts they name are in the repo at the commit above; read them there before you install.</p>
@@ -82,8 +93,6 @@ async function herdrPlugPoll() {
   }));
   if (herdrPlug.jobs !== jobs) return;
   herdrPlugRedraw();
-  const pre = $("dbody").querySelectorAll(".hp-job pre");
-  for (const p of pre) p.scrollTop = p.scrollHeight;
   if (jobs.some((j) => j.state === "running")) return setTimeout(herdrPlugPoll, 800);
   const ok = jobs.filter((j) => j.state === "done");
   if (ok.length) toast(`${herdrPlug.review?.man.name ?? "Plugin"} installed on ${ok.map((j) => j.label).join(", ")}`);
@@ -99,7 +108,7 @@ function herdrPlugJobsView() {
   const failed = herdrPlug.jobs.some((j) => j.state === "failed");
   return `<section class="ptrust hp-trust">
     <h3>${esc(r?.man.name ?? "Install")}</h3>
-    <p class="hint">${esc(`herdr plugin install ${herdrPlugSpec(r.repo, r.man)} --ref ${r.repo.headCommit}`)}</p>
+    <p class="hint"><code>${esc(`herdr plugin install ${herdrPlugSpec(r.repo, r.man)} --ref ${r.repo.headCommit} --yes`)}</code></p>
     ${blocks}
     <div class="pacts">${running ? `<span class="hint">herdr is cloning it and running its build steps…</span>` : `<button class="btn primary" data-hp-done>Done</button>${failed ? `<button class="btn ghost" data-hp-retry>Back to the review</button>` : ""}`}</div>
   </section>`;

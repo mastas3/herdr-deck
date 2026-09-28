@@ -49,7 +49,7 @@ function herdrPlugCard(m, p) {
     <div class="ptop">${plugIcon(p.name)}<div class="pid"><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(from)}</small></div><span class="pstate ${p.enabled ? "pon" : "poff"}">${p.enabled ? "On" : "Off"}</span></div>
     ${p.description ? `<p class="hp-desc">${esc(p.description)}</p>` : ""}
     ${p.warnings.map((w) => `<p class="derr">${ICON.warn}${esc(w)}</p>`).join("")}
-    ${acts ? `<div class="hp-acts">${acts}</div>` : ""}
+    ${acts && p.enabled ? `<div class="hp-acts">${acts}</div>` : acts ? `<p class="hint">Turn it on to use its ${p.actions.length === 1 ? "action" : `${p.actions.length} actions`}.</p>` : ""}
     ${auto.length ? `<details class="hp-auto"><summary>Runs on its own (${auto.length})</summary><ul>${auto.map((x) => `<li>${x}</li>`).join("")}</ul></details>` : ""}
     ${dir ? `<p class="hp-dir"><code>${esc(dir)}</code> <button class="link" data-hp-copy>Copy</button></p>` : ""}
     ${logs ? herdrPlugLogList(logs) : ""}
@@ -93,8 +93,7 @@ function herdrPlugRepo(r, why) {
   return `<article class="pcard hp-repo">
     <div class="ptop">${plugIcon(r.fullName.split("/")[1])}<div class="pid"><b>${esc(r.manifests.length === 1 ? r.manifests[0].name : r.fullName.split("/")[1])}</b><small><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">${esc(r.fullName)}</a></small></div></div>
     ${r.description ? `<p class="hp-desc">${esc(r.description)}</p>` : ""}
-    <p class="hint">${esc(facts)}</p>
-    ${why ? `<ul class="hp-why">${why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : ""}
+    ${why ? `<ul class="hp-why">${why.map((w) => `<li>${esc(w)}</li>`).join("")}</ul>` : `<p class="hint">${esc(facts)}</p>`}
     ${rows}
   </article>`;
 }
