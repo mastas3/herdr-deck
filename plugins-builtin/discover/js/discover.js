@@ -258,7 +258,7 @@ $("dbody").addEventListener("click", async (e) => {
         try { S.disc.plans.set(slug, await api("/api/discover/idea-file", { slug })); } catch (err) { toast(err.message, true); S.disc.open = null; }
         renderDiscover();
       }
-      $("dbody").querySelector(`[data-islug="${CSS.escape(slug)}"]`)?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      $("dbody").querySelector(`[data-islug="${CSS.escape(slug)}"]`)?.scrollIntoView({ block: "nearest", behavior: motion.reduced() ? "auto" : "smooth" });
     }
     return;
   }
@@ -273,7 +273,7 @@ $("dbody").addEventListener("click", async (e) => {
     card.classList.add("gone");
     await discRepo("dismiss", g);
     for (const k of ["gems", "trending"]) if (S.disc.data?.[k]) S.disc.data[k] = S.disc.data[k].filter((x) => x.full !== g.full);
-    setTimeout(renderDiscover, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180);
+    setTimeout(renderDiscover, motion.reduced() ? 0 : motion.ms(2));
   }
 });
 $("dbody").addEventListener("input", (e) => {

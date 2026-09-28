@@ -154,7 +154,7 @@ function renderChat() {
       chatDom.key = k;
       body.innerHTML = noConv
         ? `<div class="chat noconv"><p class="hint">${r.agent === "shell" ? "A shell. Type a command below and press Enter." : r.empty ? `${esc(r.agent === "opencode" ? "OpenCode" : r.agent === "codex" ? "Codex" : r.agent === "claude" ? "Claude" : r.agent)} is ready. Send it a message below.` : "No conversation found for this pane. Here’s its terminal."}</p><pre class="dterm live">${ansi(tail) || "…"}</pre>${termHidden() || app.classList.contains("term-off") ? `<button class="btn" data-dact="showterm">${ICON.term}Open the terminal</button>` : ""}</div>`
-        : `<div class="chat"><p class="hint">Loading the conversation…</p></div>`;
+        : `<div class="chat loading" aria-busy="true"><p class="sr">Loading the conversation…</p><div class="sk u"></div><div class="sk"></div><div class="sk s"></div></div>`;
     }
     return;
   }
@@ -167,6 +167,7 @@ function renderChat() {
   const rebuilt = chatDom.key !== id || !chatDom.el || !body.contains(chatDom.el);
   const anchor = !rebuilt && !nearBottom ? takeAnchor() : null;
   if (rebuilt) {
+    const wasLoading = !!body.querySelector(".chat.loading");
     chatDom.key = id;
     chatDom.blocks = [];
     const wrap = document.createElement("div");
@@ -176,12 +177,16 @@ function renderChat() {
     chatDom.el = wrap;
     chatSizeObs.disconnect();
     chatSizeObs.observe(wrap);
+    if (wasLoading) motion.enter(wrap, "fade");
   }
   const wrap = chatDom.el;
   wrap.querySelector("[data-earlier]").hidden = !(c.first > 0);
   const old = new Map(chatDom.blocks.map((b) => [b.key, b]));
   const next = [];
   let prevEl = wrap.querySelector("[data-earlier]");
+  // Your message, once the transcript echoes it, takes the pending bubble's place without a second entrance.
+  const echoed = new Set((chatDom.data ?? []).filter((b) => b.kind === "pending" && !blocks.some((x) => x.key === b.key)).map((b) => String(b.ms[0].text ?? "").trim()));
+  let entering = 0;
   for (const b of blocks) {
     const sig = JSON.stringify(b.ms) + (b.kind === "agent" ? JSON.stringify(S.details.get(key)?.data?.subagents?.map((x) => [x.id, x.running, x.now, x.tools])) : "") + expanded.has(b.key);
     let o = old.get(b.key);
@@ -191,7 +196,7 @@ function renderChat() {
       const el = t.content.firstElementChild;
       el.dataset.b = b.key;
       if (o) o.el.replaceWith(el);
-      else if (chatDom.fresh === id) el.classList.add("enter"); // new while you watch: ease it in
+      else if (chatDom.fresh === id && !(b.kind === "user" && echoed.has(String(b.ms[0].text ?? "").trim())) && entering++ < 8) el.classList.add("enter"); // new while you watch: ease it in
       o = { key: b.key, sig, el };
     }
     o.el.classList.toggle("picked", chatSel.has(b.key));
@@ -214,10 +219,12 @@ function renderChat() {
 }
 /** Only the newest agent message is actionable: its choices become buttons, a closing question gets quick replies. */
 function decorateLatest(wrap, blocks, r) {
-  wrap.querySelector(".quick")?.remove();
-  wrap.querySelector(".thinking")?.remove();
+  // The quick replies and the thinking bubble stay put across redraws (re-adding them would replay their entrance).
+  let quick = wrap.querySelector(".quick"), think = wrap.querySelector(".thinking");
   for (const el of wrap.querySelectorAll(".choices.pickable")) el.classList.remove("pickable");
-  if (!r || S.sub) return;
+  for (const el of wrap.querySelectorAll(".msg.live")) el.classList.remove("live");
+  const done = () => { quick?.remove(); think?.remove(); };
+  if (!r || S.sub) return done();
   for (const el of wrap.querySelectorAll(".choices")) el.classList.toggle("can", !r.app && isAgent(r));
   const canSend = !r.app && isAgent(r) && r.status !== "working";
   const lastAsst = [...blocks].reverse().find((b) => b.kind === "assistant");
@@ -230,18 +237,27 @@ function decorateLatest(wrap, blocks, r) {
       const text = String(lastAsst.ms[0].text ?? "").trim();
       const q = text.split(/\n\s*\n/).pop() ?? "";
       if (/\?\s*\**\s*$/.test(q) && /\b(should|shall|want|do you|would you|can i|may i|ok to|okay to|go ahead|proceed|ready)\b/i.test(q)) {
-        const d = document.createElement("div");
-        d.className = "quick";
-        d.innerHTML = ["Yes, go ahead", "No, not now", "Tell me more first"].map((t) => `<button class="btn" data-quick="${esc(t)}">${esc(t)}</button>`).join("");
-        lastEl.after(d);
+        if (quick && quick.previousElementSibling === lastEl) quick = null;
+        else {
+          const d = document.createElement("div");
+          d.className = "quick";
+          d.innerHTML = ["Yes, go ahead", "No, not now", "Tell me more first"].map((t) => `<button class="btn" data-quick="${esc(t)}">${esc(t)}</button>`).join("");
+          lastEl.after(d);
+        }
       }
     }
   }
   // A turn is running but nothing has come back yet: say so, in the chat, where you're looking.
   if (r.status === "working" && tailBlock && (tailBlock.kind === "user" || tailBlock.kind === "pending")) {
-    const d = document.createElement("div");
-    d.className = "thinking";
-    d.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>${esc(r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent)} is thinking`;
-    wrap.append(d);
+    if (think) { if (think.nextElementSibling) { wrap.append(think); think.style.animation = "none"; } think = null; }
+    else {
+      const d = document.createElement("div");
+      d.className = "thinking";
+      d.innerHTML = `<span class="dots"><i></i><i></i><i></i></span>${esc(r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent)} is thinking`;
+      wrap.append(d);
+    }
   }
+  // Still writing this message: a caret after its newest words.
+  if (r.status === "working" && lastEl && tailBlock === lastAsst) lastEl.classList.add("live");
+  done();
 }

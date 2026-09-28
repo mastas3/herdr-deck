@@ -66,7 +66,7 @@ $("detail").addEventListener("click", (e) => {
   const fp = e.target.closest("[data-path]");
   if (fp && !chatSel.size) { e.preventDefault(); e.stopPropagation(); return openFile(fp.dataset.path); }
   const blockEl = e.target.closest("[data-b]");
-  if (e.target.closest("[data-copy]") && blockEl) return copyBlocks([blockEl.dataset.b]);
+  if (e.target.closest("[data-copy]") && blockEl) { motion.confirm(e.target.closest("[data-copy]"), ICON.check); return copyBlocks([blockEl.dataset.b]); }
   if (e.target.closest("[data-pick]") && blockEl) return pickBlock(blockEl.dataset.b, e.shiftKey);
   if (chatSel.size && blockEl && !e.target.closest("a, button, [data-toggle]")) return pickBlock(blockEl.dataset.b, e.shiftKey);
   if (e.target.closest("[data-selcopy]")) { copyBlocks([...chatSel]); return clearPicks(); }
@@ -84,7 +84,14 @@ $("detail").addEventListener("click", (e) => {
   const quick = e.target.closest("[data-quick]");
   if (quick) return sendMessage(quick.dataset.quick, $("cText"));
   const fold = e.target.closest("[data-fold]");
-  if (fold) { const k = fold.dataset.fold; expanded.has(k) ? expanded.delete(k) : expanded.add(k); chatDom.v = -1; return renderChat(); }
+  if (fold) {
+    const k = fold.dataset.fold, opening = !expanded.has(k);
+    opening ? expanded.add(k) : expanded.delete(k); chatDom.v = -1; renderChat();
+    // The calls that were hidden drop in one after another (a height animation would relayout a long chat every frame).
+    const lines = opening ? [...(chatDom.blocks.find((o) => o.key === k)?.el.querySelectorAll(".tool") ?? [])].slice(0, -3) : [];
+    lines.forEach((el, i) => motion.enter(el, "drop", i));
+    return;
+  }
   const t = e.target.closest("[data-toggle]");
   if (t) return t.classList.toggle("clamp");
   if (e.target.closest("[data-earlier]")) return loadEarlier();

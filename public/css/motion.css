@@ -1,20 +1,138 @@
-/* ── micro-animations ── */
-.row { transition: background .12s, box-shadow .15s; }
-.row:active { transform: scale(.985); }
-/* Only a row that is new to the list slides in; re-inserting rows on a reorder must not replay it (FLIP moves those). */
-@starting-style { .row.born, .dcard, .toast { opacity: 0; transform: translateY(4px); } }
-.row, .dcard { transition: background .12s, box-shadow .15s, opacity .25s var(--ease), transform .25s var(--ease); }
-@media (prefers-reduced-motion: reduce) { .row { transition: none; } .row:active { transform: none; } .row.flash::after { animation: none; } .rows .sec-b { animation: none; } }
-.toast { transition: opacity .2s var(--ease), transform .25s var(--ease); }
-.btn { transition: background .12s, border-color .12s, color .12s, transform .1s; }
-.btn:active { transform: scale(.96); }
-.btn.primary:hover { filter: brightness(1.07); }
-.sec-b { animation: enter .16s var(--ease); }
-.rows.settled .sec-b { animation: none; }
-.views button { transition: background .12s, color .12s, border-color .15s, transform .1s; }
-.views button:active { transform: scale(.95); }
-.views button b { animation: tick .3s var(--ease); }
-.msg.user.pending { animation: sendup .28s var(--ease); }
-@keyframes sendup { from { opacity: 0; transform: translateY(14px) scale(.98); } }
-dialog[open]::backdrop { animation: fade .18s ease; }
+/* ── motion: one set of tokens and rules for everything that moves (public/js/motion.js is the JS half) ──
+   The action happens at once; motion only shows what changed. Exits are faster than entrances. Only transform and
+   opacity animate (a colour, an outline or a small bar at most). Nothing moves on first paint but a fade.
+   Reduce motion (the system setting, or Settings → Reduce motion: <html data-motion="reduce">) stops all of it. */
+:root {
+  --ease-out: cubic-bezier(.2,.8,.2,1); --ease-in-out: cubic-bezier(.65,0,.35,1); --ease-spring: cubic-bezier(.34,1.4,.64,1);
+  --dur-1: 90ms; --dur-2: 160ms; --dur-3: 240ms; --dur-4: 360ms;
+  --press: .96;
+}
+@keyframes enter { from { opacity: 0; transform: translateY(8px); } }
 @keyframes fade { from { opacity: 0; } }
+@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes popup { from { opacity: 0; transform: translateY(6px) scale(.98); } }
+@keyframes chipin { from { opacity: 0; transform: scale(.88); } }
+@keyframes viewin { from { opacity: 0; transform: translateY(6px); } }
+@keyframes sheetup { from { transform: translateY(100%); } }
+@keyframes sendup { from { opacity: 0; transform: translateY(14px) scale(.98); } }
+@keyframes tick { 40% { transform: scale(1.18); } }
+@keyframes shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes sweep { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+@keyframes ring { from { outline-offset: 6px; outline-color: transparent; } }
+@keyframes breathe { 50% { transform: scale(1.7); opacity: .2; } }
+@keyframes ping { from { transform: scale(1); opacity: .9; } to { transform: scale(3); opacity: 0; } }
+@keyframes caret { 50% { opacity: 0; } }
+@keyframes chose { 40% { transform: scale(1.015); } }
+
+/* ── press: anything you tap gives a little and springs back; hover lifts what opens something ── */
+:where(.btn, .ib, .chip, .seg button, .seg2 button, .views button, .machines button, .tile, .ropt, .ctools, .sec-h, .gapbtn,
+  .jumpbtm, .keys button, .askbox .ks button, .jevtog, .livebar, .menu button, .pal-list button, .slashpop .si, .pchip .pl,
+  .fold, .port, .sl-acct, .cbrun, .agent-card, .card, .row, .choice, .vclose, .newpill, .sugg button) {
+  transition: transform var(--dur-3) var(--ease-spring), background-color var(--dur-1) linear, border-color var(--dur-1) linear,
+    color var(--dur-1) linear, box-shadow var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out), filter var(--dur-1) linear;
+}
+@media (hover: hover) {
+  :where(.card, .choices:is(.pickable, .can) .choice, .agent-card:not(:disabled), .jumpbtm):hover { transform: translateY(-1px); }
+}
+:where(.btn, .ib, .chip, .seg button, .seg2 button, .views button, .machines button, .tile, .ropt, .ctools, .gapbtn, .jumpbtm,
+  .keys button, .askbox .ks button, .jevtog, .pchip .pl, .fold, .port, .sl-acct, .cbrun, .vclose, .newpill, .sugg button):active:not(:disabled) {
+  transform: scale(var(--press)); transition-duration: var(--dur-1); transition-timing-function: var(--ease-out);
+}
+:where(.row, .sec-h, .card, .choice, .agent-card, .livebar, .menu button, .pal-list button, .slashpop .si):active:not(:disabled) {
+  transform: scale(.985); transition-duration: var(--dur-1); transition-timing-function: var(--ease-out);
+}
+.btn.primary:hover { filter: brightness(1.07); }
+/* Focus rings draw in, from a little further out. */
+:focus-visible { animation: ring var(--dur-2) var(--ease-out); }
+
+/* ── list: rows arrive, leave, glide, and say when their status changes ── */
+.rows { position: relative; isolation: isolate; }
+/* Only a row that is new to the list slides in (list.js caps a batch at 8); a reorder glides (FLIP in list.js). */
+@starting-style { .row.born, .dcard, .card.enter { opacity: 0; transform: translateY(4px); } }
+.row.born { transition-timing-function: var(--ease-out); }
+.dcard { transition: opacity var(--dur-3) var(--ease-out), transform var(--dur-3) var(--ease-out); }
+.dcard.leaving { transition-duration: var(--dur-2); transition-timing-function: var(--ease-in-out); }
+/* The selection highlight glides between rows: a stand-in moves while the target's own highlight waits. */
+.selglide { position: absolute; z-index: -1; pointer-events: none; border-radius: 9px; background: var(--sel); transform-origin: 0 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+.row.sel.gliding { background: transparent; box-shadow: none; }
+/* Working: a soft ring breathes around the dot (transform and opacity, so fifty of them cost nothing). */
+.row > .dot, .tile .ab { position: relative; }
+.row[data-status="working"] > .dot::after, .tile[data-status="working"] .ab::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--working) 45%, transparent); animation: breathe 1.8s var(--ease-in-out) infinite;
+}
+/* Needs you: the row flashes once and its dot sends out one ring. Never a loop. */
+.row.flash > .dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none; background: var(--c, var(--blocked)); animation: ping 700ms var(--ease-out) both; }
+.row .why.chg { animation: tick var(--dur-3) var(--ease-in-out); }
+.lf .lfn b, .sec-h .n, .machines .n { display: inline-block; }
+.sec-h .chev { transition: transform var(--dur-2) var(--ease-out); }
+.sec-b { animation: enter var(--dur-2) var(--ease-out); }
+.rows.settled .sec-b { animation: none; }
+.empty-state, .empty-v { animation: fade var(--dur-3) var(--ease-out); }
+.views button b { display: inline-block; animation: tick var(--dur-3) var(--ease-in-out); }
+
+/* ── chat ── */
+.enter, .quick, .thinking { animation: enter var(--dur-3) var(--ease-out) both; }
+.msg.user.pending { animation: sendup var(--dur-3) var(--ease-out); }
+/* Streaming: a caret after the newest words while the agent is still on this message. */
+.msg.assistant.live .md > :is(p, li):last-child::after, .msg.assistant.live .md > :is(ul, ol):last-child > li:last-child::after {
+  content: ""; display: inline-block; width: 2px; height: 1.05em; margin-left: 3px; vertical-align: -.15em; border-radius: 1px;
+  background: var(--working); animation: caret 1s steps(2, jump-none) infinite;
+}
+.choices.pickable .choice.on, .choices.can .choice.on { animation: chose var(--dur-3) var(--ease-out); }
+.mt { transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+.ib.done { color: var(--idle); }
+.jumpbtm .n { animation: chipin var(--dur-3) var(--ease-spring); }
+
+/* ── composer, menus, dialogs, toasts ── */
+.catt, .qbar { position: relative; }
+.menu { animation: pop var(--dur-2) var(--ease-out); }
+.menu.up { animation-name: popup; }
+.slashpop { transform-origin: 30px 100%; }
+dialog { opacity: 0; transform: scale(.96);
+  transition: opacity var(--dur-1) var(--ease-in-out), transform var(--dur-1) var(--ease-in-out), overlay var(--dur-1) allow-discrete, display var(--dur-1) allow-discrete; }
+dialog[open] { opacity: 1; transform: none; transition-duration: var(--dur-3); transition-timing-function: var(--ease-out); }
+@starting-style { dialog[open] { opacity: 0; transform: scale(.96); } }
+dialog::backdrop { opacity: 0; transition: opacity var(--dur-1) linear, overlay var(--dur-1) allow-discrete, display var(--dur-1) allow-discrete; }
+dialog[open]::backdrop { opacity: 1; transition-duration: var(--dur-3); }
+@starting-style { dialog[open]::backdrop { opacity: 0; } }
+.palette { transform-origin: 50% 0; }
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.toasts .toast { pointer-events: auto; }
+
+/* ── meters, progress, loading, switches ── */
+.mb i, .prog i { transform-origin: 0 50%; }
+.nowbar .prog i { transition: width var(--dur-4) var(--ease-out); }
+/* Skeletons: a soft light sweeps across (a transform, not a repaint) where content is on its way. */
+.sk { position: relative; overflow: hidden; background: color-mix(in srgb, var(--ink-3) 13%, transparent); border-radius: 12px; }
+.sk::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); animation: sweep 1.4s var(--ease-in-out) infinite;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--ink) 7%, transparent), transparent); }
+.chat.loading { display: flex; flex-direction: column; gap: 14px; }
+.chat.loading .sk { height: 58px; width: min(72%, 560px); }
+.chat.loading .sk.u { align-self: flex-end; height: 40px; width: min(46%, 360px); border-radius: 16px; }
+.chat.loading .sk.s { height: 22px; width: min(38%, 300px); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.sw span { transition: background-color var(--dur-2) linear; }
+.sw span::after { transition: transform var(--dur-3) var(--ease-spring), width var(--dur-2) var(--ease-out); }
+.sw:active span::after { width: 20px; }
+.sw:active input:checked + span::after { transform: translateX(12px); }
+
+/* ── whole-page changes (theme, Simple mode) cross-fade ── */
+:root.vt-swap::view-transition-old(root), :root.vt-swap::view-transition-new(root) { animation-duration: var(--dur-3); animation-timing-function: var(--ease-in-out); }
+
+@media (max-width: 760px) {
+  /* Sheets rise from the bottom edge instead of growing from the middle. */
+  dialog { transform: translateY(32px); }
+  @starting-style { dialog[open] { opacity: 0; transform: translateY(32px); } }
+  .menu { animation-name: popup; }
+  .toasts { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); align-items: stretch; }
+}
+/* Reduce motion: everything lands at once. (motion.js checks the same two switches before it animates.) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important;
+    transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+}
+:root[data-motion="reduce"] *, :root[data-motion="reduce"] *::before, :root[data-motion="reduce"] *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+  animation-delay: 0s !important; transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+:root[data-motion="reduce"]::view-transition-group(*) { animation: none !important; }

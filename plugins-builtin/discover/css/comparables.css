@@ -4,7 +4,7 @@
 .galcheck p { margin: 0 !important; font-size: 14.5px !important; }
 .galcsum { margin: 0 0 12px !important; color: var(--ink-2); font-size: 14.5px !important; }
 .galcomps { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
-.galcomp { border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 40%, var(--raise)); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.galcomp { border: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 40%, var(--raise)); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; min-width: 0; animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
 .galcomp header { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
 .galcomp .gname { font: 650 15px/1.3 var(--sans); color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
 .galcomp .gname:hover { color: var(--accent); }

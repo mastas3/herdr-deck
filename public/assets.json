@@ -1,6 +1,7 @@
 {
   "scripts": [
     "js/core.js",
+    "js/motion.js",
     "js/registry.js",
     "js/format.js",
     "js/markdown.js",

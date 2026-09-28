@@ -71,7 +71,7 @@ function openMenu(anchor, items, heading, cls = "") {
     if (e.key === "Escape") { e.preventDefault(); closeMenu(); anchor.focus?.(); }
   });
 }
-function closeMenu() { menuEl?.remove(); menuEl = null; }
+function closeMenu() { if (menuEl) motion.leave(menuEl, "fade"); menuEl = null; }
 addEventListener("pointerdown", (e) => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
 function moreMenu(anchor) {
   const r = rowOf(S.sel);
@@ -112,10 +112,11 @@ function settingsMenu(anchor) {
     { html: "Tools<small>What each tool does; add your own</small>", run: () => setMode("tools") },
     { html: "Usage<small>Every AI account’s limits and balance, on every machine</small>", run: () => setMode("usage") },
     ...deckPlugins.contributions("settings.entries"),
+    { html: `Reduce motion: ${motion.reduced() ? "on" : "off"}<small>${motion.reduced() ? "Your system asks for less motion" : "Things change at once, without animating"}</small>`, run: () => { motion.setReduced(!motion.reduced()); toast(`Reduce motion ${motion.reduced() ? "on" : "off"}`); } },
     !isPhone() && { html: "Keyboard shortcuts", run: () => $("help").showModal() },
   ].filter(Boolean));
 }
-function setTheme(name) { applyTheme(name); store("theme", name); }
+function setTheme(name) { motion.swap(() => applyTheme(name)); store("theme", name); }
 function toggleTheme() {
   const cur = document.documentElement.dataset.theme || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
   setTheme(["light", "paper"].includes(cur) ? "dark" : "light");
@@ -151,7 +152,7 @@ async function openMachines() {
   };
   draw();
   document.body.append(d);
-  d.addEventListener("close", () => d.remove());
+  d.addEventListener("close", () => motion.drop(d));
   d.addEventListener("click", async (e) => {
     const add = e.target.closest("[data-madd]"), del = e.target.closest("[data-mdel]"), ren = e.target.closest("[data-mren]");
     const log = d.querySelector(".mlog");
@@ -190,6 +191,6 @@ function setSimple(on) {
   if (on) { S.tab = "chat"; S.mode = null; }
   headSig = ""; bodySig = ""; chatDom.key = null; lastOrder = "";
   for (const c of rowCache.values()) c.sig = "";
-  render(); renderDetail();
+  motion.swap(() => { renderNow(); renderDetail(); });
   toast(on ? "Simple mode on. Settings → Simple mode turns it off." : "Simple mode off");
 }

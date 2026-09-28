@@ -37,7 +37,7 @@ $("dbody").addEventListener("click", async (e) => {
     const dir = st.dataset.sdir === "audience" ? "audience" : "idea";
     const ta = $("dbody").querySelector("[data-lq]"); if (ta) { ta.value = st.dataset.lstart; ta.placeholder = LDIR[dir].ph; }
     const gl = $("dbody").querySelector("[data-lgolabel]"); if (gl) gl.textContent = LDIR[dir].go;
-    $("dbody").scrollTo?.({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    $("dbody").scrollTo?.({ top: 0, behavior: motion.reduced() ? "auto" : "smooth" });
     return leadsSearch(st.dataset.lstart, dir);
   }
   const th = t.closest("[data-lth]");
@@ -91,7 +91,7 @@ $("dbody").addEventListener("click", async (e) => {
         try { L.reports.set(slug, await api("/api/leads/report", { slug })); } catch (err) { toast(err.message, true); L.report = null; }
         leadsPatch();
       }
-      $("dbody").querySelector(`[data-lrep="${CSS.escape(slug)}"]`)?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+      $("dbody").querySelector(`[data-lrep="${CSS.escape(slug)}"]`)?.scrollIntoView({ block: "nearest", behavior: motion.reduced() ? "auto" : "smooth" });
     }
   }
 });

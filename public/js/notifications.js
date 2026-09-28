@@ -164,7 +164,7 @@ async function openNotifications() {
   });
   draw();
   document.body.append(d);
-  d.addEventListener("close", () => { clearTimeout(saveT); d.remove(); });
+  d.addEventListener("close", () => { clearTimeout(saveT); motion.drop(d); });
   d.showModal();
   d.scrollTop = 0; // focus sits on Done (no keyboard popping up on a phone); keep the top in view
 }
@@ -287,7 +287,7 @@ async function openAutomations() {
   });
   draw();
   document.body.append(d);
-  d.addEventListener("close", () => d.remove());
+  d.addEventListener("close", () => motion.drop(d));
   d.showModal();
   d.scrollTop = 0;
 }

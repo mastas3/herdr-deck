@@ -37,7 +37,7 @@ const Q_PROOF = { sell: ["Sell", "coin"], talk: ["Talk to users", "chats"], lead
 const Q_TYPE_ICON = { ship: "rocket", sell: "coin", talk: "chat", build: "wrench", prune: "skull", bonus: "quest" };
 const qmoney = (n) => `$${Number(n || 0).toLocaleString("en", { maximumFractionDigits: n >= 100 ? 0 : 2 })}`;
 const qnum = (n) => (n == null ? "–" : Number(n).toLocaleString("en", { maximumFractionDigits: 1 }));
-const qreduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+const qreduced = () => motion.reduced();
 const qseen = (k) => new Set(load(`qseen:${k}`, []));
 const qmark = (k, ids) => { const s = qseen(k); for (const i of ids) s.add(i); store(`qseen:${k}`, [...s].slice(-400)); };
 

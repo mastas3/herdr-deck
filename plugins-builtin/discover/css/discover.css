@@ -5,7 +5,7 @@
 .dlead { margin: 14px 0 12px; }
 .dprof .dsub { margin-top: 16px; }
 .dchips { display: flex; flex-wrap: wrap; gap: 6px; }
-.dchip { display: inline-flex; align-items: center; border: 1px solid var(--line-2); border-radius: 999px; background: var(--raise); overflow: hidden; animation: chipin .2s var(--ease) both; }
+.dchip { display: inline-flex; align-items: center; border: 1px solid var(--line-2); border-radius: 999px; background: var(--raise); overflow: hidden; animation: chipin var(--dur-3) var(--ease-out) both; }
 .dchip > button { border: 0; background: none; color: var(--ink-2); padding: 5px 4px 5px 11px; font: 500 13.5px/1.2 var(--read); cursor: pointer; }
 .dchip > button:hover { color: var(--ink); }
 .dchip .dx { padding: 5px 9px 5px 4px; color: var(--ink-3); display: grid; place-items: center; }
@@ -21,7 +21,7 @@
 .dstale { color: var(--working); font-weight: 600; }
 .dgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; }
 .gcard { position: relative; border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; min-width: 0;
-  transition: border-color .15s, box-shadow .2s var(--ease), transform .15s var(--ease), opacity .18s; animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 22ms); }
+  transition: border-color var(--dur-2), box-shadow var(--dur-3) var(--ease-out), transform var(--dur-2) var(--ease-out), opacity var(--dur-2); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 22ms); }
 .gcard:hover { border-color: var(--line-2); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.16); }
 .gcard.gone { opacity: 0; transform: scale(.97); }
 .gcard.skel { height: 170px; background: linear-gradient(100deg, var(--raise) 40%, var(--hover) 50%, var(--raise) 60%) 0 0 / 200% 100%; animation: shimmer 1.2s linear infinite; }
@@ -45,11 +45,11 @@
 .dstrip .gcard { flex: 0 0 min(300px, 82%); scroll-snap-align: start; }
 .gcard.gmini .gdesc { -webkit-line-clamp: 2; }
 .dlab { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
-.dbig { width: 100%; box-sizing: border-box; min-height: 92px; resize: vertical; background: var(--raise); border: 1px solid var(--line-2); border-radius: 14px; padding: 14px 16px; color: var(--ink); font: 17px/1.5 var(--read); transition: border-color .15s, box-shadow .2s; }
+.dbig { width: 100%; box-sizing: border-box; min-height: 92px; resize: vertical; background: var(--raise); border: 1px solid var(--line-2); border-radius: 14px; padding: 14px 16px; color: var(--ink); font: 17px/1.5 var(--read); transition: border-color var(--dur-2), box-shadow var(--dur-3); }
 .dbig:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .dlabacts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .dlabacts .hint { flex: 1 1 240px; font-size: 12.5px; }
-.dres { margin-top: 14px; animation: enter .22s var(--ease) both; }
+.dres { margin-top: 14px; animation: enter var(--dur-3) var(--ease-out) both; }
 .dkw { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin: 0 0 8px; }
 .dkw > .hint { margin-right: 4px; font-size: 13px; }
 .dtag { font: 12.5px/1.3 var(--read); border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 9px; color: var(--ink-2); background: var(--raise); text-decoration: none; }
@@ -69,14 +69,14 @@ a.dtag:hover { color: var(--ink); border-color: var(--ink-3); }
 .dracts .btn { font-size: 13px; padding: 3px 8px; }
 .dsparks { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .spark { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; isolation: isolate;
-  background: linear-gradient(145deg, color-mix(in srgb, oklch(0.7 0.12 var(--h)) 14%, var(--raise)), var(--raise) 60%); animation: enter .26s var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); transition: transform .15s var(--ease), box-shadow .2s var(--ease), border-color .15s; }
+  background: linear-gradient(145deg, color-mix(in srgb, oklch(0.7 0.12 var(--h)) 14%, var(--raise)), var(--raise) 60%); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 40ms); transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-3) var(--ease-out), border-color var(--dur-2); }
 .spark:hover { transform: translateY(-1px); border-color: var(--line-2); box-shadow: 0 8px 24px rgba(0,0,0,.18); }
 .spark h4 { margin: 0; font: 600 17px/1.3 var(--serif); color: var(--ink); }
 .spark p { margin: 0; color: var(--ink-2); font-size: 13.5px; line-height: 1.45; }
 .suses { display: flex; flex-wrap: wrap; gap: 4px; }
 .suses .dtag { font-size: 11.5px; padding: 1px 7px; }
 .dideas { display: flex; flex-direction: column; gap: 10px; }
-.icard { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; animation: enter .22s var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+.icard { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 30ms); }
 .icard.open { border-color: var(--line-2); }
 .itop { display: flex; align-items: center; gap: 10px; cursor: pointer; min-width: 0; }
 .itop h4 { margin: 0; font: 600 16px/1.3 var(--read); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -85,7 +85,7 @@ a.dtag:hover { color: var(--ink); border-color: var(--ink-3); }
 .ist.busy { color: var(--working); background: color-mix(in srgb, var(--working) 14%, transparent); }
 .iidea { margin: 0; color: var(--ink-2); font: italic 14.5px/1.45 var(--serif); }
 .isum { margin: 0; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
-.iplan { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px; max-width: 76ch; animation: enter .2s var(--ease) both; }
+.iplan { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 2px; max-width: 76ch; animation: enter var(--dur-3) var(--ease-out) both; }
 .iplan table { border-collapse: collapse; font-size: 13.5px; display: block; overflow-x: auto; }
 .iplan th, .iplan td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; overflow-wrap: break-word; min-width: 8ch; max-width: 40ch; }
 .iplan > h1:first-child { display: none; } /* the card already shows the plan's name */
@@ -104,7 +104,7 @@ a.dtag:hover { color: var(--ink); border-color: var(--ink-3); }
 /* Mixer cards and chips (Mixes for you, Saved, Studio builds) */
 .k-project { --kc: var(--idle); } .k-repo { --kc: var(--unknown); } .k-conn { --kc: var(--accent); } .k-tool { --kc: var(--working); } .k-interest { --kc: oklch(0.68 0.15 350); }
 .mpick { display: inline-flex; align-items: center; max-width: 100%; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--kc) 60%, transparent); background: color-mix(in srgb, var(--kc) 16%, var(--raise)); color: var(--ink); font: 500 13px/1.2 var(--read); min-width: 0; }
-.mpick.fresh { animation: chipin .18s var(--ease) both; }
+.mpick.fresh { animation: chipin var(--dur-2) var(--ease-out) both; }
 .mpick > span { padding: 4px 2px 4px 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
 .mpick button { border: 0; background: none; color: var(--ink-3); padding: 4px 8px 4px 4px; display: grid; place-items: center; cursor: pointer; }
 .mpick button svg { width: 11px; height: 11px; }
@@ -113,7 +113,7 @@ a.dtag:hover { color: var(--ink); border-color: var(--ink-3); }
 .mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
 .mixcard { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 13px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0;
   background: linear-gradient(150deg, color-mix(in srgb, oklch(0.7 0.12 var(--h)) 12%, var(--raise)), var(--raise) 55%);
-  animation: enter .26s var(--ease) both; animation-delay: calc(var(--i, 0) * 45ms); transition: transform .15s var(--ease), box-shadow .2s var(--ease), border-color .15s; }
+  animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 45ms); transition: transform var(--dur-2) var(--ease-out), box-shadow var(--dur-3) var(--ease-out), border-color var(--dur-2); }
 .mixcard.still { animation: none; }
 .mixcard:hover { transform: translateY(-1px); border-color: var(--line-2); box-shadow: 0 8px 24px rgba(0,0,0,.16); }
 .mixcard.skel { min-height: 190px; background: linear-gradient(100deg, var(--raise) 40%, var(--hover) 50%, var(--raise) 60%) 0 0 / 200% 100%; animation: shimmer 1.2s linear infinite; }
@@ -131,10 +131,10 @@ a.dtag:hover { color: var(--ink); border-color: var(--ink-3); }
 .mmore { font-size: 13.5px; color: var(--ink-2); }
 .mmore summary { cursor: pointer; color: var(--ink-3); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 5px; padding: 2px 0; }
 .mmore summary::-webkit-details-marker { display: none; }
-.mmore summary::before { content: ""; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(-45deg); transition: transform .15s var(--ease); }
+.mmore summary::before { content: ""; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: rotate(-45deg); transition: transform var(--dur-2) var(--ease-out); }
 .mmore[open] summary::before { transform: rotate(45deg); }
 .mmore summary:hover { color: var(--ink); }
-.mmore[open] > :not(summary) { animation: enter .18s var(--ease) both; }
+.mmore[open] > :not(summary) { animation: enter var(--dur-2) var(--ease-out) both; }
 .mhow { margin: 6px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; line-height: 1.4; }
 .mhow .ming { margin-right: 4px; }
 .mwhy { margin: 8px 0 0; line-height: 1.45; }

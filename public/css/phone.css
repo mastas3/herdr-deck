@@ -73,6 +73,6 @@
   .palette .pal-list { flex: 1; max-height: none; }
   .pal-foot { display: none; }
   .field input, .field textarea, .field select, .palette input, .proute textarea { font-size: 16px; }
-  .toast { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); max-width: none; }
+  .toast { max-width: none; }
   .menu { left: 8px !important; right: 8px; max-width: none; top: auto !important; bottom: calc(8px + env(safe-area-inset-bottom)); }
 }

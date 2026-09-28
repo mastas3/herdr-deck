@@ -30,7 +30,7 @@
 .sec-h { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: none; padding: 4px 6px; font-size: 13.5px; font-weight: 600; color: var(--ink-3); text-align: left; border-radius: 6px; }
 .sec-h:hover { color: var(--ink); background: var(--hover); }
 .sec-h .n { font-weight: 400; font-variant-numeric: tabular-nums; }
-.sec-h .chev { width: 14px; height: 14px; transition: transform .12s; flex: none; }
+.sec-h .chev { width: 14px; height: 14px; flex: none; }
 .sec.closed .chev { transform: rotate(-90deg); }
 .sec.closed .sec-b { display: none; }
 .sec-h .act { margin-left: auto; font-weight: 400; }
@@ -42,20 +42,18 @@
 .sec.proj .sec-h { color: var(--ink); font-size: 14.5px; }
 .sec.proj .sec-h .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--pc); flex: none; }
 .sec.proj .sec-h .dots { margin-left: auto; display: flex; gap: 3px; }
-.sec-h .padd { display: grid; place-items: center; width: 22px; height: 22px; margin: -3px -2px -3px 4px; border-radius: 6px; color: var(--ink-3); opacity: 0; transition: opacity .12s, background .12s; flex: none; }
+.sec-h .padd { display: grid; place-items: center; width: 22px; height: 22px; margin: -3px -2px -3px 4px; border-radius: 6px; color: var(--ink-3); opacity: 0; transition: opacity var(--dur-1), background-color var(--dur-1); flex: none; }
 .sec-h:hover .padd, .sec-h:focus-visible .padd, .sec-h .padd:focus-visible { opacity: 1; }
 .sec-h .padd:hover { background: var(--hover); color: var(--ink); }
 @media (hover: none) { .sec-h .padd { opacity: .8; } }
-.row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 8px; padding: 7px 8px 8px; border-radius: 9px; cursor: pointer; align-items: baseline; transition: background .1s, transform .08s; }
+.row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; gap: 2px 8px; padding: 7px 8px 8px; border-radius: 9px; cursor: pointer; align-items: baseline; }
 .row:hover { background: var(--hover); }
 /* One look per meaning: selected = filled + ringed (only ever one row); picked = dashed outline; needs you = the left bar. */
 .row.sel { background: var(--sel); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
 .row.picked { outline: 1.5px dashed color-mix(in srgb, var(--accent) 75%, transparent); outline-offset: -2px; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c, var(--idle)); align-self: center; justify-self: center; flex: none; display: inline-block; }
-.row[data-status="working"] > .dot { animation: pulse 1.6s ease-in-out infinite; }
 .row[data-status="blocked"] > .dot { box-shadow: 0 0 0 3px color-mix(in srgb, var(--blocked) 30%, transparent); }
 .row[data-status="empty"] > .dot { background: transparent; box-shadow: inset 0 0 0 1.5px var(--empty); }
-@keyframes pulse { 0%, 100% { box-shadow: 0 0 0 2px color-mix(in srgb, var(--working) 35%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--working) 10%, transparent); } }
 .row .pl { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; overflow: hidden; font-size: 13.5px; }
 .pj { color: var(--pc); font-weight: 700; overflow: hidden; text-overflow: ellipsis; flex: none; max-width: 70%; }
 .via { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
@@ -90,13 +88,10 @@
 .mini::-webkit-scrollbar { display: none; }
 .mini .mh { font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); text-align: center; margin: 8px 0 2px; display: flex; gap: 4px; align-items: center; justify-content: center; }
 .mini .mh .n { color: var(--ink-2); }
-.tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; border: 0; border-radius: 10px; background: transparent; transition: background .1s, transform .08s; }
+.tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 2px 5px; border: 0; border-radius: 10px; background: transparent; }
 .tile:hover { background: var(--hover); }
 .tile.sel { background: var(--sel); }
-.tile:active { transform: scale(.96); }
 .tile .ab { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font: 700 13.5px/1 var(--sans); letter-spacing: .02em; color: var(--pc); background: color-mix(in srgb, var(--pc) 16%, transparent); border: 1px solid color-mix(in srgb, var(--pc) 40%, transparent); }
-.tile[data-status="working"] .ab { animation: tilepulse 1.8s ease-in-out infinite; }
-@keyframes tilepulse { 0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--working) 55%, transparent); } 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--working) 0%, transparent); } }
 .tile .sd { position: absolute; top: 3px; right: 12px; width: 11px; height: 11px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 2px var(--side); }
 .tile .sb { position: absolute; top: 30px; left: 10px; font: 600 10px/1 var(--sans); background: var(--working); color: #1a1405; border-radius: 99px; padding: 2px 4px; box-shadow: 0 0 0 2px var(--side); }
 .tile .tt { font-size: 11.5px; line-height: 1.15; color: var(--ink-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -1,6 +1,5 @@
 /* ── menus, palette, dialogs ──────────────────────────────────── */
-.menu { position: fixed; z-index: 30; min-width: 230px; max-width: min(360px, 92vw); max-height: 60vh; overflow-y: auto; background: var(--raise); border: 1px solid var(--line-2); border-radius: 11px; padding: 5px; box-shadow: 0 14px 40px rgba(0,0,0,.35); animation: pop .12s var(--ease); }
-@keyframes pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+.menu { position: fixed; z-index: 30; min-width: 230px; max-width: min(360px, 92vw); max-height: 60vh; overflow-y: auto; background: var(--raise); border: 1px solid var(--line-2); border-radius: 11px; padding: 5px; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
 .menu button { display: flex; flex-direction: column; align-items: flex-start; width: 100%; border: 0; background: none; text-align: left; padding: 7px 10px; border-radius: 7px; font-size: 14.5px; }
 .menu button:hover, .menu button:focus-visible { background: var(--hover); outline: none; }
 .menu button small { color: var(--ink-3); font-size: 12.5px; }
@@ -10,7 +9,6 @@
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 2px; }
 .menu .mh { font-size: 12px; color: var(--ink-3); padding: 6px 10px 2px; }
 dialog { background: var(--raise); color: var(--ink); border: 1px solid var(--line-2); border-radius: 14px; padding: 0; width: min(640px, calc(100vw - 32px)); box-shadow: 0 24px 70px rgba(0,0,0,.45); }
-dialog[open] { animation: pop .14s var(--ease); }
 dialog::backdrop { background: rgba(8, 12, 18, .55); }
 .dlg-b { padding: 18px 20px; }
 .dlg-b h3 { margin: 0 0 8px; font: 600 22px var(--serif); }
@@ -55,7 +53,7 @@ dialog::backdrop { background: rgba(8, 12, 18, .55); }
 .lightbox { width: min(1400px, 96vw); background: var(--term-bg); }
 .lightbox img { display: block; max-width: 100%; max-height: 80vh; margin: 0 auto; }
 .lightbox .dlg-f { justify-content: space-between; align-items: center; color: var(--ink-2); font-size: 14px; }
-.toast { position: fixed; right: 16px; bottom: 16px; background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 14px; z-index: 60; max-width: 440px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); animation: pop .14s var(--ease); }
+.toast { background: var(--raise); border: 1px solid var(--line-2); border-radius: 10px; padding: 9px 14px; max-width: 440px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
 .toast.err { border-color: var(--danger); }
 .help td { padding: 3px 14px 3px 0; font-size: 14px; }
 .mbar { display: none; }

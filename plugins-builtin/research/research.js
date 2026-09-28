@@ -160,7 +160,7 @@ async function rsNew(pre = {}) {
     } catch (err) { toast(err.message, true); }
   });
   f.addEventListener("submit", (e) => { if (e.submitter?.value !== "cancel") e.preventDefault(); }); // Enter in a field doesn't close it
-  d.addEventListener("close", () => d.remove());
+  d.addEventListener("close", () => motion.drop(d));
   d.showModal();
 }
 
