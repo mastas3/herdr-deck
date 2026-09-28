@@ -9,8 +9,10 @@
 const deckPlugins = (() => {
   /** Views the core owns: a plugin can't take them. Its keys are keymap.js's coreKeys() (read at register time). */
   const CORE_VIEWS = new Set(["inbox", "history", "tools", "usage", "plugins"]);
-  const points = new Map(), views = new Map(), keys = new Map(), ids = new Set();
-  const warn = (id, msg) => console.warn(`deckPlugins: ${id}: ${msg}`);
+  const points = new Map(), views = new Map(), keys = new Map(), ids = new Set(), problems = new Map();
+  /** A plugin's page-side problems (a key it can't have, a contribution that threw) also show on its Plugins card. */
+  const note = (id, msg) => { if (!problems.has(id)) problems.set(id, []); const l = problems.get(id); if (!l.includes(msg) && l.length < 5) l.push(msg); };
+  const warn = (id, msg) => { console.warn(`deckPlugins: ${id}: ${msg}`); note(id, msg); };
   function extend(id, point, c) {
     if (typeof point !== "string" || !point) return warn(id, "extend needs a point name");
     points.set(point, [...(points.get(point) ?? []), { id, c }]);
@@ -54,7 +56,7 @@ const deckPlugins = (() => {
   /** Calls each contribution to a point that is a function, and keeps going when one throws. */
   function each(point, ...args) {
     const out = [];
-    for (const c of contributions(point)) { try { out.push(c(...args)); } catch (e) { console.error(`deckPlugins: ${point}:`, e); } }
+    for (const { id, c } of points.get(point) ?? []) { try { out.push(c(...args)); } catch (e) { console.error(`deckPlugins: ${point}:`, e); note(id, `${point}: ${e?.message ?? e}`); } }
     return out;
   }
   const contributions = (point) => (points.get(point) ?? []).map((x) => x.c);
@@ -62,6 +64,8 @@ const deckPlugins = (() => {
     register, contributions, each,
     view: (mode) => (mode ? views.get(mode) : undefined),
     key: (k) => keys.get(k)?.run,
+    problems: (id) => problems.get(id) ?? [],
+    note,
     /** Plugins' keys for the "?" sheet: [{ key, label, id }]. */
     keyList: () => [...keys].map(([key, { id, label }]) => ({ key, label, id })),
     /** Registered in this page (its scripts loaded). */

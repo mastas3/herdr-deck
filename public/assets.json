@@ -29,7 +29,8 @@
     "js/input.js",
     "js/boot.js",
     "js/plugins.js",
-    "js/plugins-code.js"
+    "js/plugins-code.js",
+    "js/plugins-dev.js"
   ],
   "styles": [
     "css/tokens.css",

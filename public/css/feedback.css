@@ -23,3 +23,9 @@
 .help td:first-child { white-space: nowrap; width: 1%; }
 
 @media (prefers-reduced-motion: reduce) { .row.closing { transition: none; } }
+
+/* A plugin's problems on its card, wrapped (not cut): where in its files, then the rest of its own stack. */
+.pcard .derr { white-space: normal; align-items: flex-start; }
+.pcard .derr > svg { flex: none; margin-top: 3px; }
+.pcard .derr code.pwhere { font-size: 12.5px; padding: 1px 5px; border-radius: 5px; background: var(--code-bg); color: var(--ink); }
+.pcard .derr .pstack { display: block; margin-top: 2px; font: 12px var(--mono); color: var(--ink-3); }

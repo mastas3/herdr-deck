@@ -19,7 +19,7 @@ function codeOffers(p) {
 }
 function codeCard(p) {
   const [label, cls] = CSTATE[p.state] ?? CSTATE.off;
-  const from = p.builtin ? "built in" : p.from?.git ? `from ${p.from.git} at ${String(p.from.commit ?? "").slice(0, 10)}` : p.from?.folder ? `from ${p.from.folder}` : "installed";
+  const from = p.dev ? `dev: ${home(p.dev)}` : p.builtin ? "built in" : p.from?.git ? `from ${p.from.git} at ${String(p.from.commit ?? "").slice(0, 10)}` : p.from?.folder ? `from ${p.from.folder}` : "installed";
   const needs = [p.requires.length && `Needs ${p.requires.join(", ")}`, p.uses.length && `works with ${p.uses.join(", ")}`, p.machine === "any" ? "runs on every machine" : "runs on the hub"].filter(Boolean).join(" · ");
   const offers = codeOffers(p);
   const on = p.state !== "off" && p.state !== "invalid";
@@ -27,7 +27,7 @@ function codeCard(p) {
   return `<article class="pcard" data-cid="${esc(p.id)}">
     <div class="ptop">${plugIcon(p.name)}<div class="pid"><b>${esc(p.name)}</b><small>${esc(p.version)} · ${esc(from)}</small></div><span class="pstate ${cls}">${label}</span></div>
     ${p.description ? `<p>${esc(p.description)}</p>` : ""}
-    ${p.error && p.state !== "off" ? `<p class="derr">${ICON.warn}${esc(p.error)}</p>` : ""}
+    ${codeFaults(p)}
     ${p.state === "hub-only" ? `<p class="hint">It runs on the hub only, so it’s off on this machine.</p>` : ""}
     ${offers.length ? `<p class="hint">Offers ${esc(offers.join(" · "))}${p.timers ? ` · ${plural(p.timers, "timer")} running` : ""}</p>` : ""}
     <p class="hint">${esc(needs)}</p>${settings}

@@ -3,8 +3,8 @@
 // Everything a plugin registers (routes, timers, services, contributions) is tracked per plugin, so turning one off
 // undoes all of it, and a plugin that fails (a missing dependency, a throwing activate) is marked failed on its own.
 // Disabled plugins are never imported. The HTTP side (/api/plugins/code/*) is src/plugin-code-api.ts.
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { join, relative } from "node:path";
 import { parseCodeManifest, type CodeManifest } from "./plugin-code-format";
 import { loadCodeState, saveCodeState, treeChanged, type CodeState } from "./plugin-code-store";
 import type { Activate, Contribution, Deactivate, Host, PointName, RouteHandler } from "./plugin-api";
@@ -16,12 +16,28 @@ type Runtime = {
   deactivate?: Deactivate; stops: (() => unknown)[]; timers: Set<ReturnType<typeof setTimeout>>;
   routes: string[]; services: string[]; contribs: { point: string; c: unknown }[];
 };
-export type Entry = { id: string; dir: string; builtin: boolean; manifest?: CodeManifest; problems?: string; state: PluginStatus; error?: string; run?: Runtime; mod?: { activate?: Activate } };
+/** A plugin's last failure: the message and where in its own files it happened ("server.ts:12:5"), for the Plugins view. */
+export type Fault = { message: string; where: string[]; at: number; what: string };
+export type Entry = {
+  id: string; dir: string; builtin: boolean; manifest?: CodeManifest; problems?: string; state: PluginStatus; error?: string; run?: Runtime; mod?: { activate?: Activate };
+  /** From a dev folder (DECK_DEV_PLUGINS): runs like a built-in, never installed or trust-checked. */
+  dev?: boolean; fault?: Fault;
+};
+/** The frames of an error's stack that are in the plugin's own folder, as "file:line:col" relative to it. */
+export function framesIn(err: unknown, dir: string): string[] {
+  const out: string[] = [];
+  for (const line of String((err as any)?.stack ?? "").split("\n")) {
+    const m = line.match(/((?:file:\/\/)?\/[^()\s]+?)(?:\?[^:()\s]*)?:(\d+):(\d+)\)?\s*$/);
+    const file = m?.[1].replace(/^file:\/\//, "");
+    if (file && file.startsWith(dir + "/")) out.push(`${relative(dir, file)}:${m![2]}:${m![3]}`);
+  }
+  return [...new Set(out)].slice(0, 4);
+}
 
 /** SSE events the page already uses: a plugin can't send these. */
 const CORE_EVENTS = new Set(["full", "patch", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
 
-export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void }) {
+export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void; devDirs?: string[] }) {
   const log = o.log ?? ((s: string) => console.warn(s));
   const entries = new Map<string, Entry>();
   let order: string[] = [];
@@ -34,8 +50,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   const contribs = new Map<string, { id: string; c: unknown }[]>();
 
   // ── finding plugins ──
-  function readEntry(id: string, dir: string, builtin: boolean): Entry {
-    const e: Entry = { id, dir, builtin, state: "off" };
+  function readEntry(id: string, dir: string, builtin: boolean, dev = false): Entry {
+    const e: Entry = { id, dir, builtin, state: "off", ...(dev ? { dev } : {}) };
     try {
       const r = parseCodeManifest(JSON.parse(readFileSync(join(dir, "plugin.json"), "utf8")));
       if (!r.ok) { e.state = "invalid"; e.problems = r.problems.map((p) => `${p.path} ${p.message}`.trim()).join("; "); }
@@ -49,6 +65,12 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     let dirs: string[] = [];
     try { dirs = readdirSync(o.builtinDir).filter((d) => existsSync(join(o.builtinDir, d, "plugin.json"))).sort(); } catch {}
     for (const d of dirs) found.set(d, readEntry(d, join(o.builtinDir, d), true));
+    // Dev folders (only when DECK_DEV_PLUGINS names them): a plugin you're writing runs like a built-in.
+    for (const root of o.devDirs ?? []) {
+      let ds: string[] = [];
+      try { ds = readdirSync(root).filter((d) => existsSync(join(root, d, "plugin.json"))).sort(); } catch {}
+      for (const d of ds) if (!found.has(d)) found.set(d, readEntry(d, join(root, d), true, true));
+    }
     for (const rec of st.installed) if (!found.has(rec.id)) found.set(rec.id, readEntry(rec.id, join(o.root, "plugins", rec.id), false));
     // Keep what's running: a rescan never drops a live runtime.
     for (const [id, e] of found) { const cur = entries.get(id); if (cur?.run) { cur.manifest = e.manifest ?? cur.manifest; found.set(id, cur); } }
@@ -110,11 +132,11 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   async function activate(e: Entry) {
     const m = e.manifest!;
     const r: Runtime = { stops: [], timers: new Set(), routes: [], services: [], contribs: [] };
-    e.run = r; e.error = undefined;
+    e.run = r; e.error = undefined; e.fault = undefined;
     try {
       if (m.server) {
         // An installed plugin's approved files are imported under their hash, so a re-approved change loads fresh.
-        const rev = e.builtin ? "" : `?v=${st.installed.find((x) => x.id === e.id)?.hash ?? ""}`;
+        const rev = e.builtin ? (devRev.get(e.id) ? `?dev=${devRev.get(e.id)}` : "") : `?v=${st.installed.find((x) => x.id === e.id)?.hash ?? ""}`;
         e.mod ??= await import(join(e.dir, m.server) + rev);
         if (typeof e.mod?.activate !== "function") throw new Error(`${m.server} doesn't export activate(host)`);
         // A plugin that never finishes starting must not hold up the deck (it starts before the server listens).
@@ -126,7 +148,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     } catch (err: any) {
       await teardown(e, r);
       e.run = undefined; e.state = "failed"; e.error = err?.message ?? String(err);
-      log(`plugin ${e.id} failed to start: ${e.error}`);
+      fault(e, err, "starting");
+      log(`plugin ${e.id} failed to start: ${e.error}${e.fault?.where[0] ? ` (${e.fault.where[0]})` : ""}`);
     }
   }
   async function deactivate(e: Entry) {
@@ -148,7 +171,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   function hostFor(e: Entry, r: Runtime): Host {
     const m = e.manifest!, id = e.id;
     const live = () => { if (e.run !== r) throw new Error(`${id} is turned off`); };
-    const safe = (what: string, fn: () => unknown) => { if (e.run !== r) return; try { Promise.resolve(fn()).catch((err) => log(`plugin ${id}: ${what}: ${err?.message ?? err}`)); } catch (err: any) { log(`plugin ${id}: ${what}: ${err?.message ?? err}`); } };
+    const failed = (what: string, err: any) => { fault(e, err, what); log(`plugin ${id}: ${what}: ${err?.message ?? err}`); };
+    const safe = (what: string, fn: () => unknown) => { if (e.run !== r) return; try { Promise.resolve(fn()).catch((err) => failed(what, err)); } catch (err: any) { failed(what, err); } };
     const providerOf = (name: string) => [...entries.values()].find((x) => x.manifest?.provides.includes(name));
     return {
       id, dir: e.dir, dataDir: o.dataDir,
@@ -221,6 +245,28 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     return [...(contribs.get(point) ?? [])].sort((a, b) => rank(a.id) - rank(b.id)).map((x) => x.c as Contribution<P>);
   }
 
+  /** The plugin's folder as given and as the module loader sees it (a symlinked folder resolves). */
+  const dirsOf = (e: Entry) => { try { return [...new Set([e.dir, realpathSync(e.dir)])]; } catch { return [e.dir]; } };
+  function fault(e: Entry, err: any, what: string) {
+    const where = dirsOf(e).map((d) => framesIn(err, d)).find((w) => w.length) ?? [];
+    e.fault = { message: err?.message ?? String(err), where, at: Date.now(), what };
+  }
+  /** Dev only: forget a built-in or dev plugin's modules and start it again from its files as they are now. */
+  const devRev = new Map<string, number>();
+  async function reload(id: string) {
+    const e = entries.get(id);
+    if (!e?.builtin) throw new Error(`${id} isn't a built-in or dev plugin`);
+    if (e.run) await deactivate(e);
+    const reg = (globalThis as any).Loader?.registry as Map<string, unknown> | undefined;
+    const mine = (k: string) => dirsOf(e).some((d) => k.startsWith(d + "/"));
+    for (const k of [...(reg?.keys() ?? [])]) if (mine(k)) reg!.delete(k);
+    for (const k of Object.keys(require.cache)) if (mine(k)) delete require.cache[k];
+    e.mod = undefined;
+    devRev.set(id, (devRev.get(id) ?? 0) + 1);
+    await reconcile();
+    return entries.get(id)!;
+  }
+
   // ── requests ──
   async function call(id: string, handler: RouteHandler, req: Request, url: URL, body: any): Promise<Response | undefined> {
     try {
@@ -228,6 +274,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       if (out === undefined) return undefined;
       return out instanceof Response ? out : Response.json(out);
     } catch (err: any) {
+      const e = entries.get(id);
+      if (e) fault(e, err, url.pathname);
       log(`plugin ${id}: ${url.pathname}: ${err?.message ?? err}`);
       return Response.json({ error: err?.message ?? String(err), plugin: id }, { status: 500 });
     }
@@ -262,7 +310,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   }
 
   return {
-    start: reconcile, reconcile, setEnabled, setSetting, api, get, isPage, contributions,
+    start: reconcile, reconcile, reload, setEnabled, setSetting, api, get, isPage, contributions,
     setting: (id: string, key: string) => st.settings[id]?.[key] ?? entries.get(id)?.manifest?.settings[key]?.default,
     /** Core's own access to a service (no dependency check): undefined while its plugin is off. */
     service: <T = any>(name: string) => services.get(name)?.api as T | undefined,
