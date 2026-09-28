@@ -8,7 +8,6 @@ import { warmSlash } from "./slash";
 import { canShare } from "./share";
 import { jevUsage } from "./jev";
 import { Deck, type Row } from "./deck";
-import { createLeads } from "./leads";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
 import { researchForServer } from "./autoresearch-server";
@@ -31,7 +30,7 @@ import { startQueue } from "./http/queue";
 import { createMcp } from "./http/mcp-ctx";
 import { createAuth } from "./http/auth";
 import { createRoutes } from "./http/routes";
-import type { DiscoverService, Hub } from "./http/hub";
+import type { DiscoverService, Hub, LeadsService } from "./http/hub";
 
 makeDataDirs();
 const API_TOKEN = loadApiToken();
@@ -63,18 +62,14 @@ const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: cha
 // and get nothing while it's off. Leads, Opportunities and Research keep their files in its data folder, as before.
 const DISCOVER_DIR = process.env.DECK_DISCOVER_DIR || DATA_DIR;
 const discover = () => pluginHost.service<DiscoverService>("discover");
-// Leads (Discover → Leads): public pain points and the people who have them. Its own module, like Discover.
-const leads = createLeads(DISCOVER_DIR, {
-  rows: () => allRows().map((r) => ({ key: r.key, title: r.title, status: r.status, firstPrompt: r.firstPrompt })),
-  saved: { get: () => discover()?.leadsSaved.get() ?? [], set: (v) => discover()?.leadsSaved.set(v) },
-  interests: async () => (await discover()?.profile())?.interests ?? [], projectsDir: process.env.DECK_PROJECTS_DIR || `${homedir()}/Documents/Projects`,
-});
+// Opportunities collects public sources through the leads plugin; with it off, a research job ends with that reason.
+const leadsOn = () => { const l = pluginHost.service<LeadsService>("leads"); if (!l) throw new Error("Leads is off: turn it on in Plugins to collect public sources"); return l; };
 const opportunities = createOpportunityService({
   dir: DISCOVER_DIR,
   ingredients: async () => (await discover()?.ingredients(2500))?.list ?? [],
   archive: async () => (await discover()?.handle("/api/discover/archive", { limit: 500, all: true }))?.ideas ?? [],
-  research: (query, kind, force) => leads.search(query, kind, force),
-  researchStatus: (id) => leads.handle("/api/leads/status", { id }),
+  research: (query, kind, force) => leadsOn().search(query, kind, force),
+  researchStatus: (id) => leadsOn().handle("/api/leads/status", { id }),
   deepResearch: runOpportunityWeb,
 });
 // Plugins (integrations and business packs): data only, reviewed and installed on the hub. Its own module.
@@ -153,7 +148,7 @@ const mcp = createMcp({
 const auth = createAuth({ port: PORT, host: HOST, apiToken: API_TOKEN, hubSeen: hosts.hubSeen });
 
 const hub: Hub = {
-  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, leads, research, opportunities, plugins, pluginHost, codePlugins,
+  DEV, TOKEN, PORT, SELF, deck, hosts, graves, fakeRows, presence, push, auto, research, opportunities, plugins, pluginHost, codePlugins,
   sse, fullState, page, assets, decisions: dec.decisions, scheduleDecisions: dec.scheduleDecisions, broadcastGraves, refreshShared: live.refreshShared,
   sessions, chat, tools, queue, mcp, auth, forwardToMachine,
 };

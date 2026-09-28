@@ -5,12 +5,12 @@
 // user confirms the New session dialog.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { gh as ghDefault, type GhRes } from "./gh";
-import { frontmatter, slugify } from "./text";
+import { gh as ghDefault, type GhRes } from "../../src/gh";
+import { frontmatter, slugify } from "../../src/text";
 import {
   FETCHERS, REDDIT_WAIT, SOURCES, analyze, keywordsFor, scrub,
   type App, type Dir, type FetchLike, type LeadsResult, type Limits, type Place, type Raw, type SourceCtx, type SourceId, type SourceOut, type SrcStatus,
-} from "./pain-search";
+} from "../../src/pain-search";
 
 const HOME = homedir();
 const DAY = 86_400_000;

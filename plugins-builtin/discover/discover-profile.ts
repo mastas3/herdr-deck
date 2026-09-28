@@ -34,7 +34,7 @@ export type DiscoverConf = {
   saved: (Repo & { why?: Why[]; savedAt: number })[]; dismissed: string[];
   ideas: { slug: string; text: string; at: number }[];
   mixes?: (Mix & { savedAt: number; direction?: string })[];
-  leads?: any[]; // Leads the user saved (src/leads.ts owns their shape)
+  leads?: any[]; // Leads the user saved (the leads plugin owns their shape)
 };
 
 // ── interests: wiki tags → searchable interests ────────────────────────────────

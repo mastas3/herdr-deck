@@ -5,7 +5,6 @@ import type { PushStore } from "../push";
 import type { Automations } from "../automations";
 import type { McpCtx } from "../mcp";
 import type { Assets } from "../assets";
-import type { createLeads } from "../leads";
 import type { researchForServer } from "../autoresearch-server";
 import type { createOpportunityService } from "../opportunity-service";
 import type { createPlugins } from "../plugins";
@@ -24,7 +23,7 @@ export type Hub = {
   /** Which session each open page is showing (and whether it's on screen): no push for what you're looking at. */
   presence: Map<string, { key: string | null; at: number }>;
   push: PushStore; auto: Automations | undefined;
-  leads: ReturnType<typeof createLeads>; research: ReturnType<typeof researchForServer>;
+  research: ReturnType<typeof researchForServer>;
   opportunities: ReturnType<typeof createOpportunityService>; plugins: ReturnType<typeof createPlugins>;
   pluginHost: PluginHost; codePlugins: ReturnType<typeof createCodePluginApi>;
   sse: Sse; fullState: () => unknown; page: () => string; assets: Assets;
@@ -34,11 +33,12 @@ export type Hub = {
   forwardToMachine: (path: string, body: any) => Promise<Response | undefined>;
 };
 
-/** The part of the discover plugin's service (plugins-builtin/discover) the core reads: Leads' saved list, the profile
- *  Research and Leads start from, and the ingredients and archive Opportunities builds on. */
+/** The part of the discover plugin's service (plugins-builtin/discover) the core reads: the profile Research starts
+ *  from, and the ingredients and archive Opportunities builds on. */
 export type DiscoverService = {
-  leadsSaved: { get: () => any[]; set: (v: any[]) => void };
   profile(): Promise<{ interests: { id: string; label: string; score?: number }[]; projects: { name: string; tldr: string; status: string; weight: number }[] }>;
   ingredients(max: number): Promise<{ list: any[] }>;
   handle(path: string, body: any): Promise<any>;
 };
+/** The part of the leads plugin's service Opportunities collects public sources with. */
+export type LeadsService = { search(query: string, kind: "audience" | "idea", force: boolean): any; handle(path: string, body: any): Promise<any> };

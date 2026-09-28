@@ -2,7 +2,8 @@
 // ══ Leads ════════════════════════════════════════════════════════════════════
 // Discover → Leads: find the people who need an idea (Idea → people), or the ideas an audience needs (People →
 // ideas), from public posts on Hacker News, Reddit, GitHub issues, Stack Exchange and App Store reviews. Results
-// stream in per source; a deep dive hands the question to an agent with the last30days skill. Server: src/leads.ts.
+// stream in per source; a deep dive hands the question to an agent with the last30days skill. Server: leads.ts (the
+// search itself is the core's src/pain-search.ts).
 // Nothing here contacts anyone or starts a session on its own: every action opens the New session dialog, prefilled.
 ICON.target = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="3.2"/><circle cx="8" cy="8" r=".8" fill="currentColor"/></svg>';
 ICON.dive = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="4.6"/><path d="m10.4 10.4 3.6 3.6M5 7h4M7 5v4"/></svg>';

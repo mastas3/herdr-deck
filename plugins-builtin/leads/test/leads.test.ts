@@ -1,12 +1,12 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import type { GhRes } from "../src/gh";
+import type { GhRes } from "../../../src/gh";
 import {
   analyze, clusterThemes, htmlText, ideaFor, keywordHits, keywordsFor, painOf, parseAppReviews, parseAppSearch,
   parseGitHubIssues, parseHN, parseRedditAtom, parseSE, scrub, setRedditWait, snippetOf, toEvidence, whoOf, type Evidence, type FetchLike, type Raw,
-} from "../src/pain-search";
-import { createLeads, deepPrompt, listReports, planPrompt, starters, surprise } from "../src/leads";
+} from "../../../src/pain-search";
+import { createLeads, deepPrompt, listReports, planPrompt, starters, surprise } from "../leads";
 
 const root = mkdtempSync(`${tmpdir()}/deck-leads-`);
 afterAll(() => rmSync(root, { recursive: true, force: true }));

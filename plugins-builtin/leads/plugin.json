@@ -1,0 +1,16 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "leads",
+  "name": "Leads",
+  "version": "1.0.0",
+  "description": "Discover → Leads: who needs an idea, or what an audience needs, from public posts (Hacker News, Reddit, GitHub, Stack Exchange, App Store reviews), with deep-dive reports and saved leads. Opportunities collects public sources through it.",
+  "server": "server.ts",
+  "client": ["leads.js", "leads-events.js"],
+  "styles": ["leads.css"],
+  "machine": "any",
+  "uses": ["discover"],
+  "routes": ["leads"],
+  "provides": ["leads"],
+  "extends": ["discover.tabs"]
+}
