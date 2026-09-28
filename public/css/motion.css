@@ -69,6 +69,7 @@
 .sec-h .chev { transition: transform var(--dur-2) var(--ease-out); }
 .sec-b { animation: enter var(--dur-2) var(--ease-out); }
 .rows.settled .sec-b { animation: none; }
+.empty-state, .empty-v { animation: fade var(--dur-3) var(--ease-out); }
 .views button b { display: inline-block; animation: tick var(--dur-3) var(--ease-in-out); }
 
 /* ── chat ── */

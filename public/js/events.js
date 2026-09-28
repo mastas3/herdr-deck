@@ -85,10 +85,12 @@ $("detail").addEventListener("click", (e) => {
   if (quick) return sendMessage(quick.dataset.quick, $("cText"));
   const fold = e.target.closest("[data-fold]");
   if (fold) {
-    const k = fold.dataset.fold, h = fold.closest(".tools")?.offsetHeight;
-    expanded.has(k) ? expanded.delete(k) : expanded.add(k); chatDom.v = -1; renderChat();
-    const el = chatDom.blocks.find((o) => o.key === k)?.el;
-    return el && h && motion.resize(el, h); // the group opens (or closes) from the height it had
+    const k = fold.dataset.fold, opening = !expanded.has(k);
+    opening ? expanded.add(k) : expanded.delete(k); chatDom.v = -1; renderChat();
+    // The calls that were hidden drop in one after another (a height animation would relayout a long chat every frame).
+    const lines = opening ? [...(chatDom.blocks.find((o) => o.key === k)?.el.querySelectorAll(".tool") ?? [])].slice(0, -3) : [];
+    lines.forEach((el, i) => motion.enter(el, "drop", i));
+    return;
   }
   const t = e.target.closest("[data-toggle]");
   if (t) return t.classList.toggle("clamp");

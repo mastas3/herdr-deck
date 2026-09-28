@@ -11,7 +11,8 @@ const motion = (() => {
   const sync = () => { if (pref() === "reduce") root.dataset.motion = "reduce"; else delete root.dataset.motion; };
   sync();
   addEventListener("storage", (e) => { if (e.key === KEY) sync(); });
-  const reduced = () => media.matches || root.dataset.motion === "reduce";
+  // Read each time, so a switch written straight to localStorage (another part of the page) applies at once.
+  const reduced = () => { const r = pref() === "reduce"; if (r !== (root.dataset.motion === "reduce")) sync(); return media.matches || r; };
   function setReduced(on) { try { if (on) localStorage.setItem(KEY, "reduce"); else localStorage.removeItem(KEY); } catch {} sync(); }
   // Tokens, read once they're needed (the stylesheet is certainly applied by then).
   let T = null;
@@ -185,13 +186,6 @@ const motion = (() => {
     run(el, [{ opacity: 0 }, { opacity: 0 }], { dur: 4 });
     if (a) a.onfinish = () => g.remove(); else g.remove();
   }
-  /** Grow or shrink a block from its old height to its new one (a fold that opens or closes). */
-  function resize(el, fromH) {
-    el.style.contentVisibility = "visible";
-    const h = el.offsetHeight;
-    if (Math.abs(h - fromH) < 2) return;
-    run(el, [{ height: `${fromH}px`, overflow: "hidden" }, { height: `${h}px`, overflow: "hidden" }], { dur: 3 });
-  }
   /** Cross-fade the whole page through a change (theme, Simple mode). */
   function swap(fn) {
     if (reduced() || !document.startViewTransition) return fn();
@@ -200,7 +194,7 @@ const motion = (() => {
   }
   /** Remove a closed <dialog> once its exit transition (css/motion.css) has played. */
   const drop = (d) => (reduced() ? d.remove() : setTimeout(() => d.remove(), ms(1) + 40));
-  return { reduced, setReduced, run, enter, leave, show, rects, flip, ghost, glide, count, bars, bump, counts, keyed, confirm, resize, travel, swap, drop, ms };
+  return { reduced, setReduced, run, enter, leave, show, rects, flip, ghost, glide, count, bars, bump, counts, keyed, confirm, travel, swap, drop, ms };
 })();
 /** The older switch plugins read (`reduceMotion.matches`), now also following Settings → Reduce motion. */
 const reduceMotion = { get matches() { return motion.reduced(); } };
