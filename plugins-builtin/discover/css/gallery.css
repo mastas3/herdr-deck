@@ -7,7 +7,7 @@
 
 /* covers: the painted image, or a typographic stand-in in the category's print colours */
 .galcov { position: relative; aspect-ratio: 16 / 9; overflow: hidden; background: var(--pp, var(--hover)); }
-.galcov img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .35s var(--ease); }
+.galcov img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity var(--dur-4) var(--ease-out); }
 .galcov img.on { opacity: 1; }
 .galcov.ph { background: radial-gradient(color-mix(in srgb, var(--i2) 34%, transparent) 1.1px, transparent 1.8px) 0 0 / 9px 9px, var(--pp); }
 .galmark { position: absolute; left: 7%; bottom: 4%; max-width: 92%; font: italic 600 clamp(30px, 17cqw, 64px)/0.95 var(--serif); letter-spacing: -0.02em; color: var(--mk, var(--i1)); white-space: nowrap; overflow: hidden; text-overflow: clip; }
@@ -52,8 +52,8 @@
 .galrun p svg { width: 15px; height: 15px; color: var(--working); vertical-align: -2px; margin-right: 6px; }
 .galrun.err { border-color: color-mix(in srgb, var(--working) 45%, var(--line)); }
 .galbar { flex-basis: 100%; height: 3px; border-radius: 99px; background: var(--hover); overflow: hidden; order: 2; }
-.galbar i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .5s var(--ease); }
-.galbar.indet i { width: 35%; animation: galindet 1.6s var(--ease) infinite; }
+.galbar i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .5s var(--ease-out); }
+.galbar.indet i { width: 35%; animation: galindet 1.6s var(--ease-out) infinite; }
 @keyframes galindet { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 
 /* lanes */
@@ -75,7 +75,7 @@
 
 /* cards */
 .galcard { scroll-snap-align: start; display: flex; flex-direction: column; min-width: 0; border-radius: 14px; overflow: hidden; background: var(--raise); border: 1px solid var(--line); cursor: pointer;
-  transition: transform .18s var(--ease), border-color .15s, box-shadow .18s var(--ease); animation: enter .28s var(--ease) both; animation-delay: calc(var(--i, 0) * 30ms); }
+  transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2), box-shadow var(--dur-2) var(--ease-out); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 30ms); }
 .view.calm .galcard { animation: none; }
 .galcard:hover { transform: translateY(-2px); border-color: var(--line-2); box-shadow: 0 10px 26px rgba(0,0,0,.14); }
 .galcard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

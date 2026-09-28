@@ -8,7 +8,7 @@
 .cstore { display: grid; grid-template-columns: 208px minmax(0, 1fr); gap: 22px; margin-top: 16px; align-items: start; }
 .cstore.rtab { grid-template-columns: minmax(0, 1fr); }
 .crail { position: sticky; top: 8px; display: flex; flex-direction: column; gap: 1px; }
-.crail button { display: flex; align-items: center; gap: 9px; border: 0; background: none; color: var(--ink-2); text-align: left; padding: 7px 10px; border-radius: 9px; font-size: 14.5px; transition: background .12s, color .12s; }
+.crail button { display: flex; align-items: center; gap: 9px; border: 0; background: none; color: var(--ink-2); text-align: left; padding: 7px 10px; border-radius: 9px; font-size: 14.5px; transition: background var(--dur-2), color var(--dur-2); }
 .crail button svg { width: 16px; height: 16px; flex: none; opacity: .85; }
 .crail button .crl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crail button:hover { background: var(--hover); color: var(--ink); }
@@ -25,14 +25,14 @@
 .cti.big { width: 40px; height: 40px; border-radius: 12px; }
 .cti.big svg { width: 21px; height: 21px; }
 .cstrip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(168px, 1fr); gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; padding: 2px 2px 8px; scrollbar-width: thin; }
-.cmini { scroll-snap-align: start; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--raise); color: var(--ink); border-radius: 14px; padding: 10px 12px; transition: transform .15s var(--ease), border-color .15s; }
+.cmini { scroll-snap-align: start; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 10px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--raise); color: var(--ink); border-radius: 14px; padding: 10px 12px; transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2); }
 .cmini:hover { transform: translateY(-2px); border-color: var(--line-2); }
 .cmini .cbadge { grid-row: span 2; }
 .cmini .cmn { font-weight: 600; font-size: 14.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmini .cms { color: var(--ink-3); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cmini .cst { grid-column: 2; justify-self: start; margin: 4px 0 0; }
 .ctiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
-.ctile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 6px 10px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--raise); color: var(--ink); border-radius: 14px; padding: 12px 14px; transition: transform .15s var(--ease), border-color .15s; animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 18ms); }
+.ctile { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 6px 10px; align-items: center; text-align: left; border: 1px solid var(--line); background: var(--raise); color: var(--ink); border-radius: 14px; padding: 12px 14px; transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 18ms); }
 .ctile:hover { transform: translateY(-2px); border-color: var(--line-2); }
 .ctile .ctl { font-weight: 600; font-size: 14.5px; }
 .ctile .ctn { color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -44,7 +44,7 @@
 .cempty { padding: 24px 0; }
 .cfile { margin-top: 26px; }
 .cgrid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(262px, 1fr)); gap: 10px; }
-.ccard { position: relative; border: 1px solid var(--line); background: var(--raise); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; transition: border-color .15s, box-shadow .2s var(--ease), transform .15s var(--ease); animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 16ms); }
+.ccard { position: relative; border: 1px solid var(--line); background: var(--raise); border-radius: 16px; padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; transition: border-color var(--dur-2), box-shadow var(--dur-3) var(--ease-out), transform var(--dur-2) var(--ease-out); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 16ms); }
 .ccard:hover { border-color: var(--line-2); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.16); }
 .ccard.picked { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 6px 20px color-mix(in srgb, var(--accent) 18%, transparent); }
 .ccard.open { grid-column: span 2; }
@@ -94,28 +94,28 @@
 .cuses { display: flex; flex-wrap: wrap; gap: 6px; }
 .cuses .chip { display: inline-flex; align-items: center; gap: 5px; }
 .cuses .chip svg { width: 13px; height: 13px; }
-.cpick { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--line-2); background: var(--bg); display: grid; place-items: center; color: transparent; padding: 0; transition: background .12s, border-color .12s, transform .15s var(--ease); }
+.cpick { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--line-2); background: var(--bg); display: grid; place-items: center; color: transparent; padding: 0; transition: background var(--dur-2), border-color var(--dur-2), transform var(--dur-2) var(--ease-out); }
 .cpick svg { width: 13px; height: 13px; }
-.cpick[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); animation: tick .25s var(--ease); }
+.cpick[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); animation: tick var(--dur-3) var(--ease-out); }
 .cpick:disabled { opacity: .25; }
 @keyframes tick { 40% { transform: scale(1.18); } }
-.cmore { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; animation: enter .18s var(--ease); }
+.cmore { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; animation: enter var(--dur-2) var(--ease-out); }
 .clab, .lab { font-size: 12.5px; color: var(--ink-3); font-weight: 600; margin-top: 8px; display: block; }
 .cuse { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 8px 10px; color: var(--ink); font: 14px/1.45 var(--read); resize: vertical; }
 .cuse:focus { outline: none; border-color: var(--accent); }
 .cacts { display: flex; gap: 6px; align-items: center; }
-.cbar { position: sticky; bottom: 12px; z-index: 5; margin-top: 20px; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--raise); border: 1px solid var(--accent); box-shadow: 0 12px 34px rgba(0,0,0,.35); transform: translateY(140%); opacity: 0; pointer-events: none; transition: transform .25s var(--ease), opacity .2s; }
+.cbar { position: sticky; bottom: 12px; z-index: 5; margin-top: 20px; display: flex; align-items: center; gap: 8px; padding: 10px 12px 10px 16px; border-radius: 14px; background: var(--raise); border: 1px solid var(--accent); box-shadow: 0 12px 34px rgba(0,0,0,.35); transform: translateY(140%); opacity: 0; pointer-events: none; transition: transform var(--dur-3) var(--ease-out), opacity var(--dur-3); }
 .cbar.on { transform: none; opacity: 1; pointer-events: auto; }
 .cbar .btn svg { width: 15px; height: 15px; }
 /* recipes */
 .rchips { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-bottom: 14px; }
-.rchips button { flex: none; border: 1px solid var(--line); background: none; color: var(--ink-2); border-radius: 999px; padding: 5px 12px; transition: background .12s, color .12s, border-color .12s; }
+.rchips button { flex: none; border: 1px solid var(--line); background: none; color: var(--ink-2); border-radius: 999px; padding: 5px 12px; transition: background var(--dur-2), color var(--dur-2), border-color var(--dur-2); }
 .rchips button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .rchips button[aria-pressed="true"] .n { color: inherit; opacity: .7; }
 .rfor { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 12px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .rfor svg { width: 17px; height: 17px; color: var(--accent); flex: none; }
 .rgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; }
-.rcard { border: 1px solid var(--line); background: var(--raise); border-radius: 16px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 9px; transition: border-color .15s, transform .15s var(--ease), box-shadow .2s var(--ease); animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 18ms); }
+.rcard { border: 1px solid var(--line); background: var(--raise); border-radius: 16px; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 9px; transition: border-color var(--dur-2), transform var(--dur-2) var(--ease-out), box-shadow var(--dur-3) var(--ease-out); animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 18ms); }
 .rcard:hover { border-color: var(--line-2); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.16); }
 .rcard.r-ready { border-left: 3px solid var(--idle); }
 .rcard.r-almost { border-left: 3px solid var(--working); }
@@ -131,7 +131,7 @@
 .rneed.partial { color: var(--working); border-color: color-mix(in srgb, var(--working) 45%, transparent); }
 .rneed.missing { color: var(--ink-3); border-style: dashed; }
 .rneed.opt { opacity: .75; font-style: italic; }
-.rmore { display: flex; flex-direction: column; gap: 8px; animation: enter .18s var(--ease); }
+.rmore { display: flex; flex-direction: column; gap: 8px; animation: enter var(--dur-2) var(--ease-out); }
 .rsteps { margin: 0; padding-left: 20px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
 .rmeta { display: flex; gap: 12px; color: var(--ink-3); font-size: 13px; align-items: center; }
 .rmeta span { display: inline-flex; align-items: center; gap: 5px; }

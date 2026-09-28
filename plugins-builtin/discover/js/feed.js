@@ -93,7 +93,7 @@ function openPlan(x, from = "feed") {
     <div class="pdb">${planBodyHTML(x)}</div>
     <div class="pdf"><button class="btn primary" data-plbuild>${ICON.bolt}Build it now</button><button class="btn" data-plplan>${ICON.bulb}Research &amp; plan it</button><button class="btn ghost" data-plusers>Find users for it</button>${from !== "studio" ? `<button class="btn ghost" data-plstudio>${ICON.wild}Open in Studio</button>` : ""}<button class="btn ghost" data-plsave aria-pressed="${saved}">${saved ? "Saved" : "Save"}</button><button class="btn ghost" data-plcopy>${ICON.copy}Copy</button></div>`;
   document.body.append(d);
-  d.addEventListener("close", () => d.remove());
+  d.addEventListener("close", () => motion.drop(d));
   d.addEventListener("click", (e) => {
     const t = e.target;
     if (t === d || t.closest("[data-plx]")) return d.close();

@@ -1,9 +1,9 @@
 /* ══ Gallery: an opened idea (side panel on a desktop, bottom sheet on a phone), the kit, and Play's confirm ══ */
 dialog.galdlg { margin: 0 0 0 auto; width: min(720px, 100vw); max-width: 100vw; height: 100dvh; max-height: 100dvh; border-radius: 18px 0 0 18px; border-width: 0 0 0 1px; padding: 0; background: var(--bg); overflow: hidden; }
-dialog.galdlg[open] { animation: galin .26s var(--ease); }
+dialog.galdlg[open] { animation: galin var(--dur-3) var(--ease-out); }
 @keyframes galin { from { transform: translateX(40px); opacity: 0; } }
 dialog.galdlg::backdrop { background: rgba(8, 12, 18, .5); }
-.galsh { height: 100%; overflow-y: auto; overscroll-behavior: contain; outline: 0; transition: transform .2s var(--ease); }
+.galsh { height: 100%; overflow-y: auto; overscroll-behavior: contain; outline: 0; transition: transform var(--dur-3) var(--ease-out); }
 .galgrab { display: none; }
 .galx { position: sticky; top: 12px; float: right; margin: 12px 12px -46px 0; z-index: 3; width: 34px; height: 34px; border-radius: 10px; background: color-mix(in srgb, var(--raise) 85%, transparent); border: 1px solid var(--line); backdrop-filter: blur(6px); }
 .galshb > .galcov { aspect-ratio: 16 / 8; }
@@ -108,7 +108,7 @@ dialog.galplay .dlg-b { padding: 20px 22px 8px; }
 
 @media (max-width: 760px) {
   dialog.galdlg { margin: auto 0 0; width: 100vw; height: 94dvh; max-height: 94dvh; border-radius: 20px 20px 0 0; border-width: 1px 0 0; }
-  dialog.galdlg[open] { animation: galup .28s var(--ease); }
+  dialog.galdlg[open] { animation: galup var(--dur-3) var(--ease-out); }
   @keyframes galup { from { transform: translateY(60px); opacity: 0; } }
   .galgrab { display: block; position: sticky; top: 0; z-index: 3; height: 0; }
   .galgrab::before { content: ""; position: absolute; left: 50%; top: 8px; width: 40px; height: 4px; margin-left: -20px; border-radius: 99px; background: color-mix(in srgb, #fff 75%, transparent); box-shadow: 0 0 0 1px rgba(0,0,0,.15); }

@@ -21,7 +21,7 @@
   background: color-mix(in oklch, var(--lv-a) 7%, var(--raise)); }
 .qhero.skel { min-height: 118px; }
 .qlvl { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.qbadge { flex: none; overflow: visible; animation: qbadge .5s var(--ease) both; }
+.qbadge { flex: none; overflow: visible; animation: qbadge .5s var(--ease-out) both; }
 .qbadge .hx-o { fill: var(--lv-a); }
 .qbadge .hx-i { fill: color-mix(in oklch, var(--lv-a) 16%, var(--bg)); stroke: color-mix(in oklch, var(--lv-b) 55%, transparent); stroke-width: 1; }
 .qbadge .glyph { color: color-mix(in oklch, var(--lv-a) 70%, var(--ink)); }
@@ -32,7 +32,7 @@
 .qlvl-t h2 { display: flex; align-items: baseline; gap: 10px; margin: 0; font: 700 34px/1 var(--sans); letter-spacing: .01em; text-transform: uppercase; }
 .qlvl-t h2 em { font: 600 14px/1 var(--mono); font-style: normal; color: color-mix(in oklch, var(--lv-a) 70%, var(--ink)); text-transform: none; letter-spacing: 0; }
 .qxpbar { position: relative; height: 8px; margin-top: 6px; border-radius: 99px; background: color-mix(in oklch, var(--ink) 10%, var(--bg)); overflow: hidden; }
-.qxpbar i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left; transform: scaleX(var(--p)); background: var(--lv-a); animation: qfill 1s var(--ease) .15s both; }
+.qxpbar i { position: absolute; inset: 0; border-radius: inherit; transform-origin: left; transform: scaleX(var(--p)); background: var(--lv-a); animation: qfill 1s var(--ease-out) .15s both; }
 .qxpl { font: 500 12.5px/1.3 var(--mono); color: var(--ink-3); }
 .qxpl b { color: var(--ink); }
 .qnextlv { font-size: 13.5px; color: var(--ink-2); line-height: 1.35; }
@@ -55,7 +55,7 @@
 /* grid & cards */
 .qgrid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 .qcol { display: grid; gap: 16px; min-width: 0; }
-.qcard { position: relative; min-width: 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--raise); animation: qin .35s var(--ease) both; }
+.qcard { position: relative; min-width: 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--raise); animation: qin var(--dur-4) var(--ease-out) both; }
 .qb.calm .qcard, .qb.calm .qq, .qb.calm .qa, .qb.calm .qbadge, .qb.calm .qxpbar i { animation: none; }
 .qsec-h { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 0 0 12px; }
 .qsec-h h3 { margin: 0; font: 700 13px/1 var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
@@ -80,18 +80,18 @@
 .qsig .g { color: color-mix(in oklch, var(--qboss) 60%, #fff); }
 .qboss .qsig { animation: qbob 3.2s ease-in-out infinite; }
 .qboss.hit .qsig { animation: qshake .55s cubic-bezier(.36, .07, .19, .97) .5s both, qbob 3.2s ease-in-out 1.1s infinite; }
-.qboss.hit .qsig .sh { animation: qflash .55s ease-out .5s both; }
+.qboss.hit .qsig .sh { animation: qflash .55s var(--ease-out) .5s both; }
 .qdmg { position: absolute; top: 4px; right: -6px; font: 700 18px/1 var(--mono); color: #ff6b6b; text-shadow: 0 2px 8px #000a; opacity: 0; pointer-events: none; }
-.qboss.hit .qdmg { animation: qdmg 1.3s var(--ease) .55s both; }
+.qboss.hit .qdmg { animation: qdmg 1.3s var(--ease-out) .55s both; }
 .qboss.cleared .qsig .sh, .qsig.won .sh { fill: color-mix(in oklch, var(--qgold) 22%, var(--raise)); stroke: var(--qgold); }
 .qsig.won .g { color: var(--qgold); }
 .qboss-b { display: grid; gap: 5px; min-width: 0; }
 .qboss-t { font: 700 22px/1.1 var(--sans); letter-spacing: .01em; }
 .qhp { position: relative; height: 16px; border-radius: 6px; background: color-mix(in oklch, var(--qboss) 12%, var(--bg)); border: 1px solid color-mix(in oklch, var(--qboss) 35%, var(--line)); overflow: hidden; }
-.qhp i { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--hp)); background: var(--qboss); animation: qhp 1.1s var(--ease) .2s both; }
+.qhp i { position: absolute; inset: 0; transform-origin: left; transform: scaleX(var(--hp)); background: var(--qboss); animation: qhp 1.1s var(--ease-out) .2s both; }
 .qhp::before { content: ""; position: absolute; inset: 0; z-index: 1; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 1px), color-mix(in oklch, var(--bg) 70%, transparent) calc(10% - 1px) 10%); pointer-events: none; }
 .qhp span { position: absolute; right: 6px; top: 50%; z-index: 2; transform: translateY(-50%); font: 700 11px/1 var(--mono); color: #fff; text-shadow: 0 1px 2px #000c; }
-.qhp.low i { animation: qhp 1.1s var(--ease) .2s both, qlow 1.4s ease-in-out 1.3s infinite; }
+.qhp.low i { animation: qhp 1.1s var(--ease-out) .2s both, qlow 1.4s ease-in-out 1.3s infinite; }
 .qbv { color: var(--ink-3); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qbv b { color: var(--ink); font-family: var(--mono); }
 .qbosses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
@@ -106,7 +106,7 @@
 .qhits .dmg { font: 700 12px/1 var(--mono); color: #ff6b6b; min-width: 34px; }
 .qhits .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qhits time { color: var(--ink-3); font-size: 12px; }
-.qhits li.new { animation: qslide .5s var(--ease) both; }
+.qhits li.new { animation: qslide .5s var(--ease-out) both; }
 .qnohit { margin: 10px 0 0; }
 .qnextms { display: grid; grid-template-columns: auto minmax(0, 1fr) 90px auto; align-items: center; gap: 4px 10px; font-size: 14px; }
 .qnextms b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -123,7 +123,7 @@
 .qcand.mini b { font-size: 15px; }
 .qpick h3 { margin: 0 0 6px; font: 600 26px/1.1 var(--serif); }
 .qpicks { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 12px; }
-.qpickb { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; text-align: left; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: color-mix(in oklch, var(--pc) 6%, var(--raise)); color: var(--ink); cursor: pointer; transition: transform .12s var(--ease), border-color .15s; }
+.qpickb { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2px 8px; align-items: center; text-align: left; padding: 11px 12px; border-radius: 12px; border: 1px solid var(--line); background: color-mix(in oklch, var(--pc) 6%, var(--raise)); color: var(--ink); cursor: pointer; transition: transform var(--dur-2) var(--ease-out), border-color var(--dur-2); }
 .qpickb:hover { border-color: var(--pc); transform: translateY(-1px); }
 .qpickb .dot { width: 9px; height: 9px; border-radius: 3px; background: var(--pc); }
 .qpickb b { font: 600 15px/1.2 var(--sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -133,7 +133,7 @@
 
 /* today's quests */
 .qqs { display: grid; gap: 10px; }
-.qq { --qc: var(--ink-3); position: relative; padding: 13px 14px 12px 16px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--raise); animation: qin .4s var(--ease) calc(var(--i, 0) * 70ms) both; }
+.qq { --qc: var(--ink-3); position: relative; padding: 13px 14px 12px 16px; border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--raise); animation: qin var(--dur-4) var(--ease-out) calc(min(var(--i, 0), 8) * 70ms) both; }
 .qq::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 0 3px 3px 0; background: var(--qc); }
 .qq.p-sell { --qc: var(--qgold); } .qq.p-talk { --qc: var(--qmint); } .qq.p-lead { --qc: var(--qblue); } .qq.p-ship { --qc: var(--qviolet); } .qq.p-milestone { --qc: var(--qboss); }
 .qq-top { display: flex; align-items: center; gap: 8px; }
@@ -162,7 +162,7 @@
 .qstamp { position: absolute; top: 10px; right: 12px; display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; font: 700 13px/1 var(--mono); color: var(--qgold); border: 2px solid color-mix(in oklch, var(--qgold) 70%, transparent); transform: rotate(-12deg); opacity: .9; background: color-mix(in oklch, var(--qgold) 9%, transparent); }
 .qq.done .qxp { visibility: hidden; }
 .qq.fresh .qstamp { animation: qstamp .7s cubic-bezier(.2, 1.6, .4, 1) .25s both; }
-.qq.fresh { animation: qin .4s var(--ease) both, qglow 1.6s ease-out .3s both; }
+.qq.fresh { animation: qin var(--dur-4) var(--ease-out) both, qglow 1.6s var(--ease-out) .3s both; }
 .qq.skel { height: 118px; background: var(--hover); animation: qsk 1.1s ease-in-out infinite alternate; }
 .qq.skel::before { display: none; }
 .qgen { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--ink-3); font-size: 13.5px; }
@@ -224,7 +224,7 @@
 
 /* achievements */
 .qshelf { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 8px; }
-.qa { display: grid; justify-items: center; gap: 4px; padding: 10px 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in oklch, var(--bg) 40%, var(--raise)); color: var(--ink-3); cursor: pointer; text-align: center; animation: qin .35s var(--ease) calc(var(--i, 0) * 25ms) both; }
+.qa { display: grid; justify-items: center; gap: 4px; padding: 10px 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: color-mix(in oklch, var(--bg) 40%, var(--raise)); color: var(--ink-3); cursor: pointer; text-align: center; animation: qin var(--dur-4) var(--ease-out) calc(min(var(--i, 0), 8) * 25ms) both; }
 .qai { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1.5px dashed var(--line-2); }
 .qai svg { width: 17px; height: 17px; }
 .qat { font: 600 12px/1.15 var(--sans); }
@@ -233,7 +233,7 @@
 .qa.got { color: var(--ink); border-color: color-mix(in oklch, var(--qgold) 40%, var(--line)); }
 .qa.got .qai { border: 0; color: #1a1406; background: var(--qgold); }
 .qa.got small { color: var(--qgold); }
-.qa.fresh .qai { animation: qpop .8s cubic-bezier(.2, 1.6, .4, 1) .3s both, qglowr 1.8s ease-out .6s both; }
+.qa.fresh .qai { animation: qpop .8s cubic-bezier(.2, 1.6, .4, 1) .3s both, qglowr 1.8s var(--ease-out) .6s both; }
 
 /* side quests */
 .qsl { list-style: none; margin: 0; padding: 0; display: grid; }
@@ -245,26 +245,26 @@
 .qsb small { color: var(--ink-3); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qsx { font: 700 12px var(--mono); color: var(--qgold); }
 .qsx.capped { color: var(--ink-3); }
-.qsa { display: flex; gap: 10px; font-size: 12.5px; opacity: 0; transition: opacity .15s; }
+.qsa { display: flex; gap: 10px; font-size: 12.5px; opacity: 0; transition: opacity var(--dur-2); }
 .qsl li:hover .qsa, .qsl li:focus-within .qsa { opacity: 1; }
 .qret { margin: 10px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .qret svg { width: 13px; height: 13px; }
 .qpend { display: flex; align-items: center; gap: 6px; margin: 14px 0 0; }
 
 /* a boss falls */
-.qdefeat { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: color-mix(in oklch, #000 58%, transparent); animation: qfade .3s ease both; }
+.qdefeat { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; background: color-mix(in oklch, #000 58%, transparent); animation: qfade var(--dur-4) var(--ease-out) both; }
 .qdf-in { display: grid; justify-items: center; gap: 6px; width: min(360px, 100%); padding: 28px 24px 22px; border-radius: 22px; text-align: center; border: 1px solid color-mix(in oklch, var(--qgold) 50%, var(--line)); background: var(--raise); box-shadow: 0 30px 80px #000a; animation: qpop .5s cubic-bezier(.2, 1.4, .4, 1) .1s both; }
 .qdf-in .qsig { width: 96px; height: 96px; }
 .qsig.dead .sh { fill: color-mix(in oklch, var(--ink-3) 18%, var(--raise)); stroke: var(--ink-3); }
 .qsig.dead .g { color: var(--ink-3); }
-.qsig.dead { animation: qdie 1s var(--ease) .3s both; }
+.qsig.dead { animation: qdie 1s var(--ease-out) .3s both; }
 .qdf-in b { font: 700 24px/1.1 var(--sans); }
 .qdf-in .qk { color: var(--qgold); font-size: 13px; margin-top: 6px; }
 .qdf-in small { color: var(--ink-3); font-size: 13px; }
 .qdf-in .btn { margin-top: 12px; }
 
 /* header chip */
-.qchip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--raise); color: var(--ink-2); font: 600 12px/1 var(--sans); cursor: pointer; white-space: nowrap; transition: border-color .15s, transform .1s; }
+.qchip { display: inline-flex; align-items: center; gap: 5px; margin-left: 8px; padding: 3px 8px 3px 4px; border: 1px solid var(--line); border-radius: 99px; background: var(--raise); color: var(--ink-2); font: 600 12px/1 var(--sans); cursor: pointer; white-space: nowrap; transition: border-color var(--dur-2), transform var(--dur-1); }
 .qchip:hover { border-color: var(--line-2); color: var(--ink); }
 .qchip:active { transform: scale(.96); }
 .qchip[hidden] { display: none; }

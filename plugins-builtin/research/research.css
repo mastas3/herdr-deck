@@ -17,11 +17,11 @@
 .rspill { display: inline-flex; align-items: center; font: 600 11.5px/1 var(--sans); letter-spacing: .03em; text-transform: uppercase; color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); padding: 4px 8px; border-radius: 999px; }
 .rsnote { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
 .rsprog { height: 4px; border-radius: 99px; background: color-mix(in srgb, var(--ink-3) 18%, transparent); overflow: hidden; margin: 4px 0 10px; }
-.rsprog i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform .4s var(--ease); }
+.rsprog i { display: block; height: 100%; background: var(--accent); transform-origin: left; transition: transform var(--dur-4) var(--ease-out); }
 .rscols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; margin-top: 8px; align-items: start; }
 .rsboard, .rsruns { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 .rsnone { margin: 0; }
-.rsn { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 13px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; animation: enter .24s var(--ease) both; animation-delay: calc(var(--i, 0) * 40ms); }
+.rsn { border: 1px solid var(--line); background: var(--raise); border-radius: 14px; padding: 13px 14px; display: flex; flex-direction: column; gap: 9px; min-width: 0; animation: enter var(--dur-3) var(--ease-out) both; animation-delay: calc(min(var(--i, 0), 8) * 40ms); }
 .rsntop { display: flex; align-items: center; gap: 10px; }
 .rsrank { font: 600 13px var(--mono); color: var(--ink-3); }
 .rsn h4 { flex: 1; min-width: 0; margin: 0; font: 600 17px/1.3 var(--serif); overflow-wrap: anywhere; }
