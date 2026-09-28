@@ -3,7 +3,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { parseCodeManifest } from "../src/plugin-code-format";
+import { CORE_API, parseCodeManifest } from "../src/plugin-code-format";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const BUILTIN = join(ROOT, "plugins-builtin");
@@ -55,5 +55,11 @@ describe("core and plugins", () => {
     const tests = plugins.flatMap((id) => (existsSync(join(BUILTIN, id, "test")) ? readdirSync(join(BUILTIN, id, "test")).map((f) => `${id}/test/${f}`) : []));
     expect(tests).toContain("covers/test/covers.test.ts");
     for (const t of tests) if (t.endsWith(".ts") && !t.includes("fixture")) expect(t).toMatch(/\.test\.ts$/);
+  });
+  test("every /api/* name the core's own API serves is refused as a plugin route (plugin routes are matched first)", () => {
+    const src = ["api-hub.ts", "api-sessions.ts", "routes.ts"].map((f) => readFileSync(join(ROOT, "src/http", f), "utf8")).join("\n");
+    const names = [...new Set([...src.matchAll(/"\/api\/([a-z0-9-]+)/g)].map((m) => m[1]))];
+    expect(names.length).toBeGreaterThan(20);
+    expect(names.filter((n) => !CORE_API.has(n))).toEqual([]);
   });
 });

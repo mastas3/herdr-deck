@@ -16,7 +16,6 @@ function mixSetSel(sel) { S.disc.mix.sel = sel.slice(0, 16); store("mixSel", S.d
 function mixEngineLabel(engine, model) { return engine === "ollama" ? `Ollama · ${model ?? "local"}` : engine === "template" ? "templates" : `Claude${model ? ` ${model[0].toUpperCase()}${model.slice(1)}` : ""}`; }
 
 Object.assign(ICON, {
-  dice: TI2('<rect x="2.5" y="2.5" width="11" height="11" rx="2.6"/><circle cx="5.6" cy="5.6" r=".55" fill="currentColor"/><circle cx="8" cy="8" r=".55" fill="currentColor"/><circle cx="10.4" cy="10.4" r=".55" fill="currentColor"/>'),
   wild: TI2('<path d="M8 1.8 9.3 6.7 14.2 8 9.3 9.3 8 14.2 6.7 9.3 1.8 8 6.7 6.7z"/><path d="M13 1.8v2.4M11.8 3h2.4"/>'),
   send: TI2('<path d="M8 13.2V3M3.6 7.4 8 3l4.4 4.4"/>'),
   stop: '<svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="4" width="8" height="8" rx="1.6"/></svg>',
