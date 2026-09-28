@@ -168,6 +168,15 @@ function feedClaude(st: State, line: string, offset: number) {
     return;
   }
   if (o.isSidechain) return;
+  // A message sent while Claude is mid-turn (Steer, or an answer that lands as it wraps up) is queued, and Claude
+  // takes it in between two steps as an attachment, not a user line. It is still what you said, and where.
+  if (o.type === "attachment" && o.attachment?.type === "queued_command") {
+    const a = o.attachment, p = a.prompt;
+    const text = typeof p === "string" ? p : Array.isArray(p) ? p.filter((x: any) => x?.type === "text").map((x: any) => x.text).join("\n") : "";
+    if (a.isMeta || (a.commandMode && a.commandMode !== "prompt") || !text.trim() || /^\s*</.test(text)) return;
+    push(d, { role: "user", at: a.timestamp ? Date.parse(a.timestamp) : at, text: full(text) });
+    return;
+  }
   if (o.type === "user") {
     const content = Array.isArray(o.message?.content) ? o.message.content : [];
     const ask = claudeAsk(o);

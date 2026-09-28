@@ -58,6 +58,7 @@ function paletteItems(q) {
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },
     cur && { t: "Write or rewrite the brief", id: "brief", ctx: true, run: () => writeBrief(cur.key) },
+    cur?.sessionId && { t: "Search this chat…", id: "chatfind", ctx: true, run: () => openFind() },
     cur && { t: "Close this session…", id: "close", ctx: true, run: () => askClose([cur.key]) },
     { t: "Select every session shown", id: "pickall", run: pickAllShown },
     n > 1 && { t: `Message ${n} selected sessions…`, run: messagePicked },

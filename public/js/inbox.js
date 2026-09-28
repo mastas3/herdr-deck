@@ -4,7 +4,7 @@ function renderInbox() {
   const box = $("dbody");
   // A reply being written survives the re-render that any decision change triggers.
   const drafts = box._mode === "inbox" ? [...box.querySelectorAll(".dcard .dreply:not([hidden])")].map((f) => { const ta = f.querySelector("textarea"); return { key: f.closest(".dcard").dataset.dkey, text: ta.value, action: f.dataset.action, focus: document.activeElement === ta, a: ta.selectionStart, b: ta.selectionEnd }; }) : [];
-  const waiting = (S.decisions ?? []).filter((d) => rowOf(d.key) && !S.done.has(d.key));
+  const waiting = (S.decisions ?? []).filter((d) => rowOf(d.key) && !answered(d));
   for (const k of [...S.skipped.keys()]) if (!waiting.some((d) => d.key === k && isSkipped(d))) S.skipped.delete(k);
   const all = waiting.filter((d) => !isSkipped(d)).sort((a, b) => ({ prompt: 0, question: 1, review: 2 })[a.kind] - ({ prompt: 0, question: 1, review: 2 })[b.kind] || b.at - a.at);
   const quick = (d) => d.jev?.low >= 0.7 || (d.kind === "review" && (d.jev?.done ?? 0) >= 0.7);
@@ -72,22 +72,24 @@ async function decide(key, action, fn, choice, sent) {
   card?.classList.add("leaving");
   applyInboxFocus(true);
   try {
+    const d = (S.decisions ?? []).find((x) => x.key === key);
     await fn();
-    S.done.set(key, Date.now());
+    if (d) markAnswered(d);
     api("/api/decide", { key, action, choice }).catch(() => {});
     if (action !== "verify") api("/api/seen", { key }).catch(() => {});
     if (sent) triageToast(sent);
     setTimeout(() => { renderInbox(); renderViews(); if (S.mode === "inbox") applyInboxFocus(true); }, 180); // the answered card is gone: keep the next one in view
   } catch (e) { card?.classList.remove("leaving"); S.ifocus = key; applyInboxFocus(true); toast(e.message, true); }
 }
-setInterval(() => { for (const [k, t] of S.done) if (Date.now() - t > 20_000) S.done.delete(k); }, 5000);
+// An answer is forgotten once the server has moved on from that decision, or after 90 s (it didn't take: ask again).
+setInterval(() => { for (const [k, a] of S.done) if (Date.now() - a.t > 90_000 || !(S.decisions ?? []).some((d) => d.key === k && (d.id ?? d.question) === a.id)) S.done.delete(k); }, 5000);
 /** Answer with one of the card's options: the digit or cursor keys for a terminal prompt, the option's text for a question. */
 function inboxPick(key, o) {
   const d = (S.decisions ?? []).find((x) => x.key === key), r = rowOf(key);
   if (!d || !r) return;
   const sent = `Sent “${plain(o.title).slice(0, 60)}” to ${r.project}`;
   if (d.kind === "prompt") return decide(key, "answer", () => api("/api/keys", { key, keys: o.keys ?? [String(o.id)] }), String(o.id), sent);
-  return decide(key, "answer", () => api("/api/send", { key, text: o.send ?? o.title }), String(o.id), sent);
+  return decide(key, "answer", () => sendAnswer(key, o.send ?? o.title), String(o.id), sent);
 }
 function inboxAct(key, act) {
   const card = cardOf(key), r = rowOf(key);

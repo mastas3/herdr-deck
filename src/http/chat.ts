@@ -5,16 +5,36 @@ import { cachedBrief } from "../brief";
 import type { Deck, Row } from "../deck";
 import type { Detail, Msg } from "../transcript";
 
+/** The words as the chat shows them: markdown marks and link targets aren't on screen, so they don't count. */
+const shown = (m: Msg) => (m.role === "tool" ? m.summary ?? "" : String(m.text ?? "").replace(/\[([^\]\n]*)\]\([^)\s]*\)/g, "$1").replace(/\*\*|__|`/g, ""))
+  .normalize("NFC").toLowerCase();
+/** Every message with the phrase (any case, any Unicode form), and how many times: [index, count][], oldest first. */
+export function findIn(all: Msg[], phrase: string): [number, number][] {
+  const w = phrase.normalize("NFC").toLowerCase().trim();
+  if (!w) return [];
+  const hits: [number, number][] = [];
+  for (const m of all) {
+    const t = shown(m);
+    let n = 0;
+    for (let at = t.indexOf(w); at >= 0 && n < 99; at = t.indexOf(w, at + w.length)) n++;
+    if (n) hits.push([m.i, n]);
+    if (hits.length >= 2000) break;
+  }
+  return hits;
+}
+
 export function createChat(o: { deck: Deck; selfId: string }) {
   const { deck } = o;
   const who = (row: Row) => ({ agent: row.agent, sessionId: row.sessionId, cwd: row.cwd, file: (row as any).hist as string | undefined });
   const detailFor = (row: Row) => detailOf(who(row));
   const imageFor = (row: Row, id: string, sub?: string) => imageOf(who(row), id, sub);
 
-  /** A window of the chat: the newest `limit` messages, those after a cursor (live updates) or before one (scrollback). */
-  function chatSlice(d: Detail, q: { gen?: number; after?: number; before?: number; limit?: number; around?: number; from?: number; to?: number }) {
+  /** A window of the chat: the newest `limit` messages, those after a cursor (live updates) or before one (scrollback).
+   *  `find`: no messages, just where the words are in the whole conversation (the chat's own search). */
+  function chatSlice(d: Detail, q: { gen?: number; after?: number; before?: number; limit?: number; around?: number; from?: number; to?: number; find?: string }) {
     const limit = Math.min(Math.max(Number(q.limit) || 120, 1), 400);
     const all = d.messages;
+    if (typeof q.find === "string") return { gen: d.gen, total: all.length, hits: findIn(all, q.find) };
     let msgs: Msg[];
     const sameGen = q.gen === d.gen;
     if (q.around != null) {

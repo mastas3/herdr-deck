@@ -133,6 +133,6 @@ const IFILTERS = [["all", "All"], ["quick", "Quick ones"], ["prompt", "Permissio
 S.skipped = new Map(); // key → the decision's signature when skipped; it comes back when the decision changes
 S.skipStack = [];
 S.ifocus = null; S.ifocusIdx = 0;
-const dsig = (d) => `${d.kind}|${d.at}|${d.question}`;
+const dsig = (d) => d.id ?? `${d.kind}|${d.at}|${d.question}`; // what was skipped: that decision, not the session
 const isSkipped = (d) => S.skipped.get(d.key) === dsig(d);
 const KEYHINTS = [[["j", "k"], "move"], [["1–9"], "pick"], [["y", "n"], "yes / no"], [["v"], "verify"], [["r"], "reply"], [["o"], "open"], [["s"], "skip"], [["u"], "undo skip"], [["f"], "filter"], [["Esc"], "back"]];

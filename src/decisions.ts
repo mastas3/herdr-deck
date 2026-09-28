@@ -11,6 +11,8 @@ import { claimsDone } from "./verify";
 export type Option = { id: string; title: string; detail?: string; rec?: boolean; send?: string; keys?: string[] };
 export type Decision = {
   key: string;
+  id: string; // what the decision is about (the agent's message, or the prompt on screen): answering or skipping hides this id only
+
   kind: "prompt" | "question" | "review";
   at: number;
   question: string;
@@ -180,39 +182,64 @@ const lastDone = new Map<string, JevState>(); // the latest answer per session, 
 // The row signature moves with every terminal redraw and transcript write (a spinner, a status line, the
 // last few writes after a turn ends). It only says "look again"; what decides whether to ask Jev is the
 // fingerprint of the request itself (see judge).
-const sigOf = (r: Row) => `${r.status}|${r.lastActiveAt ?? 0}|${(r.tail ?? []).slice(-3).join("¦")}|${r.check?.state ?? ""}|${r.check?.sig ?? ""}`;
+const sigOf = (r: Row) => `${r.status}|${r.seen ? 1 : 0}|${r.lastActiveAt ?? 0}|${(r.tail ?? []).slice(-3).join("¦")}|${r.check?.state ?? ""}|${r.check?.sig ?? ""}`;
 /** The decision as you see it: same kind, question and options means the same Jev answer still applies. */
-export const dsigOf = (d: Decision) => `${d.kind}|${d.question}|${d.options.map((o) => o.id).join(",")}|${d.claim ? 1 : 0}`;
+export const dsigOf = (d: Pick<Decision, "kind" | "question" | "options" | "claim">) => `${d.kind}|${d.question}|${d.options.map((o) => o.id).join(",")}|${d.claim ? 1 : 0}`;
 export const needsYou = (r: Row) => (r.status === "blocked" && !r.app) || (r.status === "done" && !r.seen);
+/**
+ * Whether the inbox looks at a row at all. A question stays until it's answered or a newer message replaces it:
+ * opening the session (seen) only settles a plain "done", and herdr moving a finished pane to idle (you looked at
+ * it in the terminal) keeps a question already on screen. Two days old, it has gone stale.
+ */
+export const mayAsk = (r: Row, prev?: Decision) => needsYou(r) || (!r.stale && (r.status === "done" || (r.status === "idle" && prev?.kind === "question")));
 const jevFor = (key: string, sig: string, d: Decision) => { const j = jevState.get(key); return j && (j.sig === sig || j.dsig === dsigOf(d)) ? j : undefined; };
+const hash = (s: string) => Bun.hash(s).toString(36);
 
-export async function buildDecision(r: Row, chat: (r: Row) => Promise<ChatTail | undefined>, screen?: (r: Row) => Promise<string[] | undefined>): Promise<Decision | undefined> {
+/**
+ * The decision a row waits on, if any. `prev` is the one on screen now: when the conversation can't be read this
+ * time (another machine's deck is slow, a transcript is being rewritten) it stays as it is, instead of turning into
+ * a "done" without options or vanishing until the row next changes.
+ */
+export async function buildDecision(r: Row, chat: (r: Row) => Promise<ChatTail | undefined>, screen?: (r: Row) => Promise<string[] | undefined>, prev?: Decision): Promise<Decision | undefined> {
   const sig = sigOf(r);
   const hit = cache.get(r.key);
   if (hit && hit.sig === sig) return { ...hit.d, jev: jevFor(r.key, sig, hit.d) };
   let d: Decision | undefined;
+  let keep = true; // false: built from a guess, so the next rebuild looks again
   const at = r.lastActiveAt ?? Date.now();
   if (r.status === "blocked" && !r.app) {
     // The live screen, with its blank lines and indentation, reads far better than the trimmed tail.
     const lines = (screen ? await screen(r).catch(() => undefined) : undefined) ?? r.tail ?? [];
     const p = promptFromTail(lines);
-    d = { key: r.key, kind: "prompt", at, question: p.question, options: p.options };
-  } else if (r.status === "done" && !r.seen) {
+    const id = "p:" + hash(dsigOf({ kind: "prompt", question: p.question, options: p.options }));
+    // The same prompt keeps its time: a redraw of the screen isn't a new question.
+    d = { key: r.key, id, kind: "prompt", at: prev?.id === id ? prev.at : at, question: p.question, options: p.options };
+  } else if (mayAsk(r, prev)) {
     const c = await chat(r).catch(() => undefined);
+    if (!c && prev && prev.kind !== "prompt") return prev;
+    keep = !!c;
     const msgs = c?.messages ?? [];
+    // The newest thing said: an answer after the question (typed in the terminal, or on another device) settles it.
+    const last = [...msgs].reverse().find((m) => (m.role === "assistant" || m.role === "user") && m.text);
     const lastA = [...msgs].reverse().find((m) => m.role === "assistant" && m.text);
     const text = String(lastA?.text ?? r.lastMessage ?? "");
-    const ch = extractChoices(text);
-    const cq = !ch ? closingQuestion(text) : undefined;
+    const id = lastA ? `m:${lastA.i ?? ""}:${lastA.at ?? ""}` : "t:" + hash(text);
+    const mAt = lastA?.at ?? at;
+    const answered = !!c && last?.role === "user";
+    const ch = answered ? undefined : extractChoices(text);
+    const cq = !ch && !answered ? closingQuestion(text) : undefined;
     const context = plain(text.split(/\n\s*\n/).filter((p) => p.trim()).slice(-3, ch || cq ? -1 : undefined).join("\n\n")).slice(0, 700);
-    if (ch) d = { key: r.key, kind: "question", at, question: ch.question, options: ch.options, context };
-    else if (cq) d = { key: r.key, kind: "question", at, question: cq, context, options: /^(should|shall|can|may|do you want|want me|would you like|ok to|okay to|ready to|go ahead|proceed)/i.test(cq) || /\b(should i|shall i|want me to|go ahead|proceed)\b/i.test(cq)
+    // A question already on screen stays after herdr moves the pane to idle, but only that question.
+    const stays = r.status === "done" || prev?.id === id;
+    if (ch && stays) d = { key: r.key, id, kind: "question", at: mAt, question: ch.question, options: ch.options, context };
+    else if (cq && stays) d = { key: r.key, id, kind: "question", at: mAt, question: cq, context, options: /^(should|shall|can|may|do you want|want me|would you like|ok to|okay to|ready to|go ahead|proceed)/i.test(cq) || /\b(should i|shall i|want me to|go ahead|proceed)\b/i.test(cq)
       ? [{ id: "yes", title: "Yes, go ahead", send: "Yes, go ahead." }, { id: "no", title: "No, not now", send: "No, not now." }, { id: "more", title: "Tell me more first", send: "Tell me more first." }]
       : [{ id: "yes", title: "Yes", send: "Yes." }, { id: "no", title: "No", send: "No." }, { id: "more", title: "Explain more first", send: "Explain a bit more first." }] };
-    else d = { key: r.key, kind: "review", at, question: plain(text.split("\n").filter((l) => l.trim()).slice(-1)[0] ?? "Finished").slice(0, 300), context, options: [], claim: claimsDone(text) };
+    else if (needsYou(r)) d = { key: r.key, id, kind: "review", at: mAt, question: plain(text.split("\n").filter((l) => l.trim()).slice(-1)[0] ?? "Finished").slice(0, 300), context, options: [], claim: claimsDone(text) };
   }
   if (!d) { cache.delete(r.key); return; }
-  cache.set(r.key, { sig, d });
+  if (keep) cache.set(r.key, { sig, d });
+  else cache.delete(r.key);
   const j = jevFor(r.key, sig, d);
   if (j) d.jev = j;
   return d;

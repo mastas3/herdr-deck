@@ -22,7 +22,7 @@ function setMode(m) {
 function renderViews() {
   const el = $("views");
   if (!el) return;
-  const n = (S.decisions ?? []).filter((d) => !S.done.has(d.key)).length;
+  const n = (S.decisions ?? []).filter((d) => !answered(d)).length;
   const core = [{ view: "inbox", label: "Inbox", icon: ICON.inbox, key: "i", count: n, order: 10 }, { view: "history", label: "History", icon: ICON.history, key: "h", order: 20 }, { view: "plugins", label: "Plugins", icon: ICON.puzzle, order: 90 }];
   const tabs = [...core, ...deckPlugins.contributions("view.tabs")].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   setHTML(el, tabs.map(({ view, label, icon, key, count }) => {
