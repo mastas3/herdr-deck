@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "release-train",
+  "name": "Release train",
+  "version": "0.1.0",
+  "description": "A board per repo for its QA → staging → production stages: what each stage is at, the commits waiting between them, and health (a GET, or your check command on demand). Promote starts an agent session with a deploy brief after you confirm; the deck never runs a deploy itself.",
+  "server": "server.ts",
+  "client": ["release-train.js", "release-train-edit.js"],
+  "styles": ["release-train.css"],
+  "machine": "hub",
+  "routes": ["release-train"]
+}

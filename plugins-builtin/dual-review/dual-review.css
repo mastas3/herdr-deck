@@ -31,6 +31,7 @@
 .drsend { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 0; background: var(--bg); }
 .drsend .spacer { flex: 1; }
 .drempty { margin-top: 16px; }
+.drconfirm h3:focus { outline: none; }
 .drblock { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
 .drcmd { display: block; font: 13px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; overflow-wrap: anywhere; }
 .drpre { margin: 0; font: 12.5px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; max-height: 32vh; overflow: auto; }

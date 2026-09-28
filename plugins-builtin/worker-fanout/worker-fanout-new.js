@@ -65,7 +65,7 @@ async function foConfirmStart(body) {
   try { p = await api("/api/worker-fanout", { op: "plan", ...body }); }
   catch (e) { toast(e.message, true, { label: "Retry", run: () => foOpenNew({ brief: body.brief, workers: body.workers }) }); return; }
   const d = document.createElement("dialog");
-  d.className = "ask wide";
+  d.className = "ask wide foconfirm";
   d.innerHTML = `<form method="dialog"><div class="dlg-b"><h3 tabindex="-1">Start ${p.workers.length} worker${p.workers.length === 1 ? "" : "s"}?</h3>
     <p>“${esc(p.title)}”. Each starts in its own folder. Reports go to ${esc(home(p.workers[0].dir.replace(/\/w1$/, "")))}.</p>
     ${p.workers.map((w) => `<div class="foblock"><span class="hint">${w.n}. in ${esc(home(w.cwd))}</span><code class="focmd">${esc(w.cmd)}</code></div>`).join("")}

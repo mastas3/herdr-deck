@@ -23,6 +23,7 @@
 .fonrow input, .fonrow select { min-width: 0; background: var(--bg); border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 9px; font-size: 14.5px; color: var(--ink); }
 .fonn { font: 600 13px var(--mono); color: var(--ink-3); text-align: center; }
 .fonbtns { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+.foconfirm h3:focus { outline: none; }
 .foblock { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; }
 .focmd { display: block; font: 13px/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
