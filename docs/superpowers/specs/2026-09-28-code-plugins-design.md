@@ -31,14 +31,17 @@ Core must never import plugin code (a test enforces this).
 | `covers` | covers.ts, cover-art.ts, js/covers.js | — | `covers` service (`respond`) |
 | `library` | library*.ts, bin/library-bridge.*, js/library.js, css/library.css | — | `library` service (evidence, comparables), MCP tool, Discover tab |
 | `connections` | connections.ts, store.ts, catalog.ts, accounts.ts, logins.ts, projconn.ts, recipes.ts, js/conn-store.js, js/connections.js | — | `connections` service (`inventory`), Tools entry, MCP tool, CONNECTIONS.md |
-| `discover` | discover*.ts, gallery-server.ts, ideagen/*, feed.ts, mix.ts, studio*.ts, idea-archive.ts, js/discover.js, mix, feed, studio*, gallery-* | optional: library, covers, connections | `discover` service; **extension point `discover.tabs`** |
-| `leads` | leads.ts, js/leads*.js | discover | `leads` service; Discover tab |
-| `opportunities` | opportunit*.ts, js/opportunities.js | discover, leads | Discover tab / view |
-| `research` | autoresearch*.ts, js/research.js | discover | Discover tab |
+| `discover` | discover*.ts, gallery-server.ts, ideagen/*, feed.ts, mix.ts, studio*.ts, idea-archive.ts, js/discover.js, mix, feed, studio*, gallery-* | optional: library, covers, connections | `discover` service; **extension points `discover.tabs`** (page) and `discover.evidence` (server) |
+| `leads` | leads.ts, js/leads*.js | optional: discover | `leads` service; Discover tab |
+| `opportunities` | opportunity-*.ts, revenue.ts, js/opportunities.js | optional: discover, leads | `opportunities` service; its view; Discover tab; the evidence notebook to `discover.evidence` |
+| `research` | autoresearch*.ts, js/research.js | optional: discover | `research` service; Discover tab |
 | `projects` | journey*.ts, js/journey*.js | — | `journeys` service; `/p/*` pages |
-| `quests` | game*.ts, revenue.ts, economics.ts, js/quests*.js | projects; optional discover, connections | digest lines, `game` summary, `startRun` |
+| `quests` | game*.ts, js/quests*.js | projects; optional discover, connections | digest lines, `game` summary, `startRun` |
 
-(Exact file lists are the migrating agent's call; the table is the intent.)
+(Exact file lists are the migrating agent's call; the table is the intent.) Code two plugins both need stays a core module
+any plugin may import, since a plugin never imports another's files: `src/pain-search.ts` (Leads, Discover's gallery,
+Opportunities), `src/evidence-notebook.ts` + `src/economics.ts` (Discover, Opportunities), `src/library-*.ts`,
+`src/catalog.ts`, `src/ingredients.ts`, `src/model-run.ts`, `src/model-call.ts`, `src/gh.ts`, `src/text.ts`.
 
 ## The contract (as built in phase 1)
 

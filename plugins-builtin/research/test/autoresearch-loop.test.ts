@@ -351,6 +351,23 @@ describe("engine", () => {
     expect(st.campaigns[0].runs[0].reportPath).toContain("01-");
   });
 
+  test("switched off mid-run: its timers are cancelled, nothing starts or saves; the next start carries on", async () => {
+    const h = harness();
+    let cancelled = 0;
+    h.ar.start({ every: () => () => { cancelled++; }, after: () => () => {} });
+    h.create(); await h.ar.tick();
+    expect(h.active()?.state).toBe("running");
+    const file = `${h.dir}/state/campaigns.json`, before = readFileSync(file, "utf8");
+    h.ar.stop();
+    expect(cancelled).toBe(1);
+    h.finish(); h.advance(MIN); await h.ar.tick();
+    expect(readFileSync(file, "utf8")).toBe(before);
+    expect(h.calls.start.length).toBe(1);
+    // Switched on again: a new loop over the same folder evaluates the run the session finished meanwhile.
+    const again = createAutoresearch({ dir: `${h.dir}/state`, workRoot: `${h.dir}/work`, self: "mac", now: h.now, planner: "template" }, h.deps);
+    await again.tick();
+    expect(again.store.campaigns[0].runs[0].state).toBe("kept");
+  });
   test("state and report endpoints", async () => {
     const h = harness();
     h.create();

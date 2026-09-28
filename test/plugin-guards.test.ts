@@ -41,6 +41,12 @@ describe("core and plugins", () => {
       for (const f of [r.manifest.server, ...r.manifest.client, ...r.manifest.styles].filter(Boolean) as string[]) expect(existsSync(join(BUILTIN, id, f)) ? f : `missing ${id}/${f}`).toBe(f);
     }
   });
+  test("built-in plugins' requires and uses never form a cycle (the host would stop every plugin in it)", () => {
+    const deps = new Map(plugins.map((id) => { const m = JSON.parse(readFileSync(join(BUILTIN, id, "plugin.json"), "utf8")); return [id, [...(m.requires ?? []), ...(m.uses ?? [])]]; }));
+    const reaches = (from: string, to: string, seen = new Set<string>()): boolean =>
+      (deps.get(from) ?? []).some((d: string) => d === to || (!seen.has(d) && (seen.add(d), reaches(d, to, seen))));
+    expect(plugins.filter((id) => reaches(id, id))).toEqual([]);
+  });
   test("plugin tests run with plain `bun test`: no path filter, no test root that leaves plugins-builtin out", () => {
     expect(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).scripts.test).toBe("bun test");
     const bunfig = existsSync(join(ROOT, "bunfig.toml")) ? readFileSync(join(ROOT, "bunfig.toml"), "utf8") : "";
