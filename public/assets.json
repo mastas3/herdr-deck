@@ -4,6 +4,7 @@
     "js/motion.js",
     "js/registry.js",
     "js/format.js",
+    "js/model-search.js",
     "js/markdown.js",
     "js/list-rows.js",
     "js/list.js",
