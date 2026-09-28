@@ -11,7 +11,7 @@ export function codexLifecycleBinary() {
   // A standalone CLI can manage history, but cannot supply desktop ownership or app tools.
   return undefined;
 }
-const allowed = new Set(["initialize", "thread/start", "thread/read", "thread/list", "thread/name/set", "thread/archive", "thread/unarchive", "thread/fork", "thread/inject_items", "thread/unsubscribe"]);
+const allowed = new Set(["initialize", "thread/start", "thread/read", "thread/list", "thread/turns/list", "thread/items/list", "thread/name/set", "thread/archive", "thread/unarchive", "thread/fork", "thread/inject_items", "thread/unsubscribe"]);
 export type CodexMetadataSession = {
   request(method: string, params: any, mutation?: boolean): Promise<any>;
   close(): Promise<void>;

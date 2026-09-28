@@ -24,8 +24,17 @@ inspection features, plus native controls while the desktop owns the task.
   still has a task loaded, use Archive in Codex itself. The deck does not bypass that lock.
 - Task settings offers models and reasoning efforts from the local Codex catalog. Read-only/workspace permission
   changes apply to the next turn and preserve the reviewer. Managed/custom profiles remain in Codex.
+  The dialog shows the last effective filesystem/network policy, approval policy, reviewer and writable roots
+  separately from a pending named-profile selection. Missing facts are marked unavailable. Codex remains the
+  authority for any additional restrictions in managed/custom profiles.
 - Edit last message replaces the latest user turn and reruns it after an explicit confirmation. Earlier turns
   cannot be edited through the follower protocol. Stale turn ids and repeated receipts cannot run another edit.
+- Fork after this reply copies the conversation through that completed reply into a new native task. It uses
+  the canonical `thread/fork.lastTurnId` boundary, validates the source turn and reply hash, and verifies the
+  resulting child ends at that reply. The original is preserved and neither task starts a new model turn.
+  A completed earlier reply can be forked while a later turn runs. Only explicit matching completion ids expose
+  a fork action; interrupted and legacy id-less replies do not. Receipt retries return the same child, and an
+  uncertain acknowledgement cannot repeat the fork.
 - The desktop's queued messages are visible alongside the deck queue. Native queue writes remain in Codex:
   its current follower API replaces the whole array without a conflict precondition, so concurrent edits could
   overwrite a draft. The deck never writes its private queue file.
@@ -47,6 +56,14 @@ The archived list reads the index because this desktop version's `thread/list` o
 `DECK_CODEX_APP_BINARY` can select an installed host binary explicitly; a bare CLI install is not advertised as
 a native desktop integration.
 
+Loaded-task archive needs the desktop itself. The inspected 0.155.0-alpha.16.3 bundle exposes no archive or
+unsubscribe request in its external follower IPC handlers, and this installation has no shared app-server
+control socket. Its public `thread/archive` API refuses a task held by another active writer, even while idle.
+The deck advertises `archiveLoaded: false`; a confirmed writer refusal returns HTTP 409 with
+`CODEX_DESKTOP_REQUIRED` and an explicit **Open in Codex** action. That action only opens the app when clicked.
+The task stays visible and connected until archive succeeds. A lost acknowledgement stays uncertain, and
+closing a task is not presented as a guaranteed way to release its writer.
+
 Message receipts in `~/.config/herdr-deck/codex-delivery.json` record a hash and delivery result, not prompt
 text. They are saved before sending; uncertain delivery cannot be automatically retried after a restart.
 Queued sends pause on errors instead of silently dropping the message or retrying a potentially accepted turn.
@@ -65,6 +82,14 @@ Check the conversation before deliberately editing/replacing an uncertain messag
   or image is served only when the requested child belongs to the selected parent.
 - The transcript reader shows the nested command and file-change items emitted by code mode, without repeating
   an existing direct tool call. It keeps model output text and strips known injected setup from user messages.
+- Forked rollouts can reference inherited history rather than copy it. The reader resolves the indexed parent
+  named by `session_meta.history_base` and reads only its recorded byte/ordinal prefix before the child's own
+  messages. Later parent turns are excluded. Native nested forks may flatten that reference to an earlier
+  ancestor, so the history-base id can differ from `forked_from_id`. Inline image offsets are scoped to validated
+  ancestors; generated images use the same validated ancestry and timestamp cutoffs. Missing or changed base
+  history displays an explicit note instead of appearing as an empty complete conversation.
+  Byte offsets are physical within the referenced file; ordinal limits include its inherited records. Nested
+  validation subtracts the referenced parent's inherited ordinal before comparing physical record counts.
 
 ## Compatibility and remaining gaps
 
@@ -84,6 +109,11 @@ Remaining limitations are archiving a desktop-loaded task, editing earlier user 
 queue atomically, and changing managed/custom permission profiles. The public app-server API does not attach
 a second execution server to a desktop-owned task; its metadata operations obey writer locks. The gated
 shared-daemon path in the installed app is not enabled or required by this change.
+
+Forking after an earlier completed reply provides a separate conversation for continuing in a new direction.
+It does not rewrite earlier user messages in the original task. Native queue updates still use a whole-array
+replacement with no revision condition; the deck leaves them to Codex and provides an explicit Open in Codex
+action alongside the read-only queue.
 
 Resuming into a separate CLI remains an explicit user action; the deck refuses it while the app row is working
 or blocked. No changes to desktop startup, sandbox policy or tailnet configuration are needed.
@@ -114,3 +144,12 @@ four existing home/session snapshots match the prior commit.
 The final running-deck HTTP smoke also checked blank creation without a model turn, open/reconnect after
 restore, loaded-task archive refusal, model-effort save/restore, and repeated create/edit/fork receipts.
 All disposable verification tasks were archived afterward.
+
+The selected-reply follow-up passed 994 tests across 81 files. The 34 desktop/phone fixtures exercised fork
+actions and retries, stale-reply refresh, archive handoff and Undo, permission facts and native queue handoff.
+Eight unaffected screenshots matched their baseline. Live checks verified two native turns, exact first-reply
+forking, same-receipt replay, stale hash rejection, inherited history in the deck, loaded-archive handoff, and
+continuation of the fork after its original task was archived, retaining native app tools. Nested-fork probes
+confirmed both flattened history references and a fork's own replies. Parser tests cover recursive ancestry,
+moved parents, changed prefixes, bounded image access and
+partial-replay failures. A nanosecond file-stamp regression passed 20 consecutive runs.

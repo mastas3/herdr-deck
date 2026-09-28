@@ -58,6 +58,26 @@ export const VIEWS = {
     ${scenario === "stale" ? 'if (!document.querySelector(".toast")?.textContent.includes("conversation has changed")) throw new Error("Stale creation incorrectly offers a first-message retry");' : ""}
   })()`])),
   "codex-fork-retry": `(async () => { const r = rowOf("fake:codex"); await codexTaskAction(r, "fork").catch(() => {}); await codexTaskAction(r, "fork"); })()`,
+  ...Object.fromEntries(["view", "send", "retry", "stale"].map((scenario) => [`codex-fork-point-${scenario}`, `(async () => {
+    select("fake:codex", { scroll: true, open: true }); const r = rowOf(S.sel); r.status = "idle";
+    codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); mergeChat(S.sel, await api("/api/chat", { key: S.sel })); renderDetail();
+    const buttons = document.querySelectorAll("[data-codex-fork-point]"); if (buttons.length !== 2) throw new Error("Fork actions must only appear on completed assistant replies");
+    if (document.querySelector('[data-b="m3"] [data-codex-fork-point]')) throw new Error("An intermediate reply can be forked");
+    const before = JSON.stringify([...chatOf(chatId(r.key)).msgs]);
+    ${scenario === "view" ? "buttons[0].focus();" : scenario === "send" ? "buttons[0].click();" : 'await forkCodexReply(r, chatOf(chatId(r.key)).msgs.get(1));'}
+    ${scenario === "retry" ? 'if (toastWithAct()?._act.label !== "Retry") throw new Error("Missing safe retry action"); toastWithAct().querySelector(".tact").click();' : ""}
+    ${scenario === "stale" ? 'if (toastWithAct()?._act.label !== "Refresh chat") throw new Error("A stale fork point must refresh instead of retrying");' : ""}
+    if (JSON.stringify([...chatOf(chatId(r.key)).msgs]) !== before) throw new Error("Forking changed the original conversation");
+  })()`])),
+  "codex-archive-loaded": `(async () => { select("fake:codex", { open: true }); const r = rowOf(S.sel); r.status = "idle"; codexViews.set(r.key, await api("/api/codex-state", { key: r.key })); const entry = codexTaskMenu(r).find((x) => x.html === "Archive in Codex app…"); if (!entry) throw new Error("Loaded archive does not explain the desktop handoff"); await entry.run(); })()`,
+  ...Object.fromEntries(["fallback", "handoff", "undo"].map((scenario) => [`codex-archive-${scenario}`, `(async () => {
+    select("fake:codex", { open: true }); const r = rowOf(S.sel); r.status = "idle"; codexViews.set(r.key, { ready: false, requests: [], capabilities: { archive: true, restore: true, archiveLoaded: false } });
+    await codexTaskAction(r, "archive").catch(() => {});
+    if (toastWithAct()?._act.label !== "${scenario === "undo" ? "Undo" : "Open in Codex"}") throw new Error("Archive did not offer the expected recovery action");
+    ${scenario === "fallback" ? "" : 'toastWithAct().querySelector(".tact").click();'}
+  })()`])),
+  "codex-settings-managed-open": `(async () => { select("fake:codex", { open: true }); await openCodexSettings(rowOf(S.sel)); const d = document.querySelector(".native-settings"); if (!d.textContent.includes("Current permissions") || !d.textContent.includes("Team workspace")) throw new Error("Managed permission facts are missing"); const button = d.querySelector("[data-settings-open]"); if (button.textContent !== "Open in Codex" || !d.textContent.includes("task permission menu")) throw new Error("Permissions handoff must explain where to change the profile"); button.click(); })()`,
+  "codex-queue-open": `(async () => { select("fake:codex", { open: true }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); renderDetail(); const button = document.querySelector("[data-native-queue-open]"); if (!button) throw new Error("Native queue handoff is missing"); button.click(); })()`,
   "tools-menu": `select("fake:blocked", { scroll: true, open: true }); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe"))`,
   inbox: `setMode("inbox")`,
   history: `setMode("history")`,
@@ -109,18 +129,30 @@ const FAKE_ROWS = [
 ];
 
 function nativeFixtureState(view) {
-  const capabilities = { settings: true, edit: true, create: true, rename: true, archive: true, restore: true, fork: true };
+  const capabilities = { settings: true, edit: true, create: true, rename: true, archive: true, archiveLoaded: false, restore: true, fork: true, forkPoint: true };
   if (view === "codex-disconnected") return { ready: false, canOpen: true, requests: [], capabilities, error: "Open this task in the Codex app, then reconnect." };
-  const blocked = ["codex-approval", "codex-question"].includes(view), idle = ["codex-menu", "codex-edit", "codex-settings", "codex-settings-managed", "codex-settings-save"].includes(view);
+  const blocked = ["codex-approval", "codex-question"].includes(view), idle = ["codex-menu", "codex-edit", "codex-settings", "codex-settings-managed", "codex-settings-save"].includes(view) || view.startsWith("codex-fork-point-") || view.startsWith("codex-archive-");
   return { ready: true, status: blocked ? "blocked" : idle ? "idle" : "working", activeTurnId: idle ? null : "synthetic-turn", capabilities,
     editableTurn: idle ? { turnId: "synthetic-last-turn", text: "Improve Codex support in the deck." } : undefined,
-    nativeQueue: { status: "ready", messages: view === "codex-queue" ? [{ id: "native-queued", text: "Review the API tests before continuing." }] : [] },
+    nativeQueue: { status: "ready", messages: view.startsWith("codex-queue") ? [{ id: "native-queued", text: "Review the API tests before continuing." }] : [] },
     requests: view === "codex-approval" ? [{ id: 42, method: "item/commandExecution/requestApproval", params: { command: "bun test", cwd: "/tmp/deck", reason: "Run the project tests", availableDecisions: ["accept", "decline"] } }] : view === "codex-question" ? [{ id: "async:question", method: "deck/asyncQuestion", params: { questions: [{ id: "q0", question: "Which test marker should be used?", options: [{ label: "Marker A" }, { label: "Marker B" }] }] } }] : [] };
 }
 function nativeFixtureSettings(managed = false) {
   return { model: "fixture-reasoner", effort: "high", version: "fixture-settings-v1", permissionMode: managed ? "managed-profile" : "workspace-write",
     models: [{ id: "fixture-reasoner", label: "Test reasoning model", efforts: ["medium", "high"], defaultEffort: "high" }, { id: "fixture-fast", label: "Test fast model", efforts: ["low", "medium"], defaultEffort: "medium" }],
-    permissionModes: managed ? [] : [{ id: "read-only", label: "Read only", description: "Read files; ask before making changes." }, { id: "workspace-write", label: "Workspace access", description: "Allow changes inside this task’s workspace." }], permissionsNote: managed ? "This task uses a managed permission profile. Change it in Codex." : undefined };
+    permissionModes: managed ? [] : [{ id: "read-only", label: "Read only", description: "Read files; ask before making changes." }, { id: "workspace-write", label: "Workspace access", description: "Allow changes inside this task’s workspace." }], permissionsNote: managed ? "This task uses a managed permission profile. Change it in Codex." : undefined,
+    permissions: { source: "current", profileId: managed ? "Team workspace" : ":workspace", selectedProfileId: managed ? "Team workspace" : ":workspace", filesystem: "Write in the workspace", networkAccess: "restricted", approvalPolicy: "Ask when needed", reviewer: "Automatic review", writableRoots: ["/tmp/acme-api"] } };
+}
+function nativeForkFixtureChat() {
+  const messages = [
+    { i: 0, role: "user", text: "Compare two approaches to the billing module." },
+    { i: 1, role: "assistant", text: "Keep the existing API and split its storage layer first.", forkAfterTurnId: "fixture-turn-1", forkReplyHash: "a".repeat(64) },
+    { i: 2, role: "user", text: "Now add a migration plan." },
+    { i: 3, role: "assistant", text: "I’m checking the current schema before writing the plan." },
+    { i: 4, role: "tool", tool: "Read", state: "done", summary: "src/billing.ts" },
+    { i: 5, role: "assistant", text: "Add a compatibility layer, migrate existing records, then remove the old storage path.", forkAfterTurnId: "fixture-turn-2", forkReplyHash: "b".repeat(64) },
+  ];
+  return { gen: 1, total: messages.length, messages };
 }
 
 function args(argv) {
@@ -216,7 +248,8 @@ async function snap(browser, o, deck, view, vp) {
   await page.clock.setFixedTime(NOW);
   await page.addInitScript(freezeScript);
   const out = { view, viewport: vp, errors: [], console: [], requests: new Set(), blocked: new Set() };
-  const mutationReceipts = [];
+  const mutationReceipts = [], forkPointReceipts = [], archiveActions = [];
+  let nativeOpenCount = 0;
   let inflight = 0, lastNet = Date.now();
   page.on("pageerror", (e) => out.errors.push(String(e.message ?? e)));
   page.on("console", (m) => { if (m.type() === "error") out.console.push(m.text()); });
@@ -229,7 +262,22 @@ async function snap(browser, o, deck, view, vp) {
     try { body = req.postDataJSON(); } catch {}
     // Native controls use only synthetic state in this harness, never the real desktop socket.
     if (path === "/api/codex-state") return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeFixtureState(view)) });
-    if (path === "/api/codex-settings" && body?.expectedVersion == null) return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeFixtureSettings(view === "codex-settings-managed")) });
+    if (path === "/api/codex-settings" && body?.expectedVersion == null) return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeFixtureSettings(view.startsWith("codex-settings-managed"))) });
+    if (path === "/api/chat" && body?.key === "fake:codex" && view.startsWith("codex-fork-point-")) return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeForkFixtureChat()) });
+    if (path === "/api/codex-fork-point" && body?.key === "fake:codex" && view.startsWith("codex-fork-point-")) {
+      forkPointReceipts.push(body.requestId);
+      if (body.lastTurnId !== "fixture-turn-1" || body.replyHash !== "a".repeat(64)) out.errors.push("Fork used the wrong reply boundary");
+      if (view.endsWith("stale")) return r.fulfill({ status: 409, contentType: "application/json", body: '{"error":"This reply has changed. Refresh the conversation.","code":"CODEX_STALE"}' });
+      if (view.endsWith("retry") && forkPointReceipts.length === 1) return r.fulfill({ status: 409, contentType: "application/json", body: '{"error":"Fork delivery is uncertain.","code":"CODEX_DELIVERY_UNKNOWN"}' });
+      return r.fulfill({ contentType: "application/json", body: '{"key":"fake:forked-point"}' });
+    }
+    if (path === "/api/codex-archive" && body?.key === "fake:codex" && view.startsWith("codex-archive-")) {
+      archiveActions.push(body.archived);
+      return view.endsWith("undo") ? r.fulfill({ contentType: "application/json", body: JSON.stringify({ key: "fake:codex", archived: body.archived }) }) : r.fulfill({ status: 409, contentType: "application/json", body: '{"error":"Codex still has this task loaded. Archive it in the Codex app.","code":"CODEX_DESKTOP_REQUIRED","action":{"kind":"open-codex","label":"Open in Codex"}}' });
+    }
+    if (path === "/api/codex-open" && body?.key === "fake:codex" && (view.startsWith("codex-archive-") || ["codex-settings-managed-open", "codex-queue-open"].includes(view))) {
+      nativeOpenCount++; return r.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+    }
     // The form test acknowledges a fixture-only write; no mutation reaches a server or real task.
     if (path === "/api/codex-settings" && view === "codex-settings-save" && body?.key === "fake:codex") {
       if (body.expectedVersion !== "fixture-settings-v1" || body.model !== "fixture-fast" || body.effort !== "low" || body.permissionMode !== "read-only") out.errors.push("Settings form sent an incorrect model, effort, permission, or stale-form guard");
@@ -261,6 +309,17 @@ async function snap(browser, o, deck, view, vp) {
   if (view.startsWith("codex-create-") || view === "codex-fork-retry") {
     if (mutationReceipts.length !== (view.endsWith("retry") ? 2 : 1) || mutationReceipts.some((id) => typeof id !== "string" || id !== mutationReceipts[0])) out.errors.push("Native create/fork did not reuse its receipt after uncertain delivery");
   }
+  if (view.startsWith("codex-fork-point-")) {
+    const expected = view.endsWith("view") ? 0 : view.endsWith("retry") ? 2 : 1;
+    if (forkPointReceipts.length !== expected || forkPointReceipts.some((id) => typeof id !== "string" || id !== forkPointReceipts[0])) out.errors.push("Fork-point submission/retry did not preserve its receipt");
+  }
+  if (view.startsWith("codex-archive-")) {
+    const expected = view.endsWith("loaded") ? [] : view.endsWith("undo") ? [true, false] : [true];
+    if (JSON.stringify(archiveActions) !== JSON.stringify(expected)) out.errors.push("Archive attempted an unexpected mutation");
+    if (nativeOpenCount !== Number(view.endsWith("loaded") || view.endsWith("handoff"))) out.errors.push("Archive opened Codex without the expected explicit action");
+  }
+  if (["codex-settings-managed-open", "codex-queue-open"].includes(view) && nativeOpenCount !== 1) out.errors.push("Native settings/queue handoff did not open Codex once");
+  if (view === "codex-fork-point-view") await page.locator("[data-codex-fork-point]").first().focus();
   const name = `${view}-${vp}`;
   await page.screenshot({ path: join(o.out, `${name}.png`), animations: "disabled", caret: "hide" });
   const text = await page.evaluate(() => document.body.innerText);

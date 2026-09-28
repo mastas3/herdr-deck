@@ -12,6 +12,7 @@
     "js/chat-scroll.js",
     "js/codex-controls.js",
     "js/codex-task-actions.js",
+    "js/codex-message-actions.js",
     "js/detail.js",
     "js/usage.js",
     "js/composer.js",

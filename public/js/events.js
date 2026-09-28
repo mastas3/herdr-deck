@@ -68,6 +68,7 @@ $("detail").addEventListener("click", (e) => {
   const blockEl = e.target.closest("[data-b]");
   if (e.target.closest("[data-copy]") && blockEl) { motion.confirm(e.target.closest("[data-copy]"), ICON.check); return copyBlocks([blockEl.dataset.b]); }
   if (e.target.closest("[data-pick]") && blockEl) return pickBlock(blockEl.dataset.b, e.shiftKey);
+  if (e.target.closest("[data-codex-fork-point]") && blockEl) return forkCodexReply(rowOf(S.sel), chatDom.data?.find((b) => b.key === blockEl.dataset.b)?.ms[0]);
   if (chatSel.size && blockEl && !e.target.closest("a, button, [data-toggle]")) return pickBlock(blockEl.dataset.b, e.shiftKey);
   if (e.target.closest("[data-selcopy]")) { copyBlocks([...chatSel]); return clearPicks(); }
   if (e.target.closest("[data-selall]")) { for (const b of chatDom.data ?? []) chatSel.add(b.key); return renderSelBar(); }

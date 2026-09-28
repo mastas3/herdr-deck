@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { codexModelChoices, createCodexSettings, type CodexNativeAccess } from "../src/codex-settings";
+import { codexModelChoices, codexPermissionSummary, createCodexSettings, type CodexNativeAccess } from "../src/codex-settings";
 import { codexControlState } from "../src/codex-control-state";
 import { CodexControlError } from "../src/codex-ipc";
 
@@ -68,6 +68,31 @@ describe("native Codex per-task settings", () => {
     f.raw.latestThreadSettings.activePermissionProfile = { id: ":workspace" };
     f.raw.latestThreadSettings.sandboxPolicy = { type: "readOnly", networkAccess: false };
     expect((await f.settings.read("task")).permissionMode).toBe("workspace-write");
+  });
+  test("current permissions remain distinct from a pending profile selection", async () => {
+    const f = fixture();
+    f.raw.currentPermissions = { activePermissionProfile: { id: "company-managed" }, approvalPolicy: "on-request", approvalsReviewer: "auto_review",
+      sandboxPolicy: { type: "readOnly", networkAccess: false } };
+    f.raw.latestThreadSettings.activePermissionProfile = { id: ":workspace" };
+    const v = await f.settings.read("task");
+    expect(v.permissionMode).toBe("workspace-write");
+    expect(v.permissions).toEqual({ source: "current", profileId: "company-managed", selectedProfileId: ":workspace",
+      filesystem: "Read only", networkAccess: "restricted", approvalPolicy: "When Codex requests approval", reviewer: "Automatic review", writableRoots: [] });
+    expect(f.calls).toEqual([]);
+  });
+  test("permission summaries handle custom rules and missing facts without inventing access", () => {
+    expect(codexPermissionSummary({})).toMatchObject({ source: "configured", filesystem: "Unavailable", networkAccess: "unknown", reviewer: "Unavailable" });
+    expect(codexPermissionSummary({ currentPermissions: { sandboxPolicy: { type: "externalSandbox", networkAccess: "restricted" },
+      approvalPolicy: { granular: { rules: true } }, approvalsReviewer: "guardian_subagent" } })).toMatchObject({
+      filesystem: "External sandbox", networkAccess: "restricted", approvalPolicy: "Custom approval rules", reviewer: "Guardian review" });
+    expect(codexPermissionSummary({ currentPermissions: { sandboxPolicy: { type: "dangerFullAccess" } } })).toMatchObject({
+      filesystem: "Full filesystem access", networkAccess: "enabled" });
+  });
+  test("workspace summaries include the implicit workspace and only explicit absolute extra roots", () => {
+    const f = fixture(); f.raw.latestThreadSettings.sandboxPolicy.writableRoots = ["/work/project", "/other", "relative", null];
+    expect(codexPermissionSummary(f.raw).writableRoots).toEqual(["/work/project", "/other"]);
+    f.raw.currentPermissions = { sandboxPolicy: { type: "readOnly", networkAccess: false } };
+    expect(codexPermissionSummary(f.raw).writableRoots).toEqual([]);
   });
   test("missing catalog fails closed without breaking existing settings display", async () => {
     const f = fixture(), settings = createCodexSettings(f.access, { readModels: async () => { throw new Error("missing"); } });

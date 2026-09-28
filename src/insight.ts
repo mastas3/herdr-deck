@@ -19,7 +19,7 @@ export async function detailFor(w: Who): Promise<Detail | undefined> {
   if (w.agent === "codex") {
     const f = w.file ?? findCodexFile(w.sessionId);
     const d = f ? await codexDetail(f) : undefined;
-    if (d) attachGenerated(d, w.sessionId);
+    if (d) await attachGenerated(d, w.sessionId, f);
     return d;
   }
   if (w.agent === "opencode") return opencodeDetail(w.sessionId);
@@ -36,7 +36,7 @@ export async function subDetailFor(w: Who, subId: string): Promise<Detail | unde
     const file = codexSubFile(w.sessionId, subId);
     if (!file) return;
     const d = await codexDetail(file);
-    attachGenerated(d, subId);
+    await attachGenerated(d, subId, file);
     return d;
   }
 }
@@ -48,10 +48,10 @@ export async function imageFor(w: Who, id: string, subId?: string) {
     const path = f && subId ? claudeSubFile(f, subId) : f;
     return path ? claudeImage(path, id) : undefined;
   }
-  if (id.startsWith("x:") || id.startsWith("g:")) {
+  if (id.startsWith("x:") || id.startsWith("b:") || id.startsWith("g:")) {
     const f = subId ? codexSubFile(w.sessionId, subId) : w.file ?? findCodexFile(w.sessionId);
     if (!f) return;
-    return id.startsWith("x:") ? codexImage(f, id) : codexGeneratedImage(subId ?? w.sessionId, id);
+    return !id.startsWith("g:") ? codexImage(f, id) : codexGeneratedImage(subId ?? w.sessionId, id, f);
   }
   if (id.startsWith("o:")) return opencodeImage(id);
 }

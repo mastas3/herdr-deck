@@ -1,6 +1,15 @@
 "use strict";
 // Native task settings are provided by the connected app, including its supported choices.
 const codexHasCapability = (r, name) => !!r?.app && !!codexView(r)?.capabilities?.[name] && (!["settings", "edit"].includes(name) || !!codexView(r)?.ready);
+function codexPermissionFacts(settings) {
+  const p = settings.permissions;
+  if (!p) return "";
+  const facts = [["Files", p.filesystem], ["Network", { enabled: "Allowed", restricted: "Restricted", unknown: "Not reported" }[p.networkAccess]], ["Approvals", p.approvalPolicy], ["Reviewed by", p.reviewer]];
+  const profile = (id) => ({ ":workspace": "Workspace", ":workspace-write": "Workspace write", ":read-only": "Read only", ":danger-full-access": "Full access" }[id] ?? id);
+  if (p.profileId) facts.unshift(["Profile", profile(p.profileId)]);
+  if (p.selectedProfileId && p.selectedProfileId !== p.profileId) facts.push(["Selected profile", profile(p.selectedProfileId)]);
+  return `<section class="native-permission-facts"><h4>${p.source === "current" ? "Current permissions" : "Last reported permissions"}</h4><dl>${facts.filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}${p.writableRoots?.length ? `<dt>Writable folders</dt><dd>${p.writableRoots.map((root) => `<span class="native-permission-root">${esc(home(root))}</span>`).join("")}</dd>` : ""}</dl>${!settings.permissionModes?.length ? '<p class="hint">Codex controls the full profile and its restrictions.</p>' : ""}</section>`;
+}
 async function openCodexSettings(r) {
   try {
     const settings = await api("/api/codex-settings", { key: r.key });
@@ -18,6 +27,7 @@ function showCodexSettings(r, settings) {
     <label class="field"><span>Model</span><select name="model">${models.map((m) => `<option value="${esc(m.id)}">${esc(m.label || m.id)}</option>`).join("")}</select></label>
     <label class="field"><span>Reasoning effort</span><select name="effort"></select></label>
     ${modes.length ? `<label class="field"><span>Permissions</span><select name="permissionMode">${modes.map((m) => `<option value="${esc(m.id)}">${esc(m.label || m.id)}</option>`).join("")}</select><span class="hint" data-permission-help></span></label>` : `<p class="hint">${esc(settings.permissionsNote ?? "This task inherits its managed permission settings from Codex.")}</p>`}
+    ${codexPermissionFacts(settings)}${!modes.length ? '<p class="hint">Use the task permission menu to change this profile.</p><button type="button" class="btn" data-settings-open>Open in Codex</button>' : ""}
     <p class="native-form-error" role="alert" hidden></p></div><div class="dlg-f"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save settings</button></div></form>`;
   document.body.append(dlg);
   const form = dlg.querySelector("form"), model = form.elements.model, effort = form.elements.effort, permission = form.elements.permissionMode;
@@ -41,6 +51,7 @@ function showCodexSettings(r, settings) {
     permission.onchange = syncPermission; syncPermission();
   }
   dlg.querySelector("[data-cancel]").onclick = () => dlg.close();
+  dlg.querySelector("[data-settings-open]")?.addEventListener("click", () => codexAct("codex-open", r));
   dlg.addEventListener("close", () => dlg.remove());
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -97,20 +108,30 @@ async function codexTaskAction(r, action, extra = {}) {
     } else if (action === "archive") {
       const archived = extra.archived !== false;
       const result = await api("/api/codex-archive", { key: r.key, archived });
-      if (archived) { if (S.sel === r.key) { S.board = true; renderDetail(); } toast("Archived in Codex. Restore it from Archived Codex tasks."); }
+      if (archived) { if (S.sel === r.key) { S.board = true; renderDetail(); } toast("Archived in Codex.", false, { label: "Undo", run: () => codexTaskAction(r, "archive", { archived: false }).catch(() => {}) }); }
       else { pendingSelect = result.key ?? r.key; if (S.rows.has(pendingSelect)) { const key = pendingSelect; pendingSelect = null; select(key, { scroll: true, open: true }); } toast("Restored the Codex task"); }
     }
-  } catch (e) { if (action === "fork" && e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") codexForkReceipts.delete(r.key); toast(e.message, true); throw e; }
+  } catch (e) {
+    if (action === "fork" && e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") codexForkReceipts.delete(r.key);
+    const open = e.action?.kind === "open-codex" || e.code === "CODEX_DESKTOP_REQUIRED";
+    toast(e.message, true, open ? { label: "Open in Codex", run: () => openCodexArchive(r) } : { label: "Retry", run: () => codexTaskAction(r, action, extra).catch(() => {}) });
+    throw e;
+  }
   finally { codexTaskMutations.delete(mutation); }
 }
 function codexTaskMenu(r) {
   const idle = !codexView(r)?.activeTurnId && r.status !== "working" && r.status !== "blocked";
+  const desktopArchive = codexView(r)?.ready && codexView(r)?.capabilities?.archiveLoaded === false;
   return [
     codexHasCapability(r, "rename") && { html: "Rename Codex task…", run: () => codexTaskAction(r, "rename").catch(() => {}) },
     codexHasCapability(r, "fork") && idle && { html: "Fork in Codex", run: () => codexTaskAction(r, "fork").catch(() => {}) },
-    codexHasCapability(r, "archive") && idle && { html: "Archive in Codex", run: () => codexTaskAction(r, "archive").catch(() => {}) },
+    codexHasCapability(r, "archive") && idle && { html: desktopArchive ? "Archive in Codex app…" : "Archive in Codex", run: () => desktopArchive ? openCodexArchive(r) : codexTaskAction(r, "archive").catch(() => {}) },
     codexHasCapability(r, "restore") && { html: "Archived Codex tasks…", run: () => openCodexArchives(r.machine) },
   ].filter(Boolean);
+}
+async function openCodexArchive(r) {
+  try { await api("/api/codex-open", { key: r.key }); toast("Task opened in Codex. Use its task menu to archive it."); }
+  catch (e) { toast(e.message, true, { label: "Retry", run: () => openCodexArchive(r) }); }
 }
 async function openCodexArchives(machine = S.self) {
   const dlg = document.createElement("dialog");

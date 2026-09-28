@@ -4,6 +4,8 @@ import { createCodexDelivery } from "./codex-delivery";
 import { CodexControlError } from "./codex-ipc";
 import { codexLifecycleBinary, openCodexMetadataSession, type CodexMetadataSession } from "./codex-app-server";
 import { archivedCodexTasks } from "./codex-lifecycle-index";
+import { validateCodexForkPoint, verifyCodexForkPoint, type CodexForkPoint } from "./codex-fork-point";
+import { codexArchiveFailure } from "./codex-archive";
 
 export type CodexLifecycleTask = { id: string; cwd: string; title: string };
 const invalid = (message: string) => new CodexControlError(message, "CODEX_INVALID");
@@ -41,7 +43,7 @@ export function createCodexLifecycle(options: {
   }
   return {
     available,
-    capabilities() { const ready = available(); return { available: ready, create: ready, rename: ready, archive: ready, restore: ready, fork: ready }; },
+    capabilities() { const ready = available(); return { available: ready, create: ready, rename: ready, archive: ready, archiveLoaded: false, restore: ready, fork: ready }; },
     read(id: string) { return run((s) => read(s, id)); },
     async create(input: { cwd: string; title?: string; prompt?: string; requestId: string }) {
       if (typeof input.cwd !== "string" || !isAbsolute(input.cwd)) throw invalid("Choose an absolute project folder.");
@@ -75,10 +77,7 @@ export function createCodexLifecycle(options: {
       return run(async (s) => {
         const current = await read(s, id);
         try { await s.request(archived ? "thread/archive" : "thread/unarchive", { threadId: current.id }, true); }
-        catch (e: any) {
-          if (/already has an active writer/i.test(e.message)) throw new CodexControlError("Codex still has this task loaded. Archive it in the Codex app.", "CODEX_STALE");
-          throw e;
-        }
+        catch (e) { throw codexArchiveFailure(e, archived); }
         return { ...current, archived };
       });
     },
@@ -90,6 +89,24 @@ export function createCodexLifecycle(options: {
           const response = await s.request("thread/fork", { threadId: id, excludeTurns: true, threadSource: "herdr-deck" }, true);
           createdId = response.thread?.id ?? "unknown";
           const created = task(response.thread);
+          await s.request("thread/unsubscribe", { threadId: created.id });
+          return created;
+        } catch (e) { if (createdId) throw incomplete(createdId, e); throw e; }
+      }));
+    },
+    forkPoint(id: string, input: CodexForkPoint, requestId: string) {
+      taskId(id);
+      const point = validateCodexForkPoint(input);
+      return deliver(requestId, { action: "fork-point", id, ...point }, () => run(async (s) => {
+        await read(s, id);
+        await verifyCodexForkPoint(s, id, point);
+        let createdId: string | undefined;
+        try {
+          // Codex takes the prefix atomically; no original or copied conversation is rolled back.
+          const response = await s.request("thread/fork", { threadId: id, lastTurnId: point.lastTurnId, excludeTurns: true, threadSource: "herdr-deck" }, true);
+          createdId = response.thread?.id ?? "unknown";
+          const created = task(response.thread);
+          await verifyCodexForkPoint(s, created.id, point, true);
           await s.request("thread/unsubscribe", { threadId: created.id });
           return created;
         } catch (e) { if (createdId) throw incomplete(createdId, e); throw e; }

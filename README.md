@@ -199,9 +199,11 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   attachments, **Steer**, **Stop**, approvals and questions directly in the deck. While working, **Queue** holds
   your message until the turn ends; **Steer** sends it now. The desktop keeps its model, permissions, plugins and
   app tools. **Open & reconnect** recovers an unloaded task on its host Mac. Native tasks can be created,
-  renamed, forked and restored; More actions also offers settings and editing the last message. Archive works
-  when the desktop has released the task; otherwise archive it in Codex. Model/effort and supported per-task
-  permissions apply to the next turn. The desktop's queue is visible separately. Native controls use a private,
+  renamed, forked and restored; **Fork after this reply** copies history through a completed reply into a new
+  task. More actions also offers settings and editing the last message. Archive works when the desktop has
+  released the task; loaded tasks offer an explicit handoff to Codex. Settings show the last effective permission
+  policy separately from a selected next-turn profile. Model/effort and supported per-task permissions apply
+  to the next turn. The desktop's queue is visible separately, with an action to open it in Codex. Native controls use a private,
   versioned interface; unsupported versions stay read-only. See [Codex support](docs/codex-support.md).
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.

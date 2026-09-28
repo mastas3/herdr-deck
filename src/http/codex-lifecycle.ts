@@ -2,10 +2,11 @@ import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute } from "node:path";
 import { CodexControlError } from "../codex-ipc";
+import { CodexArchiveDesktopRequired } from "../codex-archive";
 import type { Hub } from "./hub";
 import { json } from "./page";
 
-const paths = new Set(["/api/codex-create", "/api/codex-rename", "/api/codex-archive", "/api/codex-fork", "/api/codex-archived"]);
+const paths = new Set(["/api/codex-create", "/api/codex-rename", "/api/codex-archive", "/api/codex-fork", "/api/codex-fork-point", "/api/codex-archived"]);
 export async function codexLifecycleApi(hub: Hub, path: string, body: any) {
   if (!paths.has(path)) return;
   const lifecycle = hub.codexLifecycle;
@@ -38,6 +39,11 @@ export async function codexLifecycleApi(hub: Hub, path: string, body: any) {
   const id = /^codex-app\/([a-zA-Z0-9_-]{8,100})$/.exec(key)?.[1];
   if (!id) throw new CodexControlError("Not a local Codex app task.", "CODEX_INVALID");
   // The lifecycle adapter additionally checks canonical source membership before any mutation.
+  if (path === "/api/codex-fork-point") {
+    const task = await lifecycle.forkPoint(id, { lastTurnId: body.lastTurnId, replyHash: body.replyHash }, body.requestId);
+    await hub.deck.syncAppThread(task.id);
+    return json({ ok: true, id: task.id, key: `codex-app/${task.id}` });
+  }
   if (path === "/api/codex-rename") {
     await lifecycle.rename(id, body.title); await hub.deck.syncAppThread(id);
     return json({ ok: true, key });
@@ -54,7 +60,11 @@ export async function codexLifecycleApi(hub: Hub, path: string, body: any) {
     await hub.deck.syncAppThread(task.id);
     return json({ ok: true, id: task.id, key: `codex-app/${task.id}` });
   }
-  await lifecycle.archive(id, body.archived);
+  try { await lifecycle.archive(id, body.archived); }
+  catch (e) {
+    if (e instanceof CodexArchiveDesktopRequired) return json({ error: e.message, code: e.code, action: e.action }, 409);
+    throw e;
+  }
   if (body.archived) hub.codex.forget(id);
   await hub.deck.syncAppThread(id, body.archived);
   return json({ ok: true, key, archived: body.archived });

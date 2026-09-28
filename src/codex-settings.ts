@@ -37,6 +37,25 @@ function permissionState(raw: any) {
   return { sandbox, profile, mode, managed, approvalPolicy: settings.approvalPolicy ?? current.approvalPolicy,
     approvalsReviewer: settings.approvalsReviewer ?? current.approvalsReviewer };
 }
+export function codexPermissionSummary(raw: any) {
+  // A next-turn profile selection can coexist with the previous effective sandbox.
+  const current = raw?.currentPermissions, configured = raw?.latestThreadSettings ?? {};
+  const effective = current?.sandboxPolicy ? current : configured, sandbox = effective.sandboxPolicy;
+  const profileId = typeof effective.activePermissionProfile?.id === "string" ? effective.activePermissionProfile.id : null;
+  const selectedProfile = configured.activePermissionProfile === undefined ? effective.activePermissionProfile : configured.activePermissionProfile;
+  const selectedProfileId = typeof selectedProfile?.id === "string" ? selectedProfile.id : null;
+  const policy = effective.approvalPolicy, reviewer = effective.approvalsReviewer;
+  const networkAccess = sandbox?.type === "dangerFullAccess" || sandbox?.networkAccess === true || sandbox?.networkAccess === "enabled" ? "enabled"
+    : sandbox?.networkAccess === false || sandbox?.networkAccess === "restricted" ? "restricted" : "unknown";
+  const roots = sandbox?.type === "workspaceWrite" ? [raw?.cwd, ...(Array.isArray(sandbox.writableRoots) ? sandbox.writableRoots : [])] : [];
+  return { source: effective === current ? "current" : "configured", profileId, selectedProfileId,
+    filesystem: ({ readOnly: "Read only", workspaceWrite: "Workspace write", dangerFullAccess: "Full filesystem access", externalSandbox: "External sandbox" } as Record<string, string>)[sandbox?.type] ?? "Unavailable",
+    networkAccess,
+    approvalPolicy: typeof policy === "object" && policy?.granular ? "Custom approval rules"
+      : ({ "on-request": "When Codex requests approval", untrusted: "Untrusted commands require approval", never: "No approval requests" } as Record<string, string>)[policy] ?? "Unavailable",
+    reviewer: ({ user: "You", auto_review: "Automatic review", guardian_subagent: "Guardian review" } as Record<string, string>)[reviewer] ?? "Unavailable",
+    writableRoots: [...new Set<string>(roots.filter((p: any) => typeof p === "string" && isAbsolute(p)))].slice(0, 100) };
+}
 function settingsVersion(raw: any) {
   return createHash("sha256").update(JSON.stringify({ model: raw?.latestModel, effort: raw?.latestReasoningEffort ?? raw?.latestThreadSettings?.effort,
     permissions: permissionState(raw), cwd: raw?.cwd })).digest("hex").slice(0, 24);
@@ -53,6 +72,7 @@ export function createCodexSettings(access: CodexNativeAccess, options: { models
       { id: "workspace-write", label: "Workspace write", description: "Write in this task's workspace; network access is off. Ask before running outside the sandbox." },
     ];
     return { model: state.model ?? "", effort: state.effort ?? "", models, version: settingsVersion(raw), permissionMode: p.mode, permissionModes,
+      permissions: codexPermissionSummary(raw),
       permissionsNote: permissionModes.length ? "Changes apply to the next turn of this task." : "This task uses a managed or custom permission profile. Change it in Codex.",
       status: state.status };
   }

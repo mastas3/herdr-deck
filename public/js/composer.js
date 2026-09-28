@@ -92,10 +92,12 @@ function renderQueue(r) {
   const el = $("qbar");
   if ((!q.length && !native.length) || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
   el.hidden = false;
-  const html = native.map((x, i) => `<div class="qi" data-qid="codex:${i}"><span class="qn">In Codex${x.pausedReason ? " · paused" : ""}</span><span class="qt" title="${esc(x.pausedReason ?? x.text)}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span><span class="hint">Manage in Codex</span></div>`).join("") + q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${r.app ? "Deck · " : ""}${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join("");
+  const nativeHelp = native.length ? '<div class="native-queue-help" data-qid="codex:help"><span>Codex sends these messages. Edit or remove them in the app.</span><button type="button" class="btn ghost sm" data-native-queue-open>Open in Codex</button></div>' : "";
+  const html = nativeHelp + native.map((x) => `<div class="qi" data-qid="codex:${esc(x.id)}"><span class="qn">In Codex${x.pausedReason ? " · paused" : ""}</span><span class="qt" title="${esc(x.pausedReason ? `${x.pausedReason} · ${x.text}` : x.text)}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span></div>`).join("") + q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${r.app ? "Deck · " : ""}${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join("");
   if (el._h !== html) motion.keyed(el, "data-qid", () => setHTML(el, html), "rise");
 }
 $("qbar").addEventListener("click", async (e) => {
+  if (e.target.closest("[data-native-queue-open]")) return codexAct("codex-open", rowOf(S.sel));
   const b = e.target.closest("[data-qact]");
   if (!b) return;
   const id = b.closest("[data-qid]").dataset.qid, key = S.sel, act = b.dataset.qact;

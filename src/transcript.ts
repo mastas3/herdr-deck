@@ -5,8 +5,10 @@ import { Database } from "bun:sqlite";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { codexUserText } from "./agents";
-import { codexHome } from "./codex-store";
 import { codexTimestamp } from "./codex-turn";
+import { codexReplyHash } from "./codex-fork-point";
+import { codexForkHistory, type CodexHistoryPlan } from "./codex-fork-history";
+import { attachCodexGenerated, readCodexGenerated } from "./codex-generated";
 
 const HOME = homedir();
 
@@ -24,6 +26,10 @@ export type Msg = {
   images?: string[];
   sub?: string; // subagent id, once known (Claude Agent/Task calls)
   subType?: string;
+  codexSourceId?: string; // inherited rollout source; never inferred from timestamps
+  codexTurnId?: string;
+  forkAfterTurnId?: string;
+  forkReplyHash?: string;
 };
 export type Detail = {
   gen: number; // bumps when a transcript is re-read from scratch, so cursors from before are void
@@ -128,7 +134,7 @@ export function toolSummary(name: string, input: any): string {
 
 // ── Claude Code ──────────────────────────────────────────────────────────────
 
-type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; tailSig?: string; mtime?: number; used?: number; open: Map<string, Msg>; items?: Map<string, Msg> };
+type State = { path: string; pos: number; detail: Detail; cur?: Turn; ino?: number; head?: string; tailSig?: string; mtime?: number; used?: number; open: Map<string, Msg>; items?: Map<string, Msg>; historyKey?: string; imageSource?: string };
 const claudeStates = new Map<string, State>();
 
 function claudeAsk(o: any): string | undefined {
@@ -261,13 +267,13 @@ export function forgetTranscript(path: string) {
   claudeStates.delete(path); codexStates.delete(path); subStates.delete(path);
 }
 
-async function readIncremental(states: Map<string, State>, path: string, feed: (st: State, line: string, offset: number) => void): Promise<Detail> {
+async function readIncremental(states: Map<string, State>, path: string, feed: (st: State, line: string, offset: number) => void, history?: { key: string; seed: (st: State) => Promise<void> }): Promise<Detail> {
   const stat = statSync(path);
   const file = Bun.file(path);
   let st = states.get(path);
   const head = await file.slice(0, 64).text();
-  if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head) { st.used = Date.now(); return st.detail; } // untouched
-  let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head;
+  if (st && stat.size === st.pos && st.ino === stat.ino && st.mtime === stat.mtimeMs && st.head === head && st.historyKey === history?.key) { st.used = Date.now(); return st.detail; } // untouched
+  let fresh = !st || stat.size < st.pos || st.ino !== stat.ino || st.head !== head || st.historyKey !== history?.key;
   if (!fresh && st!.pos > 0) {
     // The bytes we already read must be unchanged: some writers (the Codex app) rewrite earlier parts of the
     // file in place, which a size/inode/head check can't see and which would leave every offset pointing into garbage.
@@ -276,6 +282,7 @@ async function readIncremental(states: Map<string, State>, path: string, feed: (
   }
   if (fresh) {
     st = { path, pos: 0, detail: emptyDetail(), ino: stat.ino, head, open: new Map() };
+    if (history) { await history.seed(st); st.historyKey = history.key; }
     states.set(path, st);
   }
   const s = st!;
@@ -448,10 +455,16 @@ function feedCodex(st: State, line: string, offset: number) {
   if (o.type === "compacted") { d.compactions++; push(d, { role: "note", at, text: "Conversation compacted" }); }
   if (o.type === "event_msg" && p?.type === "task_started") { d.turnStartedAt = codexTimestamp(p.started_at) ?? at; d.turnOpen = true; d.turnId = p.turn_id; }
   if (o.type === "event_msg" && (p?.type === "task_complete" || p?.type === "turn_aborted") && (!p.turn_id || !d.turnId || p.turn_id === d.turnId)) {
+    const wasOpen = d.turnOpen;
     if (d.turnOpen && d.turnStartedAt && at) d.workMs = (d.workMs ?? 0) + Math.max(0, at - d.turnStartedAt);
     d.turnOpen = false;
     for (const m of st.open.values()) m.state = p.type === "turn_aborted" ? "error" : "done";
     st.open.clear();
+    // Only an explicit matching completion can identify a stable native fork boundary.
+    if (wasOpen && p.type === "task_complete" && p.turn_id && p.turn_id === d.turnId) {
+      const reply = d.messages.findLast((m) => m.role === "assistant" && m.codexTurnId === p.turn_id);
+      if (reply?.forkReplyHash) reply.forkAfterTurnId = p.turn_id;
+    }
   }
   if (o.type === "event_msg" && p?.type === "turn_aborted") push(d, { role: "note", at, text: "Interrupted" });
   // Code mode wraps many actual commands/edits in one `exec` call. The completed items expose that work.
@@ -496,7 +509,7 @@ function feedCodex(st: State, line: string, offset: number) {
     if (Array.isArray(p.output)) {
       p.output.forEach((c: any, j: number) => {
         if (typeof c?.image_url !== "string" || !c.image_url.startsWith("data:image")) return;
-        const id = `x:${offset}:o:${j}`;
+        const id = `${st.imageSource ? `b:${st.imageSource}:` : ""}x:${offset}:o:${j}`;
         st.detail.images.push({ id, at, source: "viewed" });
         if (m) (m.images ??= []).push(id);
       });
@@ -517,26 +530,55 @@ function feedCodex(st: State, line: string, offset: number) {
     }
     (p.content ?? []).forEach((c: any, i: number) => {
       if (c?.type !== "input_image") return;
-      const id = `x:${offset}:${i}`;
+      const id = `${st.imageSource ? `b:${st.imageSource}:` : ""}x:${offset}:${i}`;
       addImage(st, { id, at, source: "pasted" });
       if (userMsg) (userMsg.images ??= []).push(id);
     });
   } else if (p.role === "assistant") {
     const text = (p.content ?? []).filter((c: any) => c?.type === "output_text").map((c: any) => c.text).join("\n");
     if (text.trim()) {
-      push(d, { role: "assistant", at, text: full(text) });
+      push(d, { role: "assistant", at, text: full(text), ...(d.turnOpen && d.turnId ? { codexTurnId: d.turnId, forkReplyHash: codexReplyHash(text) } : {}) });
       if (st.cur) st.cur.reply = clean(text, 1200);
     }
   }
 }
 
-export function codexDetail(path: string): Promise<Detail> {
-  return readIncremental(codexStates, path, feedCodex);
+const codexPending = new Map<string, Promise<Detail>>();
+export function codexDetail(path: string, historyReader = codexForkHistory): Promise<Detail> {
+  const pending = codexPending.get(path);
+  if (pending) return pending;
+  const work = (async () => {
+    const plan = await historyReader.resolve(path);
+    const read = (history: CodexHistoryPlan) => readIncremental(codexStates, path, feedCodex, { key: history.key, seed: async (st) => {
+      if (history.warning) push(st.detail, { role: "note", text: history.warning });
+      await historyReader.replay(history, (line, offset, id) => {
+        const before = st.detail.messages.length;
+        st.imageSource = id; feedCodex(st, line, offset);
+        for (let i = before; i < st.detail.messages.length; i++) st.detail.messages[i].codexSourceId = id;
+      });
+      st.imageSource = undefined;
+    } });
+    try { return await read(plan); }
+    catch (e) {
+      if (!plan.segments.length) throw e;
+      return read({ key: `unavailable:${plan.key}`, segments: [], warning: "Earlier messages could not be read from this fork’s original task. Open the task in Codex to view its full history." });
+    }
+  })();
+  codexPending.set(path, work);
+  void work.finally(() => { if (codexPending.get(path) === work) codexPending.delete(path); }).catch(() => {});
+  return work;
 }
 
-export async function codexImage(path: string, id: string) {
-  const parts = id.split(":");
-  const payload = JSON.parse(await lineAt(path, Number(parts[1]))).payload;
+export async function codexImage(path: string, id: string, historyReader = codexForkHistory) {
+  let parts = id.split(":"), line: string | undefined;
+  if (parts[0] === "b") {
+    const [, source, kind, offset] = parts;
+    if (kind !== "x") return;
+    line = await historyReader.imageLine(path, source, Number(offset));
+    if (!line) return;
+    parts = parts.slice(2);
+  } else line = await lineAt(path, Number(parts[1]));
+  const payload = JSON.parse(line).payload;
   // x:<offset>:<i> is an image in a message; x:<offset>:o:<j> one in a tool's output
   const url: string | undefined = parts[2] === "o" ? payload?.output?.[Number(parts[3])]?.image_url : payload?.content?.[Number(parts[2])]?.image_url;
   return dataUrl(url);
@@ -546,30 +588,14 @@ export async function codexImage(path: string, id: string) {
  * Images Codex generated for a thread are saved to ~/.codex/generated_images/<thread id>/, with no link back
  * to the call that made them; each one is attached to the latest message written before the file was.
  */
-export function attachGenerated(d: Detail, threadId: string) {
-  const dir = `${codexHome()}/generated_images/${threadId}`;
-  let names: string[];
-  try { names = readdirSync(dir).filter((n) => /\.(png|jpe?g|webp|gif)$/i.test(n)); } catch { return; }
-  const seen: Set<string> = ((d as any)._generated ??= new Set());
-  for (const n of names) {
-    if (seen.has(n)) continue;
-    let at: number;
-    try { at = statSync(`${dir}/${n}`).mtimeMs; } catch { continue; }
-    let target: Msg | undefined;
-    for (let i = d.messages.length - 1; i >= 0; i--) if ((d.messages[i].at ?? 0) <= at) { target = d.messages[i]; break; }
-    if (!target) continue; // the conversation hasn't caught up to this image yet
-    const id = `g:${n}`;
-    d.images.push({ id, at, source: "viewed", name: n });
-    (target.images ??= []).push(id);
-    seen.add(n);
-  }
+export async function attachGenerated(d: Detail, threadId: string, path?: string) {
+  const ancestors = path ? (await codexForkHistory.resolve(path)).segments : [];
+  attachCodexGenerated(d, threadId, ancestors);
 }
 
-export function codexGeneratedImage(threadId: string, id: string) {
-  const name = id.slice(2);
-  if (!/^[\w.-]+$/.test(name) || !/^[\w-]+$/.test(threadId)) return;
-  const f = Bun.file(`${codexHome()}/generated_images/${threadId}/${name}`);
-  return f.size ? f.arrayBuffer().then((b) => ({ type: f.type || "image/png", data: new Uint8Array(b) })) : undefined;
+export async function codexGeneratedImage(threadId: string, id: string, path?: string) {
+  const ancestors = path && id.split(":").length === 3 ? (await codexForkHistory.resolve(path)).segments : [];
+  return readCodexGenerated(threadId, id, ancestors);
 }
 
 function dataUrl(url?: string) {

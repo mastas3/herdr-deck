@@ -20,7 +20,7 @@ export async function codexApi(hub: Hub, path: string, body: any) {
   const view = async (state: any) => {
     const editableTurn = state.ready ? control.conversation.editable(row.sessionId) : undefined;
     return { ...state, canOpen: !!hub.codexRecovery?.canOpen, editableTurn,
-      capabilities: { ...hub.codexLifecycle?.capabilities(), settings: state.ready, edit: !!editableTurn }, nativeQueue: await control.conversation.queue(row.sessionId) };
+      capabilities: { ...hub.codexLifecycle?.capabilities(), forkPoint: !!hub.codexLifecycle?.available(), settings: state.ready, edit: !!editableTurn }, nativeQueue: await control.conversation.queue(row.sessionId) };
   };
   if (path === "/api/codex-state") return json(await view(await control.watch(row.sessionId, !!body.reconnect)));
   if (path === "/api/codex-connect") return json(await view(await hub.codexRecovery.connect(row.sessionId)));

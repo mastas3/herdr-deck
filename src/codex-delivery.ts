@@ -20,7 +20,7 @@ export function createCodexDelivery(file?: string) {
     renameSync(file + ".tmp", file);
   }
   return async function deliver(id: string, payload: unknown, send: () => Promise<any>) {
-    if (!/^[a-zA-Z0-9_-]{8,100}$/.test(id)) throw new CodexControlError("Invalid message receipt", "CODEX_INVALID");
+    if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{8,100}$/.test(id)) throw new CodexControlError("Invalid message receipt", "CODEX_INVALID");
     load();
     const hash = createHash("sha256").update(JSON.stringify(payload)).digest("hex"), previous = receipts[id];
     if (previous && previous.hash !== hash) throw new CodexControlError("This message receipt belongs to different content.", "CODEX_INVALID");

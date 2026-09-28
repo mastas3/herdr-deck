@@ -117,7 +117,7 @@ function blockHTML(b, key) {
     const long = (m.text ?? "").length > 900;
     return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
   }
-  if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS}<div class="md">${md(m.text)}</div>${imgs(m.images)}<div class="t">${esc(when(m.at))}</div></div>`;
+  if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS.replace("</span>", codexForkPointButton(m, key) + "</span>")}<div class="md">${md(m.text)}</div>${imgs(m.images)}<div class="t">${esc(when(m.at))}</div></div>`;
   if (b.kind === "note") return `<div class="note${/^Recap:/.test(m.text) ? " recap" : ""}">${/^Recap:/.test(m.text) ? mdLite(m.text) : esc(m.text)}</div>`;
   if (b.kind === "agent") {
     const d = S.details.get(S.sel)?.data;
@@ -160,8 +160,9 @@ function renderChat() {
   }
   const dref = S.details.get(key)?.data;
   const st = rowOf(key)?.status;
-  if (chatDom.key === id && chatDom.v === c.v && chatDom.dref === dref && chatDom.st === st && chatDom.el && body.contains(chatDom.el)) return;
-  chatDom.v = c.v; chatDom.dref = dref; chatDom.st = st;
+  const forkPoint = !S.sub && codexHasCapability(r, "forkPoint");
+  if (chatDom.key === id && chatDom.v === c.v && chatDom.dref === dref && chatDom.st === st && chatDom.forkPoint === forkPoint && chatDom.el && body.contains(chatDom.el)) return;
+  chatDom.v = c.v; chatDom.dref = dref; chatDom.st = st; chatDom.forkPoint = forkPoint;
   const blocks = chatBlocks(c);
   const nearBottom = scrollPin.stick;
   const rebuilt = chatDom.key !== id || !chatDom.el || !body.contains(chatDom.el);
@@ -188,7 +189,7 @@ function renderChat() {
   const echoed = new Set((chatDom.data ?? []).filter((b) => b.kind === "pending" && !blocks.some((x) => x.key === b.key)).map((b) => String(b.ms[0].text ?? "").trim()));
   let entering = 0;
   for (const b of blocks) {
-    const sig = JSON.stringify(b.ms) + (b.kind === "agent" ? JSON.stringify(S.details.get(key)?.data?.subagents?.map((x) => [x.id, x.running, x.now, x.tools])) : "") + expanded.has(b.key);
+    const sig = JSON.stringify(b.ms) + (b.kind === "agent" ? JSON.stringify(S.details.get(key)?.data?.subagents?.map((x) => [x.id, x.running, x.now, x.tools])) : "") + expanded.has(b.key) + (b.kind === "assistant" ? forkPoint : "");
     let o = old.get(b.key);
     if (!o || o.sig !== sig) {
       const t = document.createElement("template");

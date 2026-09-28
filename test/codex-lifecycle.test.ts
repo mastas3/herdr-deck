@@ -77,7 +77,7 @@ describe("canonical Codex lifecycle", () => {
   });
   test("writer ownership conflicts are actionable and never bypassed", async () => {
     const f = fixture({ "thread/archive": new CodexControlError(`thread ${sourceId} already has an active writer`, "CODEX_INVALID") });
-    await expect(f.api.archive(sourceId, true)).rejects.toMatchObject({ code: "CODEX_STALE", message: "Codex still has this task loaded. Archive it in the Codex app." });
+    await expect(f.api.archive(sourceId, true)).rejects.toMatchObject({ code: "CODEX_DESKTOP_REQUIRED", message: "Codex still has this task loaded. Archive it in the Codex app.", action: { kind: "open-codex" } });
     expect(f.calls.map((c) => c.method)).toEqual(["thread/read", "thread/archive"]);
   });
   test("malformed successful creation acknowledgement remains uncertain", async () => {
