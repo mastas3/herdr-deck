@@ -148,7 +148,8 @@ export function createFiles(o: { rows: () => Row[] }) {
     const base = body.base && /^[0-9a-f]{40}$/.test(body.base) ? body.base : (await headOf(w.root)) ?? EMPTY_TREE;
     const lines = await diffs(`${w.root}\0${base}\0${path}\0${old ?? ""}\0${body.untracked ? 1 : 0}`, async () => {
       if (body.untracked) {
-        const size = statSync(abs).size;
+        let size: number;
+        try { size = statSync(abs).size; } catch { throw new FilesError("That file is gone.", 404); }
         if (size > 4 << 20) return [["!", `A new file, too big to show (${Math.round(size / 1024)} KB)`]] as DiffLine[];
         const buf = readFileSync(abs);
         if (buf.subarray(0, 8000).includes(0)) return [["!", "A new binary file"]] as DiffLine[];
