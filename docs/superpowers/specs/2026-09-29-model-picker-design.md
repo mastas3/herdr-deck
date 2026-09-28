@@ -81,8 +81,12 @@ top-level names prefixed `mp`/`model` so `test/assets.test.ts` finds no clash.
   the screen does what it did before. `modelPickerMount(el, id)` draws one into a screen's slot and redraws in place (keeping keyboard focus) when it is
   already there, `modelPickerPick(id, v)` chooses a value as a user would, and `modelPickerValue(id)` and
   `modelPickerDrop(id)` read and remove one.
-- The open list is a `popover="auto"` element (top layer) appended inside the trigger's closest `<dialog>`, or the
-  body, so it is not clipped by a scrolling dialog and is not inert inside a modal one.
+- The open list is a `popover="manual"` element (top layer) appended inside the trigger's closest `<dialog>`, or the
+  body, so it is not clipped by a scrolling dialog and is not inert inside a modal one. It is `manual`, not `auto`,
+  because the picker does its own light dismiss: the trigger must toggle its own list, and Esc must close the list
+  without reaching the dialog under it. On a phone a second `manual` popover, `.mp-scrim`, is shown just beneath the
+  sheet: a popover's `::backdrop` is transparent to hit-testing, so a tap on it would land on the form under it.
+- A provider marked `off` is listed, dimmed, with its reason, and its models cannot be chosen (click, Enter or arrows).
 
 - **Behaviour:** the ARIA combobox pattern (`role="combobox"`, `listbox`, `option`, `aria-activedescendant`). ↑ ↓
   move, Home and End jump, Enter picks, Esc closes and restores the shown value, typing filters. Choosing a provider

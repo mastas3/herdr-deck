@@ -91,9 +91,18 @@ function mpOpen(id, kind, trigger) {
     else if (e.target.closest(".mp-x")) mpClose();
   });
   el.addEventListener("mousemove", (e) => { const o = e.target.closest(".mp-opt:not(.off)"); if (o && mpPop && +o.dataset.i !== mpPop.active) mpActive(+o.dataset.i); });
-  (trigger.closest("dialog") ?? document.body).append(el);
-  mpPop = { id, kind, pid: provider?.id, el, uid, input: el.querySelector(".mp-q"), list: el.querySelector(".mp-list"), foot: el.querySelector(".mp-foot"), rows: [], active: -1 };
+  const host = trigger.closest("dialog") ?? document.body;
+  let scrim = null;
+  if (isPhone()) { // a popover's ::backdrop is transparent to hit-testing, so a tap on it would land on the form beneath: the sheet gets a scrim of its own
+    scrim = document.createElement("div");
+    scrim.className = "mp-scrim"; scrim.setAttribute("popover", "manual");
+    scrim.addEventListener("click", () => mpClose());
+    host.append(scrim);
+  }
+  host.append(el);
+  mpPop = { id, kind, pid: provider?.id, el, scrim, uid, input: el.querySelector(".mp-q"), list: el.querySelector(".mp-list"), foot: el.querySelector(".mp-foot"), rows: [], active: -1 };
   trigger.setAttribute("aria-expanded", "true");
+  scrim?.showPopover(); // shown first, so the sheet stacks above it
   el.showPopover();
   mpPlace(); mpViewport(); mpRender(true);
   mpPop.input.focus({ preventScroll: true });
@@ -106,8 +115,8 @@ function mpClose(focus = true) {
   mpPop = null;
   window.visualViewport?.removeEventListener("resize", mpViewport);
   window.visualViewport?.removeEventListener("scroll", mpViewport);
-  try { pop.el.hidePopover(); } catch {}
-  pop.el.remove();
+  try { pop.el.hidePopover(); pop.scrim?.hidePopover(); } catch {}
+  pop.el.remove(); pop.scrim?.remove();
   const st = mpState.get(pop.id);
   if (st && pop.kind === "model") st.filter = null; // browsing a provider ends with the list
   mpRefresh(pop.id);
@@ -145,10 +154,10 @@ function mpRows(st, pop) {
   const seen = new Set();
   if (!q) {
     const recent = mpRecents(st).map((v) => scoped.find((m) => m.v === v)).filter(Boolean);
-    if (recent.length) { rows.push({ t: "head", label: "Recent" }); for (const m of recent) { seen.add(m.v); rows.push({ t: "model", v: m.v, m }); } rows.push({ t: "head", label: "All models" }); }
+    if (recent.length) { rows.push({ t: "head", label: "Recent" }); for (const m of recent) { seen.add(m.v); rows.push({ t: "model", v: m.v, m, off: m._p.off }); } rows.push({ t: "head", label: "All models" }); }
   }
   const found = modelSearch(scoped.filter((m) => !seen.has(m.v)), q);
-  for (const m of found.rows) rows.push({ t: "model", v: m.v, m });
+  for (const m of found.rows) rows.push({ t: "model", v: m.v, m, off: m._p.off }); // an unavailable provider's models are listed but can't be chosen
   if (st.allowCustom && q && !scoped.some((m) => m.v === q)) rows.push({ t: "custom", v: q });
   return { rows, shown: found.rows.length, total: found.total };
 }
@@ -205,6 +214,6 @@ function mpChoose(i) {
 
 document.addEventListener("click", (e) => { const b = e.target.closest?.("[data-mp-open]"); if (b) { e.preventDefault(); mpOpen(b.dataset.mp, b.dataset.mpOpen, b); } });
 document.addEventListener("keydown", (e) => { const b = e.target.closest?.("[data-mp-open]"); if (b && e.key === "ArrowDown") { e.preventDefault(); mpOpen(b.dataset.mp, b.dataset.mpOpen, b); } });
-document.addEventListener("pointerdown", (e) => { if (mpPop && !mpPop.el.contains(e.target) && !e.target.closest?.("[data-mp-open]")) mpClose(false); }, true);
+document.addEventListener("pointerdown", (e) => { if (mpPop && !mpPop.el.contains(e.target) && !e.target.closest?.("[data-mp-open], .mp-scrim")) mpClose(false); }, true); // the scrim closes on its own click, so the tap never reaches what's beneath
 window.addEventListener("resize", () => { if (mpPop) mpPlace(); });
 document.addEventListener("scroll", (e) => { if (mpPop && !mpPop.el.contains(e.target)) mpPlace(); }, true);
