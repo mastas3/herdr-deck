@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { claudeWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
 
 const j = (...o: object[]) => o.map((x) => JSON.stringify(x));
 
@@ -70,6 +72,32 @@ describe("OpenCode context windows", () => {
     expect(contextLimit(cat, "odd", "m")).toBeUndefined();
     expect(contextLimit(undefined, "openrouter", "x-ai/grok-4.6")).toBeUndefined();
     expect(contextLimit(cat, "openrouter", undefined)).toBeUndefined();
+  });
+});
+
+describe("Claude context windows", () => {
+  const home = mkdtempSync(`${tmpdir()}/deck-ctx-`);
+  mkdirSync(`${home}/.claude/context-cache`, { recursive: true });
+  const put = (id: string, body: string) => writeFileSync(`${home}/.claude/context-cache/${id}.json`, body);
+  test("the window the status line saved for the session", () => {
+    put("s1m", '{"window":1000000,"used":12,"at":1}');
+    expect(claudeWindow("s1m", "claude-opus-5-5", home, 1000)).toBe(1000000);
+  });
+  test("a session without one borrows the window last seen for its model", () => {
+    expect(claudeWindow("snone", "claude-opus-5-5", home, 1000)).toBe(1000000);
+    expect(claudeWindow("snone", "claude-haiku-4-5", home, 1000)).toBeUndefined();
+  });
+  test("re-read after 30 s, so a new file or a /model switch shows up", () => {
+    expect(claudeWindow("slate", undefined, home, 1000)).toBeUndefined();
+    put("slate", '{"window":200000}');
+    expect(claudeWindow("slate", undefined, home, 2000)).toBeUndefined();
+    expect(claudeWindow("slate", undefined, home, 32_000)).toBe(200000);
+  });
+  test("bad files give nothing", () => {
+    put("sbad", "{not json");
+    put("szero", '{"window":0}');
+    expect(claudeWindow("sbad", undefined, home, 1000)).toBeUndefined();
+    expect(claudeWindow("szero", undefined, home, 1000)).toBeUndefined();
   });
 });
 

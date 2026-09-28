@@ -3,6 +3,7 @@
 import { Database } from "bun:sqlite";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
+import { codexHome, codexStore } from "./codex-store";
 
 export type AgentMeta = {
   sessionId?: string;
@@ -113,6 +114,26 @@ export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt"
   return { lastActiveAt, model, ctxTokens, lastMessage: clip(lastMessage), title };
 }
 
+/** The context window Claude Code reported for a session. Only its status line is told, so the user's statusline
+ *  script saves it to ~/.claude/context-cache/<session id>.json: transcripts never say it, and claude-opus-5-5 is
+ *  the same id with 200k or 1M. Read again every 30 s. A session without a file borrows the window last seen for
+ *  its model; with neither, the page guesses. */
+const ctxCache = new Map<string, { at: number; window?: number }>();
+const modelWindow = new Map<string, number>();
+export function claudeWindow(id: string, model?: string, home = HOME, now = Date.now()): number | undefined {
+  let c = ctxCache.get(id);
+  if (!c || now - c.at > 30_000) {
+    let window: number | undefined;
+    try {
+      const w = JSON.parse(readFileSync(`${home}/.claude/context-cache/${id}.json`, "utf8")).window;
+      if (Number.isFinite(w) && w > 0) window = w;
+    } catch {}
+    ctxCache.set(id, (c = { at: now, window }));
+  }
+  if (c.window && model) modelWindow.set(model, c.window);
+  return c.window ?? (model ? modelWindow.get(model) : undefined);
+}
+
 let claudeDirs: { at: number; dirs: string[] } = { at: 0, dirs: [] };
 const claudePathCache = new Map<string, string>();
 
@@ -136,11 +157,13 @@ export async function claudeMeta(id: string): Promise<AgentMeta> {
   const path = findClaudeFile(id);
   // Claude only writes the transcript after the first message: no file means an untouched session.
   if (!path) return { sessionId: id, empty: true };
-  return cachedParse(path, async (size) => {
+  const meta = await cachedParse(path, async (size) => {
     const head = parseClaudeHead(await readHead(path, size));
     const tail = parseClaudeTail(await readTail(path, size));
     return { sessionId: id, ...head, ...tail, empty: !head.firstPrompt && !tail.lastMessage && !tail.ctxTokens };
   });
+  const ctxWindow = claudeWindow(id, meta.model);
+  return ctxWindow ? { ...meta, ctxWindow } : meta;
 }
 
 // ── Codex ────────────────────────────────────────────────────────────────────
@@ -149,13 +172,17 @@ const codexPathCache = new Map<string, string>();
 
 /** Codex ids are UUIDv7, so the id itself says which day folder the rollout lives in. */
 export function findCodexFile(id: string): string | undefined {
+  if (!/^[a-f0-9-]{20,64}$/i.test(id)) return;
+  const indexed = codexStore.file(id);
+  if (indexed) return indexed;
   const cached = codexPathCache.get(id);
-  if (cached) return cached;
+  if (cached && existsSync(cached)) return cached;
+  codexPathCache.delete(id);
   const ms = parseInt(id.replace(/-/g, "").slice(0, 12), 16);
   if (!Number.isFinite(ms)) return;
   for (const offset of [0, -1, 1]) {
     const d = new Date(ms + offset * 86400_000);
-    const dir = `${HOME}/.codex/sessions/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+    const dir = `${codexHome()}/sessions/${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
     try {
       const f = readdirSync(dir).find((n) => n.endsWith(`${id}.jsonl`));
       if (f) {
@@ -166,6 +193,15 @@ export function findCodexFile(id: string): string | undefined {
   }
 }
 
+/** Injected setup is separate from the user's request; markup can precede real text in the same item. */
+export function codexUserText(content: any): string {
+  if (!Array.isArray(content)) return "";
+  return content.filter((p) => p?.type === "input_text" && typeof p.text === "string").map((p) => {
+    if (/^\s*# AGENTS\.md/.test(p.text)) return "";
+    return p.text.replace(/<(environment_context|recommended_plugins|permissions instructions|collaboration_mode)>[\s\S]*?<\/\1>/g, "").trim();
+  }).filter((s) => s && !/^\s*<(?:system|developer|INSTRUCTIONS|environment_context)\b/.test(s)).join("\n");
+}
+
 export function parseCodex(head: string[], tail: string[]): AgentMeta {
   const meta: AgentMeta = {};
   let headModel: string | undefined;
@@ -174,6 +210,9 @@ export function parseCodex(head: string[], tail: string[]): AgentMeta {
     if (!meta.firstPrompt && o.type === "event_msg" && o.payload?.type === "user_message") meta.firstPrompt = clip(o.payload.message);
     // Long sessions log turn_context rarely, so the tail may not have one: the first turn's model is the fallback.
     if (!headModel && o.type === "turn_context" && o.payload?.model) headModel = o.payload.model;
+    if (!meta.firstPrompt && o.type === "response_item" && o.payload?.type === "message" && o.payload.role === "user") {
+      meta.firstPrompt = clip(codexUserText(o.payload.content));
+    }
     if (meta.createdAt && meta.firstPrompt && headModel) break;
   }
   for (const o of jsonLines(tail)) {

@@ -2,6 +2,7 @@
 // right now, and its subagents. Shared by the row engine (list) and the HTTP API (detail, chat).
 import { findClaudeFile, findCodexFile } from "./agents";
 import { inferProject, type Project } from "./projects";
+import { codexSubagents, codexSubFile } from "./codex-subagents";
 import {
   attachGenerated, claudeDetail, claudeImage, claudeSubagents, claudeSubDetail, claudeSubFile, codexDetail, codexGeneratedImage, codexImage,
   opencodeDetail, opencodeImage, opencodeSubagents, type Detail, type Sub,
@@ -31,6 +32,13 @@ export async function subDetailFor(w: Who, subId: string): Promise<Detail | unde
     return sf ? claudeSubDetail(sf) : undefined;
   }
   if (w.agent === "opencode") return opencodeDetail(subId);
+  if (w.agent === "codex" && w.sessionId) {
+    const file = codexSubFile(w.sessionId, subId);
+    if (!file) return;
+    const d = await codexDetail(file);
+    attachGenerated(d, subId);
+    return d;
+  }
 }
 
 export async function imageFor(w: Who, id: string, subId?: string) {
@@ -40,8 +48,11 @@ export async function imageFor(w: Who, id: string, subId?: string) {
     const path = f && subId ? claudeSubFile(f, subId) : f;
     return path ? claudeImage(path, id) : undefined;
   }
-  if (id.startsWith("x:")) { const f = w.file ?? findCodexFile(w.sessionId); return f ? codexImage(f, id) : undefined; }
-  if (id.startsWith("g:")) return codexGeneratedImage(w.sessionId, id);
+  if (id.startsWith("x:") || id.startsWith("g:")) {
+    const f = subId ? codexSubFile(w.sessionId, subId) : w.file ?? findCodexFile(w.sessionId);
+    if (!f) return;
+    return id.startsWith("x:") ? codexImage(f, id) : codexGeneratedImage(subId ?? w.sessionId, id);
+  }
   if (id.startsWith("o:")) return opencodeImage(id);
 }
 
@@ -52,6 +63,7 @@ export async function subagentsFor(w: Who, d?: Detail): Promise<Sub[]> {
     return f ? claudeSubagents(f, d) : [];
   }
   if (w.agent === "opencode") return opencodeSubagents(w.sessionId);
+  if (w.agent === "codex") return codexSubagents(w.sessionId);
   return [];
 }
 

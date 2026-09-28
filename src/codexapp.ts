@@ -6,8 +6,11 @@ import { Database } from "bun:sqlite";
 import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { findCodexFile } from "./agents";
+import { codexHome, codexStore, type CodexThread } from "./codex-store";
+import { turnState } from "./codex-turn";
+export { turnState } from "./codex-turn";
 
-const DB_PATH = `${homedir()}/.codex/sqlite/codex-dev.db`;
+const DB_PATH = `${codexHome()}/sqlite/codex-dev.db`;
 const RECENT_DAYS = Number(process.env.DECK_CODEX_APP_DAYS ?? 3);
 const DONE_FRESH_MS = 30 * 60_000; // a turn that finished this recently still "needs you"
 const STALL_MS = 20 * 60_000; // an open turn with no writes this long is not really running
@@ -25,12 +28,12 @@ export type AppThread = {
   lastWriteAt?: number;
 };
 
-export const codexAppInstalled = () => existsSync(DB_PATH);
+export const codexAppInstalled = () => existsSync(DB_PATH) || codexStore.hasAppThreads();
 
 let db: Database | null | undefined;
 function open() {
-  if (db !== undefined) return db;
-  try { db = codexAppInstalled() ? new Database(DB_PATH, { readonly: true }) : null; } catch { db = null; }
+  if (db) return db;
+  try { db = existsSync(DB_PATH) ? new Database(DB_PATH, { readonly: true }) : null; } catch { db = null; }
   return db;
 }
 
@@ -57,103 +60,52 @@ export function codexAppRunning(): boolean {
 /** Test seam: swap the process check and forget the cached answer. */
 export function _setRunningProbe(fn: () => Promise<boolean>) { probe = fn; running = { at: 0, value: false, busy: false }; }
 
-type TurnState = { size: number; mtime: number; ino: number; open: boolean; startedAt?: number; endedAt?: number };
-const turnCache = new Map<string, TurnState>();
-const MARKER = /"type":"event_msg","payload":\{"type":"(task_started|task_complete|turn_aborted)"/;
-
-/** Applies every turn marker in `text` (whole lines only) to the state, in order. */
-function applyMarkers(v: TurnState, text: string) {
-  for (const line of text.split("\n")) {
-    const m = line.match(MARKER);
-    if (!m) continue;
-    const at = Date.parse(line.match(/"timestamp":"([^"]+)"/)?.[1] ?? "") || undefined;
-    if (m[1] === "task_started") { v.open = true; v.startedAt = at; }
-    else { v.open = false; v.endedAt = at; }
-  }
-}
-
-/**
- * Whether the thread's latest turn is still open. A busy turn can write tens of MB (screenshots, tool
- * output) after it starts, so a fixed tail window misses its start: search backwards chunk by chunk for
- * the last marker the first time, then only read what was appended since.
- */
-export async function turnState(file: string) {
-  const st = statSync(file);
-  const hit = turnCache.get(file);
-  if (hit && hit.size === st.size && hit.mtime === st.mtimeMs && hit.ino === st.ino) return hit;
-  const f = Bun.file(file);
-  let v: TurnState;
-  if (hit && hit.ino === st.ino && st.size > hit.size) {
-    v = { ...hit, size: st.size, mtime: st.mtimeMs };
-    // Back up to the start of the line the previous read may have cut through.
-    const from = Math.max(0, hit.size - 4096);
-    const text = await f.slice(from, st.size).text();
-    const lastNl = text.lastIndexOf("\n");
-    applyMarkers(v, text.slice(text.indexOf("\n") + 1, lastNl + 1));
-    v.size = from + Buffer.byteLength(text.slice(0, lastNl + 1)); // re-read an unfinished last line next time
-  } else {
-    v = { size: st.size, mtime: st.mtimeMs, ino: st.ino, open: false };
-    const CHUNK = 4 << 20;
-    for (let end = st.size; end > 0; end -= CHUNK) {
-      const text = await f.slice(Math.max(0, end - CHUNK - 8192), end).text();
-      const lines = text.split("\n");
-      let found = false;
-      for (let i = lines.length - 1; i > (end - CHUNK - 8192 > 0 ? 0 : -1); i--) {
-        if (!MARKER.test(lines[i])) continue;
-        applyMarkers(v, lines[i]);
-        // For a closed turn, also find when it started (for the elapsed clock we don't need; keep it cheap).
-        found = true;
-        break;
-      }
-      if (found) break;
-    }
-  }
-  turnCache.set(file, v);
-  return v;
-}
-
 /** Recent local threads from the app, newest first, plus any older one that is working right now. */
-export async function listAppThreads(hidden: Set<string>): Promise<AppThread[]> {
-  const d = open();
-  if (!d) return [];
-  const since = Date.now() / 1000 - RECENT_DAYS * 86400;
-  let rows: { thread_id: string; display_title: string | null; cwd: string | null; git_branch: string | null; source_created_at: number | null; source_updated_at: number | null }[] = [];
+export async function listAppThreads(hidden: Set<string>, options: {
+  catalog?: Database | null; store?: typeof codexStore; running?: boolean; now?: number;
+  findFile?: (id: string) => string | undefined;
+} = {}): Promise<AppThread[]> {
+  const d = options.catalog === undefined ? open() : options.catalog;
+  const store = options.store ?? codexStore, now = options.now ?? Date.now();
+  const since = now / 1000 - RECENT_DAYS * 86400;
+  type CatalogRow = { thread_id: string; display_title: string | null; cwd: string | null; git_branch: string | null; source_created_at: number | null; source_updated_at: number | null };
+  let rows: CatalogRow[] = [];
   try {
-    rows = d
-      .query(`select thread_id, display_title, cwd, git_branch, source_created_at, source_updated_at from local_thread_catalog
-              where host_id = 'local' and source_kind = 'vscode' and source_updated_at > ? order by source_updated_at desc limit 60`)
-      .all(since) as any;
-  } catch {
-    return [];
-  }
-  const appUp = codexAppRunning();
-  const now = Date.now();
+    // Inspect older entries too: their catalog timestamp can lag a currently running rollout.
+    rows = d?.query(`select thread_id, display_title, cwd, git_branch, source_created_at, source_updated_at from local_thread_catalog
+      where host_id = 'local' and source_kind = 'vscode' order by source_updated_at desc limit 300`).all() as CatalogRow[] ?? [];
+  } catch {}
+  const indexed = new Map<string, CodexThread>(store.recentApp(since).map((r) => [r.id, r]));
+  const known = new Set(rows.map((r) => r.thread_id));
+  for (const r of indexed.values()) if (!known.has(r.id)) rows.push({ thread_id: r.id, display_title: r.title ?? null,
+    cwd: r.cwd ?? null, git_branch: r.git_branch ?? null, source_created_at: r.created_at ?? null, source_updated_at: r.updated_at ?? null });
+  const appUp = options.running ?? codexAppRunning();
   const out: AppThread[] = [];
   for (const r of rows) {
     if (hidden.has(r.thread_id)) continue;
-    const file = findCodexFile(r.thread_id);
+    const core = store.get(r.thread_id) ?? indexed.get(r.thread_id);
+    if (core?.archived) continue;
+    const file = options.findFile ? options.findFile(r.thread_id) : findCodexFile(r.thread_id);
     let status: AppThread["status"] = "idle", turnStartedAt: number | undefined, lastWriteAt: number | undefined;
+    try { if (file) lastWriteAt = statSync(file).mtimeMs; } catch {}
+    const updatedAt = Math.max((core?.updated_at ?? 0) * 1000, (r.source_updated_at ?? 0) * 1000, lastWriteAt ?? 0);
+    // An old file cannot have a fresh active turn. Avoid scanning months of old rollouts at startup.
+    if (updatedAt < since * 1000 && (!lastWriteAt || now - lastWriteAt >= STALL_MS)) continue;
     if (file) {
       try {
         const t = await turnState(file);
-        lastWriteAt = t.mtime;
-        turnStartedAt = t.startedAt;
+        lastWriteAt = t.mtime; turnStartedAt = t.startedAt;
         if (t.open && appUp && now - t.mtime < STALL_MS) status = "working";
-        else if (!t.open && t.endedAt && now - t.endedAt < DONE_FRESH_MS) status = "done";
+        else if (!t.open && !t.interrupted && t.endedAt && now - t.endedAt < DONE_FRESH_MS) status = "done";
       } catch {}
     }
+    if (updatedAt < since * 1000 && status !== "working") continue;
     out.push({
-      id: r.thread_id,
-      title: r.display_title?.trim() || "Codex thread",
-      cwd: r.cwd || homedir(),
-      branch: r.git_branch ?? undefined,
-      createdAt: r.source_created_at ? r.source_created_at * 1000 : undefined,
-      updatedAt: Math.max(r.source_updated_at ? r.source_updated_at * 1000 : 0, lastWriteAt ?? 0) || undefined,
-      file,
-      status,
-      turnStartedAt,
-      lastWriteAt,
+      id: r.thread_id, title: core?.name?.trim() || r.display_title?.trim() || core?.title?.trim() || "Codex thread",
+      cwd: core?.cwd || r.cwd || homedir(), branch: core?.git_branch ?? r.git_branch ?? undefined,
+      createdAt: (core?.created_at ?? r.source_created_at ?? 0) * 1000 || undefined,
+      updatedAt: updatedAt || undefined, file, status, turnStartedAt, lastWriteAt,
     });
   }
-  return out;
+  return out.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 }

@@ -5,6 +5,7 @@ let headSig = "", bodySig = "";
 function renderDetail() {
   const r = rowOf(S.sel);
   const d = S.details.get(S.sel)?.data;
+  $("mTitle").nextElementSibling.hidden = !!r?.app && !S.board && !S.mode;
   if (S.mode) return renderMode();
   $("dbody")._mode = null;
   if (S.board || !r) return renderBoard();
@@ -20,7 +21,7 @@ function renderDetail() {
   $("appbar").hidden = !(r.app || r.hist) || S.sub != null;
   renderStatusLine(r);
   if (r.hist) setHTML($("appbar"), `<span>A past session${r.startedAt ? ` · started <b>${esc(DF.format(new Date(r.startedAt)))}</b>` : ""}${r.lastActiveAt ? ` · last active ${esc(agoText(r.lastActiveAt))}` : ""}${multiMachine() ? ` · ${esc(machineLabel(r.machine))}` : ""}</span><span class="spacer"></span><button class="btn primary" data-dact="histresume" title="Resume it in a new herdr tab">${ICON.term}Resume in herdr</button><button class="btn ghost" data-dact="backhist">${ICON.back} History</button>`);
-  else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "This thread lives in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" title="Resume it with the Codex CLI in a new herdr tab">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
+  else if (r.app) setHTML($("appbar"), `<span>${r.status === "working" ? '<span class="spin" style="vertical-align:-1px"></span> Working in the Codex app' : "Read-only here · reply in the Codex app"}${!(S.summary.machines ?? []).find((m) => m.kind === "app")?.online ? " (the app isn’t running)" : ""}.</span><span class="spacer"></span><button class="btn primary" data-dact="codexopen">${ICON.jump}Open in Codex</button><button class="btn" data-dact="codexresume" ${r.status === "working" || r.status === "blocked" ? "disabled" : ""} title="Finish or stop the app turn first, then resume with the Codex CLI to reply from the deck">${ICON.term}Continue in herdr</button><button class="btn ghost" data-dact="codexhide" title="Hide it from the deck (it stays in the app)">Hide</button>`);
   $("cStop").hidden = !(r.status === "working" && isAgent(r));
   const busy = r.status === "working" && isAgent(r);
   $("cSend").textContent = "Send";
@@ -73,7 +74,7 @@ function renderHead(r, d, tab) {
   const tabs = [["chat", "Chat"], ["agents", "Subagents", d?.subagents?.length, subsRun], ["about", "About"], ["images", "Images", d?.imagesTotal], ["info", "Info"]]
     .filter(([k, , n]) => (k !== "images" && k !== "agents") || n)
     .map(([k, label, n, run]) => `<button role="tab" data-tab="${k}" aria-selected="${tab === k}">${label}${n ? ` <span class="n">${run ? `${run} running · ` : ""}${n}</span>` : ""}</button>`).join("");
-  const swap = S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
+  const swap = !r.app && S.tpos === "tab" ? `<div class="seg2"><button data-main="chat" aria-selected="${S.main === "chat"}">Chat</button><button data-main="term" aria-selected="${S.main === "term"}">Terminal</button></div>` : "";
   setHTML($("dh"), `<div class="dh-top"><h1 class="dh-title" title="${esc(r.title || "")}">${esc(r.title || "(untitled)")}</h1>
       <div class="dh-acts"><button class="ib desk" data-dact="home" aria-label="Home" title="Home: the live board (Esc)">${ICON.home}</button>${r.hist ? `<button class="btn" data-dact="backhist">${ICON.back} History</button><button class="btn primary" data-dact="histresume">${ICON.term}Resume</button>` : r.app ? `<button class="btn" data-dact="codexopen" title="Open this thread in the Codex app">${ICON.jump}Open in Codex</button>` : `${termHidden() ? `<button class="btn desk" data-dact="showterm" title="Show the terminal (t)">${ICON.term}Terminal</button>` : ""}<button class="btn" data-dact="tools" title="Tools (.)">${ICON.bolt}Tools</button><button class="btn desk" data-dact="focus" title="Switch herdr to this pane (f)">${ICON.jump}Jump</button>`}<button class="ib" data-dact="link" aria-label="Copy a link to this session" title="Copy link (y)">${ICON.link}</button><button class="ib" data-dact="more" aria-label="More actions" title="More">${ICON.more}</button></div></div>
     <div class="dh-meta">${meta}</div>
@@ -282,7 +283,7 @@ async function writeBrief(key = S.sel, auto = false) {
 // ── status line: project, context, the account and its limits ──────────────────────────────
 function meter(pct, label, title, resets, extra, more = "") {
   const p = Math.max(0, Math.min(100, Math.round(pct)));
-  const cls = `${p >= 85 ? "hot" : p >= 60 ? "warm" : ""} ${more}`.trim();
+  const cls = `${p >= 80 ? "hot" : p >= 50 ? "warm" : ""} ${more}`.trim(); // the terminal status line's colours
   return `<span class="meter ${cls}" title="${esc(title)}${resets ? ` · resets ${esc(inText(resets))}` : ""}"><span class="ml">${esc(label)}</span><span class="mb"><i style="width:${p}%"></i></span><b>${p}%</b>${extra ? `<span class="mx">${esc(extra)}</span>` : ""}</span>`;
 }
 function inText(t) { const ms = t - Date.now(); if (ms <= 0) return "now"; const h = Math.floor(ms / 3600_000), m = Math.round((ms % 3600_000) / 60_000); return h >= 24 ? `in ${Math.floor(h / 24)}d ${h % 24}h` : h ? `in ${h}h ${m}m` : `in ${m}m`; }

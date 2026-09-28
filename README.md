@@ -192,6 +192,11 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
 
 ## Daily use
 
+- **Codex desktop threads** show their chat, nested commands and edits, subagents and their conversations,
+  project changes, context usage and completion state. The deck reads Codex's state index (including moved
+  transcripts and archive status), respecting `CODEX_HOME`. Desktop threads are read-only: use **Open in Codex**
+  to reply there, or **Continue in herdr** for the Codex CLI and the deck's message box. Finish or stop the app's
+  current turn before continuing. Direct desktop messaging, approvals and stopping are not connected yet.
 - **Inbox:** sessions sort themselves into Needs you (waiting for input or finished), Running, Quiet, Stale and Empty.
   Stale and Empty start collapsed. Empty has a "Close all" link.
 - **⌘K** searches sessions on every machine, tools, views, projects and commands in one place.
@@ -215,7 +220,8 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   herdr agent name, and runs `/rename` in Claude Code or Codex so their own history shows it (queued if busy).
 - **Status line** above the message box: project, context used, and the plan limits for that agent
   (Claude 5-hour and weekly from `~/.claude/rate-cache.json`, written by the Claude status line script;
-  Codex limits from its session files).
+  Codex limits from its session files). Claude's context window (200k or 1M) is only told to the status line,
+  so the script also saves it to `~/.claude/context-cache/<session id>.json`; without that the deck guesses 200k.
 - **Tools** (`.`, or the ⚡ Tools button next to the message box): one click that makes the agent, or the deck, do something:
   check my email for context, related past work (from History), attach files, handoff → compact (writes a
   handoff note to `~/.config/herdr-deck/handoffs/`, waits, then compacts around it), status line, step back,

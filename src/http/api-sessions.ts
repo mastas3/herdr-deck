@@ -104,6 +104,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       // Opens the thread in the Codex app on this machine.
       const lr = localRow(body.key);
       if (!lr?.app || !lr.sessionId) return json({ error: "not a Codex app thread" }, 400);
+      if (process.platform !== "darwin") return json({ error: "Open this thread in the Codex app on its host machine." }, 400);
       Bun.spawn(["open", `codex://threads/${lr.sessionId}`]);
       return json({ ok: true });
     }
@@ -111,6 +112,7 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       // Continues an app thread in a new herdr tab with the Codex CLI.
       const lr = localRow(body.key);
       if (!lr?.app || !lr.sessionId) return json({ error: "not a Codex app thread" }, 400);
+      if (lr.status === "working" || lr.status === "blocked") return json({ error: "Finish or stop this turn in the Codex app before continuing in herdr." }, 409);
       return json(await startSession({ kind: "codex", cwd: lr.cwd, args: ["resume", lr.sessionId], label: lr.title.slice(0, 40), focus: !!body.focus }));
     }
     case "/api/codex-hide": {
