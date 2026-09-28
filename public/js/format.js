@@ -11,9 +11,21 @@ function ago(t) {
   return Math.round(s / 86400 / 30) + "mo";
 }
 const agoText = (t) => (!t ? "" : ago(t) === "now" ? "just now" : ago(t) + " ago");
-const DTF = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-const DF = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-const TF = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+const DTF = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const DF = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const TF = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+/** A 24-hour HH:MM field. The browser's own time input follows its locale (AM/PM in some), so times are typed as text. */
+const time24 = (attrs, v) => `<input type="text" inputmode="numeric" maxlength="5" pattern="([01][0-9]|2[0-3]):[0-5][0-9]" placeholder="HH:MM" autocomplete="off" ${attrs} value="${esc(v ?? "")}">`;
+// "7:30", "0730" or "7" becomes "07:30"/"07:00" when you leave the field; anything that isn't a time goes back to what it was.
+document.addEventListener("focusin", (e) => { if (e.target.matches?.("input[pattern^='([01]']")) e.target.dataset.was = e.target.value; });
+document.addEventListener("focusout", (e) => {
+  const el = e.target; if (!el.matches?.("input[pattern^='([01]']")) return;
+  const m = el.value.trim().match(/^(\d{1,2}):?(\d{2})$/) || el.value.trim().match(/^(\d{1,2})$/);
+  const h = m ? +m[1] : NaN, mi = m ? +(m[2] ?? 0) : NaN;
+  const ok = h >= 0 && h < 24 && mi >= 0 && mi < 60;
+  const v = ok ? `${String(h).padStart(2, "0")}:${String(mi).padStart(2, "0")}` : el.dataset.was ?? "";
+  if (v !== el.value) { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }
+});
 const abs = (t) => (t ? DTF.format(new Date(t)) : "—");
 const when = (t) => (!t ? "" : Date.now() - t < 20 * 3600_000 ? TF.format(new Date(t)) : DF.format(new Date(t)));
 const mem = (kb) => (kb >= 1048576 ? (kb / 1048576).toFixed(1) + " GB" : Math.round(kb / 1024) + " MB");

@@ -95,7 +95,7 @@ async function openNotifications() {
       ${chk("digest", "The morning digest", `At ${esc(S.auto?.rules?.digest?.time ?? "08:30")}: what finished overnight, what’s waiting, what’s idle (Automations sets the time)`)}
       ${plugPrefs().map((g) => `<h4>${esc(g.title)}</h4>
       ${g.prefs.map((x) => chk(x.key, x.label, x.hint, x.default)).join("\n      ")}`).join("\n      ")}
-      <label class="nchk"><input type="checkbox" data-pref="quiet" ${p.quiet?.on ? "checked" : ""}><span><b>Quiet hours</b><small>No needs-you or finished alerts from <input type="time" class="inp tm" data-n="from" value="${esc(p.quiet?.from ?? "22:00")}"> to <input type="time" class="inp tm" data-n="to" value="${esc(p.quiet?.to ?? "07:30")}"></small></span></label>
+      <label class="nchk"><input type="checkbox" data-pref="quiet" ${p.quiet?.on ? "checked" : ""}><span><b>Quiet hours</b><small>No needs-you or finished alerts from ${time24('class="inp tm" data-n="from"', p.quiet?.from ?? "22:00")} to ${time24('class="inp tm" data-n="to"', p.quiet?.to ?? "07:30")}</small></span></label>
       </div>
       ${others.length ? `<h4>Other devices</h4>${others.map((x) => `<div class="mrow"><span class="dot" style="--c:var(--${x.lastError ? "blocked" : "idle"})"></span><b>${esc(x.label)}</b><span class="hint">${esc(x.service)}${x.lastOkAt ? ` · last delivered ${esc(agoText(x.lastOkAt))}` : ""}</span><span class="spacer"></span><button type="button" class="btn ghost danger" data-ndel="${esc(x.id)}">Remove</button></div>`).join("")}` : ""}
       <p class="nlog hint" aria-live="polite"></p></div>
@@ -215,7 +215,7 @@ function autoCards() {
     const cap = isPhone() ? 4 : 8;
     const sec = (label, all, n, extra = "", max = cap) => { const list = all.slice(0, max); return n ? `<div class="dgs"><h5>${label} <span class="n">${n}</span>${extra}</h5>${list.length ? `<div class="dgl">${list.map((x) => it(x)).join("")}${n > list.length ? `<span class="hint">+${n - list.length} more</span>` : ""}</div>` : ""}</div>` : ""; };
     const idleLive = (dg.idle ?? []).filter((x) => rowOf(x.key));
-    out += `<div class="acard digest" data-acard="digest"><div class="ah"><span class="ai">${ICON.sun}</span><b>Morning digest</b><span class="hint">${esc(new Date(dg.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" }))}<span class="desk"> · since yesterday 18:00</span></span><span class="spacer"></span><button class="ib" data-auto="dismissDigest" aria-label="Dismiss the digest" title="Dismiss">${ICON.x}</button></div>
+    out += `<div class="acard digest" data-acard="digest"><div class="ah"><span class="ai">${ICON.sun}</span><b>Morning digest</b><span class="hint">${esc(new Date(dg.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }))}<span class="desk"> · since yesterday 18:00</span></span><span class="spacer"></span><button class="ib" data-auto="dismissDigest" aria-label="Dismiss the digest" title="Dismiss">${ICON.x}</button></div>
       ${dg.counts.waiting + dg.counts.finished + dg.counts.running + dg.counts.idle === 0 ? `<p class="hint">Quiet night: nothing finished, nothing waiting.</p>` : ""}
       ${sec("Waiting on you", dg.waiting, dg.counts.waiting)}${sec("Finished since last evening", dg.finished, dg.counts.finished)}${sec("Still running", dg.running, dg.counts.running)}
       ${sec("Idle for 3+ days", dg.idle, dg.counts.idle, idleLive.length ? `<button class="btn sm" data-auto="closeIdle">Close these…</button>` : "", isPhone() ? 0 : 6)}</div>`;
@@ -257,7 +257,7 @@ async function openAutomations() {
     const devs = A.devices ?? [];
     const cfg = {
       alerts: `<label class="nchk in"><input type="checkbox" data-r="alerts.needs" ${R.alerts.needs ? "checked" : ""}> needs you</label><label class="nchk in"><input type="checkbox" data-r="alerts.done" ${R.alerts.done ? "checked" : ""}> finished</label><span class="hint">· ${devs.length ? `${devs.length} device${devs.length === 1 ? "" : "s"}: ${esc(devs.map((x) => x.label).join(", "))}` : "no devices yet"} · <button type="button" class="link" data-a="notif">Notifications on this device…</button></span>`,
-      digest: `<label class="nchk in">at <input type="time" class="inp tm" data-r="digest.time" value="${esc(R.digest.time)}"></label><button type="button" class="btn sm" data-a="digestShow">Show digest now</button><button type="button" class="btn sm" data-a="digestPush" ${devs.length ? "" : "disabled"}>Push it now</button>`,
+      digest: `<label class="nchk in">at ${time24('class="inp tm" data-r="digest.time"', R.digest.time)}</label><button type="button" class="btn sm" data-a="digestShow">Show digest now</button><button type="button" class="btn sm" data-a="digestPush" ${devs.length ? "" : "disabled"}>Push it now</button>`,
       empty: `<label class="nchk in">after <input type="number" min="5" step="5" class="inp num" data-r="empty.minutes" value="${R.empty.minutes}"> minutes</label>${A.empty?.keys?.length ? `<span class="hint">· ${A.empty.keys.length} right now</span>` : ""}`,
       proof: "",
     };

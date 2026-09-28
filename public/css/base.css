@@ -65,3 +65,6 @@ body.moving .dz { display: block; }
 body.moving { cursor: grabbing; user-select: none; }
 .dz div { position: fixed; display: grid; place-items: center; border: 2px dashed var(--line-2); border-radius: 12px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--ink-2); font-weight: 600; font-size: 15px; transition: background .1s, border-color .1s; }
 .dz div.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); }
+
+/* 24-hour HH:MM fields (time24 in format.js) */
+input[pattern^="([01]"] { width: 7ch; text-align: center; font-family: var(--mono); }
