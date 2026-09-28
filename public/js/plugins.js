@@ -1,20 +1,21 @@
 // ══ Plugins ══════════════════════════════════════════════════════════════════
 // Integrations and business packs anyone can share. They're data only: the server validates them, and the trust
 // screen shows exactly what one may do, built from its grants rather than its description, before it's installed.
-// Server side: src/plugins.ts. This file ships after app.js (public/assets.json).
+// Server side: src/plugins.ts. Code plugins (the "Built in" tab and adding one from a folder or git) are in
+// plugins-code.js, server side src/plugin-host.ts and src/plugin-code-api.ts.
 ICON.puzzle = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2.8 5.6h2.4a1.7 1.7 0 1 1 3.2 0h2.4V8a1.7 1.7 0 1 1 0 3.2v2.4H8.4a1.7 1.7 0 1 0-3.2 0H2.8v-2.4a1.7 1.7 0 1 0 0-3.2z"/></svg>';
-S.plug = { data: null, loading: false, tab: load("plugTab", "installed"), review: null, busy: false, tick: false };
-const PTABS = [["installed", "Installed"], ["catalog", "Catalog"], ["add", "Add"]];
+S.plug = { data: null, code: null, loading: false, tab: load("plugTab", "installed"), review: null, creview: null, busy: false, tick: false };
+const PTABS = [["installed", "Installed"], ["catalog", "Catalog"], ["code", "Built in"], ["add", "Add"]];
 const PSTATE = { on: ["On", "pon"], off: ["Off", "poff"], changed: ["Files changed", "pwarn"] };
 
 async function loadPlugins() {
   if (S.plug.loading) return;
   S.plug.loading = true;
-  try { S.plug.data = await api("/api/plugins", {}); } catch (e) { toast(e.message, true); }
+  try { [S.plug.data, S.plug.code] = await Promise.all([api("/api/plugins", {}), api("/api/plugins/code", {})]); } catch (e) { toast(e.message, true); }
   S.plug.loading = false;
   if (S.mode === "plugins") renderPlugins();
 }
-function plugTab(t) { S.plug.tab = t; S.plug.review = null; store("plugTab", t); renderPlugins(); $("dbody").scrollTop = 0; }
+function plugTab(t) { S.plug.tab = t; S.plug.review = null; S.plug.creview = null; store("plugTab", t); renderPlugins(); $("dbody").scrollTop = 0; }
 /** The plugin's badge. The colour comes from a stranger, so it's checked again here before it goes into a style. */
 function plugIcon(name, icon) {
   const color = /^#[0-9a-f]{6}$/i.test(icon?.color ?? "") ? icon.color : "var(--accent)";
@@ -24,13 +25,16 @@ const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 function renderPlugins() {
   const d = S.plug.data;
-  const tabs = PTABS.map(([id, label]) => `<button data-ptab="${id}" aria-pressed="${S.plug.tab === id && !S.plug.review}">${label}${id === "installed" && d?.plugins?.length ? ` <span class="n">${d.plugins.length}</span>` : ""}</button>`).join("");
-  const head = `<header class="vh"><h2>${ICON.puzzle}Plugins</h2><p>Add integrations and whole working setups to the deck. A plugin is data only, and you see exactly what it may do before it’s installed.</p><nav class="seg dtabs">${tabs}</nav></header>`;
+  const count = (id) => (id === "installed" ? d?.plugins?.length : id === "code" ? S.plug.code?.plugins?.length : 0);
+  const tabs = PTABS.map(([id, label]) => `<button data-ptab="${id}" aria-pressed="${S.plug.tab === id && !S.plug.review && !S.plug.creview}">${label}${count(id) ? ` <span class="n">${count(id)}</span>` : ""}</button>`).join("");
+  const head = `<header class="vh"><h2>${ICON.puzzle}Plugins</h2><p>Turn parts of the deck on and off, and add integrations and whole working setups. Shared plugins are data only, and you see exactly what one may do before it’s installed.</p><nav class="seg dtabs">${tabs}</nav></header>`;
   let body;
   if (S.plug.review) body = plugReview(S.plug.review);
+  else if (S.plug.creview) body = codeReview(S.plug.creview);
   else if (!d) body = `<p class="hint">Loading plugins…</p>`;
   else if (S.plug.tab === "catalog") body = plugCatalog(d);
-  else if (S.plug.tab === "add") body = plugAdd();
+  else if (S.plug.tab === "code") body = codeList(S.plug.code);
+  else if (S.plug.tab === "add") body = plugAdd() + codeAdd();
   else body = plugInstalled(d);
   modeHTML(head + body);
 }

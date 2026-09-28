@@ -36,3 +36,15 @@
 .pdrop b { color: var(--ink); }
 .pdrop.over, .pdrop:hover { border-color: var(--accent); background: var(--raise); }
 .pdrop.busy { opacity: .6; pointer-events: none; }
+/* Code plugins (public/js/plugins-code.js): the switches, adding one, and the red trust screen. */
+.cadd { display: flex; flex-direction: column; gap: 8px; margin-top: 26px; max-width: 720px; }
+.cadd h3 { margin: 0; font-size: 15px; }
+.cadd label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ink-2); flex: 1; min-width: 0; }
+.cadd input, .csets input:not([type]) { font: inherit; font-size: 14px; padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--bg); color: var(--ink); min-width: 0; }
+.crow { display: flex; flex-wrap: wrap; gap: 8px; }
+.csets { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
+.csets label { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.ccode { border: 2px solid var(--danger); border-radius: 14px; padding: 12px 16px; }
+.cdanger { display: flex; gap: 8px; align-items: flex-start; color: var(--danger); border: 1px solid var(--danger); background: color-mix(in srgb, var(--danger) 9%, transparent); border-radius: 10px; padding: 10px 12px; margin: 0; }
+.cdanger b { color: var(--danger); }
+.btn.primary.danger { background: var(--danger); border-color: var(--danger); }

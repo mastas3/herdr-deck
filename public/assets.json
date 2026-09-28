@@ -52,6 +52,7 @@
     "js/gallery-comparables.js",
     "js/library.js",
     "js/plugins.js",
+    "js/plugins-code.js",
     "js/studio-comparables.js",
     "js/journey-comparables.js"
   ],
