@@ -81,31 +81,40 @@ function which(bin: string): string | undefined {
   for (const dir of PATH.split(":")) if (dir && existsSync(`${dir}/${bin}`)) return `${dir}/${bin}`;
 }
 const ENV = () => ({ ...process.env, PATH, NO_COLOR: "1", CI: "1", NO_UPDATE_NOTIFIER: "1", TERM: "dumb" });
+/** Stop a probe. One that timed out goes with everything it started (it runs in its own process group), so a shell
+ * wrapper (like macOS's /usr/local/bin/tailscale) can't leave its hung child behind. */
+function stop(p: ReturnType<typeof Bun.spawn> | undefined, timedOut: boolean) {
+  if (!p) return;
+  try { if (timedOut) process.kill(-p.pid, "SIGKILL"); else p.kill(9); } catch { try { p.kill(9); } catch {} }
+}
 /** Run a probe and give it at most `ms`: a probe that hangs (or leaves a child holding its pipe) is abandoned. */
 async function run(cmd: string[], ms = 2500): Promise<{ out: string; code: number | null }> {
-  let p: ReturnType<typeof Bun.spawn> | undefined;
+  let p: ReturnType<typeof Bun.spawn> | undefined, timedOut = true;
   try {
-    p = Bun.spawn(cmd, { stdin: "ignore", stdout: "pipe", stderr: "ignore", env: ENV() });
+    p = Bun.spawn(cmd, { stdin: "ignore", stdout: "pipe", stderr: "ignore", env: ENV(), detached: true } as any);
     const done = (async () => { const out = await new Response(p!.stdout as ReadableStream).text(); return { out, code: await p!.exited }; })();
-    return await Promise.race([done, Bun.sleep(ms).then(() => ({ out: "", code: null }))]);
+    const r = await Promise.race([done, Bun.sleep(ms).then(() => undefined)]);
+    timedOut = !r;
+    return r ?? { out: "", code: null };
   } catch {
     return { out: "", code: null };
   } finally {
-    try { p?.kill(9); } catch {}
+    stop(p, timedOut);
   }
 }
 /** A tool's version, never waiting more than 2.5s. */
 async function version(path: string, arg = "--version"): Promise<string | undefined> {
-  let p: ReturnType<typeof Bun.spawn> | undefined;
+  let p: ReturnType<typeof Bun.spawn> | undefined, timedOut = true;
   try {
-    p = Bun.spawn([path, arg], { stdin: "ignore", stdout: "pipe", stderr: "pipe", env: ENV() });
+    p = Bun.spawn([path, arg], { stdin: "ignore", stdout: "pipe", stderr: "pipe", env: ENV(), detached: true } as any);
     const read = (async () => (await new Response(p!.stdout as ReadableStream).text()) || (await new Response(p!.stderr as ReadableStream).text()))();
-    const out = await Promise.race([read, Bun.sleep(2500).then(() => "")]);
-    return out.match(/\bv?(\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?)\b/)?.[1]?.slice(0, 30);
+    const out = await Promise.race([read, Bun.sleep(2500).then(() => undefined)]);
+    timedOut = out === undefined;
+    return out?.match(/\bv?(\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?)\b/)?.[1]?.slice(0, 30);
   } catch {
     return undefined;
   } finally {
-    try { p?.kill(9); } catch {}
+    stop(p, timedOut);
   }
 }
 

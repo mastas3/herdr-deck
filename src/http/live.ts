@@ -5,7 +5,7 @@ import { startHistory, historyStats } from "../history";
 import { localUsage, type MachineUsage } from "../usage-accounts";
 import { refreshCredits } from "../usage-credits";
 import { mergeUsage } from "../usage-merge";
-import { servedPorts } from "../share";
+import { pruneShares, servedPorts } from "../share";
 import { claimsDone, onCheck, resultFor, verify } from "../verify";
 import type { Automations } from "../automations";
 import type { Deck, Row } from "../deck";
@@ -35,8 +35,10 @@ export function startLive(o: Deps) {
   credits();
   setInterval(credits, 10 * 60_000);
 
+  // The deck's own tailnet addresses whose server has been gone half an hour are turned off (src/share.ts).
   async function refreshShared() {
-    const m = await servedPorts().catch(() => new Map());
+    let m = await servedPorts().catch(() => new Map());
+    if (await pruneShares(m).catch(() => false)) m = await servedPorts().catch(() => new Map());
     if (JSON.stringify([...m]) !== JSON.stringify([...deck.shared])) { deck.shared = m; deck.refresh(); }
   }
   refreshShared();
