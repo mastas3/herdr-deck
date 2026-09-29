@@ -135,6 +135,14 @@ export const VIEWS = {
   projects: `openProjects()`,
   // Grouped by project: each project header carries its project page link (the projects plugin's "project.link").
   "by-project": `setGroup("project"); select("fake:blocked", { scroll: true, open: true })`,
+  // A finished session you've opened is no light at all, and one you haven't is blue (not red). Neither changes the
+  // list's order, so the header's lights must follow them on their own.
+  "by-project-lights": `(async () => { setGroup("project"); select("fake:blocked", { scroll: true, open: true });
+    const frame = () => new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok))); await frame();
+    const lights = (p) => [...document.querySelectorAll(\`.sec-h[data-sec="p:\${p}"] > .dots .dot\`)].map((d) => d.style.getPropertyValue("--c")).join(" ");
+    if (lights("acme-site") !== "var(--done)") throw new Error("acme-site should be blue, is " + lights("acme-site"));
+    Object.assign(rowOf("fake:working"), { status: "done", seen: true }); [...S.rows.values()].find((r) => r.project === "acme-site").seen = true; renderList();
+    if (lights("acme-site") !== "" || lights("acme-api") !== "var(--blocked)") throw new Error("lights didn't follow: " + lights("acme-site") + " / " + lights("acme-api")); })()`,
   // Grouped by project with a worktree: acme-api's folder is the demo project in the scratch HOME, one session works
   // in a linked worktree of it (its own sub-section), and the header offers the folder window.
   "by-project-worktree": `${WORKTREE_SETUP}; select("fake:blocked", { scroll: true });

@@ -143,6 +143,8 @@ function flipRows(box, before) {
 }
 /** The rows about to leave the list fade out where they were (motion.ghost), measured before the DOM changes. */
 const leavingRows = (box, keep) => motion.ghost([...box.querySelectorAll(".row[data-key]")].filter((el) => !keep.has(el.dataset.key)), box);
+const LIGHTS = [["blocked", "waiting on you"], ["done", "finished, not opened yet"], ["working", "working"]];
+const lightsHTML = (rows) => { const n = projLights(rows); return LIGHTS.map(([k, what]) => n[k] ? `<span class="dot" style="--c:var(--${k})" title="${n[k]} ${what}"></span>` : "").join(""); };
 let selWas = null;
 let lastView = "";
 function renderList() {
@@ -216,8 +218,7 @@ function renderList() {
       const sec = document.createElement("section");
       sec.className = "sec" + (g.closed ? " closed" : "") + (g.proj ? " proj" : "");
       if (g.proj) sec.style.setProperty("--pc", pc(g.proj));
-      const nb = g.rows.filter((r) => r.status === "blocked" || r.status === "done").length, nw = g.rows.filter((r) => r.status === "working").length;
-      const dots = g.proj ? `<span class="dots">${nb ? `<span class="dot" style="--c:var(--blocked)" title="${nb} need you"></span>` : ""}${nw ? `<span class="dot" style="--c:var(--working)" title="${nw} working"></span>` : ""}</span>` : "";
+      const dots = g.proj ? `<span class="dots">${lightsHTML(g.rows)}</span>` : "";
       const extra = g.key === "empty" || g.tail ? `<span class="act link" data-secact="closeEmpty" role="button">Close empty</span>`
         : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
       const jour = g.proj && projectLink() ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${projectLink().icon}</span>` : "";
@@ -261,6 +262,11 @@ function renderList() {
     const open = new Set([...box.querySelectorAll(".row[data-key]")].filter((el) => !el.closest(".closed")).map((el) => el.dataset.key));
     S.visible = keys.filter((k) => open.has(k)).map((k) => S.rows.get(k)).filter(Boolean);
   } else S.visible = groups.flatMap(shownRows);
+  // Headers are rebuilt only when the order changes; their lights follow every status change and every session you open.
+  if (byProject) for (const g of groups) {
+    const el = g.proj && box.querySelector(`.sec-h[data-sec="${CSS.escape(g.key)}"] > .dots`), html = el && lightsHTML(g.rows);
+    if (el && el.innerHTML !== html) el.innerHTML = html;
+  }
   if (selWas !== S.sel) { const to = rowCache.get(S.sel)?.el; if (oldSel && to?.classList.contains("sel")) motion.glide(oldSel, to, box); selWas = S.sel; }
   if (app.classList.contains("list-off")) renderRail(rows);
   renderFoldAll(groups); // after the list's measurements, so it never forces an extra layout

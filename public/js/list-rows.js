@@ -97,6 +97,12 @@ function timeSig(rows, askOf, now) {
   for (const r of rows) s += r.key + ":" + reasonOf(r, askOf(r), now).k + ";";
   return s;
 }
+/** A project header's lights, by the same rules as its rows: waiting on you, finished and not opened yet, working. */
+function projLights(rows) {
+  const n = { blocked: 0, done: 0, working: 0 };
+  for (const r of rows) if (r.status === "blocked" || r.status === "working" || (r.status === "done" && !r.seen)) n[r.status]++;
+  return n;
+}
 /* @pure:list-end */
 function sectionOf(r) {
   const k = rank(r);

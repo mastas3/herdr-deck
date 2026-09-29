@@ -50,7 +50,7 @@
 .row[data-status="blocked"].unseen { --c-need: var(--blocked); }
 .row { position: relative; }
 .sec.proj > .sec-h { color: var(--ink); font-size: 14.5px; }
-.sec.proj > .sec-h .dots { margin-left: auto; display: flex; gap: 3px; }
+.sec.proj > .sec-h .dots { margin-left: auto; display: flex; gap: 3px; background: none; border: 0; padding: 0; } /* not chat.css's typing bubble */
 .sec-h .sl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A project's sessions sit one level in, on a thin guide in the project's colour (under its chevron); a worktree's
    sub-section one more level in, on its own guide. */

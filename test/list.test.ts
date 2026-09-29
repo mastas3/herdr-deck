@@ -4,11 +4,19 @@ import { readFileSync } from "node:fs";
 // The list helpers live in the browser script (no build step); evaluate just their marked block.
 const src = readFileSync(new URL("../public/js/list-rows.js", import.meta.url), "utf8");
 const block = src.slice(src.indexOf("/* @pure:list-begin"), src.indexOf("/* @pure:list-end */"));
-const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder, commonBranch, splitWorktrees, timeSig };`)();
+const L = new Function(`${block}; return { span, reasonLabel, reasonOf, stableSig, frozenOrder, commonBranch, splitWorktrees, timeSig, projLights };`)();
 
 const NOW = 1_800_000_000_000;
 const MIN = 60_000, HOUR = 60 * MIN, DAY = 24 * HOUR;
 const row = (o: any = {}) => ({ key: "k", status: "idle", empty: false, stale: false, tail: [], rssKB: 0, cpu: 0, procs: 0, ...o });
+
+describe("project header lights", () => {
+  test("a finished session you've opened is not a light; one you haven't is blue, not red", () => {
+    const rows = [row({ status: "blocked" }), row({ status: "done" }), row({ status: "done", seen: true }), row({ status: "working" }), row({ status: "working" }), row({}), row({ status: "empty" })];
+    expect(L.projLights(rows)).toEqual({ blocked: 1, done: 1, working: 2 });
+    expect(L.projLights([row({ status: "done", seen: true }), row({})])).toEqual({ blocked: 0, done: 0, working: 0 });
+  });
+});
 
 describe("reason chip", () => {
   test("a pending decision wins: permission, then question", () => {
