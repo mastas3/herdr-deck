@@ -91,3 +91,18 @@ describe("restoring a snapshot through the core's Reopen", () => {
     fake.stop();
   }, 30_000);
 });
+
+describe("permission-skipping flags on restore", () => {
+  test("dropped unless that session is named in `unsafe`", async () => {
+    const got: string[] = [];
+    const r = createRestorer({ machine: "mac", reopen: async (o) => { got.push(o.resume ?? ""); return { key: `new/${got.length}` } as any; }, workspaces: () => new Set(["w1"]), changed() {}, gapMs: 0, sleep: async () => {} });
+    const panes = [
+      pane({ key: "k/1", paneId: "1", tabNumber: 1, sessionId: "s1", resume: "claude --resume s1", command: "claude --dangerously-skip-permissions --model opus" }),
+      pane({ key: "k/2", paneId: "2", tabNumber: 2, sessionId: "s2", resume: "claude --resume s2", command: "claude --dangerously-skip-permissions" }),
+    ];
+    const job = r.start("snap", panes, 1, ["k/2"]);
+    for (let i = 0; i < 100 && r.job()!.running; i++) await Bun.sleep(5);
+    expect(got).toEqual(["claude --resume s1 --model opus", "claude --resume s2 --dangerously-skip-permissions"]);
+    expect(job.items.map((x) => x.cmd)).toEqual(["claude --resume s1 --model opus", "claude --resume s2 --dangerously-skip-permissions"]);
+  });
+});

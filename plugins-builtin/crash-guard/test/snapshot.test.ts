@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { keptFlags, looksLikeCrash, lostPanes, restoreCommand, restoreOrder, sigOf } from "../snapshot";
+import { keptFlags, looksLikeCrash, lostPanes, restoreCommand, restoreOrder, sigOf, unsafeFlags } from "../snapshot";
 import { pane } from "./fixture";
 
 describe("restore commands", () => {
   test("keep the model and permission flags the agent ran with, drop the rest", () => {
-    expect(keptFlags("claude", "node /opt/homebrew/bin/claude --dangerously-skip-permissions --model opus --resume abc fix the bug")).toEqual(["--dangerously-skip-permissions", "--model", "opus"]);
+    expect(keptFlags("claude", "node /opt/homebrew/bin/claude --dangerously-skip-permissions --model opus --resume abc fix the bug")).toEqual(["--model", "opus"]);
+    expect(keptFlags("claude", "node /opt/homebrew/bin/claude --dangerously-skip-permissions --model opus --resume abc fix the bug", true)).toEqual(["--dangerously-skip-permissions", "--model", "opus"]);
     expect(keptFlags("claude", "claude --permission-mode=plan --effort high")).toEqual(["--permission-mode", "plan", "--effort", "high"]);
-    expect(keptFlags("codex", `codex -m gpt-5.5 -c model_reasoning_effort="high" --dangerously-bypass-approvals-and-sandbox`)).toEqual(["-m", "gpt-5.5", "-c", `'model_reasoning_effort="high"'`, "--dangerously-bypass-approvals-and-sandbox"]);
+    expect(keptFlags("codex", `codex -m gpt-5.5 -c model_reasoning_effort="high" --dangerously-bypass-approvals-and-sandbox`)).toEqual(["-m", "gpt-5.5", "-c", `'model_reasoning_effort="high"'`]);
+    expect(keptFlags("codex", `codex -m gpt-5.5 -c model_reasoning_effort="high" --dangerously-bypass-approvals-and-sandbox`, true)).toEqual(["-m", "gpt-5.5", "-c", `'model_reasoning_effort="high"'`, "--dangerously-bypass-approvals-and-sandbox"]);
     expect(keptFlags("claude", undefined)).toEqual([]);
     expect(keptFlags("shell", "zsh -l")).toEqual([]);
   });
@@ -15,6 +17,16 @@ describe("restore commands", () => {
     expect(restoreCommand(pane({ key: "b", agent: "codex", resume: "codex resume 019a-11", command: "codex -s workspace-write" }))).toBe("codex resume -s workspace-write 019a-11");
     expect(restoreCommand(pane({ key: "c", resume: "opencode -s ses_1", agent: "opencode" }))).toBe("opencode -s ses_1");
     expect(restoreCommand(pane({ key: "d", agent: "shell" }))).toBeUndefined();
+  });
+  test("permission-skipping flags come back only when asked for", () => {
+    const p = pane({ key: "y", resume: "claude --resume s9", command: "claude --dangerously-skip-permissions --model opus" });
+    expect(restoreCommand(p)).toBe("claude --resume s9 --model opus");
+    expect(restoreCommand(p, true)).toBe("claude --resume s9 --dangerously-skip-permissions --model opus");
+    expect(unsafeFlags(p)).toEqual(["--dangerously-skip-permissions"]);
+    const x = pane({ key: "z", agent: "codex", resume: "codex resume 019a-12", command: "codex --dangerously-bypass-approvals-and-sandbox" });
+    expect(restoreCommand(x)).toBe("codex resume 019a-12");
+    expect(restoreCommand(x, true)).toBe("codex resume --dangerously-bypass-approvals-and-sandbox 019a-12");
+    expect(unsafeFlags(pane({ key: "w", resume: "claude --resume s1", command: "claude --model opus" }))).toEqual([]);
   });
   test("a value with shell characters is quoted, never run", () => {
     expect(keptFlags("claude", "claude --model x;rm")).toEqual(["--model", "'x;rm'"]);

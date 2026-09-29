@@ -39,7 +39,8 @@ function cgItemHTML(p, on) {
   const agent = !!p.resume;
   const why = p.open ? "open now" : agent ? "" : "opens a shell in its folder";
   return `<label class="cg-item${p.open ? " open" : ""}"><input type="checkbox" value="${esc(p.key)}"${on ? " checked" : ""}${p.open ? " disabled" : ""}>
-    <span class="cg-it"><b>${esc(p.title || p.agent)}</b><small>${cgWhere(p)}${why ? ` · <i>${why}</i>` : ""}</small>${p.cmd ? `<code>${esc(p.cmd)}</code>` : ""}</span></label>`;
+    <span class="cg-it"><b>${esc(p.title || p.agent)}</b><small>${cgWhere(p)}${why ? ` · <i>${why}</i>` : ""}</small>${p.cmd ? `<code>${esc(p.cmd)}</code>` : ""}</span></label>${
+    p.risky?.length && !p.open ? `<label class="cg-risky"><input type="checkbox" data-cgrisky value="${esc(p.key)}"> It ran with <code>${esc(p.risky.join(" "))}</code>. Add it back</label>` : ""}`;
 }
 
 /** The checklist for one snapshot; with a job id it opens on that restore's progress. */
@@ -81,8 +82,9 @@ async function cgOpenRestore(machine, snapId, jobId) {
     if (!ok || cgDlg?.job) return; // Cancel / Close closes
     e.preventDefault();
     const keys = picked();
+    const unsafe = [...form.querySelectorAll("[data-cgrisky]:checked")].map((x) => x.value).filter((k) => keys.includes(k));
     form.querySelector("[data-cgok]").disabled = true;
-    try { const { job } = await cgApi(machine, { op: "restore", id: snap.id, keys }); cgDlg.job = job.id; cgSeen.set(machine, job.id); cgShowJob(job); }
+    try { const { job } = await cgApi(machine, { op: "restore", id: snap.id, keys, unsafe }); cgDlg.job = job.id; cgSeen.set(machine, job.id); cgShowJob(job); }
     catch (x) { toast(x.message, true); sync(); }
   });
   sync();

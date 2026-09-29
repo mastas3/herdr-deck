@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import type { Host } from "../../src/plugin-api";
 import { createStore } from "./store";
 import { createRestorer } from "./restore";
-import { isPane, looksLikeCrash, restoreCommand, lostPanes, paneOf, sigOf, stillOpen, worthRestoring, type Crash, type Snapshot, type SnapPane } from "./snapshot";
+import { isPane, looksLikeCrash, restoreCommand, unsafeFlags, lostPanes, paneOf, sigOf, stillOpen, worthRestoring, type Crash, type Snapshot, type SnapPane } from "./snapshot";
 
 type CoreRemotes = { get(id: string): { post(path: string, body: unknown): Promise<{ status: number; data: any }>; online: boolean; conf: { id: string } } | undefined; all(): { online: boolean; conf: { id: string }; post(path: string, body: unknown): Promise<{ status: number; data: any }> }[] };
 const TICK = 5_000, MINUTE = 60_000, COALESCE = 20_000, MAX_AGE = 7 * 86400_000;
@@ -125,7 +125,7 @@ export function activate(host: Host) {
         const s = store.get(String(body.id ?? ""));
         if (!s) return Response.json({ error: "That snapshot is gone" }, { status: 404 });
         const cur = localPanes();
-        return { ...s, panes: s.panes.map((p) => ({ ...p, open: stillOpen(p, cur), cmd: restoreCommand(p) })) };
+        return { ...s, panes: s.panes.map((p) => ({ ...p, open: stillOpen(p, cur), cmd: restoreCommand(p), risky: unsafeFlags(p) })) };
       }
       case "restore": {
         const s = store.get(String(body.id ?? ""));
@@ -133,7 +133,9 @@ export function activate(host: Host) {
         const want = new Set<string>((body.keys ?? []).map(String));
         const picked = s.panes.filter((p) => want.has(p.key));
         if (!picked.length) return Response.json({ error: "Pick at least one session" }, { status: 400 });
-        try { return { job: restorer.start(s.id, picked, num("atOnce", 2)) }; } catch (e: any) { return Response.json({ error: e.message }, { status: 409 }); }
+        const unsafe = new Set<string>((body.unsafe ?? []).map(String));
+        const risky = picked.filter((p) => unsafe.has(p.key) && unsafeFlags(p).length).map((p) => p.key);
+        try { return { job: restorer.start(s.id, picked, num("atOnce", 2), risky) }; } catch (e: any) { return Response.json({ error: e.message }, { status: 409 }); }
       }
       case "retry": try { return { job: restorer.retry(String(body.job ?? "")) }; } catch (e: any) { return Response.json({ error: e.message }, { status: 409 }); }
       case "clear-job": restorer.clear(); changed(); return { ok: true };

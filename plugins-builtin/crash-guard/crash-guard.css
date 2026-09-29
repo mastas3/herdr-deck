@@ -20,6 +20,8 @@ dialog.cgdlg { width: min(700px, calc(100vw - 24px)); }
 .cgdlg .cg-ws legend label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .cgdlg .cg-item { display: flex; gap: 10px; align-items: flex-start; padding: 7px 2px; border-top: 1px solid var(--line); cursor: pointer; }
 .cgdlg .cg-ws legend + .cg-item { border-top: 0; }
+.cgdlg .cg-risky { display: flex; gap: 8px; align-items: baseline; margin: -2px 0 6px 28px; font-size: 12.5px; color: var(--ink-3); cursor: pointer; }
+.cgdlg .cg-risky code { font: 12px var(--mono); color: var(--warn, var(--ink-2)); }
 .cgdlg .cg-item.open { opacity: .6; cursor: default; }
 .cgdlg input[type="checkbox"] { margin-top: 3px; accent-color: var(--accent); width: 16px; height: 16px; flex: none; }
 .cgdlg .cg-it { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
