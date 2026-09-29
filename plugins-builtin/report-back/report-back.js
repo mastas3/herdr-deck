@@ -52,14 +52,21 @@ function rbBar(r) {
     : `<div class="rbnext">${rep.reportFile ? `<a class="fpath" data-path="${esc(rep.reportFile)}">REPORT.md</a>${rep.doneMarker ? ` <span class="hint">and DONE</span>` : ""}` : `<span class="hint">${esc(agoText(rep.at))}</span>`}<span class="spacer"></span>${rep.reportFile ? "" : `<button class="btn ghost" data-rbact="ask" title="Sends a short message asking it to write REPORT.md and a DONE marker">Ask for a report</button>`}</div>`;
   return `<div class="rbcard" data-rbkey="${esc(r.key)}" data-rbat="${rep.at}">
     <div class="rbtop">${rbChip(rep)}<b class="rbsum" title="${esc(rep.source === "report-file" ? "From its REPORT.md" : "From its last message")}">${esc(rep.summary)}</b><button class="ib" data-rbact="dismiss" aria-label="Dismiss the report" title="Dismiss">${ICON.x}</button></div>
-    ${facts.length || files ? `<div class="rbfacts">${facts.join("")}${files ? `<span class="rbfiles">${files}</span>` : ""}</div>` : ""}${next}</div>`;
+    ${facts.length || files ? `<div class="rbfacts">${facts.join("")}${files ? `<span class="rbfiles">${files}</span>` : ""}</div>` : ""}${next}${rbWorktree(r)}</div>`;
 }
 
+/** A session in a worktree: getting its work back, right on the card (the core's worktree dialogs, diff first). */
+function rbWorktree(r) {
+  if (!r.worktree) return "";
+  return `<div class="rbwt"><span class="rbwt-b" title="Worktree ${esc(r.worktree)}">${ICON.tree}<span class="mono">${esc(r.branch ?? r.worktree)}</span></span><span class="spacer"></span>
+    <button class="btn" data-rbact="wt-merge">Merge into ${esc(wtBaseOf(r))}</button><button class="btn ghost" data-rbact="wt-pr">Open PR</button><button class="btn ghost" data-rbact="wt-keep">Keep</button><button class="btn ghost" data-rbact="wt-remove">Remove worktree</button></div>`;
+}
 async function rbAct(e) {
   const b = e.target.closest("[data-rbact]"), card = b?.closest(".rbcard");
   if (!b || !card) return;
   e.stopPropagation();
   const key = card.dataset.rbkey, act = b.dataset.rbact;
+  if (act.startsWith("wt-")) { const r = rowOf(key); if (r) wtOpen(r, act.slice(3)); return; }
   if (act === "answer") { const box = $("askbox"); if (!box.hidden) { box.scrollIntoView({ block: "nearest" }); box.querySelector(".ropt, button")?.focus(); } else setMode("inbox"); return; }
   if (act === "dismiss") {
     const rep = S.reports.get(key);

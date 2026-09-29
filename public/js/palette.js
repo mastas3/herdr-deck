@@ -54,6 +54,7 @@ function paletteItems(q) {
     cur && { t: "Copy a link to this session", id: "link", ctx: true, run: () => copy(linkUrl(cur), "link") },
     cur?.resume && { t: "Copy its resume command", id: "resume", ctx: true, run: () => copy(cur.resume, "resume command") },
     cur && !cur.app && !cur.hist && { t: "Rename this session…", id: "rename", ctx: true, run: () => renameSession(cur) },
+    ...wtPaletteItems(cur),
     ...slot("views"),
     { t: "Machines: add or remove computers", run: openMachines },
     { t: S.simple ? "Simple mode: off" : "Simple mode: big and friendly", run: () => setSimple(!S.simple) },

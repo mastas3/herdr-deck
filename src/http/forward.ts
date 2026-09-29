@@ -38,7 +38,7 @@ export function createForward(deps: Deps) {
       }
       return json({ results });
     }
-    if (["/api/new", "/api/new-options", "/api/codex-create", "/api/codex-archived"].includes(path)) {
+    if (["/api/new", "/api/new-options", "/api/codex-create", "/api/codex-archived", "/api/worktrees"].includes(path)) {
       const remote = body.machine && body.machine !== deps.selfId ? remotes.get(body.machine) : undefined;
       if (!remote) return;
       const r = await remote.post(path, { ...body, machine: undefined });

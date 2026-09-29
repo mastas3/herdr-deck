@@ -6,6 +6,8 @@ const HOME = homedir();
 const BIN_DIRS = [`${HOME}/.local/bin`, "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...(process.env.PATH ?? "").split(":")];
 const GH = BIN_DIRS.map((d) => `${d}/gh`).find((p) => existsSync(p));
 export const ghAvailable = () => !!GH;
+/** Where `gh` is, for commands other than `gh api` (a pull request from a worktree). */
+export const ghPath = () => GH;
 export type GhRes = { ok: boolean; status: number; data?: any; error?: string; remaining?: number; reset?: number };
 export async function gh(args: string[], timeoutMs = 15_000): Promise<GhRes> {
   if (!GH) return { ok: false, status: 0, error: "The GitHub CLI (gh) isn't installed" };

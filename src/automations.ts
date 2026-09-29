@@ -25,13 +25,17 @@ export type Digest = {
   idle: Item[];
   counts: { waiting: number; finished: number; running: number; idle: number };
   auto?: boolean;
+  /** Once a week: worktrees that look finished (merged, or untouched for two weeks), with a Clean up on the board. */
+  stale?: StaleWorktree[];
 };
+export type StaleWorktree = { path: string; repo: string; branch: string; base: string; why: "merged" | "untouched"; days: number; dirty: number; machine?: string };
 export type AutoState = {
   rules: Rules;
   status: Partial<Record<RuleId, RuleStatus>>;
   digest?: Digest;
   digestDismissedAt?: number;
   digestDay?: string; // local date of the last scheduled digest
+  staleAt?: number; // when a scheduled digest last carried the stale worktrees (weekly)
 };
 
 export const DEFAULT_RULES: Rules = {
@@ -219,6 +223,8 @@ export type AutoDeps = {
   /** Extra sections for the digest push (the "digest.lines" extension point, e.g. today's quests). A section with a
    *  `pref` goes only to devices that keep that preference on. */
   digest?: () => DigestSection[];
+  /** Every machine's worktrees that look finished, and the digest's line about them. */
+  worktrees?: () => Promise<{ stale: StaleWorktree[]; line: string }>;
   now?: () => number;
 };
 
@@ -289,7 +295,13 @@ export class Automations {
   /** Build the digest; show it on the board, and push it when asked (the scheduled run always pushes). */
   async runDigest(push: boolean, auto = false) {
     const rows = this.d.rows();
-    const dg = { ...buildDigest(rows, new Date(this.now())), auto };
+    const dg: Digest = { ...buildDigest(rows, new Date(this.now())), auto };
+    // Stale worktrees once a week in the scheduled digest; always when you ask for the digest yourself.
+    if (this.d.worktrees && (!auto || this.now() - (this.state.staleAt ?? 0) >= 6.5 * DAY)) {
+      const w = await this.d.worktrees().catch(() => ({ stale: [], line: "" }));
+      if (auto) this.state.staleAt = this.now();
+      if (w.stale.length) { dg.stale = w.stale; dg.body += `\n${w.line}`; }
+    }
     this.state.digest = dg;
     this.state.digestDismissedAt = undefined;
     let note = "shown on the board";

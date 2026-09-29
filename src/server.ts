@@ -14,6 +14,8 @@ import { createCodexLifecycle } from "./codex-lifecycle";
 import { call } from "./herdr";
 import { PushStore } from "./push";
 import { Automations } from "./automations";
+import { loadWorktrees } from "./wt-store";
+import { staleLine, staleWorktrees } from "./wt-stale";
 import { createPlugins } from "./plugins";
 import { createPluginHost } from "./plugin-host";
 import { createCodePluginApi } from "./plugin-code-api";
@@ -35,6 +37,7 @@ import { createRoutes } from "./http/routes";
 import type { Hub } from "./http/hub";
 
 makeDataDirs();
+loadWorktrees(`${DATA_DIR}/worktrees.json`);
 const API_TOKEN = loadApiToken();
 const { hostsConf, self: SELF } = loadHosts();
 const graves = loadGraves();
@@ -87,6 +90,18 @@ const auto: Automations | undefined = new Automations({
   ctx: () => ({ machineLabel: (id) => machineLabelOf(id) ?? "", multi: machines().filter((m) => m.kind !== "app").length > 1, question: (key) => dec.decisions.get(key)?.question }),
   canSend: () => !isNode(),
   digest: () => pluginHost.contributions("digest.lines"),
+  worktrees: async () => {
+    // This machine's, then every other machine's (each deck looks at its own disk).
+    const busy = [...deck.rows.values()].filter((r) => !r.hist).map((r) => r.cwd);
+    const dirs = [...deck.rows.values()].map((r) => r.gitRoot ?? r.projectRoot).filter(Boolean) as string[];
+    const stale = (await staleWorktrees(dirs, busy)).map((s) => ({ ...s, machine: SELF.id }));
+    for (const h of remotes.values()) {
+      if (!h.online) continue;
+      const r = await Promise.race([h.post("/api/worktrees", { op: "stale" }), Bun.sleep(8000).then(() => null)]).catch(() => null);
+      for (const s of r?.data?.stale ?? []) stale.push({ ...s, machine: h.conf.id });
+    }
+    return { stale, line: staleLine(stale) };
+  },
 });
 // Code plugins (plugins-builtin/<id>/, and approved installs under <data>/plugins/<id>/): each gets exactly what this
 // lends it, and its routes, timers, services and contributions go away when it's turned off (src/plugin-host.ts).

@@ -20,6 +20,7 @@ async function loadNewOptions() {
   const recent = [...new Set([...projRoots, ...newOpts.recent])].slice(0, 7);
   $("nCwdSugg").innerHTML = recent.length ? `<span class="hint">Recent:</span>` + recent.map((p) => `<button type="button" data-cwd="${esc(home(p))}" title="${esc(p)}">${esc(p.split("/").pop())}</button>`).join("") : "";
   renderKinds();
+  wtNewPlan(0);
 }
 /** Where a project lives: the folder and machine of its most recent session (a worktree's session: its repo's main
  *  checkout). `key` is that session, which routes requests about the folder to its machine. */
@@ -50,9 +51,10 @@ async function openNew(pre) {
   $("newDlg").querySelector("h3").textContent = pre?.title ?? (pre ? `New session in ${pre.project}` : "New session");
   if (pre) $("nCwd").value = home(pre.cwd);
   $("newDlg").showModal();
+  wtNewReset();
   renderKinds();
   await loadNewOptions();
-  if (pre) { $("nCwd").value = home(pre.cwd); renderCmd(); }
+  if (pre) { $("nCwd").value = home(pre.cwd); renderCmd(); wtNewPlan(0); }
   if (!isPhone()) (newKind === "shell" ? $("nCwd") : $("nPrompt")).focus();
 }
 function renderKinds() {
@@ -69,6 +71,7 @@ function renderKinds() {
   $("nOk").textContent = native ? "Create Codex task" : "Start session";
   $("nOk").disabled = !newOpts;
   renderNewExtras();
+  wtNewRender();
   nSel = { model: "", effort: "", mode: "", ...load("opts:" + newKind, {}) };
   $("nArgs").value = load("args:" + newKind, "");
   const hints = newOpts?.argHints?.[newKind] ?? [];
@@ -130,6 +133,7 @@ $("nPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.me
 async function submitNewSession() {
   const body = { machine: newMachine, kind: newKind, cwd: $("nCwd").value.trim(), ...(newKind === "shell" ? {} : nSel), args: $("nArgs").value.trim(), prompt: newKind === "shell" ? "" : $("nPrompt").value, label: $("nLabel").value.trim(), focus: $("nFocus").checked };
   if (newMkdir && home(newMkdir) === body.cwd) body.mkdir = true; // quests: startRun
+  wtNewApply(body);
   for (const c of deckPlugins.contributions("new.fields")) try { c.apply?.(body); } catch (e) { console.error("new.fields:", e); }
   store("newCwd:" + newMachine, body.cwd); store("args:" + newKind, body.args); store("newFocus", body.focus);
   try {
@@ -143,7 +147,7 @@ async function submitNewSession() {
     if (native && key && result.promptSent === false && result.canRetryPrompt !== false && !result.deliveryUnknown && !result.promptPersisted && body.prompt) S.drafts.set(key, body.prompt);
     pendingSelect = key;
     if (S.rows.has(key)) { pendingSelect = null; select(key, { scroll: true, open: true }); }
-    toast(native && result.deliveryUnknown ? "Task created. First-message delivery is uncertain; check its conversation before sending again." : native && result.canRetryPrompt === false ? `Task created; its conversation has changed. ${result.error ?? "Open it in Codex to continue."}` : native && result.promptSent === false && body.prompt ? `Task created; first message ${result.promptPersisted ? "saved in Codex" : "kept as a draft"}. ${result.error ?? "Reconnect to continue."}` : native ? "Created a Codex app task" : newKind === "shell" ? "Opened a shell" : `Starting ${newKind}…`, !!(native && (result.error || result.deliveryUnknown)));
+    toast(native && result.deliveryUnknown ? "Task created. First-message delivery is uncertain; check its conversation before sending again." : native && result.canRetryPrompt === false ? `Task created; its conversation has changed. ${result.error ?? "Open it in Codex to continue."}` : native && result.promptSent === false && body.prompt ? `Task created; first message ${result.promptPersisted ? "saved in Codex" : "kept as a draft"}. ${result.error ?? "Reconnect to continue."}` : native ? "Created a Codex app task" : newKind === "shell" ? "Opened a shell" : result.worktree ? `Starting ${newKind} in a worktree on ${result.worktree.branch}…` : `Starting ${newKind}…`, !!(native && (result.error || result.deliveryUnknown)));
   } catch (e) { if (e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") newCodexReceipt = null; toast("Couldn’t start: " + e.message, true); }
 }
 $("newDlg").addEventListener("close", () => { if ($("newDlg").returnValue === "ok") void submitNewSession(); });

@@ -15,12 +15,15 @@ import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
 import { codexApi } from "./codex";
 import { codexLifecycleApi } from "./codex-lifecycle";
+import { worktreesApi } from "./worktrees";
 
 export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
   const lifecycle = await codexLifecycleApi(hub, path, body);
   if (lifecycle) return lifecycle;
   const native = await codexApi(hub, path, body);
   if (native) return native;
+  const wt = await worktreesApi(hub, path, body);
+  if (wt) return wt;
   const { deck, graves, broadcastGraves, refreshShared, pluginHost } = hub;
   const { remotes, allRows, localRow } = hub.hosts;
   const { reopen, startSession, sendText, sendAny, closeLocal } = hub.sessions;

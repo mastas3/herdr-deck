@@ -6,7 +6,7 @@ import type { Row } from "../../src/deck";
 import type { Who } from "../../src/insight";
 import { detailFor } from "../../src/insight";
 import { ttlCache } from "./cache";
-import { addedDiff, parseDiff, parseNameStatus, parseNumstat, type DiffLine } from "./diff";
+import { addedDiff, parseDiff, parseNameStatus, parseNumstat, type DiffLine } from "../../src/git-diff";
 import { commitAt, EMPTY_TREE, git, headOf, listFiles, repoRoot, status, type Badge, type StatusEntry } from "./git";
 import { inside, safeRoot, viewable } from "./safe";
 import { sessionEdits, touchedList, touchedPaths } from "./touched";

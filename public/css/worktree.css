@@ -1,0 +1,80 @@
+/* Worktrees: "Own worktree" in New session, the worktree marker in the session header, the merge / PR / keep /
+   remove dialogs with their diff, and the digest's stale list. The diff styles are scoped here so they don't depend
+   on the Files plugin being on. */
+.wtn, .wtn-body, .wtn-steps { min-width: 0; max-width: 100%; }
+.wtn { margin-top: 14px; padding: 10px 12px; border: 1px solid var(--line-2); border-radius: 10px; background: color-mix(in srgb, var(--accent) 3%, var(--bg)); }
+.wtn-top { display: flex; gap: 12px; align-items: flex-start; }
+.wtn-top b { font-size: 14.5px; }
+.wtn-top p { margin: 2px 0 0; font-size: 12.5px; }
+.wtn-body .fields2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; }
+.wtn-body .field { margin-top: 10px; }
+.wtn-body input.mono { font-family: var(--mono); font-size: 13.5px; }
+.wtn-chk { display: flex; gap: 8px; align-items: baseline; margin-top: 10px; font-size: 14px; cursor: pointer; }
+.wtn-chk input { accent-color: var(--accent); width: 15px; height: 15px; flex: none; transform: translateY(2px); }
+.wtn-chk .hint { font-size: 12.5px; }
+.wtn-chk code { font: 12.5px var(--mono); }
+.wtn-err, .wt-err { margin: 8px 0 0; color: var(--danger); font-size: 13px; }
+.wtn-warn, .wt-warn { margin: 8px 0 0; font-size: 13px; color: color-mix(in oklch, var(--working) 75%, var(--ink)); }
+.wtn-warn svg, .wt-warn svg { width: 13px; height: 13px; vertical-align: -2px; margin-right: 5px; }
+.wtn-steps { margin-top: 10px; font-size: 12.5px; }
+.wtn-steps ol { margin: 4px 0 0; padding: 7px 10px 7px 30px; background: var(--term-bg); color: var(--term-ink); border-radius: 7px; font: 12px/1.6 var(--mono); overflow-x: auto; }
+.wtn-steps li { white-space: nowrap; }
+.wtn-steps .hint { font-family: var(--sans); color: color-mix(in srgb, var(--term-ink) 60%, transparent); }
+
+.dh-id .wtm { display: inline-flex; align-items: center; gap: 3px; padding: 0 7px; border: 1px solid var(--line-2); border-radius: 99px; background: none; font-size: 12px; color: var(--ink-2); cursor: pointer; flex: none; }
+.dh-id .wtm svg { width: 12px; height: 12px; }
+.dh-id .wtm:hover { color: var(--ink); border-color: var(--ink-3); }
+
+@media (min-width: 761px) { dialog.wtdlg { width: min(760px, calc(100vw - 24px)); } }
+.wtdlg .dlg-b { max-height: min(76vh, 820px); overflow-y: auto; }
+.wtdlg h3 { overflow-wrap: anywhere; }
+.wt-where { margin: -4px 0 8px; font-size: 13px; overflow-wrap: anywhere; }
+.wt-where svg { width: 13px; height: 13px; vertical-align: -2px; margin-right: 4px; }
+.wt-where .mono { color: var(--ink); }
+.wt-notes > p { margin: 8px 0 0; font-size: 14px; line-height: 1.45; }
+.wt-notes .btn.sm { margin-left: 6px; padding: 1px 9px; font-size: 12.5px; }
+.wt-plan { color: var(--ink); }
+.wt-ok { color: color-mix(in srgb, var(--done) 80%, var(--ink)); }
+.wt-msg { margin: 8px 0 0; padding: 8px 12px; border-left: 3px solid var(--accent); background: var(--raise); border-radius: 0 7px 7px 0; font-size: 13.5px; white-space: pre-wrap; }
+.wt-cmds { margin: 8px 0 0; padding: 7px 10px; background: var(--term-bg); color: var(--term-ink); border-radius: 7px; font: 12px/1.55 var(--mono); overflow-x: auto; white-space: pre; }
+.wt-diff { margin-top: 14px; }
+.wtd-sum { margin: 0 0 6px; font-size: 13.5px; }
+.wtd-commits { margin: 0 0 8px; font-size: 13px; }
+.wtd-commits summary { cursor: pointer; color: var(--ink-2); }
+.wtd-commits ul { margin: 4px 0 0; padding-left: 18px; }
+.wtd-commits li { margin: 2px 0; }
+.wtd-commits .mono { font-size: 12px; color: var(--ink-3); }
+.wtd-files { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.wtd-f + .wtd-f { border-top: 1px solid var(--line); }
+.wtd-h { display: flex; width: 100%; align-items: center; gap: 8px; padding: 6px 10px; border: 0; background: none; text-align: left; color: var(--ink); cursor: pointer; font-size: 13px; }
+.wtd-h:hover { background: var(--raise); }
+.wtd-h[aria-expanded="true"] { background: var(--raise); }
+.wtd-b { flex: none; width: 16px; text-align: center; font: 600 11.5px var(--mono); border-radius: 4px; color: var(--ink-2); }
+.wtd-b[data-st="A"] { color: var(--idle); } .wtd-b[data-st="D"] { color: var(--blocked); } .wtd-b[data-st="U"] { color: var(--danger); }
+.wtd-p { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 12.5px var(--mono); direction: ltr; }
+.wtd-n { flex: none; }
+.wtdlg .cx-a { color: var(--idle); font-family: var(--mono); font-size: 12px; }
+.wtdlg .cx-d { color: var(--blocked); font-family: var(--mono); font-size: 12px; }
+.wtd-lines { overflow-x: auto; font: 12px/1.5 var(--mono); background: var(--bg); border-top: 1px solid var(--line); max-height: 420px; overflow-y: auto; }
+.wtd-lines > .hint { padding: 6px 10px; margin: 0; font-family: var(--sans); }
+.wtd-lines .dl { display: flex; min-width: max-content; white-space: pre; }
+.wtd-lines .dn { flex: none; width: 3.6em; padding-right: 6px; text-align: right; color: var(--ink-3); user-select: none; opacity: .75; }
+.wtd-lines .dt { padding: 0 12px 0 6px; flex: 1; }
+.wtd-lines .dl[data-k="a"] { background: color-mix(in srgb, var(--idle) 14%, transparent); }
+.wtd-lines .dl[data-k="d"] { background: color-mix(in srgb, var(--blocked) 13%, transparent); }
+.wtd-lines .dhunk, .wtd-lines .dnote { color: var(--ink-3); background: color-mix(in srgb, var(--done) 8%, transparent); padding: 1px 0 1px 8px; }
+
+.dgl.wtst { display: flex; flex-direction: column; gap: 3px; }
+.wtsi { display: flex; align-items: baseline; gap: 5px; font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wtsi svg { width: 12px; height: 12px; flex: none; align-self: center; color: var(--ink-3); }
+.wtsi .mono { font-size: 12.5px; }
+
+@media (max-width: 760px) {
+  .wtn-body .fields2 { grid-template-columns: 1fr; gap: 0; }
+  .wtn-steps li { white-space: normal; overflow-wrap: anywhere; }
+  .wtdlg .dlg-b { max-height: 70vh; }
+}
+.wt-notes .mono { font-size: 12.5px; white-space: nowrap; }
+.wtd-lines, .wt-cmds, .wtn-steps ol { font-variant-ligatures: none; }
+/* On the phone the dialog is a flex column: let the long step lines scroll inside their box, not widen the page. */
+#newDlg form, #newDlg .dlg-b { min-width: 0; }

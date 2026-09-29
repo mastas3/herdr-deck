@@ -14,7 +14,7 @@ function renderDetail() {
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, tab, S.insp.open, S.sub, S.summary.machines?.length, radarChip(r)]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.worktree, r.wtBase, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, tab, S.insp.open, S.sub, S.summary.machines?.length, radarChip(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -69,6 +69,7 @@ function renderHead(r, d, tab) {
     `<span class="pill" style="--c:${statusVar(r.status)}">${STATUS_NAME[r.status] ?? esc(r.status)}</span>`,
     projectLink() ? `<button class="pj" data-dact="journey" style="--pc:${pc(r.project)}" title="${esc(where)} · open the project page">${esc(r.project)}</button>` : `<span class="pj" style="--pc:${pc(r.project)}" title="${esc(where)}">${esc(r.project)}</span>`,
     r.branch ? `<span class="mono br" title="Branch">${esc(r.branch)}</span>` : "",
+    r.worktree ? `<button class="wtm" data-dact="worktree" title="Working in the worktree ${esc(r.worktree)}${r.wtBase ? `, from ${esc(r.wtBase)}` : ""}. Merge, open a PR, keep or remove it">${ICON.tree}worktree</button>` : "",
   ].join("");
   const chips = [
     radarChip(r),

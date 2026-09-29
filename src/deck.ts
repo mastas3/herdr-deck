@@ -8,6 +8,7 @@ import { cleanTail, isShellOnly } from "./tail";
 import { insightFor, type Insight } from "./insight";
 import { projectRoot } from "./projects";
 import { inWorktree, parseCheckout } from "./git-worktree";
+import { wtRecord } from "./wt-store";
 import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
 import { codexStore } from "./codex-store";
 import { RowFeed, type Usage } from "./row-feed";
@@ -48,6 +49,7 @@ export type Row = {
   dirty?: number;
   gitRoot?: string; // the project folder of the repo's main checkout (the same as projectRoot outside a worktree)
   worktree?: string; // the linked worktree's folder name, when the session works in one (projectRoot is that folder)
+  wtBase?: string; // for a worktree the deck made: the branch it came from (what "Merge into …" merges into)
   startedAt?: number;
   createdAt?: number;
   bornAt?: number; // first seen by this deck (only for panes opened while it runs)
@@ -427,10 +429,12 @@ export class Deck {
     this.scheduleRebuild();
   }
 
-  private async refreshGit() {
+  /** `fresh`: only folders it hasn't looked at yet (a tab just opened, e.g. in a new worktree). */
+  private async refreshGit(fresh = false) {
     const cwds = new Set<string>(this.appThreads.map((t) => t.cwd));
     for (const s of this.sessions.values()) for (const p of s.snap?.panes ?? []) cwds.add(p.cwd);
-    const queue = [...cwds];
+    const queue = [...cwds].filter((c) => !fresh || !this.git.has(c));
+    if (!queue.length) return;
     const worker = async () => {
       for (let cwd; (cwd = queue.shift()); ) {
         try {
@@ -520,6 +524,7 @@ export class Deck {
           launch: projRoot !== cwdRoot ? basename(cwdRoot) : undefined,
           gitRoot: tree?.gitRoot ?? (g?.root ? projRoot : undefined),
           worktree: tree?.worktree,
+          wtBase: tree && g?.root ? wtRecord(g.root)?.base : undefined,
           now: status === "working" || status === "blocked" ? ins?.now : undefined,
           step: ins?.todo, todos: ins?.todos,
           turnStartedAt: ins?.turnStartedAt,
@@ -635,6 +640,7 @@ export class Deck {
   async kick(herdr: string) {
     const s = this.sessions.get(herdr);
     if (s) await this.refreshSnapshot(s);
+    void this.refreshGit(true);
   }
 }
 

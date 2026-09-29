@@ -277,13 +277,14 @@ test("a subscription only seconds old that answers 410 is retried, not dropped a
 
 describe("the rules engine", () => {
   const NOON = T0 + 3.5 * H; // away from the digest window
-  function engine(rows: Row[], now: { t: number }) {
+  function engine(rows: Row[], now: { t: number }, extra: Partial<AutoDeps> = {}) {
     const dir = mkdtempSync(`${tmpdir()}/auto-`);
     const sent: Message[] = [];
     const deps: AutoDeps = {
       file: `${dir}/automations.json`, rows: () => rows, now: () => now.t, changed: () => {}, viewing: () => false, canSend: () => true,
       ctx: () => ({ machineLabel: (x) => String(x), multi: false }),
       deliver: async (m) => { sent.push(m); return { sent: 1, targets: 1, dropped: 0 }; },
+      ...extra,
     };
     return { a: new Automations(deps), sent, dir };
   }
@@ -311,6 +312,24 @@ describe("the rules engine", () => {
     now.t += 6000;
     await a.tick();
     expect(sent.map((m) => m.kind)).toEqual(["burst"]);
+  });
+  test("stale worktrees: once a week in the scheduled digest, always when you ask for it", async () => {
+    const now = { t: new Date(2026, 8, 28, 8, 31).getTime() };
+    const stale = [{ path: "/r/.claude/worktrees/x", repo: "r", branch: "stas/x", base: "main", why: "merged" as const, days: 3, dirty: 0 }];
+    let asked = 0;
+    const { a, sent } = engine([], now, { worktrees: async () => { asked++; return { stale, line: "1 worktree looks finished: r ⎇ stas/x (merged into main)" }; } });
+    await a.runDigest(true, true);
+    expect(a.publicState().digest?.stale).toEqual(stale);
+    expect(sent[0].body).toContain("1 worktree looks finished");
+    now.t += 24 * H;
+    await a.runDigest(true, true);
+    expect(a.publicState().digest?.stale).toBeUndefined();
+    expect(asked).toBe(1);
+    await a.runDigest(false);
+    expect(a.publicState().digest?.stale).toEqual(stale);
+    now.t += 6 * 24 * H;
+    await a.runDigest(true, true);
+    expect(asked).toBe(3);
   });
   test("the scheduled digest runs once at its time, pushes, and shows until dismissed", async () => {
     const now = { t: new Date(2026, 8, 26, 8, 0).getTime() };
