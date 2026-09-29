@@ -90,10 +90,11 @@ function renderAgentOpts() {
   const ch = newOpts?.choices?.[newKind];
   if (!ch) { $("nAgentOpts").hidden = true; renderCmd(); return; }
   $("nAgentOpts").hidden = newKind === "shell";
-  $("nModel").value = nSel.model;
-  $("nModelList").innerHTML = ch.models.filter((m) => m.v).map((m) => `<option value="${esc(m.v)}">${esc(m.l ?? "")}</option>`).join("");
-  const quick = ch.models.slice(0, newKind === "opencode" ? 1 : 7);
-  $("nModelSugg").innerHTML = quick.map((m) => `<button type="button" data-model="${esc(m.v)}" style="${nSel.model === m.v ? "border-style:solid;color:var(--ink)" : ""}">${esc(m.l ?? m.v)}</button>`).join("") + (newKind === "opencode" && ch.models.length > 1 ? `<span class="hint">${ch.models.length - 1} models: type to search</span>` : "");
+  // An older node's options have no providers: fall back to one list, so the picker still works.
+  const providers = ch.providers ?? [{ id: newKind, label: (KINDS.find(([k]) => k === newKind) ?? [newKind, newKind])[1], models: ch.models.filter((m) => m.v) }];
+  const pid = "new:" + newKind;
+  modelPickerSet(pid, { providers, value: nSel.model, label: "Model", allowCustom: true, allowDefault: true, defaultLabel: ch.models[0]?.v === "" ? ch.models[0].l : "Default", recentKey: "new-" + newKind, hint: ch.error ? `${ch.error}. You can still type a model ID.` : "", onChange: (v) => { nSel.model = v; saveOpts(); } });
+  modelPickerMount($("nModelPick"), pid);
   const model = ch.models.find((m) => m.v === nSel.model);
   const efforts = model?.efforts?.length ? model.efforts : ch.efforts;
   $("nEffortWrap").hidden = !efforts.length;
@@ -119,9 +120,6 @@ $("nMachine").addEventListener("click", (e) => { const b = e.target.closest("[da
 $("nKind").addEventListener("click", (e) => { const b = e.target.closest("[data-kind]"); if (b) { newKind = b.dataset.kind; store("newKind", newKind); renderKinds(); } });
 $("nCodexTarget").addEventListener("click", (e) => { const b = e.target.closest("[data-codex-target]"); if (!b || b.disabled) return; newCodexTarget = b.dataset.codexTarget; store("newCodexTarget", newCodexTarget); renderKinds(); });
 $("nCodexArchives").onclick = () => { $("newDlg").close("cancel"); openCodexArchives(newMachine); };
-$("nModelSugg").addEventListener("click", (e) => { const b = e.target.closest("[data-model]"); if (b) { nSel.model = b.dataset.model; saveOpts(); } });
-$("nModel").addEventListener("change", (e) => { nSel.model = e.target.value.trim(); saveOpts(); });
-$("nModel").addEventListener("input", (e) => { nSel.model = e.target.value.trim(); store("opts:" + newKind, nSel); renderCmd(); });
 $("nEffort").addEventListener("click", (e) => { const b = e.target.closest("[data-effort]"); if (b) { nSel.effort = b.dataset.effort; saveOpts(); } });
 $("nMode").addEventListener("click", (e) => { const b = e.target.closest("[data-mode]"); if (b) { nSel.mode = b.dataset.mode; saveOpts(); } });
 $("nArgs").addEventListener("input", renderCmd);

@@ -12,7 +12,8 @@ function resolveLink(path) {
   if (!m) return null;
   const [machine, agent, id] = m.slice(1).map(decodeURIComponent);
   if (agent === "pane") return S.rows.has(id) ? { key: id } : { missing: true };
-  const r = [...S.rows.values()].find((x) => x.sessionId === id && (x.machine === machine || !machine)) ?? [...S.rows.values()].find((x) => x.sessionId === id);
+  const is = (x) => x.sessionId === id || x.movedFrom?.includes(id); // a link from before Claude Code moved the session
+  const r = [...S.rows.values()].find((x) => is(x) && (x.machine === machine || !machine)) ?? [...S.rows.values()].find(is);
   if (r) return { key: r.key };
   const g = S.graveyard.find((x) => x.resume && x.resume.includes(id));
   return { missing: true, grave: g };

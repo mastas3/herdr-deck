@@ -18,6 +18,12 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
 - `src/plugin-format.ts` (manifest validator), `src/plugin-trust.ts` (trust screen, update diff) and `src/plugins.ts`
   (staging, install, catalog) are **data plugins**: data-only packages, never code. Built-in ones live in
   `plugins-catalog/`. The design is `docs/superpowers/specs/2026-09-26-plugins-design.md`.
+- `src/model-catalog.ts` is what the model picker lists: every provider OpenCode is connected to (from `opencode models
+  --verbose`, cached, refreshed in the background), Anthropic for Claude Code and OpenAI for Codex, in one
+  `providers → models` shape. The page side is `public/js/model-search.js` (pure: search, highlights, badges) and
+  `public/js/model-picker.js` (`modelPickerSet(id, cfg)` registers a picker and `modelPickerHTML(id)` draws it, so a screen
+  that rebuilds its markup just calls it again). A screen that gets a new model choice uses the picker instead of a
+  `<select>`. The design is `docs/superpowers/specs/2026-09-29-model-picker-design.md`.
 - **Code plugins** are the deck's extras: `plugins-builtin/<id>/` (see "Code plugins" below). The host is
   `src/plugin-host.ts` (+ `plugin-api.ts` the contract, `plugin-code-format.ts` the manifest, `plugin-code-store.ts`
   hashes and state, `plugin-code-api.ts` the Plugins view's API); the page side is `public/js/registry.js`. Core

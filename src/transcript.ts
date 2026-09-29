@@ -181,6 +181,18 @@ function codexShell(content: any): { cmd: string; out: string; failed: boolean }
   return { cmd, out: result.split(/\nOutput:\n/)[1] ?? "", failed: code !== 0 };
 }
 
+/** Background tasks report back in <task-notification>s: close the call each names, so a background subagent's
+ *  line stops spinning when it finishes. */
+function taskDone(st: State, text: string) {
+  for (const n of text.matchAll(/<task-notification>([\s\S]*?)<\/task-notification>/g)) {
+    const id = n[1].match(/<tool-use-id>([^<]+)<\/tool-use-id>/)?.[1];
+    const m = id ? st.open.get(id) : undefined;
+    if (!id || !m) continue;
+    m.state = /<status>(failed|killed|error)/.test(n[1]) ? "error" : "done";
+    st.open.delete(id);
+  }
+}
+
 function push(d: Detail, m: Omit<Msg, "i">): Msg {
   const msg = { i: d.messages.length, ...m } as Msg;
   d.messages.push(msg);
@@ -204,19 +216,24 @@ function feedClaude(st: State, line: string, offset: number) {
     return;
   }
   if (o.isSidechain) return;
-  // A message sent while Claude is mid-turn (Steer, or an answer that lands as it wraps up) is queued, and Claude
-  // takes it in between two steps as an attachment, not a user line. It is still what you said, and where.
+  // What arrives while Claude works is queued and folded into the running turn, never a user line of its own: your
+  // messages (Steer, or an answer that lands as it wraps up), in between two steps where Claude took them in, and
+  // background tasks' notices, which close the calls they name.
   if (o.type === "attachment" && o.attachment?.type === "queued_command") {
     const a = o.attachment, p = a.prompt;
     const text = typeof p === "string" ? p : Array.isArray(p) ? p.filter((x: any) => x?.type === "text").map((x: any) => x.text).join("\n") : "";
-    if (a.isMeta || (a.commandMode && a.commandMode !== "prompt") || !text.trim() || /^\s*</.test(text)) return;
-    push(d, { role: "user", at: a.timestamp ? Date.parse(a.timestamp) : at, text: full(text) });
+    if ((a.commandMode && a.commandMode !== "prompt") || text.includes("<task-notification>")) { taskDone(st, text); return; }
+    // A person's message: origin human (older Claude Code names no origin), never a meta line or a tag.
+    if (a.isMeta || (a.origin?.kind && a.origin.kind !== "human") || /^\s*</.test(text)) return;
+    const said = unwrapPastes(text);
+    if (said.trim()) push(d, { role: "user", at: a.timestamp ? Date.parse(a.timestamp) : at, text: full(said) });
     return;
   }
   if (o.type === "user") {
     const content = Array.isArray(o.message?.content) ? o.message.content : [];
     const ask = claudeAsk(o);
     const raw = typeof o.message?.content === "string" ? o.message.content : "";
+    if (raw.includes("<task-notification>")) taskDone(st, raw); // one that arrived while Claude was idle
     if (ask?.startsWith("[Request interrupted")) { push(d, { role: "note", at, text: "Interrupted" }); return; }
     let userMsg: Msg | undefined;
     if (ask) {
@@ -442,10 +459,10 @@ export async function claudeSubagents(sessionFile: string, parent?: Detail, now 
     const hit = subCache.get(path);
     const scan = hit && hit.mtime === st.mtimeMs ? hit.scan : await scanSub(dir, n, st.size, st.mtimeMs);
     if (scan !== hit?.scan) subCache.set(path, { mtime: st.mtimeMs, scan });
-    // The parent's Agent call closes when a foreground subagent returns (a background one's closes at once).
-    const id = scan.sub.id;
-    const call = parent?.messages.find((m) => m.sub === id || (m.tool && /^(agent|task)$/i.test(m.tool) && scan.toolUseId && (m as any)._tid === scan.toolUseId));
-    const running = subRunning({ ended: scan.ended, pending: scan.pending, background: scan.background, callDone: call?.state === "done", quietMs: now - st.mtimeMs });
+    // The parent's Agent call closes when a foreground subagent returns, or when a background one's notice arrives.
+    // Running is worked out on every read (not cached with the parse): the parent's call and the clock move on.
+    const call = parent?.messages.find((m) => m.sub === scan.sub.id || (m.tool && /^(agent|task)$/i.test(m.tool) && scan.toolUseId && (m as any)._tid === scan.toolUseId));
+    const running = subRunning({ ended: scan.ended, pending: scan.pending, background: scan.background, call: call?.state, quietMs: now - st.mtimeMs });
     out.push({ ...scan.sub, running });
   }
   return out.sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0));

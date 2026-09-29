@@ -1,24 +1,12 @@
-// What the New session dialog offers: folders you work in, each agent's models, efforts and modes, and the flags you
-// tend to start each agent with.
+// What the New session dialog offers: folders you work in, each agent's providers, models, efforts and modes, and the
+// flags you tend to start each agent with.
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import type { Deck } from "../deck";
 import type { Graves } from "./config";
+import { claudeProvider, codexProvider, flatModels, opencodeCatalog, type OpencodeCatalog } from "../model-catalog";
 
 type Opt = { v: string; l?: string; efforts?: string[] };
-let ocModels: { at: number; list: Opt[] } = { at: 0, list: [] };
-async function opencodeModels(): Promise<Opt[]> {
-  if (Date.now() - ocModels.at < 10 * 60_000 && ocModels.list.length) return ocModels.list;
-  try {
-    const p = Bun.spawn(["opencode", "models"], { stdout: "pipe", stderr: "ignore", env: { ...process.env, NO_COLOR: "1" } });
-    const t = setTimeout(() => p.kill(), 15_000);
-    const out = await new Response(p.stdout).text();
-    clearTimeout(t);
-    const list = out.split("\n").map((l) => l.trim()).filter((l) => /^[\w.-]+\/[\w.:/@-]+$/.test(l)).map((v) => ({ v }));
-    if (list.length) ocModels = { at: Date.now(), list };
-  } catch {}
-  return ocModels.list;
-}
 
 function codexChoices() {
   let models: Opt[] = [], defModel = "", defEffort = "";
@@ -35,22 +23,30 @@ function codexChoices() {
   return { models, defModel, defEffort };
 }
 
-async function agentChoices() {
+/** `oc` is injectable so a test needn't run OpenCode. `models` stays the flat list (with "Default" first); `providers`
+ *  is the same models grouped for the page's picker. */
+export async function agentChoices(oc: { get(): Promise<OpencodeCatalog> } = opencodeCatalog) {
   const cx = codexChoices();
+  const ocat = await oc.get();
+  const claude = [claudeProvider()], codex = [codexProvider(cx.models)];
   return {
     claude: {
-      models: [{ v: "", l: "Default" }, { v: "fable", l: "Fable" }, { v: "opus", l: "Opus" }, { v: "sonnet", l: "Sonnet" }, { v: "haiku", l: "Haiku" }],
+      models: [{ v: "", l: "Default" }, ...flatModels(claude)],
+      providers: claude,
       efforts: ["low", "medium", "high", "xhigh", "max"],
       modes: [{ v: "", l: "Ask first" }, { v: "acceptEdits", l: "Accept edits" }, { v: "auto", l: "Auto" }, { v: "plan", l: "Plan only" }, { v: "bypassPermissions", l: "Skip all checks" }],
     },
     codex: {
       models: [{ v: "", l: `Default${cx.defModel ? ` (${cx.defModel})` : ""}` }, ...cx.models],
+      providers: codex,
       efforts: [...new Set(cx.models.flatMap((m) => m.efforts ?? []))],
       defaultEffort: cx.defEffort,
       modes: [{ v: "", l: "Default" }, { v: "read-only", l: "Read only" }, { v: "workspace-write", l: "Workspace write" }, { v: "yolo", l: "No sandbox, no approvals" }],
     },
     opencode: {
-      models: [{ v: "", l: "Default" }, ...(await opencodeModels())],
+      models: [{ v: "", l: "Default" }, ...flatModels(ocat.providers)],
+      providers: ocat.providers,
+      ...(ocat.error ? { error: ocat.error } : {}),
       efforts: [],
       modes: [{ v: "", l: "Build (default)" }, { v: "plan", l: "Plan" }],
     },

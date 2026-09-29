@@ -50,13 +50,18 @@ describe("which subagents are running", () => {
   });
   test("the same answers from the cache, and time still moves them: an open call waits up to 30 minutes, a quiet one 45 s", async () => {
     expect(await running()).toEqual({ bglong: true, bgdone: false, fgrun: true, fgret: false });
-    expect(await running(NOW + 20 * MIN)).toMatchObject({ bglong: true, fgrun: false });
-    expect(await running(NOW + 26 * MIN)).toMatchObject({ bglong: false });
+    // fgrun's parent call is still open, so it may be deep in a long command too.
+    expect(await running(NOW + 20 * MIN)).toMatchObject({ bglong: true, fgrun: true });
+    expect(await running(NOW + 26 * MIN)).toMatchObject({ bglong: false, fgrun: true }); // bglong has been quiet 31 minutes
+    expect(await running(NOW + 31 * MIN)).toMatchObject({ fgrun: false });
   });
   test("the rule on its own", () => {
-    const base = { ended: false, pending: false, background: true, callDone: true, quietMs: 10_000 };
-    expect(subRunning(base)).toBe(true); // the parent's call closing means nothing for a background agent
+    const base = { ended: false, pending: false, background: true, call: "done" as const, quietMs: 10_000 };
+    expect(subRunning(base)).toBe(true); // a background launch can read as a closed call
     expect(subRunning({ ...base, background: false })).toBe(false);
+    expect(subRunning({ ...base, call: "error" })).toBe(false); // killed or failed
+    expect(subRunning({ ...base, background: false, call: "running", quietMs: 10 * MIN })).toBe(true); // the parent still waits on it
+    expect(subRunning({ ...base, call: undefined, quietMs: 10 * MIN })).toBe(false);
     expect(subRunning({ ...base, quietMs: 50_000 })).toBe(false);
     expect(subRunning({ ...base, quietMs: 50_000, pending: true })).toBe(true);
     expect(subRunning({ ...base, quietMs: 31 * MIN, pending: true })).toBe(false);

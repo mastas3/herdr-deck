@@ -64,6 +64,7 @@ export type Row = {
   procs: number;
   command?: string;
   sessionId?: string;
+  movedFrom?: string[]; // earlier ids of a Claude session that moved to a new transcript
   resume?: string;
   tail: string[];
   cols?: number;
@@ -540,6 +541,7 @@ export class Deck {
           procs: usage.count,
           command: p.agent ? agentProc?.cmdline : lead?.cmdline,
           sessionId: meta?.sessionId ?? p.agent_session?.value,
+          movedFrom: meta?.movedFrom,
           resume: resumeCommand(p.agent, meta?.sessionId ?? p.agent_session?.value),
           tail: s.tails.get(p.pane_id) ?? [],
           cols: rects.get(p.pane_id)?.width,

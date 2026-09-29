@@ -26,10 +26,9 @@
 .stmi .ib svg { width: 15px; height: 15px; }
 .stmi .ib:hover { color: var(--ink); background: var(--hover); }
 .stmh { padding: 8px 10px; margin: 0; }
-.steng { position: relative; display: inline-flex; align-items: center; min-width: 0; flex: 0 1 230px; }
-.steng select { appearance: none; -webkit-appearance: none; border: 1px solid var(--line); background: var(--raise); color: var(--ink-2); border-radius: 10px; padding: 6px 28px 6px 10px; font: 500 13.5px var(--read); width: 100%; min-width: 0; text-overflow: ellipsis; cursor: pointer; }
-.steng select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.steng svg { position: absolute; right: 8px; width: 13px; height: 13px; pointer-events: none; color: var(--ink-3); }
+.steng { display: inline-flex; min-width: 0; flex: 0 1 230px; }
+.steng .mp { width: 100%; }
+.steng .mp-btn { padding: 6px 10px; border-radius: 10px; border-color: var(--line); background: var(--raise); color: var(--ink-2); font: 500 13.5px var(--read); }
 .stnew { border-radius: 10px; padding: 6px 11px; }
 .stnew svg { width: 13px; height: 13px; }
 /* the log */
@@ -255,7 +254,6 @@ button.ming:active { transform: scale(.95); }
   .stbubble, .stuse { max-width: 88%; }
   .stcomp { margin: 0 -6px; }
   .steng { flex-basis: 150px; }
-  .steng select { padding-right: 24px; }
   .stnew span { display: none; }
   .stconvb .stct { max-width: 32vw; }
   .stbuild { padding: 14px; border-radius: 16px; }

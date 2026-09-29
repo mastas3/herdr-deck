@@ -27,11 +27,15 @@ function stBarHTML() {
   const convos = st.home?.convos ?? [];
   const title = cur?.messages?.length ? cur.title || "Untitled" : "New conversation";
   const e = S.disc.mix.engines ?? st.home?.engines;
-  const opts = [["claude:haiku", "Claude Haiku · fast", e && !e.claude], ["claude:sonnet", "Claude Sonnet · deeper", e && !e.claude], ...(e?.ollama ?? []).map((x) => [`ollama:${x}`, `Ollama · ${x} · private`]), ["template", "Templates · instant, offline"]];
-  if (!opts.some(([v]) => v === st.engine)) opts.push([st.engine, st.engine]);
+  const off = e && !e.claude ? "Claude Code isn't installed here" : "";
+  modelPickerSet("studio-engine", { label: "Engine", compact: true, value: st.engine, onChange: (v) => { S.studio.engine = v; store("studioEngine", v); }, providers: [
+    { id: "claude", label: "Claude", off, models: [{ v: "claude:haiku", l: "Claude Haiku", note: "fast" }, { v: "claude:sonnet", l: "Claude Sonnet", note: "deeper" }] },
+    ...(e?.ollama?.length ? [{ id: "ollama", label: "Ollama", models: e.ollama.map((x) => ({ v: `ollama:${x}`, l: x, note: "private" })) }] : []),
+    { id: "template", label: "Templates", models: [{ v: "template", l: "Templates", note: "instant, offline" }] },
+  ] });
   return `<div class="stconv"><button class="stconvb" data-stmenu aria-expanded="${st.menu}" aria-haspopup="menu" title="Your conversations">${ICON.chat}<span class="stct">${esc(title)}</span>${convos.length ? `<span class="n">${convos.length}</span>` : ""}${ICON.chev}</button>${st.menu ? stMenuHTML(convos) : ""}</div>
     <span class="spacer"></span>
-    <label class="steng"><span class="sr">Engine</span><select data-steng aria-label="Engine">${opts.map(([v, l, dis]) => `<option value="${esc(v)}"${v === st.engine ? " selected" : ""}${dis ? " disabled" : ""}>${esc(l)}</option>`).join("")}</select>${ICON.chev}</label>
+    <div class="steng">${modelPickerHTML("studio-engine")}</div>
     <button class="btn sm stnew" data-stnew ${cur?.messages?.length ? "" : "disabled"} title="Start a new conversation">${ICON.plus}<span>New</span></button>`;
 }
 function stMenuHTML(convos) {

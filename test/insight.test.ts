@@ -1,7 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { claudeDetail, prettyTool, toolSummary } from "../src/transcript";
+import { claudeDetail, claudeSubagents, forgetTranscript, prettyTool, toolSummary } from "../src/transcript";
 import { inferProject } from "../src/projects";
 import { agentArgs } from "../src/args";
 
@@ -42,6 +42,42 @@ describe("chat messages", () => {
       line({ type: "assistant", timestamp: "2026-09-20T10:00:05Z", message: { id: "a1", content: [{ type: "tool_use", id: "t1", name: "TodoWrite", input: { todos: "[]" } }] } }));
     const d = await claudeDetail(path);
     expect(d.messages.map((m) => m.role)).toEqual(["user", "tool"]);
+  });
+
+  test("a message sent while Claude works shows; a task's notice doesn't, and closes its call", async () => {
+    const path = `${tmp()}/s.jsonl`;
+    const queued = (prompt: string, kind: string | undefined, mode: string, t: string) =>
+      line({ type: "attachment", timestamp: t, attachment: { type: "queued_command", prompt, commandMode: mode, ...(kind ? { origin: { kind } } : {}) } });
+    writeFileSync(path,
+      line({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: "Review it" } }) +
+      line({ type: "assistant", timestamp: "2026-09-20T10:00:05Z", message: { id: "a1", content: [{ type: "tool_use", id: "t1", name: "Agent", input: { description: "Review", subagent_type: "general-purpose", run_in_background: true } }] } }) +
+      line({ type: "user", timestamp: "2026-09-20T10:00:06Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "launched" }] }, toolUseResult: { status: "async_launched", agentId: "ab12" } }) +
+      queued("status?", "human", "prompt", "2026-09-20T10:01:00Z") +
+      queued("<task-notification>\n<task-id>ab12</task-id>\n<tool-use-id>t1</tool-use-id>\n<status>completed</status>\n</task-notification>", undefined, "task-notification", "2026-09-20T10:02:00Z"));
+    const d = await claudeDetail(path);
+    expect(d.messages.map((m) => m.text ?? m.tool)).toEqual(["Review it", "Agent", "status?"]);
+    expect(d.messages[1]).toMatchObject({ sub: "ab12", state: "done" });
+  });
+
+  test("a subagent busy in a long command still shows as running while its call is open", async () => {
+    const dir = tmp();
+    const path = `${dir}/s.jsonl`;
+    writeFileSync(path,
+      line({ type: "user", timestamp: "2026-09-20T10:00:00Z", message: { content: "Merge" } }) +
+      line({ type: "assistant", timestamp: "2026-09-20T10:00:05Z", message: { id: "a1", content: [{ type: "tool_use", id: "t1", name: "Agent", input: { description: "Merge", run_in_background: true } }] } }) +
+      line({ type: "user", timestamp: "2026-09-20T10:00:06Z", message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "launched" }] }, toolUseResult: { status: "async_launched", agentId: "ab12" } }));
+    mkdirSync(`${dir}/s/subagents`, { recursive: true });
+    const sub = `${dir}/s/subagents/agent-ab12.jsonl`;
+    writeFileSync(`${dir}/s/subagents/agent-ab12.meta.json`, JSON.stringify({ agentType: "general-purpose", description: "Merge", toolUseId: "t1" }));
+    writeFileSync(sub, line({ type: "user", timestamp: "2026-09-20T10:00:06Z", message: { content: "Merge" } }) +
+      line({ type: "assistant", timestamp: "2026-09-20T10:00:07Z", message: { content: [{ type: "tool_use", id: "x", name: "Bash", input: { command: "bun test" } }] } }));
+    const fiveMinAgo = new Date(Date.now() - 5 * 60_000);
+    utimesSync(sub, fiveMinAgo, fiveMinAgo);
+    expect((await claudeSubagents(path, await claudeDetail(path)))[0].running).toBe(true);
+    // Its notice arrives: the same (unchanged) subagent file now reads as finished.
+    appendFileSync(path, line({ type: "attachment", timestamp: "2026-09-20T10:09:00Z", attachment: { type: "queued_command", commandMode: "task-notification", prompt: "<task-notification>\n<tool-use-id>t1</tool-use-id>\n<status>completed</status>\n</task-notification>" } }));
+    forgetTranscript(path);
+    expect((await claudeSubagents(path, await claudeDetail(path)))[0].running).toBe(false);
   });
 
   test("a message that starts with a paste shows, without the paste tags", async () => {
