@@ -42,8 +42,8 @@ export async function repoRoot(dir: string): Promise<string | undefined> {
   return top || undefined;
 }
 
-/** A file's badge: M changed, A added, D deleted, R renamed, ? new (untracked), U conflict. */
-export type Badge = "M" | "A" | "D" | "R" | "?" | "U";
+import type { Badge } from "../../src/git-diff";
+export type { Badge };
 export type StatusEntry = { path: string; st: Badge; old?: string; staged: boolean };
 
 /** `git status --porcelain=v1 -z`: "XY path\0" (+ "orig\0" after a rename or copy). */

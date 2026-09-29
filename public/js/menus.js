@@ -85,6 +85,7 @@ function moreMenu(anchor) {
     r.status !== "working" && r.status !== "blocked" && { html: "Continue in herdr<small>Resume with the Codex CLI in a terminal</small>", run: () => codexAct("codex-resume", r) },
     r.projectRoot && { html: "Verify this project", run: () => verifyRow(r, true) },
     projectHome(r.project) && { html: `New session in ${esc(r.project)}`, run: () => openNew(projectHome(r.project)) },
+    ...wtMenuItems(r),
     { html: "Copy folder path", run: () => copy(r.cwd, "path") },
     { html: "Copy link", run: () => copy(linkUrl(r), "link") },
     { html: "Copy resume command", run: () => copy(r.resume, "resume command") },
@@ -103,6 +104,7 @@ function moreMenu(anchor) {
     !isPhone() && { html: "Type into the terminal<small>t</small>", run: () => focusTerminal() },
     { html: "Servers…<small>Open, share or preview what it runs</small>", run: () => openInspector("ports") },
     { html: "Home: what’s running now<small>Esc</small>", run: goHome },
+    ...wtMenuItems(r), // its worktree: merge, pull request, keep, remove
     ...deckPlugins.each("session.menu", r, anchor).flat(), // plugins' items for this session: { html, run, danger? }
     "-",
     { html: "Close session…", danger: true, run: () => askClose([r.key]) },

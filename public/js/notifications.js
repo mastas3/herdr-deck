@@ -216,9 +216,9 @@ function autoCards() {
     const sec = (label, all, n, extra = "", max = cap) => { const list = all.slice(0, max); return n ? `<div class="dgs"><h5>${label} <span class="n">${n}</span>${extra}</h5>${list.length ? `<div class="dgl">${list.map((x) => it(x)).join("")}${n > list.length ? `<span class="hint">+${n - list.length} more</span>` : ""}</div>` : ""}</div>` : ""; };
     const idleLive = (dg.idle ?? []).filter((x) => rowOf(x.key));
     out += `<div class="acard digest" data-acard="digest"><div class="ah"><span class="ai">${ICON.sun}</span><b>Morning digest</b><span class="hint">${esc(new Date(dg.at).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }))}<span class="desk"> · since yesterday 18:00</span></span><span class="spacer"></span><button class="ib" data-auto="dismissDigest" aria-label="Dismiss the digest" title="Dismiss">${ICON.x}</button></div>
-      ${dg.counts.waiting + dg.counts.finished + dg.counts.running + dg.counts.idle === 0 ? `<p class="hint">Quiet night: nothing finished, nothing waiting.</p>` : ""}
+      ${dg.counts.waiting + dg.counts.finished + dg.counts.running + dg.counts.idle + wtStaleNow(dg).length === 0 ? `<p class="hint">Quiet night: nothing finished, nothing waiting.</p>` : ""}
       ${sec("Waiting on you", dg.waiting, dg.counts.waiting)}${sec("Finished since last evening", dg.finished, dg.counts.finished)}${sec("Still running", dg.running, dg.counts.running)}
-      ${sec("Idle for 3+ days", dg.idle, dg.counts.idle, idleLive.length ? `<button class="btn sm" data-auto="closeIdle">Close these…</button>` : "", isPhone() ? 0 : 6)}</div>`;
+      ${sec("Idle for 3+ days", dg.idle, dg.counts.idle, idleLive.length ? `<button class="btn sm" data-auto="closeIdle">Close these…</button>` : "", isPhone() ? 0 : 6)}${wtStaleHTML(dg)}</div>`;
   }
   const snoozed = new Set(load("emptySnooze", []));
   const keys = (A.empty?.keys ?? []).filter((k) => { const r = rowOf(k); return r && inScope(r) && r.empty; });
@@ -239,6 +239,7 @@ $("dbody").addEventListener("click", async (e) => {
     else if (act === "closeEmpty") askClose(emptyKeys());
     else if (act === "snoozeEmpty") { store("emptySnooze", emptyKeys()); bodySig = ""; render(); }
     else if (act === "closeIdle") askClose((S.auto?.digest?.idle ?? []).map((x) => x.key).filter((k) => rowOf(k)));
+    else if (act === "cleanWt") wtCleanStale();
   } catch (x) { toast(x.message, true); }
 }, true);
 const RULES = [

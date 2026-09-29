@@ -126,6 +126,7 @@ $("detail").addEventListener("click", (e) => {
   const r = rowOf(S.sel);
   if (!r) return;
   if (act === "journey") return projectLink()?.open(r.project);
+  if (act === "worktree") return openMenu(b, wtMenuItems(r), `Worktree · ${r.branch ?? r.worktree}`);
   if (act === "tools") openToolMenu(b);
   if (act === "share") shareRow(r, Number(b.dataset.port));
   if (act === "unshare") unshareRow(r, Number(b.dataset.port));

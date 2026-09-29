@@ -9,6 +9,9 @@ import type { Graves } from "./config";
 import { AGENT_KINDS } from "./new-session";
 import type { CodexControl } from "../codex-control";
 import { codexUploadImages } from "./codex";
+import { isShellOnly } from "../tail";
+import { installCommand } from "../wt-git";
+import { discardWorktree, makeWorktree } from "../wt-create";
 
 type SendOptions = { requestId?: string; onlyIdle?: boolean };
 /** Where to reopen a session (a graveyard entry, or a crash-guard snapshot's pane). */
@@ -77,6 +80,20 @@ export function createSessions(o: Deps) {
     }
   }
 
+  /** Resolves once a command typed into the pane has finished: only the shell is in front again (15 minutes at most). */
+  async function waitForShell(socket: string, paneId: string, timeoutMs = 15 * 60_000) {
+    const start = Date.now();
+    let seen = false, idle = 0;
+    while (Date.now() - start < timeoutMs) {
+      await Bun.sleep(1000);
+      const r = await call(socket, "pane.process_info", { pane_id: paneId }).catch(() => null);
+      const shellOnly = isShellOnly(r?.process_info?.foreground_processes);
+      if (!shellOnly) { seen = true; idle = 0; continue; }
+      // A command that never showed up in front (it was that quick) counts as done after a few seconds.
+      if (++idle >= 2 && (seen || Date.now() - start > 4000)) return;
+    }
+  }
+
   /**
    * Opens a tab where a session used to be and resumes it there: the Closed list's Reopen, and plugins (crash-guard
    * restores many this way). Its workspace by id, else by name; when neither exists any more and `createWorkspace` is
@@ -122,7 +139,7 @@ export function createSessions(o: Deps) {
   async function startSession(body: any) {
     const kind = String(body.kind ?? "claude");
     if (kind !== "shell" && !AGENT_KINDS.has(kind)) throw new Error(`unknown agent "${kind}"`);
-    const cwd = String(body.cwd ?? "").replace(/^~(?=\/|$)/, homedir());
+    let cwd = String(body.cwd ?? "").replace(/^~(?=\/|$)/, homedir());
     try {
       if (!statSync(cwd).isDirectory()) throw 0;
     } catch {
@@ -130,9 +147,16 @@ export function createSessions(o: Deps) {
     }
     const sess = deck.sessions.get(body.herdr) ?? [...deck.sessions.values()].find((s) => s.online);
     if (!sess?.online) throw new Error("no herdr server running");
+    // Own worktree: made before the tab, and taken away again if the tab can't be opened in it.
+    const wt = body.worktree?.branch ? await makeWorktree(cwd, body.worktree) : undefined;
+    if (wt) cwd = wt.cwd;
+    // Only the command the lockfile calls for, never text from the request.
+    const install = wt && body.worktree.install ? installCommand(wt.path)?.cmd : undefined;
     const ws = body.workspaceId ?? sess.snap?.focused_workspace_id ?? null;
     const label = String(body.label ?? "").trim() || cwd.split("/").pop() || kind;
-    const r = await call(sess.socket, "tab.create", { cwd, label, workspace_id: ws, focus: false });
+    let r;
+    try { r = await call(sess.socket, "tab.create", { cwd, label, workspace_id: ws, focus: false }); }
+    catch (e) { if (wt) await discardWorktree(wt); throw e; }
     const paneId: string = r.root_pane?.pane_id;
     const key = `${sess.name}/${paneId}`;
     await deck.kick(sess.name);
@@ -140,6 +164,13 @@ export function createSessions(o: Deps) {
     // The rest waits on a slow shell and the agent's own startup; report progress over SSE.
     (async () => {
       try {
+        if (install) {
+          notice({ key, ok: true, message: `Waiting for the shell in “${label}”…` });
+          await waitForPrompt(sess.socket, paneId, 30_000);
+          notice({ key, ok: true, message: `Installing dependencies in the worktree (${install})…` });
+          await call(sess.socket, "pane.send_input", { pane_id: paneId, text: install, keys: ["enter"] });
+          await waitForShell(sess.socket, paneId);
+        }
         if (kind !== "shell") {
           notice({ key, ok: true, message: `Waiting for the shell in “${label}”…` });
           await waitForPrompt(sess.socket, paneId, 30_000);
@@ -186,7 +217,7 @@ export function createSessions(o: Deps) {
       }
       await deck.kick(sess.name);
     })();
-    return { key, paneId };
+    return { key, paneId, ...(wt ? { worktree: { path: wt.path, branch: wt.branch, base: wt.base, cwd: wt.cwd } } : {}) };
   }
 
   async function sendText(key: string, text: string, options: SendOptions = {}) {

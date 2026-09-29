@@ -15,6 +15,11 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
   is called from `server.ts` at its place in startup. `src/deck.ts` builds the session rows from herdr's socket
   (`src/herdr.ts`). Transcripts come from `src/agents.ts` / `src/transcript.ts` (Claude Code JSONL, Codex rollouts,
   OpenCode SQLite). `src/federation.ts` is the hub-to-node tunnel. `src/mcp.ts` is the MCP endpoint.
+- Worktrees the deck makes for a session ("Own worktree" in New session) live in `src/wt-*.ts`: `wt-git.ts` (git
+  plumbing, branch names, .env files, install command), `wt-create.ts` (the dialog's plan, making one and undoing it
+  on failure), `wt-ops.ts` (status, diff, fast-forward merge, remove with a stash, restore), `wt-pr.ts`, `wt-stale.ts`
+  (the weekly digest line) and `wt-store.ts` (base branch, .env links, kept); the API is `src/http/worktrees.ts`
+  and the page side `public/js/worktree*.js`. The deck only fast-forwards; anything else goes to the agent.
 - `src/plugin-format.ts` (manifest validator), `src/plugin-trust.ts` (trust screen, update diff) and `src/plugins.ts`
   (staging, install, catalog) are **data plugins**: data-only packages, never code. Built-in ones live in
   `plugins-catalog/`. The design is `docs/superpowers/specs/2026-09-26-plugins-design.md`.

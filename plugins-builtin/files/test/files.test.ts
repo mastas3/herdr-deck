@@ -4,7 +4,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { claudeDetail, codexDetail } from "../../../src/transcript";
-import { addedDiff, parseDiff, parseNameStatus, parseNumstat } from "../diff";
+import { addedDiff, parseDiff, parseNameStatus, parseNumstat } from "../../../src/git-diff";
 import { listFiles, parseStatus, status } from "../git";
 import { inside, safeRoot } from "../safe";
 import { touchedList, touchedPaths } from "../touched";

@@ -232,6 +232,6 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const rc = radarChip(r);
   if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}${machIcon(r)}${subs}</span>${agoEl}${line}${rowAsk(r)}`;
   // Grouped by project, a worktree has its own sub-section; in the priority list the row says so itself.
-  const wt = r.worktree ? `<span class="via wtag" title="In the worktree ${esc(r.worktree)}${r.branch ? ` (${esc(r.branch)})` : ""}">${ICON.tree}${esc(r.worktree)}</span>` : "";
+  const wt = r.worktree ? `<span class="via wtag" title="In the worktree ${esc(r.worktree)}${r.branch ? ` on the branch ${esc(r.branch)}` : ""}">${ICON.tree}${esc(r.branch || r.worktree)}</span>` : "";
   return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${wt}${machIcon(r)}${subs}${rc}</span>${agoEl}${title}${line}${rowAsk(r)}`;
 }

@@ -1,6 +1,7 @@
-// Parsing git's diff output for the Changes tab: which files changed (--name-status), by how much (--numstat), and
-// one file's unified diff as numbered lines the page draws as is.
-import type { Badge } from "./git";
+// Parsing git's diff output, for the Files plugin's Changes tab and the worktree actions: which files changed
+// (--name-status), by how much (--numstat), and one file's unified diff as numbered lines the page draws as is.
+/** A file's badge: M changed, A added, D deleted, R renamed, ? new (untracked), U conflict. */
+export type Badge = "M" | "A" | "D" | "R" | "?" | "U";
 
 export type FileStat = { add?: number; del?: number; bin?: boolean };
 
