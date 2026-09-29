@@ -49,6 +49,7 @@ export function createCodePluginApi(o: { host: PluginHost; root: string; broadca
     // Reviews nobody installed within the hour go.
     for (const f of readdirSync(stageDir)) if (f.startsWith("code-")) try { if (Date.now() - lstatSync(join(stageDir, f)).mtimeMs > 3600_000) rmSync(join(stageDir, f), { recursive: true, force: true }); } catch {}
     const staged = `code-${randomUUID()}`, dir = join(stageDir, staged);
+    let keep = false; // only a review the trust screen can install stays staged
     try {
       await fill(dir);
       writeFileSync(`${dir}.from.json`, JSON.stringify(from));
@@ -64,15 +65,14 @@ export function createCodePluginApi(o: { host: PluginHost; root: string; broadca
       if (o.dataPluginIds().includes(m.id)) return { ok: false as const, problems: [{ path: "id", message: `A data plugin called ${m.id} is installed` }] };
       const old = o.host.installed().find((x) => x.id === m.id);
       const known = new Set(o.host.entries().map((e) => e.id));
+      keep = true;
       return {
         ok: true as const, staged, hash: hashOf(files), from, trust: TRUST_LINE,
         manifest: m, files: Object.keys(files).map((path) => ({ path, bytes: statSync(join(dir, path)).size })),
         update: old ? { fromVersion: old.version } : null, missing: m.requires.filter((d) => !known.has(d)),
       };
-    } catch (e) {
-      rmSync(dir, { recursive: true, force: true });
-      rmSync(`${dir}.from.json`, { force: true });
-      throw e;
+    } finally {
+      if (!keep) { rmSync(dir, { recursive: true, force: true }); rmSync(`${dir}.from.json`, { force: true }); }
     }
   }
   function fromFolder(folder: string) {
@@ -112,6 +112,9 @@ export function createCodePluginApi(o: { host: PluginHost; root: string; broadca
     rmSync(`${dir}.from.json`, { force: true });
     await o.host.record({ id: m.id, name: m.name, version: m.version, from, files, hash: hashOf(files), approvedAt: Date.now() });
     changed();
+    // Whether it started, so the trust screen can say why not (say, an MCP tool named like one of the deck's own).
+    const e = o.host.entries().find((x) => x.id === m.id);
+    return { ...list(), started: { id: m.id, state: e?.state, error: e?.error } };
   }
   async function remove(id: string) {
     if (!o.host.installed().some((x) => x.id === id)) throw new Error("Only installed plugins can be removed; built-ins can be turned off.");
@@ -129,7 +132,7 @@ export function createCodePluginApi(o: { host: PluginHost; root: string; broadca
         if (body?.review) return review(String(body.review));
         if (body?.git) return fromGit(String(body.git).trim(), String(body.commit ?? "").trim());
         return fromFolder(String(body?.folder ?? "").trim());
-      case "/api/plugins/code/install": await install(body); return list();
+      case "/api/plugins/code/install": return install(body);
       case "/api/plugins/code/remove": await remove(String(body?.id ?? "")); return list();
     }
     return undefined;

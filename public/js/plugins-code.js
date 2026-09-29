@@ -79,6 +79,8 @@ async function codeDo(path, body) {
   S.plug.busy = true;
   try {
     S.plug.code = await api(path, body);
+    const st = S.plug.code.started;
+    if (st?.state === "failed") toast(`${st.id} didn’t start: ${st.error ?? "see its card"}`, true);
     const now = S.plug.code.plugins.filter((p) => p.state === "on").map((p) => p.id);
     if (now.join() !== (S.plugins?.active ?? []).join()) { toast("Reloading with the change…"); return setTimeout(() => location.reload(), 300); }
   } catch (e) { toast(e.message, true); }

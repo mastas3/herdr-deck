@@ -49,6 +49,8 @@ const TOOLS = [
   { name: "deck_start", description: "Start a new agent session in a herdr tab (claude, codex or opencode) in a folder, optionally with a first prompt. It starts in the agent's normal permission mode; skip-permission modes can't be requested here.",
     inputSchema: { type: "object", properties: { agent: { type: "string", enum: ["claude", "codex", "opencode"] }, cwd: { type: "string" }, prompt: { type: "string" }, model: { type: "string" }, effort: { type: "string" }, machine: { type: "string" }, label: { type: "string" } }, required: ["agent", "cwd"] } },
 ];
+/** The deck's own tool names: a plugin's "mcp.tools" contribution can't take one (src/plugin-host.ts refuses it). */
+export const CORE_TOOL_NAMES: ReadonlySet<string> = new Set(TOOLS.map((t) => t.name));
 
 const text = (v: unknown) => ({ content: [{ type: "text", text: typeof v === "string" ? v : JSON.stringify(v, null, 1) }] });
 

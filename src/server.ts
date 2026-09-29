@@ -157,7 +157,7 @@ deck.onPatch(dec.scheduleDecisions);
 setInterval(dec.scheduleDecisions, 10_000);
 sse.startPing();
 
-const { assets, page } = createPage({ dev: DEV, fullState, plugins: () => pluginHost.assets() });
+const { assets, page } = createPage({ dev: DEV, fullState, plugins: () => pluginHost.assets(), distrust: (id, file) => void pluginHost.distrust(id, file) });
 const queue = startQueue({ dataDir: DATA_DIR, broadcast, allRows, sendAny: sessions.sendAny });
 const mcp = createMcp({
   selfId: SELF.id, remotes, allRows, localRow: hosts.localRow, machineLabelOf, detailFor: chat.detailFor, searchLocal: chat.searchLocal,
@@ -173,6 +173,8 @@ const hub: Hub = {
 };
 // Plugins start before the port opens, so their routes exist for the first request.
 await pluginHost.start();
+// Installed plugins' files, re-checked against what you approved (cheap: only files whose size or mtime moved are hashed).
+setInterval(() => void pluginHost.checkInstalled(), 30_000).unref();
 // Plugin dev mode: an edited plugin restarts in place and the page reloads (src/plugin-dev.ts).
 if (DEV && process.env.DECK_PLUGIN_DEV) watchPlugins({ host: pluginHost, dirs: [BUILTIN_DIR, ...DEV_PLUGIN_DIRS], onReload: (dev) => broadcast("plugins", { active: pluginHost.active(), dev }) });
 const serveOptions = { hostname: HOST, port: PORT, idleTimeout: 0, fetch: createRoutes(hub).fetch };

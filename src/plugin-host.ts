@@ -7,6 +7,8 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join, relative } from "node:path";
 import { parseCodeManifest, type CodeManifest } from "./plugin-code-format";
 import { loadCodeState, saveCodeState, treeChanged, type CodeState } from "./plugin-code-store";
+import { approvedCopy, forgetCopies, treeChangedCached } from "./plugin-approved";
+import { CORE_TOOL_NAMES } from "./mcp";
 import type { Activate, Contribution, Deactivate, Host, PointName, RouteHandler } from "./plugin-api";
 
 export type PluginStatus = "on" | "off" | "failed" | "hub-only" | "changed" | "invalid";
@@ -22,6 +24,8 @@ export type Entry = {
   id: string; dir: string; builtin: boolean; manifest?: CodeManifest; problems?: string; state: PluginStatus; error?: string; run?: Runtime; mod?: { activate?: Activate };
   /** From a dev folder (DECK_DEV_PLUGINS): runs like a built-in, never installed or trust-checked. */
   dev?: boolean; fault?: Fault;
+  /** An installed plugin's verified copy of its approved files, which its server side runs from (src/plugin-approved.ts). */
+  runDir?: string; modFrom?: string;
 };
 /** The frames of an error's stack that are in the plugin's own folder, as "file:line:col" relative to it. */
 export function framesIn(err: unknown, dir: string): string[] {
@@ -35,6 +39,7 @@ export function framesIn(err: unknown, dir: string): string[] {
 }
 
 /** SSE events the page already uses: a plugin can't send these. */
+const CHANGED = "Its files changed since you approved them";
 const CORE_EVENTS = new Set(["full", "stale", "ready", "patch", "procs", "queue", "graveyard", "history", "usage", "jev", "radar", "decisions", "auto", "audit", "notice", "plugins"]);
 
 export function createPluginHost(o: { builtinDir: string; root: string; dataDir: string; core: CoreCaps; reservedState?: string[]; log?: (s: string) => void; builtinsOn?: boolean; devDirs?: string[] }) {
@@ -107,7 +112,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     if (cyclic.has(e.id)) return { state: "failed", error: "Its dependencies need each other (a cycle)" };
     if (!e.builtin) {
       const rec = st.installed.find((x) => x.id === e.id);
-      if (!rec || treeChanged(e.dir, rec.files)) return { state: "changed", error: "Its files changed since you approved them" };
+      if (!rec || treeChanged(e.dir, rec.files)) return { state: "changed", error: CHANGED };
     }
     if (e.manifest.machine !== "any" && o.core.isNode()) return { state: "hub-only" };
     const missing = e.manifest.requires.filter((d) => !running.has(d));
@@ -133,13 +138,21 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   const ACTIVATE_MS = Number(process.env.DECK_PLUGIN_START_MS) || 15_000;
   async function activate(e: Entry) {
     const m = e.manifest!;
+    if (!e.builtin) {
+      // Checked again right before its code loads: every file, server modules included, must be the approved bytes.
+      const rec = st.installed.find((x) => x.id === e.id);
+      e.runDir = rec && approvedCopy(o.root, e.id, e.dir, rec.files);
+      if (!e.runDir) { e.state = "changed"; e.error = CHANGED; e.mod = undefined; log(`plugin ${e.id}: ${CHANGED}; not started`); return; }
+    }
     const r: Runtime = { stops: [], timers: new Set(), routes: [], services: [], contribs: [] };
     e.run = r; e.error = undefined; e.fault = undefined;
     try {
       if (m.server) {
-        // An installed plugin's approved files are imported under their hash, so a re-approved change loads fresh.
-        const rev = e.builtin ? (devRev.get(e.id) ? `?dev=${devRev.get(e.id)}` : "") : `?v=${st.installed.find((x) => x.id === e.id)?.hash ?? ""}`;
-        e.mod ??= await import(join(e.dir, m.server) + rev);
+        // Installed: from the approved copy, a new folder per approval, so an update loads all of its modules fresh.
+        const from = join(e.runDir ?? e.dir, m.server) + (devRev.get(e.id) ? `?dev=${devRev.get(e.id)}` : "");
+        if (e.modFrom !== from) e.mod = undefined;
+        e.mod ??= await import(from);
+        e.modFrom = from;
         if (typeof e.mod?.activate !== "function") throw new Error(`${m.server} doesn't export activate(host)`);
         // A plugin that never finishes starting must not hold up the deck (it starts before the server listens).
         let t: ReturnType<typeof setTimeout> | undefined;
@@ -177,7 +190,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     const safe = (what: string, fn: () => unknown) => { if (e.run !== r) return; try { Promise.resolve(fn()).catch((err) => failed(what, err)); } catch (err: any) { failed(what, err); } };
     const providerOf = (name: string) => [...entries.values()].find((x) => x.manifest?.provides.includes(name));
     return {
-      id, dir: e.dir, dataDir: o.dataDir,
+      id, dir: e.runDir ?? e.dir, dataDir: o.dataDir,
       env: (name) => process.env[name],
       log: (msg) => log(`${id}: ${msg}`),
       routes(prefix, handler) {
@@ -238,6 +251,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     if (point === "digest.lines" && (typeof c?.title !== "string" || typeof c.lines !== "function")) bad("needs { title, lines }");
     if (point === "mcp.tools") {
       if (typeof c?.name !== "string" || typeof c.call !== "function" || !c.inputSchema) bad("needs { name, description, inputSchema, call }");
+      if (CORE_TOOL_NAMES.has(c.name)) bad(`${c.name} is one of the deck's own MCP tools; give yours another name`);
       if (contributions("mcp.tools").some((x) => x.name === c.name)) bad(`the tool ${c.name} is taken`);
     }
     if (point === "tools.entries" && (typeof c?.id !== "string" || typeof c.label !== "string")) bad("needs a tool with an id and a label");
@@ -248,7 +262,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   }
 
   /** The plugin's folder as given and as the module loader sees it (a symlinked folder resolves). */
-  const dirsOf = (e: Entry) => { try { return [...new Set([e.dir, realpathSync(e.dir)])]; } catch { return [e.dir]; } };
+  const dirsOf = (e: Entry) => [e.dir, ...(e.runDir ? [e.runDir] : [])].flatMap((d) => { try { return [d, realpathSync(d)]; } catch { return [d]; } }).filter((d, i, a) => a.indexOf(d) === i);
   function fault(e: Entry, err: any, what: string) {
     const where = dirsOf(e).map((d) => framesIn(err, d)).find((w) => w.length) ?? [];
     e.fault = { message: err?.message ?? String(err), where, at: Date.now(), what };
@@ -267,6 +281,31 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
     devRev.set(id, (devRev.get(id) ?? 0) + 1);
     await reconcile();
     return entries.get(id)!;
+  }
+
+  /** An installed plugin's file no longer matches what you approved (a page file as it was served, or the periodic
+   *  check): it's out of the page at once, then stopped like reconcile stops it, and open pages are told. */
+  let distrusting: Promise<unknown> = Promise.resolve();
+  function distrust(id: string, file?: string) {
+    const e = entries.get(id);
+    if (!e || e.builtin || e.state === "changed") return distrusting;
+    e.state = "changed"; e.error = file ? `${file} changed since you approved it` : CHANGED; e.mod = undefined;
+    log(`plugin ${id}: ${e.error}; stopped until you review it again`);
+    o.core.notice({ key: `plugin-${id}`, ok: false, message: `${e.manifest?.name ?? id} was stopped: ${file ?? "its files"} changed since you approved ${file ? "it" : "them"}. Review it in Plugins.` });
+    return (distrusting = distrusting.then(async () => {
+      if (e.run) await deactivate(e);
+      await reconcile();
+      o.core.broadcast("plugins", { active: active().map((x) => x.id) });
+    }).catch((err) => log(`plugin ${id}: stopping: ${err?.message ?? err}`)));
+  }
+  /** Every running installed plugin, its install folder and the copy it runs from, still as approved. */
+  async function checkInstalled() {
+    for (const e of active()) {
+      if (e.builtin) continue;
+      const rec = st.installed.find((x) => x.id === e.id);
+      if (!rec || treeChangedCached(e.dir, rec.files) || (e.runDir && treeChangedCached(e.runDir, rec.files))) distrust(e.id);
+    }
+    await distrusting;
   }
 
   // ── requests ──
@@ -312,7 +351,7 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
   }
 
   return {
-    start: reconcile, reconcile, reload, setEnabled, setSetting, api, get, isPage, contributions,
+    start: reconcile, reconcile, reload, setEnabled, setSetting, api, get, isPage, contributions, distrust, checkInstalled,
     setting: (id: string, key: string) => st.settings[id]?.[key] ?? entries.get(id)?.manifest?.settings[key]?.default,
     /** Core's own access to a service (no dependency check): undefined while its plugin is off. */
     service: <T = any>(name: string) => services.get(name)?.api as T | undefined,
@@ -320,8 +359,9 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
      *  aren't a plugin's (remotes, data plugins' recipes). A plugin that provides the same name wins, and while that
      *  plugin is off the name gives undefined (off means off). Calling it again replaces the api. */
     provideCore(name: string, api: object) { coreServices.set(name, api); },
-    /** Running plugins' page files, in load order (src/assets.ts appends them after the deck's own). */
-    assets: () => active().map((e) => ({ id: e.id, dir: e.dir, scripts: e.manifest!.client, styles: e.manifest!.styles })),
+    /** Running plugins' page files, in load order (src/assets.ts appends them after the deck's own); an installed
+     *  plugin's come with their approved hashes, which each file must match as it's served. */
+    assets: () => active().map((e) => ({ id: e.id, dir: e.dir, scripts: e.manifest!.client, styles: e.manifest!.styles, approved: e.builtin ? undefined : st.installed.find((x) => x.id === e.id)?.files ?? {} })),
     /** fullState slices from running plugins. */
     state: () => Object.fromEntries(contributions("fullState").map((c) => { try { return [c.key, c.get()]; } catch { return [c.key, null]; } })),
     active: () => active().map((e) => e.id),
@@ -332,7 +372,8 @@ export function createPluginHost(o: { builtinDir: string; root: string; dataDir:
       const id = "remove" in rec ? rec.remove : rec.id;
       const e = entries.get(id);
       if (e?.run) await deactivate(e);
-      if (e) e.mod = undefined;
+      if (e) { e.mod = undefined; e.runDir = undefined; }
+      forgetCopies(o.root, id);
       const installed = st.installed.filter((x) => x.id !== id);
       st = { ...st, installed: "remove" in rec ? installed : [...installed, rec], enabled: { ...st.enabled, [id]: !("remove" in rec) } };
       saveCodeState(o.root, st);

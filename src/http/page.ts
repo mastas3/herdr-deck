@@ -7,9 +7,9 @@ const PUBLIC = new URL("../../public", import.meta.url).pathname;
 const HTML_PATH = `${PUBLIC}/index.html`;
 
 /** The page, read at startup (DEV: on every load). */
-export function createPage(o: { dev: boolean; fullState: () => unknown; plugins: () => PluginAssets[] }) {
+export function createPage(o: { dev: boolean; fullState: () => unknown; plugins: () => PluginAssets[]; distrust?: (id: string, file: string) => void }) {
   // The files public/assets.json names, then running plugins' files, are served under content hashes (src/assets.ts).
-  const assets = createAssets(PUBLIC, { dev: o.dev, log: (s) => console.warn(s), plugins: o.plugins });
+  const assets = createAssets(PUBLIC, { dev: o.dev, log: (s) => console.warn(s), plugins: o.plugins, distrust: o.distrust });
   let htmlTemplate = readFileSync(HTML_PATH, "utf8");
   function page() {
     if (o.dev) htmlTemplate = readFileSync(HTML_PATH, "utf8");

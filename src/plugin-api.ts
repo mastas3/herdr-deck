@@ -43,7 +43,8 @@ export type PointName = keyof CorePoints | (string & {});
 export type Contribution<P extends PointName> = P extends keyof CorePoints ? CorePoints[P] : unknown;
 
 export type Host = {
-  /** This plugin's id, its folder, and the deck's data folder (~/.config/herdr-deck): data stays where it lives today. */
+  /** This plugin's id, its folder, and the deck's data folder (~/.config/herdr-deck): data stays where it lives today.
+   *  An installed plugin's folder is the copy of its approved files it runs from: never write there (a change stops it). */
   readonly id: string;
   readonly dir: string;
   readonly dataDir: string;

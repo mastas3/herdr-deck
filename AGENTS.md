@@ -31,7 +31,8 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
   `<select>`. The design is `docs/superpowers/specs/2026-09-29-model-picker-design.md`.
 - **Code plugins** are the deck's extras: `plugins-builtin/<id>/` (see "Code plugins" below). The host is
   `src/plugin-host.ts` (+ `plugin-api.ts` the contract, `plugin-code-format.ts` the manifest, `plugin-code-store.ts`
-  hashes and state, `plugin-code-api.ts` the Plugins view's API); the page side is `public/js/registry.js`. Core
+  hashes and state, `plugin-approved.ts` the approved copy installed plugins run from, `plugin-code-api.ts` the Plugins
+  view's API); the page side is `public/js/registry.js`. Core
   never imports plugin code. The design is `docs/superpowers/specs/2026-09-28-code-plugins-design.md`.
 - `public/` is the page: `index.html` (markup only), a service worker and a manifest. The code is `public/js/*.js`
   and the styles `public/css/*.css`, all listed in `public/assets.json` and loaded in that order: scripts as classic

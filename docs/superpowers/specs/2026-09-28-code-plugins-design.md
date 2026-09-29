@@ -140,6 +140,15 @@ red trust screen lists every file and the manifest's surface and needs a tick, a
 exactly the staged bytes (checked by hash) into place and records each file's sha256. Any added, removed or edited
 file → `changed`, off until reviewed again. Data plugins keep their own flow; a name one uses can't be taken.
 
+What runs is only ever the approved bytes. The server side is imported from a copy of the approved files,
+`<data>/plugins/.approved/<id>/<hash>/` (`src/plugin-approved.ts`), checked against the hashes before every start; a new
+approval is a new folder, so every module it imports loads fresh without a restart, and old copies are deleted. Page
+files are hashed as they're served (again whenever a file's size or mtime moves): one that doesn't match is refused
+(409), the plugin goes `changed` at once and stops, and open pages get a notice and reload without it. Every 30 s the
+host re-checks running installed plugins (install folder and copy). An MCP tool named like one of the deck's own is
+refused when the plugin registers it (the install reply says why it didn't start), and a review that fails its checks
+leaves nothing in staging.
+
 ## Phases
 
 1. **Host + proof** (one agent): plugin host (server + client registry), trust screen for code plugins, Plugins
