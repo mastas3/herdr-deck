@@ -63,11 +63,13 @@ const KEEP: Record<string, Record<string, boolean>> = {
   codex: { "-m": true, "--model": true, "-c": true, "--config": true, "-s": true, "--sandbox": true, "-a": true, "--ask-for-approval": true, "-p": true, "--profile": true, "--dangerously-bypass-approvals-and-sandbox": false, "--search": false, "--add-dir": true },
   opencode: { "-m": true, "--model": true, "--agent": true },
 };
+/** Flags that turn off the agent's permission checks. Restore leaves them out unless the user adds them back per session. */
+export const UNSAFE = new Set(["--dangerously-skip-permissions", "--allow-dangerously-skip-permissions", "--dangerously-bypass-approvals-and-sandbox"]);
 /** A shell word as typed: plain when it's safe, single-quoted otherwise. */
 export const shq = (s: string) => (/^[\w./:=@%+,-]+$/.test(s) ? s : `'${s.replace(/'/g, `'\\''`)}'`);
 
 /** The flags the agent was started with (from its command line), limited to the ones above. */
-export function keptFlags(agent: string, command?: string): string[] {
+export function keptFlags(agent: string, command?: string, unsafe = false): string[] {
   const keep = KEEP[agent];
   if (!keep || !command) return [];
   const words = command.trim().split(/\s+/);
@@ -76,7 +78,7 @@ export function keptFlags(agent: string, command?: string): string[] {
   for (let i = start < 0 ? 0 : start + 1; i < words.length; i++) {
     const w = words[i];
     const [name, inline] = w.startsWith("--") && w.includes("=") ? [w.slice(0, w.indexOf("=")), w.slice(w.indexOf("=") + 1)] : [w, undefined];
-    if (!(name in keep)) continue;
+    if (!(name in keep) || (!unsafe && UNSAFE.has(name))) continue;
     if (!keep[name]) { out.push(name); continue; }
     const v = inline ?? words[++i];
     if (v == null || (inline == null && v.startsWith("-"))) continue;
@@ -85,10 +87,16 @@ export function keptFlags(agent: string, command?: string): string[] {
   return out;
 }
 
-/** The deck's resume command (src/agents.ts resumeCommand) plus the model and permission flags the pane ran with. */
-export function restoreCommand(p: SnapPane): string | undefined {
+/** The permission-skipping flags this pane ran with (restore drops them unless asked). */
+export const unsafeFlags = (p: SnapPane) => keptFlags(p.agent, p.command, true).filter((f) => UNSAFE.has(f));
+
+/**
+ * The deck's resume command (src/agents.ts resumeCommand) plus the model and permission flags the pane ran with.
+ * Flags that skip permission checks come back only with `unsafe`, so nothing resumes unattended by surprise.
+ */
+export function restoreCommand(p: SnapPane, unsafe = false): string | undefined {
   if (!p.resume) return;
-  const flags = keptFlags(p.agent, p.command);
+  const flags = keptFlags(p.agent, p.command, unsafe);
   if (!flags.length) return p.resume;
   if (p.agent === "codex") return p.resume.replace(/^codex resume /, `codex resume ${flags.join(" ")} `);
   return `${p.resume} ${flags.join(" ")}`;

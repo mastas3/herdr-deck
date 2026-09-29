@@ -25,8 +25,9 @@ export function createRestorer(d: Deps) {
   const sleep = d.sleep ?? ((ms: number) => Bun.sleep(ms));
   let job: Job | undefined;
   let panes = new Map<string, SnapPane>();
+  let unsafeKeys = new Set<string>();
 
-  const specOf = (p: SnapPane): ReopenSession => ({ herdr: p.herdr, workspaceId: p.workspaceId, workspace: p.workspace, createWorkspace: true, cwd: p.cwd, tab: p.tab, project: p.project, resume: restoreCommand(p) });
+  const specOf = (p: SnapPane): ReopenSession => ({ herdr: p.herdr, workspaceId: p.workspaceId, workspace: p.workspace, createWorkspace: true, cwd: p.cwd, tab: p.tab, project: p.project, resume: restoreCommand(p, unsafeKeys.has(p.key)) });
 
   async function one(j: Job, it: Item) {
     const p = panes.get(it.key)!;
@@ -78,13 +79,14 @@ export function createRestorer(d: Deps) {
 
   return {
     job: () => job,
-    /** Starts restoring these panes of a snapshot. Refused while another restore is running. */
-    start(snapshotId: string, picked: SnapPane[], atOnce: number) {
+    /** Starts restoring these panes of a snapshot; `unsafe` names the ones that get their permission-skipping flags back. */
+    start(snapshotId: string, picked: SnapPane[], atOnce: number, unsafe: Iterable<string> = []) {
       if (job?.running) throw new Error("A restore is already running");
       panes = new Map(picked.map((p) => [p.key, p]));
+      unsafeKeys = new Set(unsafe);
       const j: Job = {
         id: crypto.randomUUID(), machine: d.machine, snapshotId, at: Date.now(), running: false, atOnce: Math.max(1, Math.min(6, Math.round(atOnce) || 2)),
-        items: restoreOrder(picked).map((p) => ({ key: p.key, title: p.title, project: p.project, agent: p.agent, workspace: p.workspace, cwd: p.cwd, cmd: restoreCommand(p), state: "waiting" })),
+        items: restoreOrder(picked).map((p) => ({ key: p.key, title: p.title, project: p.project, agent: p.agent, workspace: p.workspace, cwd: p.cwd, cmd: restoreCommand(p, unsafeKeys.has(p.key)), state: "waiting" })),
       };
       job = j;
       void run(j);
