@@ -50,7 +50,6 @@
 .row[data-status="blocked"].unseen { --c-need: var(--blocked); }
 .row { position: relative; }
 .sec.proj > .sec-h { color: var(--ink); font-size: 14.5px; }
-.sec.proj > .sec-h .sw { width: 10px; height: 10px; border-radius: 3px; background: var(--pc); flex: none; }
 .sec.proj > .sec-h .dots { margin-left: auto; display: flex; gap: 3px; }
 .sec-h .sl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A project's sessions sit one level in, on a thin guide in the project's colour (under its chevron); a worktree's
@@ -67,7 +66,7 @@
 .brc { display: inline-flex; align-items: center; gap: 3px; min-width: 0; flex: 0 1 auto; max-width: 60%; font: 500 11.5px/17px var(--mono); color: var(--ink-3); padding: 0 6px 0 4px; border-radius: 99px; background: color-mix(in srgb, var(--ink-3) 12%, transparent); }
 /* The second line: branch, then the folder, indented to the name. The path loses its start first (rtl + bdi). */
 .sec-h.has-meta { flex-wrap: wrap; row-gap: 0; }
-.smeta { order: 9; flex: 1 0 100%; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 1px 0 1px 36px; font-weight: 400; }
+.smeta { order: 9; flex: 1 0 100%; display: flex; align-items: center; gap: 6px; min-width: 0; padding: 1px 0 1px 20px; font-weight: 400; }
 .wt-h .smeta { padding-left: 40px; }
 .smeta .brc { flex: none; max-width: 45%; }
 .pthc { min-width: 0; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; font: 400 11px/17px var(--mono); color: var(--ink-3); padding: 0 6px; border-radius: 99px; cursor: copy; }

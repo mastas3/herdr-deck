@@ -223,7 +223,7 @@ function renderList() {
       const jour = g.proj && projectLink() ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${projectLink().icon}</span>` : "";
       const fold = g.proj && projectHome(g.proj) ? folderBtn(g.proj, g.proj) : "";
       if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
-      sec.innerHTML = `<button class="sec-h${g.branch || g.dir ? " has-meta" : ""}" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}${g.proj ? '<span class="sw"></span>' : ""}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${metaLine(g.branch, g.dir)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
+      sec.innerHTML = `<button class="sec-h${g.branch || g.dir ? " has-meta" : ""}" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${metaLine(g.branch, g.dir)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
       for (const r of g.main ?? g.rows) body.append(rowCache.get(r.key).el);
       // Each worktree: a sub-header one level in (⎇, its folder name, branch, count), its sessions one level further.
