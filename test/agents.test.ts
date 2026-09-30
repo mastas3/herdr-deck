@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { claudeMeta, claudeWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
+import { claudeMeta, claudeWindow, settingsWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
 
 const j = (...o: object[]) => o.map((x) => JSON.stringify(x));
 
@@ -152,6 +152,18 @@ describe("Claude context windows", () => {
     put("slate", '{"window":200000}');
     expect(claudeWindow("slate", undefined, home, 2000)).toBeUndefined();
     expect(claudeWindow("slate", undefined, home, 32_000)).toBe(200000);
+  });
+  test("with no file and nothing seen, the default model from settings.json decides", () => {
+    const h = mkdtempSync(`${tmpdir()}/deck-set-`);
+    mkdirSync(`${h}/.claude`, { recursive: true });
+    writeFileSync(`${h}/.claude/settings.json`, '{"model":"opus[1m]"}');
+    expect(settingsWindow("claude-opus-5-5", h, 1000)).toBe(1000000);
+    expect(settingsWindow("claude-sonnet-5", h, 1000)).toBeUndefined();
+    writeFileSync(`${h}/.claude/settings.json`, '{"model":"sonnet"}');
+    expect(settingsWindow("claude-opus-5-5", h, 1000)).toBe(1000000); // still opus[1m]: read once a minute
+    expect(settingsWindow("claude-opus-5-5", h, 70_000)).toBeUndefined();
+    writeFileSync(`${h}/.claude/settings.json`, '{"model":"claude-sonnet-5[1m]"}');
+    expect(settingsWindow("claude-sonnet-5", h, 140_000)).toBe(1000000);
   });
   test("bad files give nothing", () => {
     put("sbad", "{not json");

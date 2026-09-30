@@ -166,7 +166,20 @@ export function claudeWindow(id: string, model?: string, home = HOME, now = Date
     ctxCache.set(id, (c = { at: now, window }));
   }
   if (c.window && model) modelWindow.set(model, c.window);
-  return c.window ?? (model ? modelWindow.get(model) : undefined);
+  return c.window ?? (model ? modelWindow.get(model) ?? settingsWindow(model, home, now) : undefined);
+}
+
+/** Claude Code's default model, e.g. "opus[1m]": a session on that model family runs with the 1M window. */
+const settingsCache = new Map<string, { at: number; model?: string }>();
+export function settingsWindow(model: string, home = HOME, now = Date.now()): number | undefined {
+  let c = settingsCache.get(home);
+  if (!c || now - c.at > 60_000) {
+    let m: string | undefined;
+    try { const v = JSON.parse(readFileSync(`${home}/.claude/settings.json`, "utf8")).model; if (typeof v === "string") m = v; } catch {}
+    settingsCache.set(home, (c = { at: now, model: m }));
+  }
+  const d = c.model?.toLowerCase().match(/^(?:claude-)?([a-z]+)[^[]*\[1m\]$/);
+  return d && model.toLowerCase().includes(d[1]) ? 1_000_000 : undefined;
 }
 
 let claudeDirs: { at: number; dirs: string[] } = { at: 0, dirs: [] };
