@@ -1,5 +1,5 @@
 "use strict";
-// The composer: sending, queued messages, long pastes as chips, the "/" menu and file uploads.
+// The composer: sending, queued messages, long pastes as chips, the "/" menu and file uploads (attach.js).
 // ── sending ──────────────────────────────────────────────────────────────
 const codexSendReceipts = new Map();
 /** The box fits its text. Measured with its transition off, then eased from the old height to the new one. */
@@ -11,22 +11,39 @@ function autosize(el) {
   el.style.height = h;
   if (el.id === "cText") syncSendLook();
 }
-/** Send looks off while there's nothing to send (no words, no pasted blocks); it still works as before. */
-function syncSendLook() { $("cSend").classList.toggle("empty", !$("cText").value.trim() && !(S.sel && pasteList(S.sel).length)); }
+/** Send looks off while there's nothing to send (no words, pasted blocks or files); it still works as before. While
+ *  files upload it says so ("Uploading 2…") and waits for them. Its own label (Send, Queue…) is set in detail.js. */
+function syncSendLook() {
+  const b = $("cSend"), { up } = attachCount(attachList());
+  b.classList.toggle("empty", !$("cText").value.trim() && !(S.sel && (pasteList(S.sel).length || attachList(S.sel).length)));
+  b.classList.toggle("busy", up > 0);
+  const label = up ? `Uploading ${up}…` : b.dataset.label || "Send", sl = b.querySelector(".sl");
+  if (sl.textContent !== label) sl.textContent = label;
+}
+/** Files still uploading, or one that failed, hold a send from the box until they're sorted. */
+function attachHold(key) {
+  const { up, err } = attachCount(attachList(key));
+  if (up) toast(`Still uploading ${up} file${up > 1 ? "s" : ""}. Send when ${up > 1 ? "they’re" : "it’s"} done.`);
+  else if (err) toast(`${err > 1 ? `${err} files` : "A file"} didn’t upload. Retry or remove ${err > 1 ? "them" : "it"} first.`, true);
+  return up + err > 0;
+}
 async function sendMessage(text, fromEl, how) {
   const key = S.sel;
   const r = rowOf(key);
-  if (!r || r.hist || (!text && !pasteList(key).length)) return;
+  const box = fromEl.id === "cText" && bangCmd(text) == null; // a "!" command goes without the box's files
+  if (!r || r.hist || (!text && !pasteList(key).length && !(box && attachList(key).length))) return;
+  if (box && attachHold(key)) return;
   if (!r.app) return sendReadyMessage(r, text, fromEl, how);
   if (codexSending.has(key)) return;
-  const draft = fromEl.value, pastes = pasteList(key).map((p) => p.id).join();
+  const extras = () => [...pasteList(key), ...(box ? attachList(key) : [])].map((p) => p.id).join();
+  const draft = fromEl.value, pastes = extras();
   codexSending.add(key); renderDetail();
   try {
     if (!codexCanReply(r)) {
       const state = await connectCodex(r);
       if (!state.ready) throw new Error(state.error ?? "Could not connect to Codex. Your draft stays here.");
       // Connecting can take seconds. Never send an edited draft or clear another chat's composer.
-      if (S.sel !== key || fromEl.value !== draft || pasteList(key).map((p) => p.id).join() !== pastes) return toast("Connected to Codex. Your draft is ready when you are.");
+      if (S.sel !== key || fromEl.value !== draft || extras() !== pastes) return toast("Connected to Codex. Your draft is ready when you are.");
     }
     await sendReadyMessage(r, text, fromEl, how);
   } catch (x) { toast(x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim(), fromEl, how); } }); }
@@ -36,16 +53,22 @@ async function sendReadyMessage(r, text, fromEl, how) {
   const key = r.key, working = r.app ? codexView(r)?.status === "working" : r.status === "working";
   if (r.app && working && how !== "steer") how = "later";
   const pastes = fromEl === $("cText") ? takePastes(key) : [];
-  if (!text && !pastes.length) return;
+  const files = fromEl === $("cText") && bangCmd(text) == null ? attachTake(key) : [];
+  if (!text && !pastes.length && !files.length) return;
   // Long text travels as a file: pasted blocks, and anything too big to type into a terminal.
   if (pastes.length || text.length > LONG_SEND) {
     try { text = await fileLongText(r, text, pastes); }
-    catch (x) { restorePastes(key, pastes); toast("Couldn’t save the long text: " + x.message, true); return; }
+    catch (x) { restorePastes(key, pastes); attachRestore(key, files); toast("Couldn’t save the long text: " + x.message, true); return; }
   }
+  // The box keeps only what you typed; the agent gets the files as "[Attached: <path>]" lines after it.
+  const typed = text;
+  text = withAttachments(text, files.map((a) => a.path));
+  attachKeep(files);
+  const undo = () => { fromEl.value = typed; autosize(fromEl); attachRestore(key, files); };
   if (how === "later" && working && isAgent(r)) {
     fromEl.value = ""; autosize(fromEl); S.drafts.delete(key); closeSlash();
     try { await api("/api/queue", { op: "add", key, text }); toast("Queued. It goes when the agent finishes this turn."); }
-    catch (x) { fromEl.value = text; toast("Couldn’t queue: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } }); }
+    catch (x) { undo(); toast("Couldn’t queue: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || typed, fromEl, how); } }); }
     return;
   }
   closeSlash();
@@ -68,9 +91,9 @@ async function sendReadyMessage(r, text, fromEl, how) {
     setTimeout(pollTerm, 150);
   } catch (x) {
     if (x.code && x.code !== "CODEX_DELIVERY_UNKNOWN") codexSendReceipts.delete(key);
-    fromEl.value = text;
+    undo();
     if (p) dropPending(key, p);
-    toast("Send failed: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || text, fromEl, how); } });
+    toast("Send failed: " + x.message, true, { label: "Retry", run: () => { if (S.sel === key) sendMessage(fromEl.value.trim() || typed, fromEl, how); } });
   }
 }
 $("composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("cText").value.trim(), $("cText"), e.submitter?.id === "cSteer" ? "steer" : undefined); });
@@ -115,7 +138,7 @@ function renderQueue(r) {
   if ((!q.length && !native.length) || !r || S.mode || S.sub) { el.hidden = true; el._h = ""; return; }
   el.hidden = false;
   const nativeHelp = native.length ? '<div class="native-queue-help" data-qid="codex:help"><span>Codex sends these messages. Edit or remove them in the app.</span><button type="button" class="btn ghost sm" data-native-queue-open>Open in Codex</button></div>' : "";
-  const html = nativeHelp + native.map((x) => `<div class="qi" data-qid="codex:${esc(x.id)}"><span class="qn">In Codex${x.pausedReason ? " · paused" : ""}</span><span class="qt" title="${esc(x.pausedReason ? `${x.pausedReason} · ${x.text}` : x.text)}">${esc(x.text.replace(/\s+/g, " ").slice(0, 160))}</span></div>`).join("") + q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${r.app ? "Deck · " : ""}${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${x.text.slice(0, 100)}` : x.text.replace(/\s+/g, " ").slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join("");
+  const html = nativeHelp + native.map((x) => `<div class="qi" data-qid="codex:${esc(x.id)}"><span class="qn">In Codex${x.pausedReason ? " · paused" : ""}</span><span class="qt" title="${esc(x.pausedReason ? `${x.pausedReason} · ${x.text}` : x.text)}">${esc(attachSummary(x.text).slice(0, 160))}</span></div>`).join("") + q.map((x, i) => `<div class="qi" data-qid="${esc(x.id)}"><span class="qn">${r.app ? "Deck · " : ""}${x.error ? "Paused" : i === 0 ? (r.status === "working" ? "Next" : "Sending…") : i + 1}</span><span class="qt" title="${esc(x.error ?? x.text.slice(0, 600))}">${esc(x.error ? `${x.error} · ${attachSummary(x.text).slice(0, 100)}` : attachSummary(x.text).slice(0, 160))}</span><button class="ib" data-qact="edit" title="Edit">${ICON.note}</button><button class="btn ghost sm" data-qact="now" title="Send it now (steer)">Send now</button><button class="ib" data-qact="remove" title="Remove">${ICON.x}</button></div>`).join("");
   if (el._h !== html) motion.keyed(el, "data-qid", () => setHTML(el, html), "rise");
 }
 $("qbar").addEventListener("click", async (e) => {
@@ -157,20 +180,29 @@ function addPaste(text) {
   S.pastes.set(S.sel, l);
   renderPastes();
 }
+/** The box's tray: your files (attach-view.js), then pasted blocks, one family of chips. */
 function renderPastes() {
   const el = $("cAtt");
-  const l = S.sel ? pasteList() : [];
-  el.hidden = !l.length;
-  const html = l.map((p) => { const lines = p.text.split("\n").length; return `<span class="pchip" data-pid="${p.id}"><span class="pk">${esc(p.kind.toUpperCase())}</span><button class="pl" data-pact="view" title="Preview">Pasted text · ${lines.toLocaleString()} lines · ${p.text.length < 1024 * 1024 ? Math.max(1, Math.round(p.text.length / 1024)) + " KB" : (p.text.length / 1048576).toFixed(1) + " MB"}</button><button class="ib" data-pact="inline" title="Put the text in the message instead">${ICON.note}</button><button class="ib" data-pact="remove" title="Remove">${ICON.x}</button></span>`; }).join("") + (l.length ? `<span class="hint">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : "");
-  if (el._h !== html) motion.keyed(el, "data-pid", () => setHTML(el, html));
+  const l = S.sel ? pasteList() : [], files = S.sel ? attachList() : [];
+  el.hidden = !l.length && !files.length;
+  const pastes = l.map((p) => { const lines = p.text.split("\n").length, size = attachSize(p.text.length); return `<div class="achip file paste pchip" data-pid="${p.id}" role="listitem"><button type="button" class="a-main pl" data-pact="view" title="Preview" aria-label="Pasted text, ${lines} lines, ${size}. Preview"><span class="a-ic">${ATTACH_GLYPH.text}</span><span class="a-tx"><span class="a-nm">Pasted text</span><span class="a-mt">${esc(p.kind.toUpperCase())} · ${lines.toLocaleString()} lines · ${size}</span></span></button><button type="button" class="a-in" data-pact="inline" title="Put the text in the message instead" aria-label="Put the pasted text in the message instead">${ICON.note}</button><button type="button" class="a-x" data-pact="remove" title="Remove" aria-label="Remove the pasted text">${ICON.x}</button></div>`; }).join("") + (l.length ? `<span class="hint" role="listitem">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : "");
+  const sig = attachSig(files) + pastes;
+  if (el._sig !== sig) { el._sig = sig; const html = files.map(attachChipHTML).join("") + pastes; motion.keyed(el, "data-pid", () => setHTML(el, html)); }
   syncSendLook();
+}
+function pasteRemove(id) {
+  const key = S.sel, l = pasteList(key), i = l.findIndex((x) => x.id === id), p = l[i];
+  if (!p) return;
+  S.pastes.set(key, l.filter((x) => x !== p));
+  renderPastes();
+  toast("Removed the pasted text", false, { label: "Undo", run: () => { const now = [...pasteList(key)]; now.splice(Math.min(i, now.length), 0, p); S.pastes.set(key, now); renderPastes(); } });
 }
 $("cAtt").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pact]");
   if (!b) return;
   const id = b.closest("[data-pid]").dataset.pid, l = pasteList(), p = l.find((x) => x.id === id);
   if (!p) return;
-  if (b.dataset.pact === "remove") S.pastes.set(S.sel, l.filter((x) => x !== p));
+  if (b.dataset.pact === "remove") return pasteRemove(id);
   if (b.dataset.pact === "inline") { S.pastes.set(S.sel, l.filter((x) => x !== p)); const ta = $("cText"); ta.value = ta.value ? `${ta.value}\n${p.text}` : p.text; autosize(ta); }
   if (b.dataset.pact === "view") {
     const d = document.createElement("dialog"); d.className = "ask wide";
@@ -266,31 +298,7 @@ function pickFiles() {
   $("fileIn").value = "";
   $("fileIn").click();
 }
-async function uploadFiles(files) {
-  const r = rowOf(S.sel);
-  if (!r || r.hist) return toast("Open a live session to attach files", true);
-  const list = [...files].slice(0, 20);
-  if (!list.length) return;
-  const ta = $("cText");
-  toast(`Uploading ${list.length} file${list.length > 1 ? "s" : ""}…`);
-  const paths = [];
-  for (const f of list) {
-    try {
-      const res = await fetch(`/api/upload?key=${encodeURIComponent(r.key)}&name=${encodeURIComponent(f.name || "pasted.png")}`, { method: "POST", headers: { "x-deck-token": S.token, "content-type": "application/octet-stream" }, body: f });
-      const j = await res.json();
-      if (!res.ok || j.error) throw new Error(j.error ?? res.statusText);
-      paths.push(j.path);
-    } catch (e) { toast(`${f.name}: ${e.message}`, true); }
-  }
-  if (!paths.length) return;
-  const block = paths.map((p) => `[Attached: ${p}]`).join("\n");
-  ta.value = ta.value.trim() ? `${ta.value.trimEnd()}\n${block}\n` : `${block}\n`;
-  autosize(ta);
-  ta.focus();
-  ta.setSelectionRange(ta.value.length, ta.value.length);
-  toast(`Attached ${paths.length}. Add a note and send.`);
-}
-$("fileIn").addEventListener("change", (e) => uploadFiles(e.target.files));
+$("fileIn").addEventListener("change", (e) => attachFiles(e.target.files));
 // The paperclip is a <label for="fileIn">: the browser opens the picker itself, which works everywhere
 // (a script-triggered click on a hidden input is ignored by some phones and installed apps).
 $("cAttach").addEventListener("click", (e) => {
@@ -306,10 +314,10 @@ $("cAttach").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key
   det.addEventListener("dragenter", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth++; det.classList.add("dropping"); });
   det.addEventListener("dragover", (e) => { if (canDrop(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
   det.addEventListener("dragleave", () => { depth = Math.max(0, depth - 1); if (!depth) det.classList.remove("dropping"); });
-  det.addEventListener("drop", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth = 0; det.classList.remove("dropping"); uploadFiles(e.dataTransfer.files); });
+  det.addEventListener("drop", (e) => { if (!canDrop(e)) return; e.preventDefault(); depth = 0; det.classList.remove("dropping"); attachFiles(e.dataTransfer.files); });
   $("cText").addEventListener("paste", (e) => {
     const fs = [...(e.clipboardData?.files ?? [])];
-    if (fs.length) { e.preventDefault(); return uploadFiles(fs); }
+    if (fs.length) { e.preventDefault(); return attachFiles(fs); }
     const t = e.clipboardData?.getData("text/plain") ?? "";
     if (t.length > LONG_PASTE_CHARS || t.split("\n").length > LONG_PASTE_LINES) { e.preventDefault(); addPaste(t); }
   });

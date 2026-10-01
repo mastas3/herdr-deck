@@ -31,7 +31,7 @@ function renderDetail() {
   $("cSend").disabled = !!r.app && (codexSending.has(r.key) || codexConnecting.has(r.key));
   $("cSteer").disabled = $("cSend").disabled;
   const sendLabel = r.app && codexConnecting.has(r.key) ? "Connecting…" : r.app && busy ? "Queue" : "Send";
-  if ($("cSend").textContent !== sendLabel) $("cSend").querySelector(".sl").textContent = sendLabel; // the arrow icon stays
+  $("cSend").dataset.label = sendLabel; // syncSendLook writes it (the arrow icon stays), unless files are uploading
   $("cSend").title = busy ? "Send now; the agent picks it up while it works (⌥Enter: hold it until it finishes)" : "Send (Enter)";
   $("cSteer").hidden = !(r.app && busy);
   if (r.app && busy) $("cSend").title = "Send after the current turn; Steer sends now";

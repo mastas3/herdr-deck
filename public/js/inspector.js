@@ -129,8 +129,9 @@ function syncDock() {
   const off = ["nowbar", "statusline", "qbar", "cAtt", "composer"].every((id) => $(id).hidden);
   if ($("dock").hidden !== off) $("dock").hidden = off;
 }
-// The jump-to-latest button floats just above the frame, whatever its height (a long draft grows it).
-new ResizeObserver(([e]) => $("detail").style.setProperty("--dock-h", Math.round(e.target.offsetHeight) + "px")).observe($("dock"));
+// The jump-to-latest button floats just above the frame, whatever its height (a long draft or attachments grow it);
+// so do a phone's toasts while the box holds attachments (motion.css), which they'd otherwise cover.
+new ResizeObserver(([e]) => document.documentElement.style.setProperty("--dock-h", Math.round(e.target.offsetHeight) + "px")).observe($("dock"));
 
 // ── the installed app's title bar: the deck draws into it (manifest: window-controls-overlay) ──
 // The window's own buttons keep their corners: the list's top row starts after them, the right-most column's top

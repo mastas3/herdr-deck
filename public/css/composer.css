@@ -62,11 +62,7 @@ label.ib { display: inline-grid; place-items: center; cursor: pointer; }
 .btn.sm { padding: 3px 9px; font-size: 13px; border-radius: 8px; }
 .catt { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 22px 0; background: var(--side); flex: none; }
 .qbar + .catt { border-top: 0; }
-.pchip { display: inline-flex; align-items: center; gap: 2px; padding: 3px 4px 3px 4px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line-2); font-size: 13.5px; }
-.pchip .pk { font: 600 10.5px var(--mono); padding: 2px 5px; border-radius: 6px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
-.pchip .pl { border: 0; background: none; color: var(--ink); padding: 2px 6px; }
-.pchip .pl:hover { text-decoration: underline; }
-.pchip .ib svg { width: 13px; height: 13px; }
+/* The tray's chips (files and pasted blocks) are in attach.css. */
 .pview { max-height: 60vh; overflow: auto; font: 12.5px/1.45 var(--mono); background: var(--code-bg); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
 dialog.ask.wide { width: min(820px, calc(100vw - 24px)); }
 .slashpop { position: absolute; left: 22px; right: 22px; bottom: calc(100% + 6px); max-height: min(52vh, 420px); overflow-y: auto; background: var(--raise); border: 1px solid var(--line-2); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.35); padding: 4px; z-index: 20; }

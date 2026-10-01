@@ -1,0 +1,99 @@
+/* ── attachments: chips in the message box (files and pasted blocks, one family) and in your messages in the chat ── */
+/* The tray sits in the dock above the box; it wraps on a desktop and scrolls sideways on a phone. */
+.dock .catt { gap: 8px; padding-top: 12px; }
+.catt > .hint { font-size: 12px; color: var(--ink-3); padding: 0 4px; }
+.achip {
+  --chip-h: 56px; --chip-bg: color-mix(in srgb, var(--ink) 4%, var(--dock-bg, var(--raise))); --chip-line: color-mix(in srgb, var(--line-2) 80%, transparent);
+  position: relative; display: inline-flex; align-items: center; flex: none; height: var(--chip-h); max-width: 100%;
+  border: 1px solid var(--chip-line); border-radius: 12px; background: var(--chip-bg); color: var(--ink);
+}
+.achip .a-main { display: flex; align-items: center; gap: 10px; height: 100%; min-width: 0; padding: 0 6px 0 9px; border: 0; background: none; color: inherit; border-radius: inherit; text-align: left; }
+.achip .a-ic { display: grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 9px; background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.achip .a-ic svg { width: 18px; height: 18px; }
+.achip .a-tx { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+.achip .a-nm { font-size: 13.5px; font-weight: 600; line-height: 1.25; max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.achip .a-mt { font-size: 12px; line-height: 1.25; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.achip .a-x, .achip .a-in { display: grid; place-items: center; flex: none; width: 28px; height: 28px; margin-right: 6px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--ink-3); }
+.achip .a-in { margin-right: 0; }
+.achip .a-x svg, .achip .a-in svg { width: 13px; height: 13px; }
+.achip .a-x:hover, .achip .a-in:hover { background: var(--hover); color: var(--ink); }
+@media (hover: hover) { .achip.file .a-main:hover { background: color-mix(in srgb, var(--ink) 5%, transparent); } }
+/* Uploading: a ring that fills (over the icon, or over the picture) and quieter text; failed: a red edge and Retry. */
+.a-ring { position: absolute; pointer-events: none; width: 36px; height: 36px; }
+.achip.file .a-ring { left: 9px; top: calc(50% - 18px); }
+.a-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.a-ring circle { fill: none; stroke-width: 3; stroke: color-mix(in srgb, var(--accent) 22%, transparent); }
+.a-ring circle.fg { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100px; stroke-dashoffset: calc((1 - var(--p, 0)) * 100px); transition: stroke-dashoffset var(--dur-3) linear; }
+.achip.waiting .a-ring svg { animation: spin 1.4s linear infinite; }
+.achip.waiting .a-ring circle.fg { stroke-dashoffset: 75px; }
+.achip.file.s-up .a-ic { background: none; color: color-mix(in srgb, var(--accent) 70%, transparent); }
+.achip.file.s-up .a-ic svg { transform: scale(.78); }
+.achip.s-err { --chip-line: color-mix(in srgb, var(--danger) 55%, var(--line-2)); --chip-bg: color-mix(in srgb, var(--danger) 8%, var(--dock-bg, var(--raise))); }
+.achip.file.s-err .a-ic { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+.achip.file.s-err .a-mt { color: var(--danger); }
+.achip .a-retry.txt { flex: none; height: 28px; margin: 0 2px 0 4px; padding: 0 10px; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line-2)); background: none; color: var(--ink); font-size: 13px; font-weight: 600; }
+.achip .a-retry.txt:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); }
+/* A picture is its own thumbnail: a square tile, its name on hover, the × in its corner. */
+.achip.img { width: var(--chip-h); padding: 0; overflow: visible; background: var(--code-bg); }
+.achip.img .a-main { width: 100%; padding: 0; overflow: hidden; border-radius: 11px; }
+.achip.img img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity var(--dur-2) var(--ease-out), filter var(--dur-2) var(--ease-out); }
+.achip.img.s-up img { opacity: .45; filter: saturate(.6); }
+.achip.img.s-err img { opacity: .35; filter: grayscale(1); }
+.achip.img .a-ring { left: calc(50% - 15px); top: calc(50% - 15px); width: 30px; height: 30px; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .5)); }
+.achip.img .a-ring circle { stroke: rgb(255 255 255 / .28); }
+.achip.img .a-ring circle.fg { stroke: #fff; }
+.achip.img .a-retry { position: absolute; left: calc(50% - 15px); top: calc(50% - 15px); width: 30px; height: 30px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--danger); color: #fff; box-shadow: 0 2px 8px -2px rgb(0 0 0 / .5); }
+.achip.img .a-retry svg { width: 15px; height: 15px; }
+/* The × sits inside the picture's corner on a dark disc (readable on any picture); its tap area is bigger than it looks. */
+.achip.img .a-x { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; margin: 0; border-radius: 50%; background: rgb(12 16 22 / .66); color: #fff; backdrop-filter: blur(3px); opacity: 0; transform: scale(.8); transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-spring), background-color var(--dur-1) linear; }
+.achip.img .a-x::after { content: ""; position: absolute; inset: -8px -8px 0 0; }
+.achip.img .a-x svg { width: 10px; height: 10px; }
+.achip.img .a-x:hover { background: rgb(12 16 22 / .9); color: #fff; }
+.achip.img:is(:hover, :focus-within) .a-x, .achip.img.s-err .a-x { opacity: 1; transform: none; }
+@media (hover: none) { .achip.img .a-x { opacity: 1; transform: none; } }
+@media (hover: hover) {
+  .achip.img .a-main[data-name]::after { content: attr(data-name); position: absolute; left: 0; top: calc(100% + 6px); z-index: 6; max-width: 240px; padding: 3px 8px; border-radius: 6px; background: var(--ink); color: var(--bg); font-size: 12px; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transform: translateY(-2px); transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+  .achip.img .a-main[data-name]:hover::after { opacity: 1; transform: none; transition-delay: .25s; }
+}
+.achip.paste .a-main { padding-right: 2px; }
+
+/* ── in the chat: your message's pictures, then its files ── */
+.msg.user .atts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.msg.user > .mt + .atts { margin-top: 2px; }
+.atts .aims, .atts .afls { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Fixed height, so a picture loading never moves the chat; its width follows the picture. */
+.aimg { position: relative; height: 104px; min-width: 72px; max-width: 100%; padding: 0; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 10px; overflow: hidden; background: var(--code-bg); }
+.atts.one .aimg { height: 168px; }
+.aimg img { display: block; height: 100%; width: auto; max-width: 100%; object-fit: cover; }
+.aimg .a-bk { display: none; }
+.msg .atts .aimg.broken { width: auto; height: 44px; min-width: 0; }
+.aimg.broken img { display: none; }
+.aimg.broken .a-bk { display: flex; align-items: center; gap: 7px; height: 100%; padding: 0 12px 0 10px; font-size: 13px; color: var(--ink-2); }
+.aimg.broken .a-bk svg { width: 16px; height: 16px; flex: none; }
+@media (hover: hover) { .aimg:hover { border-color: color-mix(in srgb, var(--ink) 30%, transparent); } .aimg:hover img { filter: brightness(1.06); } }
+.afile { display: inline-flex; align-items: center; gap: 9px; max-width: 100%; height: 48px; padding: 0 12px 0 7px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 11px; background: color-mix(in srgb, var(--bg) 28%, transparent); color: var(--ink); text-align: left; }
+.afile .a-ic { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 15%, transparent); color: var(--accent); }
+.afile .a-ic svg { width: 17px; height: 17px; }
+.afile .a-tx { display: flex; flex-direction: column; min-width: 0; }
+.afile .a-nm { font-size: 13.5px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 260px; }
+.afile .a-mt { font: 11px/1.3 var(--mono); color: var(--ink-3); }
+/* Send while files upload: a spinner instead of the arrow, and it reads as waiting. */
+.ctbar #cSend.busy { cursor: progress; filter: saturate(.55); box-shadow: none; }
+.ctbar #cSend.busy svg { display: none; }
+.ctbar #cSend.busy::before { content: ""; width: 12px; height: 12px; flex: none; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@media (hover: hover) { .afile:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: color-mix(in srgb, var(--accent) 8%, transparent); } }
+
+/* ── phone: one row that scrolls sideways; touch-sized ── */
+@media (max-width: 760px) {
+  .dock .catt { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding-top: 10px; padding-bottom: 2px; scroll-padding-inline: 12px; }
+  .dock .catt::-webkit-scrollbar { display: none; }
+  .achip { --chip-h: 52px; }
+  .achip .a-nm { max-width: 150px; }
+  .achip .a-x { width: 32px; height: 32px; }
+  .catt > .hint { white-space: nowrap; }
+  .aimg { height: 92px; }
+  .atts.one .aimg { height: 150px; }
+  .afile .a-nm { max-width: 180px; }
+}
+[data-simple] .achip .a-nm, [data-simple] .afile .a-nm { font-size: 15px; }
+[data-simple] .achip .a-mt { font-size: 13px; }

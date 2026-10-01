@@ -108,11 +108,13 @@ $("detail").addEventListener("click", (e) => {
   if (sub) return openSub(sub.dataset.sub);
   const card = e.target.closest("[data-card]");
   if (card) return select(card.dataset.card, { scroll: true, open: true });
-  const cimg = e.target.closest("[data-cimg]");
+  const cimg = e.target.closest("[data-cimg], [data-aimg]");
+  if (cimg?.classList.contains("broken")) return openFile(cimg.dataset.apath); // its picture won't load: say why
   if (cimg) {
-    const all = [...$("dbody").querySelectorAll("[data-cimg]")].map((b) => ({ id: b.dataset.cimg, sub: S.sub }));
-    S.gallery = all;
-    return openLightbox(all.findIndex((x) => x.id === cimg.dataset.cimg));
+    // The transcript's pictures and the ones your messages attach, in the order they show.
+    const els = [...$("dbody").querySelectorAll("[data-cimg], [data-aimg]")];
+    S.gallery = els.map((b) => (b.dataset.aimg ? { src: b.dataset.aimg, name: b.dataset.aname } : { id: b.dataset.cimg, sub: S.sub }));
+    return openLightbox(els.indexOf(cimg));
   }
   const img = e.target.closest("[data-img]");
   if (img) return openLightbox(Number(img.dataset.img));
@@ -214,8 +216,8 @@ function openLightbox(i) {
   const g = S.gallery ?? [];
   if (!g[i]) return;
   S.lb = i;
-  $("lbImg").src = imgUrl(S.sel, g[i].id, g[i].sub);
-  $("lbCap").textContent = `${i + 1} of ${g.length}${g[i].source ? ` · ${g[i].source === "pasted" ? "you pasted this" : "the agent looked at this"}` : ""}${g[i].at ? " · " + abs(g[i].at) : ""}`;
+  $("lbImg").src = g[i].src ?? imgUrl(S.sel, g[i].id, g[i].sub);
+  $("lbCap").textContent = `${i + 1} of ${g.length}${g[i].name ? ` · ${g[i].name}` : ""}${g[i].source ? ` · ${g[i].source === "pasted" ? "you pasted this" : "the agent looked at this"}` : ""}${g[i].at ? " · " + abs(g[i].at) : ""}`;
   if (!$("lightbox").open) $("lightbox").showModal();
 }
 $("lbPrev").onclick = () => openLightbox(Math.max(0, S.lb - 1));

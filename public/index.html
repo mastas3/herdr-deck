@@ -55,7 +55,8 @@
     <div class="dock" id="dock">
       <div class="cmeta"><div class="nowbar" id="nowbar" hidden></div><div class="statusline" id="statusline" hidden></div></div>
       <div class="qbar" id="qbar" hidden aria-label="Queued messages"></div>
-      <div class="catt" id="cAtt" hidden></div>
+      <div class="catt" id="cAtt" role="list" aria-label="Attachments" hidden></div>
+      <span class="sr" id="cAttLive" aria-live="polite"></span>
       <form class="composer" id="composer" hidden>
         <div class="slashpop" id="slashPop" hidden role="listbox" aria-label="Commands"></div>
         <textarea id="cText" rows="1" placeholder="Message" enterkeyhint="send" autocomplete="off"></textarea>

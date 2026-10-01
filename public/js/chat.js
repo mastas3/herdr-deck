@@ -171,8 +171,11 @@ function blockHTML(b, key) {
   if (b.kind === "gap") return `<button class="gapbtn" data-gap="${m.i}" data-gapto="${m.to}">⋯ ${m.to - m.i} more messages here · show them</button>`;
   if ((b.kind === "user" || b.kind === "pending") && bangCmd(m.text) != null) return runCardHTML(b, key);
   if (b.kind === "user" || b.kind === "pending") {
-    const long = (m.text ?? "").length > 900;
-    return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
+    // "[Attached: <path>]" lines show as the files they name (attach-view.js); copying still gives the lines.
+    const a = splitAttachments(m.text), long = a.text.length > 900;
+    const body = a.text || !a.files.length ? `<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(a.text)}</div>` : "";
+    const same = a.files.some((f) => f.kind === "image"); // a Codex app thread's native images are these pictures again
+    return `<div class="msg user${b.kind === "pending" ? " pending" : ""}${a.files.length ? " has-atts" : ""}">${MSG_TOOLS}${body}${attachMsgHTML(a.files, key)}${same ? "" : imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
   }
   if (b.kind === "assistant") return `<div class="msg assistant">${MSG_TOOLS.replace("</span>", codexForkPointButton(m, key) + "</span>")}<div class="md">${md(m.text)}</div>${imgs(m.images)}<div class="t">${esc(when(m.at))}</div></div>`;
   if (b.kind === "note") return `<div class="note${/^Recap:/.test(m.text) ? " recap" : ""}">${/^Recap:/.test(m.text) ? mdLite(m.text) : esc(m.text)}</div>`;
