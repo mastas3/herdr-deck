@@ -1,12 +1,11 @@
 /* ── the dock under the chat: one solid frame holding the status strip, the queue, attachments and the message box ──
    It reads as its own surface, raised off the chat: a lighter fill, a real edge and a soft shadow; focused, its edge
-   takes the accent and a ring. On a desktop it spans the chat column (wider than the prose, as wide as most code). */
-.detail { --dock-w: 880px; }
+   takes the accent and a ring. On a desktop it is as wide as the chat's text column (--col, session.css). */
 .dock {
   --dock-bg: color-mix(in srgb, var(--raise) 95%, var(--ink));
   --dock-line: color-mix(in srgb, var(--line-2) 88%, var(--ink));
   --dock-sh: 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent) inset, 0 14px 34px -16px rgb(0 0 0 / .65), 0 3px 10px -4px rgb(0 0 0 / .35);
-  flex: none; width: calc(100% - 28px); max-width: var(--dock-w); margin: 4px auto 14px; border: 1px solid var(--dock-line); border-radius: 18px;
+  flex: none; width: var(--col); max-width: calc(100% - 28px); margin: 4px auto 14px; border: 1px solid var(--dock-line); border-radius: 18px;
   background: var(--dock-bg); box-shadow: var(--dock-sh); overflow: hidden;
   transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
 }
@@ -53,13 +52,13 @@
 .detail .jumpbtm { bottom: calc(var(--dock-h, 90px) + 26px); }
 .detail .appbar, .detail .askbox { border-bottom: 0; }
 /* The answer box and the plugins' bar (a report card) sit in the message box's column, not across the whole pane. */
-.detail > .askbox, .detail > .pbar { flex: none; width: calc(100% - 28px); max-width: var(--dock-w); margin: 0 auto 8px; }
+.detail > .askbox, .detail > .pbar { flex: none; width: var(--col); max-width: calc(100% - 28px); margin: 0 auto 8px; }
 html:not([data-simple]) .detail > .askbox { border: 1px solid color-mix(in srgb, var(--blocked) 22%, var(--line)); border-radius: 12px; padding: 8px 10px; }
 
 /* ── phone: the frame keeps its compact shape (one line to start, bigger tap targets) ── */
 @media (max-width: 760px) {
-  .dock { width: calc(100% - 16px); margin: 0 auto calc(8px + env(safe-area-inset-bottom)); border-radius: 16px; --dock-sh: 0 6px 18px -10px rgb(0 0 0 / .5); }
-  .detail > .askbox, .detail > .pbar { width: calc(100% - 16px); }
+  .dock { width: calc(100% - 16px); max-width: none; margin: 0 auto calc(8px + env(safe-area-inset-bottom)); border-radius: 16px; --dock-sh: 0 6px 18px -10px rgb(0 0 0 / .5); }
+  .detail > .askbox, .detail > .pbar { width: calc(100% - 16px); max-width: none; }
   .cmeta { padding: 5px 10px; gap: 10px; }
   .nowbar .prog, .nowbar .what { display: none; }
   .statusline { gap: 9px; }

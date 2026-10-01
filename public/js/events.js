@@ -177,7 +177,7 @@ $("q").addEventListener("keydown", (e) => {
 $("paletteBtn").onclick = (e) => { e.preventDefault(); openPalette(); };
 $("paletteMini").onclick = () => openPalette();
 $("newBtn").onclick = openNew;
-$("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed font size"); };
+$("fitBtn").onclick = () => { S.fit = !S.fit; store("fit", S.fit); fitTerm(); toast(S.fit ? "Fitting the pane’s width" : "Fixed size: the screen scrolls sideways"); };
 $("listToggle").onclick = () => { app.classList.toggle("list-off"); store("listOff", app.classList.contains("list-off")); lastOrder = ""; $("mini")._h = ""; render(); setTimeout(fitTerm, 0); };
 
 let fileCtx = null;

@@ -24,26 +24,66 @@ async function pollTerm(first) {
       if (!res.same) {
         termHash = res.hash;
         termText = res.text;
-        const el = $("screen");
-        const atBottom = first === true || el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-        let text = res.text.replace(/\s+$/, "");
-        if (isPhone()) { const cols = Math.max(20, Math.floor((el.clientWidth - 24) / 6.9)); text = text.replace(/[─━═▀▄_]{24,}/g, (m) => m.slice(0, cols)); }
-        el.innerHTML = ansi(text);
-        if (atBottom) el.scrollTop = el.scrollHeight;
+        paintTerm(first === true);
       }
     } catch {}
   }
   fitTerm();
   termTimer = setTimeout(pollTerm, typing ? 150 : r.status === "working" ? 500 : 1400);
 }
+/** Draw the screen's text. Where lines wrap (the phone, or a pane too wide to fit), long divider lines are cut to the
+ *  visible width so they don't wrap into a block of rules. */
+function paintTerm(toEnd) {
+  const el = $("screen");
+  const atBottom = toEnd || el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+  let text = termText.replace(/\s+$/, "");
+  if (isPhone() || el.classList.contains("wrap")) {
+    const cols = Math.max(20, Math.floor((el.clientWidth - 24) / (isPhone() ? 6.9 : parseFloat(el.style.fontSize || "11") * termCharW())));
+    text = text.replace(/[─━═▀▄_]{24,}/g, (m) => m.slice(0, cols));
+  }
+  el.innerHTML = ansi(text);
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+/** A monospace character's width per pixel of font size, measured once the font is in (JetBrains Mono: about 0.6). */
+let termRatio = 0;
+function termCharW() {
+  if (termRatio) return termRatio;
+  const s = document.createElement("span");
+  s.textContent = "M".repeat(50);
+  s.style.cssText = "position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;font:100px var(--mono)";
+  document.body.append(s);
+  const w = s.getBoundingClientRect().width / 5000;
+  s.remove();
+  if (w > 0.3 && w < 1) termRatio = w;
+  return termRatio || 0.6;
+}
+document.fonts?.ready.then(() => { termRatio = 0; fitTerm(); });
+/** The widest line on screen, in characters (when herdr didn't say how wide the pane is). */
+const termCols = (t) => Math.max(0, ...t.replace(/\x1b\[[0-9;:?]*[A-Za-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "").split("\n").map((l) => l.replace(/\s+$/, "").length));
+const TERM_MIN = 9; // below this a fitted screen is too small to read: it wraps at a readable size instead
+/** Fit (the default, Fit on): the pane's whole width shows at the largest size up to 13.5px; when that would be
+ *  under 9px, the lines wrap at 11px instead. Never a sideways scrollbar. Fit off: a fixed 12.5px and scrolling. */
 function fitTerm() {
   const r = rowOf(S.sel);
-  const el = $("screen");
-  if (isPhone()) { el.style.fontSize = ""; return; }
-  let size = 12.5;
-  if (S.fit && r?.cols && el.clientWidth) size = Math.max(8, Math.min(13.5, (el.clientWidth - 26) / (r.cols * 0.6)));
-  const v = size.toFixed(2) + "px";
-  if (el.style.fontSize !== v) el.style.fontSize = v;
+  const el = $("screen"), btn = $("fitBtn");
+  btn.classList.toggle("on", !!S.fit);
+  btn.setAttribute("aria-pressed", String(!!S.fit));
+  btn.title = S.fit ? "Fitting the pane’s width (click for a fixed size that scrolls)" : "Fixed size, scrolls sideways (click to fit the pane’s width)";
+  if (isPhone()) { el.style.fontSize = ""; el.classList.remove("wrap", "fit"); return; }
+  let size = 12.5, wrap = false;
+  const cols = Math.max(r?.cols || 0, termCols(termText));
+  if (S.fit && cols && el.clientWidth) {
+    const cs = getComputedStyle(el);
+    const fit = (el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 2) / (cols * termCharW());
+    if (fit >= TERM_MIN) size = Math.min(13.5, Math.floor(fit * 100) / 100); else { size = 11; wrap = true; }
+  }
+  const v = size.toFixed(2) + "px", was = el.classList.contains("wrap");
+  const end = el.scrollHeight - el.scrollTop - el.clientHeight < 40, sized = el.style.fontSize !== v;
+  if (sized) el.style.fontSize = v;
+  el.classList.toggle("fit", !!S.fit);
+  el.classList.toggle("wrap", wrap);
+  if (wrap !== was || wrap) { const k = `${wrap}:${el.clientWidth}`; if (k !== fitTerm.k) { fitTerm.k = k; if (termText) paintTerm(end); } }
+  if (end && (sized || wrap !== was)) el.scrollTop = el.scrollHeight; // a new size or wrapping keeps you at the end
 }
 const KEYMAP = { Enter: "enter", Escape: "esc", Backspace: "backspace", Tab: "tab", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
 let typeOps = [], typeTimer = null;

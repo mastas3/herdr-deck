@@ -37,18 +37,26 @@
 .dbody { flex: 1; overflow-y: auto; min-height: 0; overscroll-behavior: contain; scroll-behavior: auto; position: relative; }
 .pad { padding: 20px 26px 40px; max-width: 900px; margin: 0 auto; }
 
-/* The conversation: a readable measure (about 76 characters of prose), centered in its column. Code blocks and
-   tables may run wider (up to 1100px), centered on the same line, so nothing wide has to scroll early. */
-.detail { --measure: 560px; }
+/* The conversation spans its column: as wide as the pane allows, less a gutter that grows with it, up to 920px of
+   text (about 125 characters; wider stops reading as lines). Code blocks and tables run wider still (up to 1240px),
+   centered on the same line. The message box, the answer box and a report card take the same width (dock.css), so
+   their edges line up with the chat's. --col is worked out once against the whole pane (.detail) and inherited as a
+   length, so the chat and the box below it use the same number. The phone keeps the full width (phone.css). */
+@property --col { syntax: "<length>"; inherits: true; initial-value: 560px; }
+@property --wide { syntax: "<length>"; inherits: true; initial-value: 1100px; }
+.detail { container-type: inline-size; --measure: var(--col); }
 .dbody { container-type: inline-size; }
-.chat { padding: 12px 22px 18px; display: flex; flex-direction: column; gap: 10px; max-width: calc(var(--measure) + 44px); margin: 0 auto; }
+.detail > :is(.dbody, .dock, .askbox, .pbar, .appbar) { --gut: clamp(16px, 3cqw, 48px); --col: max(280px, min(100cqw - 2 * var(--gut) - 44px, 920px)); --wide: max(280px, min(100cqw - 2 * var(--gut), 1240px)); }
+/* A scrollbar (where the system draws one) takes the same room on both sides, so the chat stays centered on the box. */
+.dbody:has(> .chat) { scrollbar-gutter: stable both-edges; }
+.chat { padding: 12px 22px 18px; display: flex; flex-direction: column; gap: 10px; max-width: calc(var(--col) + 44px); margin: 0 auto; }
 /* A reply with code or a table widens as a whole (a message clips what overflows it); its prose stays on the line. */
-.chat .msg.assistant:has(> .md > :is(pre, .cb, table)) { max-width: none; margin-inline: min(0px, calc((100% - min(100cqw - 44px, 1100px)) / 2)); }
-.chat .msg.assistant:has(> .md > :is(pre, .cb, table)) > :is(.t, .thumbs), .chat .msg.assistant:has(> .md > :is(pre, .cb, table)) > .md > :not(pre, .cb, table) { max-width: var(--measure); margin-inline: auto; }
+.chat .msg.assistant:has(> .md > :is(pre, .cb, table)) { max-width: none; margin-inline: min(0px, calc((100% - var(--wide)) / 2)); }
+.chat .msg.assistant:has(> .md > :is(pre, .cb, table)) > :is(.t, .thumbs), .chat .msg.assistant:has(> .md > :is(pre, .cb, table)) > .md > :not(pre, .cb, table) { max-width: var(--col); margin-inline: auto; }
 .chat .msg.assistant > .md > table { width: fit-content; max-width: 100%; margin-inline: auto; }
 .chat .more { align-self: center; }
 .msg { content-visibility: auto; contain-intrinsic-size: auto 60px; }
-.msg.user { align-self: flex-end; max-width: min(78%, 680px); background: var(--me); border-radius: 16px 16px 4px 16px; padding: 9px 13px; }
+.msg.user { align-self: flex-end; max-width: min(75%, 720px); background: var(--me); border-radius: 16px 16px 4px 16px; padding: 9px 13px; }
 .msg.user.pending { opacity: .6; }
 .msg.user .body { font: 15.5px/1.5 var(--read); white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.user .body.clamp { display: -webkit-box; -webkit-line-clamp: 12; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }

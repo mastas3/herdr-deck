@@ -40,6 +40,7 @@
   .tabsbar { overflow-x: auto; scrollbar-width: none; margin-left: -8px; }
   .tabsbar button { flex: none; }
   .chat { padding: 10px 12px 14px; }
+  .detail > :is(.dbody, .dock, .askbox, .pbar, .appbar) { --col: 100cqw; } /* the chat keeps the whole width */
   .msg.user { max-width: 88%; }
   .msgbar { padding: 8px 12px; }
   .filedlg { width: 100vw; height: 92dvh; }
