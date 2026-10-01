@@ -10,6 +10,7 @@ function render() {
   requestAnimationFrame(() => { queued = false; renderNow(); });
 }
 function renderNow() {
+  treeIndex(); // each dispatcher's workers, for the list, the header, Info and the board
   renderMachines();
   if (S.view === "closed") renderClosed(); else renderList();
   renderLive();
@@ -49,27 +50,40 @@ function renderLive() {
   const head = working.length ? `<span class="spin"></span>Running <b>${working.length}</b>${blocked.length ? `<span class="lvx"> · ${blocked.length} waiting</span>` : ""}` : `<span class="dot" style="--c:var(--blocked)"></span>Waiting <b>${blocked.length}</b>`;
   setHTML(el, `<span class="lt">${head}${subs ? `<span class="lvx"> · ${subs} subagent${subs === 1 ? "" : "s"}</span>` : ""}</span><span class="spacer"></span><span class="dim">${S.board && !(isPhone() && app.dataset.mview === "list") ? "Close board" : "Live board"}${ICON.chev}</span>`);
 }
+/** Sections of the list. Each holds families (list-tree.js): a session and the workers it dispatched, which go
+ *  wherever it goes (its project, its worktree, its place in the queue). `rows` counts every row, `open` is what shows. */
 function listGroups(rows) {
+  const fams = treeFams(rows);
   if (S.group === "project") {
-    const empty = rows.filter((r) => r.empty && !fresh(r));
-    const by = new Map();
-    for (const r of rows) if (!r.empty || fresh(r)) by.set(r.project, [...(by.get(r.project) ?? []), r]);
+    const lone = (f) => f.members.every((r) => r.empty && !fresh(r));
+    const empty = treeFams(fams.filter(lone).flatMap((f) => f.members));
+    const by = new Map(), head = new Map();
+    for (const f of fams) {
+      if (lone(f)) continue;
+      const h = f.root ?? f.lead;
+      for (const r of f.members) head.set(r.key, h);
+      by.set(h.project, [...(by.get(h.project) ?? []), ...f.members]);
+    }
     const rank = (rs) => (rs.some((r) => r.status === "blocked" || r.status === "done") ? 0 : rs.some((r) => r.status === "working") ? 1 : 2);
     const latest = (rs) => Math.max(...rs.map(act));
     const groups = [...by.entries()].sort((a, b) => rank(a[1]) - rank(b[1]) || latest(b[1]) - latest(a[1]))
       .map(([p, rs]) => {
         rs.sort((a, b) => ["blocked", "done", "working"].indexOf(b.status) - ["blocked", "done", "working"].indexOf(a.status) || act(b) - act(a));
         // The main checkout's sessions sit right under the project, each linked worktree's in a sub-section after them.
-        const w = splitWorktrees(p, rs, S.closedProj);
-        return { key: "p:" + p, label: p, proj: p, rows: w.rows, open: w.open, main: w.main, trees: w.trees, branch: w.branch, dir: projectHome(p)?.cwd, closed: !!S.closedProj[p] };
+        const w = splitWorktrees(p, rs, S.closedProj, (r) => head.get(r.key) ?? r);
+        const main = treeFams(w.main), trees = w.trees.map((t) => ({ ...t, fams: treeFams(t.rows) }));
+        const open = treeShown(main).concat(...trees.map((t) => (t.closed ? [] : treeShown(t.fams))));
+        return { key: "p:" + p, label: p, proj: p, rows: w.rows, open, fams: main, trees, branch: w.branch, dir: projectHome(p)?.cwd, closed: !!S.closedProj[p] };
       });
-    if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty, closed: S.closedSecs.empty !== false });
+    if (empty.length) groups.push({ key: "empty", label: "Empty", rows: empty.flatMap((f) => f.members), open: treeShown(empty), fams: empty, closed: S.closedSecs.empty !== false });
     return groups;
   }
-  // Priority: one attention-ordered list; old and empty sessions fold away at the bottom.
-  const main = rows.filter((r) => rank(r) < 5), tail = rows.filter((r) => rank(r) >= 5);
-  const out = [{ key: "all", label: "", rows: main, closed: false, flat: true }];
-  if (tail.length) out.push({ key: "old", label: `Stale & empty`, rows: tail, closed: S.closedSecs.old !== false, tail: true });
+  // Priority: one attention-ordered list; old and empty sessions fold away at the bottom. A family goes by its most
+  // urgent row (its first).
+  const main = fams.filter((f) => rank(f.lead) < 5), tail = fams.filter((f) => rank(f.lead) >= 5);
+  const sec = (fs, o) => ({ rows: fs.flatMap((f) => f.members), open: treeShown(fs), fams: fs, ...o });
+  const out = [sec(main, { key: "all", label: "", closed: false, flat: true })];
+  if (tail.length) out.push(sec(tail, { key: "old", label: `Stale & empty`, closed: S.closedSecs.old !== false, tail: true }));
   return out.filter((x) => x.rows.length);
 }
 /** The rows a section shows (what keyboard navigation walks): none while folded, and not a folded worktree's. */
@@ -149,13 +163,15 @@ let selWas = null;
 let lastView = "";
 function renderList() {
   const box = $("rows");
-  const rows = visibleRows();
+  // A worker the filter matched brings its dispatcher along (dimmed), so it never shows out of context.
+  const { rows, ctx: ctxKeys } = treeWithContext(visibleRows(), S.rows);
+  treeIndex();
   const byProject = S.group === "project";
   const groups = listGroups(rows);
-  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + (g.branch ?? "") + (g.dir ?? "") + g.rows.map((r) => r.key).join(",")
-    + (g.trees ?? []).map((t) => `/${t.key}${t.closed ? "x" : ""}:${t.branch}:${t.rows.length}`).join("")).join("|");
+  const order = S.group + groups.map((g) => g.key + ":" + (g.closed ? "x" : "") + (g.branch ?? "") + (g.dir ?? "") + treeOrderSig(g.fams)
+    + (g.trees ?? []).map((t) => `/${t.key}${t.closed ? "x" : ""}:${t.branch}:${treeOrderSig(t.fams)}`).join("")).join("|");
   // Anything you changed yourself (filter, grouping, machine, a folded section) applies at once, even under the pointer.
-  const view = [S.group, S.machine, S.q, S.deep?.q ?? "", JSON.stringify(S.closedSecs), JSON.stringify(S.closedProj)].join("\u0001");
+  const view = [S.group, S.machine, S.q, S.deep?.q ?? "", JSON.stringify(S.closedSecs), JSON.stringify(S.closedProj), JSON.stringify(S.treeClosed)].join("\u0001");
   const selHidden = !!S.sel && rows.some((r) => r.key === S.sel) && !rowCache.get(S.sel)?.el.isConnected;
   const force = !lastOrder || box.dataset.view !== "list" || view !== lastView || selHidden || !rows.length || !box.querySelector(".row[data-key]");
   const apply = order !== lastOrder && (force || !orderFrozen());
@@ -184,7 +200,7 @@ function renderList() {
     }
     const ask = pendingAsk(r);
     const why = reasonOf(r, ask?.kind, now);
-    const ctx = JSON.stringify(ask ?? "") + radarChip(r) + rowChips(r, "list") + why.k + !!S.simple + S.machine + multiMachine() + byProject + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
+    const ctx = JSON.stringify(ask ?? "") + radarChip(r) + rowChips(r, "list") + why.k + !!S.simple + S.machine + multiMachine() + byProject + treeCtx(r) + (deepOn ? JSON.stringify(S.deep.byKey.get(r.key) ?? "") + S.q : "");
     // Memory, CPU and process counts aren't in a row: a new reading (the `procs` event) doesn't rebuild it.
     const { rssKB, cpu, procs, ...shown } = r;
     const sig = JSON.stringify(shown) + ctx;
@@ -208,6 +224,7 @@ function renderList() {
     c.el.classList.toggle("sel", S.sel === r.key && !S.board && !S.mode);
     c.el.classList.toggle("picked", S.picked.has(r.key));
     c.el.classList.toggle("stale", !!r.stale && r.status !== "working" && r.status !== "blocked");
+    c.el.classList.toggle("ctx", ctxKeys.has(r.key));
   }
   if (apply) {
     lastOrder = order; lastView = view;
@@ -223,17 +240,17 @@ function renderList() {
         : g.proj && projectHome(g.proj) ? `<span class="padd" data-secact="newin" data-proj="${esc(g.proj)}" role="button" title="New session in ${esc(g.proj)}" aria-label="New session in ${esc(g.proj)}">${ICON.plus}</span>` : "";
       const jour = g.proj && projectLink() ? `<span class="padd pjour" data-secact="journey" data-proj="${esc(g.proj)}" role="button" title="${esc(g.proj)}: project page" aria-label="${esc(g.proj)} project page">${projectLink().icon}</span>` : "";
       const fold = g.proj && projectHome(g.proj) ? folderBtn(g.proj, g.proj) : "";
-      if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; const body = sec.lastChild; for (const r of g.rows) body.append(rowCache.get(r.key).el); frag.append(sec); continue; }
+      if (g.flat) { sec.className = "sec flat"; sec.innerHTML = `<div class="sec-b"></div>`; treeAppend(sec.lastChild, g.fams); frag.append(sec); continue; }
       sec.innerHTML = `<button class="sec-h${g.branch || g.dir ? " has-meta" : ""}" data-sec="${esc(g.key)}" aria-expanded="${!g.closed}">${ICON.chev}<span class="sl">${esc(g.label)}</span> <span class="n">${g.rows.length}</span>${metaLine(g.branch, g.dir)}${dots}${fold}${jour}${extra}</button><div class="sec-b"></div>`;
       const body = sec.lastChild;
-      for (const r of g.main ?? g.rows) body.append(rowCache.get(r.key).el);
+      treeAppend(body, g.fams);
       // Each worktree: a sub-header one level in (⎇, its folder name, branch, count), its sessions one level further.
       for (const t of g.trees ?? []) {
         const wt = document.createElement("div");
         wt.className = "wt" + (t.closed ? " closed" : "");
         const k = t.rows.find((r) => r.projectRoot === t.root)?.key;
         wt.innerHTML = `<button class="sec-h wt-h${t.branch || t.root ? " has-meta" : ""}" data-sec="${esc(t.key)}" aria-expanded="${!t.closed}">${ICON.chev}<span class="wti">${ICON.tree}</span><span class="sl">${esc(t.name)}</span> <span class="n">${t.rows.length}</span>${metaLine(t.branch, t.root)}${t.root && k ? folderBtn(g.proj, t.name, t.root, k) : ""}</button><div class="sec-b"></div>`;
-        for (const r of t.rows) wt.lastChild.append(rowCache.get(r.key).el);
+        treeAppend(wt.lastChild, t.fams);
         body.append(wt);
       }
       frag.append(sec);
@@ -288,13 +305,16 @@ function renderRail(rows) {
   const groups = { needs: [], running: [], quiet: [] };
   let hidden = 0;
   for (const r of rows) { const s = sectionOf(r); if (groups[s]) groups[s].push(r); else hidden++; }
-  for (const g of Object.values(groups)) g.sort((a, b) => rank(a) - rank(b) || act(b) - act(a));
+  // A worker's tile follows its dispatcher's when both are in the same group.
+  for (const [k, g] of Object.entries(groups)) groups[k] = treeShown(treeFamilies(g.sort((a, b) => rank(a) - rank(b) || act(b) - act(a)), S.rows));
   const tile = (r) => {
     const subs = (r.subagents ?? []).filter((x) => x.running).length;
     const since = r.status === "working" && r.turnStartedAt && Date.now() - r.turnStartedAt < 12 * 3600_000 ? r.turnStartedAt : null;
     const tm = since ? `<span class="tm" data-since="${since}">${clock(Date.now() - since)}</span>` : r.status === "blocked" ? `<span class="tm">waiting</span>` : `<span class="tm" data-t="${r.lastActiveAt ?? ""}">${ago(r.lastActiveAt)}</span>`;
-    const tip = `${r.title || r.agent}\n${r.project}${r.launch ? " (via " + r.launch + ")" : ""} · ${paneName(r)}${multiMachine() ? " · " + machineLabel(r.machine) : ""}\n${STATUS_NAME[r.status] ?? r.status}${r.now ? " · " + r.now : ""}${subs ? `\n${subs} subagent${subs === 1 ? "" : "s"} running` : ""}`;
-    return `<button class="tile${S.sel === r.key && !S.board && !S.mode ? " sel" : ""}" data-key="${esc(r.key)}" data-status="${r.status}" style="--pc:${pc(r.project)};--c:${statusVar(r.status)}" title="${esc(tip)}"><span class="ab">${esc(initials(r.project))}</span>${r.status !== "idle" ? '<span class="sd"></span>' : ""}${subs ? `<span class="sb">+${subs}</span>` : ""}<span class="tt">${esc(shortTitle(r.title))}</span>${tm}</button>`;
+    const kids = treeKids(r.key), pr = r.parent?.key ? rowOf(r.parent.key) : null;
+    const fleet = r.parent ? `\nWorker${r.parent.brief ? " #" + r.parent.brief : ""} of “${pr ? treeName(pr) : r.parent.srcName}”` : kids.length ? `\n${treeSummary(kids)}` : "";
+    const tip = `${r.title || r.agent}\n${r.project}${r.launch ? " (via " + r.launch + ")" : ""} · ${paneName(r)}${multiMachine() ? " · " + machineLabel(r.machine) : ""}\n${STATUS_NAME[r.status] ?? r.status}${r.now ? " · " + r.now : ""}${subs ? `\n${subs} subagent${subs === 1 ? "" : "s"} running` : ""}${fleet}`;
+    return `<button class="tile${S.sel === r.key && !S.board && !S.mode ? " sel" : ""}${r.parent ? " kid" : ""}" data-key="${esc(r.key)}" data-status="${r.status}" style="--pc:${pc(r.project)};--c:${statusVar(r.status)}" title="${esc(tip)}"><span class="ab">${esc(initials(r.project))}</span>${r.status !== "idle" ? '<span class="sd"></span>' : ""}${subs ? `<span class="sb">+${subs}</span>` : ""}${r.parent ? `<span class="wk">${ICON.bolt}</span>` : ""}<span class="tt">${esc(shortTitle(r.title))}</span>${tm}</button>`;
   };
   const html = [["needs", "Needs you"], ["running", "Running"], ["quiet", "Quiet"]].filter(([k]) => groups[k].length)
     .map(([k, label]) => `<div class="mh">${label.split(" ")[0]} <span class="n">${groups[k].length}</span></div>${groups[k].map(tile).join("")}`).join("")

@@ -23,6 +23,8 @@ export function createMcp(deps: Deps) {
     key: r.key, title: r.title, project: r.project, machine: machineLabelOf(r.machine), agent: r.agent, status: r.status, needs_you: needsYou(r),
     now: r.step ?? r.now, last_active: r.lastActiveAt ? new Date(r.lastActiveAt).toISOString() : undefined, branch: r.branch, uncommitted: r.dirty,
     last_message: r.lastMessage?.slice(0, 240), servers: r.ports?.map((p) => p.url ?? `localhost:${p.port}`),
+    // A fleet worker: the session that dispatched it (its key when it's open) and the brief.
+    dispatched_by: r.parent ? { key: r.parent.key, name: r.parent.srcName, brief: r.parent.brief } : undefined,
   });
   const fmtMsgs = (msgs: any[]) => msgs.map((m) => m.role === "tool" ? `  [tool] ${m.tool}: ${m.summary ?? ""}` : `${m.role === "user" ? "USER" : m.role === "assistant" ? "AGENT" : m.role.toUpperCase()}${m.at ? ` (${new Date(m.at).toISOString().slice(0, 16)})` : ""}: ${String(m.text ?? "").slice(0, 1500)}`).join("\n");
   const mcpCtx: McpCtx = {

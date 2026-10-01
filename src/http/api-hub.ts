@@ -12,8 +12,12 @@ import { readAudit } from "../mcp";
 import { endpointOk, type Message } from "../push";
 import { routeMessage } from "../route";
 import type { Row } from "../deck";
+import { linkParents } from "../dispatch-links";
 import { json } from "./page";
 import type { Hub } from "./hub";
+
+/** DECK_DEV fake rows posted with a `parent` of their own (the rest are linked like real rows). */
+const fakeParents = new WeakSet<Row>();
 
 export async function hubApi(hub: Hub, path: string, body: any): Promise<Response | undefined> {
   const { DEV, PORT, SELF, deck, push, auto, fakeRows, presence, decisions, scheduleDecisions, fullState } = hub;
@@ -66,7 +70,16 @@ export async function hubApi(hub: Hub, path: string, body: any): Promise<Respons
       // DECK_DEV only: rows that exist nowhere but here, so the automations can be driven end to end.
       if (!DEV) return json({ error: "dev only" }, 403);
       if (body.clear) fakeRows.clear();
-      for (const r of body.rows ?? []) fakeRows.set(String(r.key), { machine: "fake", herdr: "fake", workspaceId: "fake", workspace: "Fake", tabId: String(r.key), tab: "", tabNumber: 0, tabPanes: 1, paneId: String(r.key), agent: "claude", status: "idle", focused: false, title: "fake", cwd: "/tmp", project: "fake", rssKB: 0, cpu: 0, procs: 0, tail: [], empty: false, stale: false, duplicate: false, approx: false, ...r } as Row);
+      for (const r of body.rows ?? []) {
+        const row = { machine: "fake", herdr: "fake", workspaceId: "fake", workspace: "Fake", tabId: String(r.key), tab: "", tabNumber: 0, tabPanes: 1, paneId: String(r.key), agent: "claude", status: "idle", focused: false, title: "fake", cwd: "/tmp", project: "fake", rssKB: 0, cpu: 0, procs: 0, tail: [], empty: false, stale: false, duplicate: false, approx: false, ...r } as Row;
+        if (r.parent) fakeParents.add(row);
+        fakeRows.set(String(r.key), row);
+      }
+      // Workers among them find their dispatcher the way real rows do: this HOME's ledger, and herdr's tokens
+      // (`tokens: { sname, src }` on a fake row) when they have no entry. A row posted with its own `parent` keeps it.
+      const fake = [...fakeRows.values()], tokens = (r: any) => ({ names: [r.tokens?.sname], tokenSrc: r.tokens?.src });
+      const links = linkParents(fake, deck.ledger.read(Date.now(), true), tokens);
+      for (const r of fake) if (!fakeParents.has(r)) { if (links.has(r.key)) r.parent = links.get(r.key); else delete r.parent; }
       fakeRowsChanged();
       auto?.observe();
       return json({ ok: true, rows: fakeRows.size });

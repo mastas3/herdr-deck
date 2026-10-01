@@ -25,6 +25,8 @@ const DECK_KEYS = [
   { sec: "The selected session", id: "resume", keys: ["Y"], when: () => cursel(), label: "Copy its resume command", run: () => { const r = rowOf(cursel()); r.resume ? copy(r.resume, "resume command") : toast("This session has no resume command yet", true); } },
   { sec: "The selected session", id: "rename", keys: ["e"], when: () => { const r = rowOf(cursel()); return r && !r.app && !r.hist; }, label: "Rename it", run: () => renameSession(rowOf(cursel())) },
   { sec: "The selected session", id: "brief", keys: ["b"], when: () => cursel(), label: "Write or rewrite its brief", run: () => writeBrief(cursel()) },
+  { sec: "The selected session", id: "workers", keys: ["w"], when: () => cursel(), label: "Show or hide the workers it dispatched (on a worker: its dispatcher’s)", run: () => toggleTreeSel() },
+  { sec: "The selected session", id: "parent", keys: ["p"], when: () => cursel(), label: "Open the session that dispatched this worker", run: () => gotoTreeParent() },
   { sec: "The selected session", id: "pick", keys: ["s"], when: () => cursel(), label: "Add it to the selection (or ⌘-click a row)", run: () => togglePick(cursel()) },
   { sec: "The selected session", id: "pickall", keys: ["A"], label: "Select every session the list shows (again: clear)", run: () => pickAllShown() },
   { sec: "The selected session", id: "close", keys: ["x"], when: () => cursel() || S.picked.size, label: "Close it or the selection (asks first, then offers Undo)", run: () => askClose(targets()) },

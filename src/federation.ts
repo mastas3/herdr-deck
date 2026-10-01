@@ -167,7 +167,8 @@ export class RemoteHost {
     }
   }
 
-  private tag = (r: Row): Row => ({ ...r, key: `${this.conf.id}|${r.key}`, machine: this.conf.id });
+  /** A node's row under the hub's keys: its own, and its dispatcher's (a worker's parent is on the same machine). */
+  private tag = (r: Row): Row => ({ ...r, key: `${this.conf.id}|${r.key}`, machine: this.conf.id, ...(r.parent?.key ? { parent: { ...r.parent, key: `${this.conf.id}|${r.parent.key}` } } : {}) });
   private tagGrave = (g: any) => ({ ...g, id: `${this.conf.id}|${g.id}`, machine: this.conf.id });
 
   /** One event from the node's stream, in order: numbered ones must follow on from the last applied. */

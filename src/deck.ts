@@ -12,6 +12,7 @@ import { wtRecord } from "./wt-store";
 import { codexAppInstalled, listAppThreads, type AppThread } from "./codexapp";
 import { codexStore } from "./codex-store";
 import { RowFeed, type Usage } from "./row-feed";
+import { CachedJson, createLedgers, linkParents, parseNamesync, type LinkExtra, type ParentLink } from "./dispatch-links";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -81,6 +82,7 @@ export type Row = {
   ports?: { port: number; addr: string; cmd: string; url?: string }[]; // servers this session is running (url: shared on the tailnet)
   check?: any; // proof-of-done result for its project (verify.ts)
   hist?: string; // a past session from the history index: its transcript file
+  parent?: ParentLink; // a fleet worker: the session that dispatched it (src/dispatch-links.ts)
 };
 
 type FgProc = { pid: number; name?: string; argv0?: string; cmdline?: string };
@@ -122,6 +124,9 @@ export class Deck {
   listening: Listen[] = [];
   shared = new Map<number, string>(); // local port → tailnet URL (set by the server from `tailscale serve status`)
   checks = new Map<string, any>(); // project root → proof-of-done result (set by the server)
+  /** Who dispatched which worker (src/dispatch-links.ts), and herdr namesync's sidebar names by pane. */
+  ledger = createLedgers();
+  private namesync = new CachedJson(`${homedir()}/.cache/herdr-namesync.json`, parseNamesync, new Map());
 
   onPatch(fn: (p: Patch) => void) {
     this.listeners.add(fn);
@@ -465,6 +470,8 @@ export class Deck {
   rebuildNow() {
     const rows = new Map<string, Row>();
     const now = Date.now();
+    const names = new Map<string, LinkExtra>(); // what else each pane is called, for finding a worker's dispatcher
+    const synced = this.namesync.read(now);
     for (const s of this.sessions.values()) {
       if (!s.online || !s.snap) continue;
       const tabs = new Map<string, any>(s.snap.tabs.map((t: any) => [t.tab_id, t]));
@@ -501,6 +508,9 @@ export class Deck {
         const projRoot = ins?.project?.root ?? cwdRoot;
         const tree = inWorktree(g, projRoot);
         if (!this.born.has(key)) this.born.set(key, this.bornReady ? Date.now() : 0);
+        // herdr carries namesync's tokens on the pane; its cache file covers a herdr that doesn't (default server only).
+        const tok = p.tokens ?? (s.name === "default" ? synced.get(p.pane_id) : undefined);
+        names.set(key, { names: [tok?.sname, p.terminal_title_stripped, meta?.title], tokenSrc: tok?.src });
         rows.set(key, {
           key,
           bornAt: this.born.get(key) || undefined,
@@ -595,10 +605,18 @@ export class Deck {
     }
     for (const group of bySession.values()) if (group.length > 1) for (const r of group) r.duplicate = true;
     this.attachPorts(rows);
+    this.attachParents(rows, names, now);
 
     this.rows = rows;
     this.bornReady = true;
     this.emit();
+  }
+
+  /** Fleet workers: the session that dispatched each (by the ledger, or herdr's `src` token). */
+  private attachParents(rows: Map<string, Row>, names: Map<string, LinkExtra>, now: number) {
+    const ledger = this.ledger.read(now);
+    if (!ledger.size && ![...names.values()].some((n) => n.tokenSrc)) return;
+    for (const [k, link] of linkParents([...rows.values()], ledger, (r) => names.get(r.key) ?? {})) rows.get(k)!.parent = link;
   }
 
   summary() {

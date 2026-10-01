@@ -1,0 +1,60 @@
+/* ── fleet workers under the session that dispatched them (list-tree.js) ── */
+/* The workers sit one level in, on a thin guide that drops from under the dispatcher's dot. */
+.tkids { --guide: color-mix(in srgb, var(--ink-3) 34%, transparent); margin: 0 0 2px 15px; padding-left: 5px; border-left: 1.5px solid var(--guide); }
+.tkids .tkids { margin-left: 15px; }
+/* A worker that needs you lights its stretch of the guide instead of drawing a second bar beside it. */
+.tkids > .row.unseen::before { left: -7px; }
+/* A worker's chip: ⚡ and its brief. Quiet, like the branch chip: it says what the row is, not how it's doing. */
+.row .wkc { flex: none; display: inline-flex; align-items: center; gap: 2px; align-self: center; font: 600 11.5px/17px var(--mono); color: var(--ink-2); padding: 0 6px 0 4px; border-radius: 99px; background: color-mix(in srgb, var(--ink-3) 14%, transparent); }
+.row .wkc svg { width: 11px; height: 11px; flex: none; }
+.row .tl .wkc { display: inline-flex; vertical-align: 1px; margin-right: 6px; }
+.row .ln .wkc { display: inline-flex; vertical-align: 1px; margin-left: 6px; }
+/* A dispatcher's line under its row: the fold caret and how its workers are doing. */
+.row .tgl { grid-column: 2 / -1; justify-self: start; display: inline-flex; align-items: center; gap: 4px; margin: 3px 0 -2px -3px; padding: 1px 7px 1px 3px; border-radius: 6px; font-size: 12.5px; line-height: 18px; color: var(--ink-3); white-space: nowrap; max-width: 100%; overflow: hidden; }
+.row .tgl span { overflow: hidden; text-overflow: ellipsis; }
+.row .tgl svg { width: 12px; height: 12px; flex: none; }
+.row .tgl .chev { width: 13px; height: 13px; transition: transform var(--dur-1); }
+.row .tgl[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.row .tgl:hover { color: var(--ink); background: var(--hover); }
+.row.sel .tgl:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+/* A dispatcher shown only because a filter matched one of its workers. */
+.row.ctx { opacity: .55; }
+.row.ctx:hover, .row.ctx.sel { opacity: .85; }
+/* Workers whose dispatcher isn't open: a dimmed line naming it, the workers under it. */
+.torph { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; border: 0; background: none; padding: 6px 8px 3px; font-size: 13px; color: var(--ink-3); text-align: left; border-radius: 8px; cursor: pointer; }
+.torph:hover { color: var(--ink-2); background: var(--hover); }
+.torph .chev { width: 14px; height: 14px; flex: none; }
+.torph[aria-expanded="false"] .chev { transform: rotate(-90deg); }
+.torph .tl2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.torph .tst { flex: none; white-space: nowrap; }
+.torph .n { flex: none; margin-left: auto; font-variant-numeric: tabular-nums; }
+.torph + .tkids { border-left-style: dashed; }
+/* The collapsed rail: a worker's tile carries a small ⚡. */
+.tile .wk { position: absolute; top: 2px; left: 7px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; color: var(--ink-2); background: var(--side); box-shadow: 0 0 0 1px var(--line-2); }
+.tile .wk svg { width: 10px; height: 10px; }
+/* The live board, the session header and Info. */
+.card .wkline { display: flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 12.5px; color: var(--ink-3); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card .wkline svg { width: 12px; height: 12px; flex: none; }
+.card .wkline b { color: var(--ink-2); font: 600 11.5px var(--mono); }
+.fleetc { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px 1px 7px; border-radius: 99px; font: 600 12.5px/18px var(--sans); color: var(--ink-2); background: color-mix(in srgb, var(--ink-3) 12%, transparent); border: 1px solid var(--line-2); cursor: pointer; max-width: 340px; }
+.fleetc span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fleetc b { font-weight: 600; color: var(--ink); }
+.fleetc svg { width: 13px; height: 13px; flex: none; }
+.fleetc:hover { color: var(--ink); border-color: var(--ink-3); }
+.fleetc.off { cursor: default; border-style: dashed; }
+.fleetc.off:hover { color: var(--ink-2); border-color: var(--line-2); }
+.facts .tlink { display: flex; align-items: center; gap: 7px; border: 0; background: none; padding: 3px 0; color: var(--ink); font: inherit; text-align: left; cursor: pointer; max-width: 100%; }
+.facts .tone { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.facts .tlink:hover { color: var(--accent); }
+.facts .tlink .dot { width: 8px; height: 8px; }
+.facts .tlink b { font: 600 12.5px var(--mono); color: var(--ink-2); }
+[data-simple] .row .tgl, [data-simple] .torph { font-size: 15px; }
+@media (max-width: 760px) {
+  .tkids { margin-left: 16px; padding-left: 4px; }
+  .tkids .tkids { margin-left: 14px; }
+  .tkids > .row.unseen::before { left: -6px; }
+  /* A finger-sized fold. */
+  .row .tgl { padding: 4px 10px 4px 4px; margin: 2px 0 -4px -4px; font-size: 13.5px; }
+  .torph { padding: 9px 10px 5px; font-size: 14px; }
+  .fleetc { max-width: none; } /* the chips' row scrolls sideways: the brief stays readable */
+}

@@ -14,7 +14,7 @@ function renderDetail() {
   if (S.board || !r) return renderBoard();
   $("dh").hidden = false;
   const tab = effTab(S.tab, d, S.simple);
-  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.worktree, r.wtBase, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, tab, S.insp.open, S.sub, S.summary.machines?.length, radarChip(r)]);
+  const hs = JSON.stringify([r.title, r.project, r.launch, r.status, r.model, r.branch, r.worktree, r.wtBase, r.dirty, r.tab, r.tabNumber, r.cwd, r.check?.state, r.check?.cmd, r.check?.at, r.ports, r.lastActiveAt, r.duplicate, r.machine, d?.asks, d?.imagesTotal, tab, S.insp.open, S.sub, S.summary.machines?.length, radarChip(r), treeHeadSig(r)]);
   if (hs !== headSig) { headSig = hs; renderHead(r, d, tab); }
   const cached = S.details.get(S.sel);
   if (cached && cached.stamp !== r.lastActiveAt && !inflight.has(r.key)) { clearTimeout(renderDetail.t); renderDetail.t = setTimeout(() => loadDetail(r.key), 700); }
@@ -53,7 +53,7 @@ function renderDetail() {
     renderChat();
     return;
   }
-  const bs = JSON.stringify([tab, r.key, d, r.subagents, briefBusy.has(r.key)]);
+  const bs = JSON.stringify([tab, r.key, d, r.subagents, briefBusy.has(r.key), tab === "info" ? treeHeadSig(r) : ""]);
   if (bs === bodySig && $("dbody").firstElementChild?.classList.contains("pad")) return;
   bodySig = bs;
   chatDom.key = null;
@@ -73,6 +73,7 @@ function renderHead(r, d, tab) {
     r.worktree ? `<button class="wtm" data-dact="worktree" title="Working in the worktree ${esc(r.worktree)}${r.wtBase ? `, from ${esc(r.wtBase)}` : ""}. Merge, open a PR, keep or remove it">${ICON.tree}worktree</button>` : "",
   ].join("");
   const chips = [
+    treeHeadChip(r), // list-tree.js: who dispatched this worker, or this dispatcher's workers
     radarChip(r),
     r.dirty ? `<span class="wchip" title="${esc(`${r.dirty} file${r.dirty === 1 ? "" : "s"} changed and not committed${r.branch ? ` on ${r.branch}` : ""}`)}">${ICON.warn}${esc(dirtyText(r.dirty))}</span>` : "",
     r.check ? checkChip(r.check, r.project) : "",
@@ -210,6 +211,7 @@ function factsHTML(r, d) {
   fact("Resume with", esc(r.resume), true);
   fact("Model", esc(r.model));
   fact("Launched via", esc(r.launch));
+  for (const [k, v] of treeFacts(r)) fact(k, v);
   fact("Conversation started", (d?.startedAt ?? r.createdAt) ? esc(abs(d?.startedAt ?? r.createdAt)) : "");
   fact("Requests", d?.asks || "");
   fact("Branch", r.branch ? `${esc(r.branch)}${r.dirty ? ` · ${r.dirty} uncommitted` : ""}` : "", true);
@@ -242,7 +244,7 @@ function boardCard(r) {
   const ask = boardAsk(r);
   const tail = (r.tail ?? []).slice(-4).join("\n");
   return `<div class="top"><span class="dot" style="--c:${statusVar(r.status)}"></span><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${multiMachine() ? `<span class="mach">${esc(machineLabel(r.machine))}</span>` : ""}<span class="spacer"></span><span class="hint">${since ? `<span data-since="${since}">${clock(Date.now() - since)}</span>` : esc(STATUS_NAME[r.status])}</span></div>
-      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>${rowChips(r, "board")}
+      <div class="ti">${esc(r.title || r.agent)} <span class="hint">${paneTag(r)}</span></div>${treeBoardLine(r)}${rowChips(r, "board")}
       ${ask ? "" : r.status === "blocked" ? `<div class="now" style="color:var(--blocked)">${esc(plain(r.tail?.[r.tail.length - 1]) || "waiting for you")}</div>` : r.step || r.now ? `<div class="now">${r.todos?.total ? `<span class="stp">${r.todos.done}/${r.todos.total}</span> ` : ""}${esc(r.step ?? "")}${r.step && r.now ? " · " : ""}${esc(nowWords(r.now))}</div>` : ""}
       ${subs.map((x) => `<div class="now"><span class="spin" style="width:9px;height:9px;border-width:1.5px"></span> ${esc(x.type || "agent")}: ${esc(x.description ?? "")}${x.now ? ` · ${esc(x.now)}` : ""}</div>`).join("")}
       ${ask || (tail.trim() ? `<pre>${ansi(tail)}</pre>` : "")}`;
@@ -271,7 +273,8 @@ function renderBoard() {
   chatDom.key = null;
   const rows = [...S.rows.values()].filter(inScope);
   const waits = (r) => r.status === "blocked" || !!pendingAsk(r);
-  const live = rows.filter((r) => r.status === "working" || waits(r)).sort((a, b) => Number(waits(b)) - Number(waits(a)) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0));
+  // A fleet worker's card follows its dispatcher's when both are live.
+  const live = treeShown(treeFamilies(rows.filter((r) => r.status === "working" || waits(r)).sort((a, b) => Number(waits(b)) - Number(waits(a)) || (a.turnStartedAt ?? 0) - (b.turnStartedAt ?? 0)), S.rows));
   const done = rows.filter((r) => unseenDone(r) && !live.includes(r)).sort((a, b) => act(b) - act(a)).slice(0, 12);
   const nWork = live.filter((r) => r.status === "working" && !waits(r)).length, nWait = live.filter(waits).length;
   const box = $("dbody");

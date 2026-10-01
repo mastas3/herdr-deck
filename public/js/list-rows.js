@@ -75,20 +75,23 @@ function commonBranch(rows) {
   return best;
 }
 /** One project's rows (already in list order) split by checkout: the main checkout's first, then one sub-section per
- *  linked worktree, in the order its first row comes. `closed` tells which sub-sections are folded (by key). */
-function splitWorktrees(proj, rows, closed = {}) {
+ *  linked worktree, in the order its first row comes. `closed` tells which sub-sections are folded (by key). `place`
+ *  names the row whose checkout decides (a fleet worker goes where its dispatcher is); only such rows name the branch. */
+function splitWorktrees(proj, rows, closed = {}, place = (r) => r) {
   const main = [], by = new Map();
   for (const r of rows) {
-    if (!r.worktree) { main.push(r); continue; }
-    if (!by.has(r.worktree)) by.set(r.worktree, []);
-    by.get(r.worktree).push(r);
+    const wt = place(r).worktree;
+    if (!wt) { main.push(r); continue; }
+    if (!by.has(wt)) by.set(wt, []);
+    by.get(wt).push(r);
   }
+  const own = (rs) => rs.filter((r) => place(r) === r);
   const trees = [...by].map(([name, rs]) => {
     const key = `w:${proj}/${name}`;
-    return { key, name, rows: rs, branch: commonBranch(rs), root: rs.find((r) => r.projectRoot)?.projectRoot, closed: !!closed[key] };
+    return { key, name, rows: rs, branch: commonBranch(own(rs)), root: own(rs).find((r) => r.projectRoot)?.projectRoot, closed: !!closed[key] };
   });
   // Display order, and what keyboard navigation walks (folded sub-sections are skipped).
-  return { main, trees, branch: commonBranch(main), rows: main.concat(...trees.map((t) => t.rows)), open: main.concat(...trees.map((t) => (t.closed ? [] : t.rows))) };
+  return { main, trees, branch: commonBranch(own(main)), rows: main.concat(...trees.map((t) => t.rows)), open: main.concat(...trees.map((t) => (t.closed ? [] : t.rows))) };
 }
 /** Each row's time-based state at `now` (a new session reads "empty" after 15 minutes): the list's minute ticker redraws
  *  when this changes, so an idle deck moves such rows without waiting for an event. */
@@ -192,7 +195,7 @@ function srcLine(r) {
 const rowChips = (r, where) => deckPlugins.each("row.chips", r, where).filter(Boolean).join("");
 function simpleRow(r) {
   const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
-  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago"${r.status === "working" ? "" : ` data-t="${r.lastActiveAt ?? ""}"`}>${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span> · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}${rowChips(r, "list")}</span>${srcLine(r)}${rowAsk(r)}`;
+  return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago"${r.status === "working" ? "" : ` data-t="${r.lastActiveAt ?? ""}"`}>${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${treeChip(r)} · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}${rowChips(r, "list")}</span>${srcLine(r)}${rowAsk(r)}${treeToggle(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */
 function reasonChip(r, why) {
@@ -236,8 +239,8 @@ function rowHTML(r, byProject, why = reasonOf(r, pendingAsk(r)?.kind, Date.now()
   const subs = running.length ? `<span class="rsub" title="${esc(running.map((x) => `${x.type || "agent"}: ${x.description ?? ""}${x.now ? " · " + x.now : ""}`).join("\n"))}"><span class="spin"></span>${running.length}</span>` : "";
   const dot = `<span class="dot" style="--c:${statusVar(r.status === "done" && r.seen ? "idle" : r.status)}"></span>`;
   const rc = radarChip(r);
-  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}${machIcon(r)}${subs}</span>${agoEl}${line}${rowAsk(r)}`;
+  if (byProject) return `${dot}<span class="tl" style="grid-column:auto">${rc}${treeChip(r)}<b>${esc(r.title || "(untitled)")}</b> <span class="pane">${paneTag(r)}</span>${r.launch ? ` <span class="via">via ${esc(r.launch)}</span>` : ""}${treeWhere(r)}${machIcon(r)}${subs}</span>${agoEl}${line}${rowAsk(r)}${treeToggle(r)}`;
   // Grouped by project, a worktree has its own sub-section; in the priority list the row says so itself.
   const wt = r.worktree ? `<span class="via wtag" title="In the worktree ${esc(r.worktree)}${r.branch ? ` on the branch ${esc(r.branch)}` : ""}">${ICON.tree}${esc(r.branch || r.worktree)}</span>` : "";
-  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${wt}${machIcon(r)}${subs}${rc}</span>${agoEl}${title}${line}${rowAsk(r)}`;
+  return `${dot}<span class="pl"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${treeChip(r)}${r.launch ? `<span class="via">via ${esc(r.launch)}</span>` : ""}${wt}${machIcon(r)}${subs}${rc}</span>${agoEl}${title}${line}${rowAsk(r)}${treeToggle(r)}`;
 }

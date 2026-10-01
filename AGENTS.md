@@ -15,6 +15,8 @@ follow [AGENT_SETUP.md](AGENT_SETUP.md) instead.
   is called from `server.ts` at its place in startup. `src/deck.ts` builds the session rows from herdr's socket
   (`src/herdr.ts`). Transcripts come from `src/agents.ts` / `src/transcript.ts` (Claude Code JSONL, Codex rollouts,
   OpenCode SQLite). `src/federation.ts` is the hub-to-node tunnel. `src/mcp.ts` is the MCP endpoint.
+  `src/dispatch-links.ts` reads fleet ledgers (who dispatched which worker) into each row's `parent`; the list nests
+  workers under it in `public/js/list-tree.js`.
 - Worktrees the deck makes for a session ("Own worktree" in New session) live in `src/wt-*.ts`: `wt-git.ts` (git
   plumbing, branch names, .env files, install command), `wt-create.ts` (the dialog's plan, making one and undoing it
   on failure), `wt-ops.ts` (status, diff, fast-forward merge, remove with a stash, restore), `wt-pr.ts`, `wt-stale.ts`

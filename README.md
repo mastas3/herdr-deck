@@ -493,6 +493,15 @@ and opens the link.
 - Each row shows the title, project, agent, branch with changed-file count, last activity and the last output line.
 - Flags: `empty`, `dup` (two panes on one conversation), `stale` (no activity for 2+ days) and `heavy` (over 1.5 GB).
 - Search takes `-word`, `is:stale`, `is:dup`, `is:empty` and `agent:codex`.
+- **Fleet workers** (sessions another session started in a pane of their own, like Conductor's `factoryctl dispatch
+  launch`) sit under the session that dispatched them, one level in, with their brief (⚡ #PS1). The dispatcher's row
+  says how they're doing ("3 workers · 1 running · 2 done") and folds them away (click the line, or `w`); a worker
+  that needs you stays in sight, and lifts its dispatcher up the list. Workers whose dispatcher isn't open sit together
+  under a dimmed line naming it. `p` opens a worker's dispatcher; Info lists a dispatcher's workers. The links come
+  from the machine's ledger, `~/.config/herdr/dispatch-map.json` (`{ "<worker session id>": { "src": "<dispatcher's
+  name>", "brief": "PS1", "src_sid": "<dispatcher session id>" } }`, `src_sid` optional; other tools can write the same
+  shape to `~/.config/herdr-deck/dispatch-map.json`), or herdr's `$src` token. Claude's in-process subagents are
+  something else: the "N subagents" badge and the inspector's Subagents tab.
 - Filter by status, agent or project. Sort by what needs you, last active, newest, project, memory or context size.
   Group by project, status, agent or workspace.
 

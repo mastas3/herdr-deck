@@ -110,8 +110,8 @@ describe("worktrees inside a project", () => {
 describe("simple mode row", () => {
   // Rows re-render only when something shown changes (no longer every few seconds), so a time label must tick by itself.
   const fn = src.slice(src.indexOf("function simpleRow"), src.indexOf("/** The reason chip"));
-  const simpleRow = new Function("SIMPLE_STATUS", "statusVar", "esc", "ago", "pc", "radarChip", "rowChips", "srcLine", "rowAsk", `${fn}; return simpleRow;`)(
-    { idle: ["idle", ""], working: ["working", "…"] }, () => "", String, () => "3m", () => "", () => "", () => "", () => "", () => "");
+  const simpleRow = new Function("SIMPLE_STATUS", "statusVar", "esc", "ago", "pc", "radarChip", "rowChips", "srcLine", "rowAsk", "treeChip", "treeToggle", `${fn}; return simpleRow;`)(
+    { idle: ["idle", ""], working: ["working", "…"] }, () => "", String, () => "3m", () => "", () => "", () => "", () => "", () => "", () => "", () => "");
   test("its time since last activity is a live label; a working row's isn't a time", () => {
     expect(simpleRow(row({ lastActiveAt: NOW }))).toContain(`<span class="ago" data-t="${NOW}">3m</span>`);
     expect(simpleRow(row({ status: "working", lastActiveAt: NOW }))).not.toContain("data-t");
