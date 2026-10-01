@@ -1,0 +1,13 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "aether",
+  "name": "Aether",
+  "version": "0.1.0",
+  "description": "One project island, a live agent, and a path back to its conversation.",
+  "server": "server.ts",
+  "client": ["aether-model.js", "aether.js"],
+  "styles": ["aether.css"],
+  "machine": "hub",
+  "routes": ["/aether-art/"]
+}

@@ -118,6 +118,7 @@ export const VIEWS = {
   "codex-queue-open": `(async () => { select("fake:codex", { open: true }); codexViews.set(S.sel, await api("/api/codex-state", { key: S.sel })); renderDetail(); const button = document.querySelector("[data-native-queue-open]"); if (!button) throw new Error("Native queue handoff is missing"); button.click(); })()`,
   "tools-menu": `select("fake:blocked", { scroll: true, open: true }); openToolMenu(document.querySelector('[data-dact="tools"]') ?? $("cRecipe"))`,
   inbox: `setMode("inbox")`,
+  aether: `if (deckPlugins.has("aether")) { Object.assign(rowOf("fake:working"), { sessionId: "fixture-aether-session" }); aetherPin("fake:working"); setMode("aether"); }`,
   history: `setMode("history")`,
   tools: `setMode("tools")`,
   connections: `setMode("connections")`,
@@ -163,7 +164,7 @@ export const VIEWS = {
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr", "review", "workers", "releases", "shipped", "private", "chat-sent"];
+const NEWER = ["aether", "plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr", "review", "workers", "releases", "shipped", "private", "chat-sent"];
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {
