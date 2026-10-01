@@ -1,0 +1,46 @@
+/* ── a command you ran: its card in your column (run-card.js), from Run until its result, then its output ── */
+/* The card's frame is its inner box (it clips the output and the sweep); the card itself only places it, so its
+   copy/select tools can still sit above its top edge like any message's. */
+.msg.user.runcard { width: fit-content; min-width: min(100%, 360px); max-width: min(92%, 720px); padding: 0; background: none; border-radius: 0; }
+.msg.user.runcard.pending { opacity: 1; }
+.runcard .rc-box { position: relative; background: color-mix(in srgb, var(--me) 50%, var(--raise)); border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--line-2)); border-radius: 14px 14px 4px 14px; overflow: hidden; }
+.runcard .rc-cmd { display: flex; align-items: baseline; gap: 8px; padding: 9px 14px 6px; font: 600 13.5px/1.45 var(--mono); color: var(--ink); }
+.runcard .rc-p { color: var(--accent); flex: none; }
+.runcard .rc-cmd code { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; }
+.runcard .rc-st { display: flex; align-items: center; gap: 7px; padding: 0 14px 9px; font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.runcard .rc-st svg { width: 14px; height: 14px; flex: none; }
+.runcard .rc-st .spin { width: 11px; height: 11px; border-width: 1.5px; }
+.runcard .rc-st.done svg, .runcard .rc-st.done b { color: var(--idle); }
+.runcard .rc-st:is(.failed, .sendfail) svg, .runcard .rc-st:is(.failed, .sendfail) b { color: var(--blocked); }
+.runcard .rc-st.queued svg { color: var(--working); }
+.runcard .rc-st.lost svg { color: var(--ink-3); }
+.runcard .rc-el { color: var(--ink); font-weight: 600; }
+/* Running: a thin bar sweeps along the top edge. */
+.rc-box:is(.running, .sending)::before { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: linear-gradient(90deg, transparent, var(--working), transparent); animation: sweep 1.6s var(--ease-in-out) infinite; }
+.rc-box.queued { border-style: dashed; }
+.rc-box:is(.failed, .sendfail) { border-color: color-mix(in srgb, var(--blocked) 45%, var(--line-2)); }
+.runcard .rc-out { margin: 0; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--code-bg); color: var(--ink); font: 12.5px/1.5 var(--mono); white-space: pre; overflow: auto; max-height: min(60vh, 520px); tab-size: 4; }
+.runcard .rc-out.clamp { max-height: calc(6 * 1.5em + 16px); overflow-y: hidden; mask-image: linear-gradient(to bottom, #000 65%, transparent); }
+.runcard .rc-out.live { color: var(--ink-2); max-height: calc(12 * 1.5em + 16px); }
+.runcard .rc-ft { display: flex; align-items: center; gap: 14px; padding: 6px 14px 8px; border-top: 1px solid var(--line); font-size: 12.5px; }
+.runcard .rc-out + .rc-ft { border-top: 0; background: var(--code-bg); padding-top: 2px; }
+.runcard .rc-lnk { border: 0; background: none; padding: 2px 0; color: var(--accent); font: inherit; font-weight: 600; }
+.runcard .rc-lnk:hover { text-decoration: underline; }
+.runcard .rc-ft .btn { margin-right: -6px; }
+.msg.user.runcard.hl { animation: none; }
+.runcard.hl .rc-box { animation: hl 2.2s var(--ease-out); }
+/* The code block a run came from: when it ran and how it went, then "Run again", under the block. */
+.cb.ran > .cbt { position: static; justify-content: flex-end; opacity: 1; padding: 5px 0 0; }
+.cb.ran > pre { padding-right: 12px; }
+.cbran { border: 1px solid var(--line-2); background: var(--raise); color: var(--ink-2); border-radius: 7px; padding: 3px 10px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cbran:hover { border-color: var(--accent); color: var(--ink); }
+.cbran.done { color: var(--idle); }
+.cbran:is(.failed, .sendfail) { color: var(--blocked); }
+@media (max-width: 760px) {
+  .msg.user.runcard { max-width: 100%; min-width: 0; width: 100%; }
+}
+/* No hover on a touch screen: a message's tools stay out; on a card they sit in its header's corner. */
+@media (hover: none) {
+  .msg.user.runcard > .mt { float: none; position: absolute; top: 5px; right: 6px; margin: 0; z-index: 3; }
+  .runcard .rc-cmd { padding-right: 68px; }
+}

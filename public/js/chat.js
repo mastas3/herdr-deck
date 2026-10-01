@@ -19,7 +19,10 @@ function mergeChat(key, slice, sub) {
     c.first = Math.min(c.first, m.i);
     c.last = Math.max(c.last, m.i);
   }
-  c.pending = settlePending(c.pending, slice.messages).filter((p) => Date.now() - p.at < 90_000);
+  const was = c.pending;
+  // A command you ran (run-card.js) waits for its result as long as a command may take; anything else 90 s.
+  c.pending = settlePending(c.pending, slice.messages).filter((p) => Date.now() - p.at < (p.run ? 1_800_000 : 90_000));
+  for (const p of was) if (p.run && p.echo != null && !c.pending.includes(p)) runEchoed(p.run, key, p.echo);
   c.v++;
   if (S.sel === key && S.sub === (sub ?? null)) renderChat();
 }
@@ -108,7 +111,7 @@ function settlePending(pending, messages) {
     if (m.role !== "user" || !left.length) continue;
     const t = sendWords(m.text);
     const hit = left.find((p) => m.i > (p.after ?? -1) && (sendWords(p.text) === t || (t.length > 200 && sendWords(p.text).startsWith(t.slice(0, 200)))));
-    if (hit) left = left.filter((p) => p !== hit);
+    if (hit) { hit.echo = m.i; left = left.filter((p) => p !== hit); }
   }
   return left;
 }
@@ -125,6 +128,8 @@ function chatBlocks(c) {
     flush(m.i);
     if (prevI != null && m.i - prevI > 1) { group = null; blocks.push({ key: "gap" + prevI, kind: "gap", ms: [{ i: prevI + 1, to: m.i }] }); }
     prevI = m.i;
+    // A command's Shell row is shown inside the command's card (run-card.js), once the card has the output.
+    if (m.role === "tool" && m.of != null && c.msgs.get(m.of)?.shell) continue;
     const agent = m.role === "tool" && /^(agent|task)$/i.test(m.tool ?? "");
     if (m.role === "tool" && !agent) {
       if (!group) { group = { key: "t" + m.i, kind: "tools", ms: [] }; blocks.push(group); }
@@ -164,6 +169,7 @@ function blockHTML(b, key) {
   const m = b.ms[0];
   const imgs = (list) => (list?.length ? `<div class="thumbs">${list.map((id) => `<button data-cimg="${esc(id)}"><img loading="lazy" decoding="async" alt="" src="${imgUrl(key, id, S.sub)}" onerror="this.parentElement.hidden=true"></button>`).join("")}</div>` : "");
   if (b.kind === "gap") return `<button class="gapbtn" data-gap="${m.i}" data-gapto="${m.to}">⋯ ${m.to - m.i} more messages here · show them</button>`;
+  if ((b.kind === "user" || b.kind === "pending") && bangCmd(m.text) != null) return runCardHTML(b, key);
   if (b.kind === "user" || b.kind === "pending") {
     const long = (m.text ?? "").length > 900;
     return `<div class="msg user${b.kind === "pending" ? " pending" : ""}">${MSG_TOOLS}<div class="body${long ? " clamp" : ""}" ${long ? "data-toggle" : ""}>${esc(m.text)}</div>${imgs(m.images)}<div class="t">${b.kind === "pending" ? "sending…" : esc(when(m.at))}</div></div>`;
@@ -301,7 +307,7 @@ function decorateLatest(wrap, blocks, r) {
     }
   }
   // A turn is running but nothing has come back yet: say so, in the chat, where you're looking.
-  if (r.status === "working" && tailBlock && (tailBlock.kind === "user" || tailBlock.kind === "pending")) {
+  if (r.status === "working" && tailBlock && (tailBlock.kind === "user" || (tailBlock.kind === "pending" && bangCmd(tailBlock.ms[0].text) == null))) {
     if (think) { if (think.nextElementSibling) { wrap.append(think); think.style.animation = "none"; } think = null; }
     else {
       const d = document.createElement("div");

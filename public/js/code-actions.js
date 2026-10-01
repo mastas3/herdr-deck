@@ -1,5 +1,6 @@
 // Copy and Run on code blocks. Run sends a "!" command to the session it was written in:
-// Claude Code runs a message that starts with "!" as a shell command. You confirm (and can edit) it first.
+// Claude Code runs a message that starts with "!" as a shell command. You confirm (and can edit) it first; the
+// chat then shows the run as a card (run-card.js).
 const canRunCode = (r) => !!r && r.agent === "claude" && !r.app && !r.hist && r.status !== "empty" && !S.mode;
 const renderDetailBeforeCode = renderDetail;
 renderDetail = function (...a) {
@@ -17,6 +18,5 @@ document.addEventListener("click", async (e) => {
   if (!canRunCode(r)) return toast("Run works in a live Claude Code session", true);
   const cmd = await askDialog({ title: "Run this command?", text: `It runs in “${r.title}” on ${machineLabel(r.machine)}, as if you typed it there.`, input: code.trim(), multiline: true, ok: "Run", selectInput: false });
   if (!cmd || !cmd.trim()) return;
-  try { await api("/api/send", { key: r.key, text: cmd.trim().startsWith("!") ? cmd.trim() : `! ${cmd.trim()}` }); toast("Sent to run"); }
-  catch (err) { toast(err.message, true); }
+  runCommand(r, cmd, code); // the run's card in the chat shows it from here on (run-card.js)
 }, true);

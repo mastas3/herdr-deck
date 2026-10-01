@@ -2,7 +2,17 @@
 // The composer: sending, queued messages, long pastes as chips, the "/" menu and file uploads.
 // ── sending ──────────────────────────────────────────────────────────────
 const codexSendReceipts = new Map();
-function autosize(el) { el.style.height = ""; el.style.height = Math.min(el.scrollHeight, innerHeight * 0.34) + "px"; }
+/** The box fits its text. Measured with its transition off, then eased from the old height to the new one. */
+function autosize(el) {
+  const was = el.style.height;
+  el.style.transition = "none"; el.style.height = "";
+  const h = Math.min(el.scrollHeight, innerHeight * 0.34) + "px";
+  el.style.height = was; void el.offsetHeight; el.style.transition = "";
+  el.style.height = h;
+  if (el.id === "cText") syncSendLook();
+}
+/** Send looks off while there's nothing to send (no words, no pasted blocks); it still works as before. */
+function syncSendLook() { $("cSend").classList.toggle("empty", !$("cText").value.trim() && !(S.sel && pasteList(S.sel).length)); }
 async function sendMessage(text, fromEl, how) {
   const key = S.sel;
   const r = rowOf(key);
@@ -66,7 +76,7 @@ async function sendReadyMessage(r, text, fromEl, how) {
 $("composer").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("cText").value.trim(), $("cText"), e.submitter?.id === "cSteer" ? "steer" : undefined); });
 $("reply").addEventListener("submit", (e) => { e.preventDefault(); sendMessage($("replyText").value.trim(), $("replyText")); });
 for (const [id, form] of [["cText", "composer"], ["replyText", "reply"]]) {
-  $(id).addEventListener("input", (e) => { autosize(e.target); if (S.sel) S.drafts.set(S.sel, e.target.value); });
+  $(id).addEventListener("input", (e) => { autosize(e.target); if (S.sel) S.drafts.set(S.sel, e.target.value); syncSendLook(); });
   $(id).addEventListener("keydown", (e) => {
     if (e.key === "Enter" && e.altKey && !e.isComposing) { e.preventDefault(); return sendMessage(e.target.value.trim(), e.target, "later"); }
     if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); $(form).requestSubmit(); }
@@ -153,6 +163,7 @@ function renderPastes() {
   el.hidden = !l.length;
   const html = l.map((p) => { const lines = p.text.split("\n").length; return `<span class="pchip" data-pid="${p.id}"><span class="pk">${esc(p.kind.toUpperCase())}</span><button class="pl" data-pact="view" title="Preview">Pasted text · ${lines.toLocaleString()} lines · ${p.text.length < 1024 * 1024 ? Math.max(1, Math.round(p.text.length / 1024)) + " KB" : (p.text.length / 1048576).toFixed(1) + " MB"}</button><button class="ib" data-pact="inline" title="Put the text in the message instead">${ICON.note}</button><button class="ib" data-pact="remove" title="Remove">${ICON.x}</button></span>`; }).join("") + (l.length ? `<span class="hint">Sent as ${l.length > 1 ? "files" : "a file"} the agent reads</span>` : "");
   if (el._h !== html) motion.keyed(el, "data-pid", () => setHTML(el, html));
+  syncSendLook();
 }
 $("cAtt").addEventListener("click", (e) => {
   const b = e.target.closest("[data-pact]");

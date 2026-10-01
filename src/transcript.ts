@@ -10,6 +10,7 @@ import { codexReplyHash } from "./codex-fork-point";
 import { codexForkHistory, type CodexHistoryPlan } from "./codex-fork-history";
 import { attachCodexGenerated, readCodexGenerated } from "./codex-generated";
 import { subRunning } from "./subagent-state";
+import { clipShell, pairShell, type ShellResult } from "./shell-out";
 
 const HOME = homedir();
 
@@ -31,6 +32,8 @@ export type Msg = {
   codexTurnId?: string;
   forkAfterTurnId?: string;
   forkReplyHash?: string;
+  shell?: ShellResult; // a "! command" you ran: how it went and what it printed (clipped), once it finished
+  of?: number; // a Shell row: the command (by index) whose result it is
 };
 export type Detail = {
   gen: number; // bumps when a transcript is re-read from scratch, so cursors from before are void
@@ -167,9 +170,12 @@ function claudeAsk(o: any): string | undefined {
 function shellRun(d: Detail, at: number | undefined, cmd: string) {
   push(d, { role: "user", at, text: "! " + cmd.trim() });
 }
-function shellOut(d: Detail, at: number | undefined, out: string, failed: boolean) {
+/** The one-line Shell row stays (history, search and the MCP read it); the command also keeps the whole output,
+ *  clipped, and the row says whose result it is, so the chat shows the two as one card. */
+function shellOut(d: Detail, at: number | undefined, out: string, failed: boolean, full = out) {
   const first = out.replace(/\x1b\[[0-9;]*m/g, "").split("\n").map((l) => l.trim()).find(Boolean) ?? "no output";
-  push(d, { role: "tool", at, tool: "Shell", summary: oneLine(first), state: failed ? "error" : "done" });
+  const k = pairShell(d.messages, clipShell(full, failed));
+  push(d, { role: "tool", at, tool: "Shell", summary: oneLine(first), state: failed ? "error" : "done", ...(k >= 0 ? { of: d.messages[k].i } : {}) });
 }
 /** Codex records a shell command you ran as a user message wrapped in <user_shell_command>. */
 function codexShell(content: any): { cmd: string; out: string; failed: boolean } | undefined {
@@ -248,7 +254,7 @@ function feedClaude(st: State, line: string, offset: number) {
       if (cmd?.trim()) { shellRun(d, at, cmd); d.turnStartedAt = at; }
     } else if (/^\s*<bash-std(out|err)>/.test(raw)) {
       const out = raw.match(/<bash-stdout>([\s\S]*?)<\/bash-stdout>/)?.[1] ?? "", err = raw.match(/<bash-stderr>([\s\S]*?)<\/bash-stderr>/)?.[1] ?? "";
-      shellOut(d, at, out.trim() ? out : err, !out.trim() && !!err.trim());
+      shellOut(d, at, out.trim() ? out : err, !out.trim() && !!err.trim(), [out, err].filter((x) => x.trim()).join("\n"));
     } else if (/^\s*<command-name>/.test(raw)) {
       const cmd = raw.match(/<command-name>([^<]+)<\/command-name>/)?.[1];
       const args = raw.match(/<command-args>([^<]*)<\/command-args>/)?.[1];

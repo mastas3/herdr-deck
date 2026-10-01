@@ -1,0 +1,78 @@
+/* ── the dock under the chat: one solid frame holding the status strip, the queue, attachments and the message box ──
+   It reads as its own surface, raised off the chat: a lighter fill, a real edge and a soft shadow; focused, its edge
+   takes the accent and a ring. On a desktop it spans the chat column (wider than the prose, as wide as most code). */
+.detail { --dock-w: 880px; }
+.dock {
+  --dock-bg: color-mix(in srgb, var(--raise) 95%, var(--ink));
+  --dock-line: color-mix(in srgb, var(--line-2) 88%, var(--ink));
+  --dock-sh: 0 1px 0 color-mix(in srgb, var(--ink) 6%, transparent) inset, 0 14px 34px -16px rgb(0 0 0 / .65), 0 3px 10px -4px rgb(0 0 0 / .35);
+  flex: none; width: calc(100% - 28px); max-width: var(--dock-w); margin: 4px auto 14px; border: 1px solid var(--dock-line); border-radius: 18px;
+  background: var(--dock-bg); box-shadow: var(--dock-sh); overflow: hidden;
+  transition: border-color var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out);
+}
+/* Light themes: a white sheet on the grey page; the shadow is lighter so it stays a lift, not a smudge. */
+:root:is([data-theme="light"], [data-theme="paper"], [data-theme="latte"], [data-theme="github"]) .dock { --dock-bg: var(--raise); --dock-line: var(--line-2); --dock-sh: 0 12px 30px -16px rgb(15 25 40 / .28), 0 2px 6px -2px rgb(15 25 40 / .12); }
+@media (prefers-color-scheme: light) { :root:not([data-theme]) .dock { --dock-bg: var(--raise); --dock-line: var(--line-2); --dock-sh: 0 12px 30px -16px rgb(15 25 40 / .28), 0 2px 6px -2px rgb(15 25 40 / .12); } }
+.dock:focus-within { border-color: color-mix(in srgb, var(--accent) 75%, var(--dock-line)); box-shadow: var(--dock-sh), 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+/* The status strip: what the agent is doing now (left) and what's being used up (right), quiet, at the top. */
+.cmeta { display: flex; align-items: center; gap: 14px; padding: 6px 16px 5px; border-bottom: 1px solid color-mix(in srgb, var(--line) 70%, transparent); font-size: 12px; color: var(--ink-3); min-width: 0; white-space: nowrap; background: color-mix(in srgb, var(--dock-bg) 55%, var(--side)); }
+.cmeta:not(:has(> :not([hidden]))) { display: none; }
+.dock:has(.nowbar:not([hidden])) .cmeta { background: color-mix(in srgb, var(--working) 8%, var(--dock-bg)); color: var(--ink-2); }
+.nowbar { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1 1 auto; overflow: hidden; }
+.nowbar .spin { width: 10px; height: 10px; border-width: 1.5px; }
+.nowbar b { font-variant-numeric: tabular-nums; }
+.nowbar .what { font: 12px var(--mono); color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.nowbar .step { color: var(--ink); font-family: var(--sans); font-size: 12.5px; font-weight: 600; margin-right: 6px; }
+.nowbar .prog { width: 54px; }
+.nowbar .sub-n { display: inline-flex; align-items: center; gap: 5px; flex: none; border: 0; background: none; padding: 1px 6px; border-radius: 6px; color: var(--ink-2); font-size: 12.5px; }
+.nowbar .sub-n:hover { background: var(--hover); color: var(--ink); }
+.nowbar .sub-n svg { width: 13px; height: 13px; }
+.statusline { display: flex; align-items: center; gap: 12px; flex: none; margin-left: auto; min-width: 0; overflow: hidden; }
+.cmeta .nowbar[hidden] + .statusline { margin-left: 0; }
+.statusline .meter .mb { width: 44px; }
+.dock .qbar, .dock .catt { background: none; border-top: 0; padding: 10px 14px 0; }
+.dock .qbar { border-bottom: 0; }
+/* The box: at least two lines, it grows with the text (up to a third of the screen), the tools sit on one row under it. */
+.composer { display: flex; flex-direction: column; gap: 6px; padding: 12px 10px 10px 16px; }
+.composer textarea { width: 100%; resize: none; min-height: 50px; max-height: 34vh; background: transparent; border: 0; padding: 2px 4px 2px 0; font: 15.5px/1.5 var(--read); color: var(--ink); outline: none; transition: height var(--dur-2) var(--ease-out); }
+.composer textarea::placeholder { color: var(--ink-3); opacity: 1; }
+.ctbar { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ctbar .ctools, .ctbar .mchip { height: 34px; border-radius: 10px; background: transparent; border-color: color-mix(in srgb, var(--line-2) 70%, transparent); }
+.ctbar .mchip { min-width: 0; flex: 0 1 auto; }
+.ctbar .btn { border-radius: 10px; padding: 6px 14px; }
+.ctbar #cAttach { width: 34px; height: 34px; border-radius: 10px; color: var(--ink-2); }
+.ctbar #cAttach:hover { background: var(--hover); color: var(--ink); }
+/* Send: a solid button with its arrow; it looks off while there's nothing to send, and says its key on hover. */
+.ctbar #cSend { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 15px 0 12px; border-radius: 11px; font-weight: 700; box-shadow: 0 1px 0 color-mix(in srgb, #fff 18%, transparent) inset, 0 2px 6px -2px color-mix(in srgb, var(--accent) 55%, transparent); }
+.ctbar #cSend svg { width: 15px; height: 15px; flex: none; }
+.ctbar #cSend.empty:not(:hover) { opacity: .5; box-shadow: none; }
+.ctbar :is(#cSend, #cSteer)[data-hint]::after { content: attr(data-hint); position: absolute; right: 0; bottom: calc(100% + 7px); padding: 2px 7px; border-radius: 6px; background: var(--ink); color: var(--bg); font: 600 11px/1.5 var(--mono); white-space: nowrap; pointer-events: none; opacity: 0; transform: translateY(3px); transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out); }
+@media (hover: hover) { .ctbar :is(#cSend, #cSteer)[data-hint]:hover::after { opacity: 1; transform: none; transition-delay: .35s; } }
+#cSteer { position: relative; }
+.slashpop { left: 8px; right: 8px; }
+.detail .jumpbtm { bottom: calc(var(--dock-h, 90px) + 26px); }
+.detail .appbar, .detail .askbox { border-bottom: 0; }
+/* The answer box and the plugins' bar (a report card) sit in the message box's column, not across the whole pane. */
+.detail > .askbox, .detail > .pbar { flex: none; width: calc(100% - 28px); max-width: var(--dock-w); margin: 0 auto 8px; }
+html:not([data-simple]) .detail > .askbox { border: 1px solid color-mix(in srgb, var(--blocked) 22%, var(--line)); border-radius: 12px; padding: 8px 10px; }
+
+/* ── phone: the frame keeps its compact shape (one line to start, bigger tap targets) ── */
+@media (max-width: 760px) {
+  .dock { width: calc(100% - 16px); margin: 0 auto calc(8px + env(safe-area-inset-bottom)); border-radius: 16px; --dock-sh: 0 6px 18px -10px rgb(0 0 0 / .5); }
+  .detail > .askbox, .detail > .pbar { width: calc(100% - 16px); }
+  .cmeta { padding: 5px 10px; gap: 10px; }
+  .nowbar .prog, .nowbar .what { display: none; }
+  .statusline { gap: 9px; }
+  .composer { padding: 6px 6px 6px 10px; gap: 2px; }
+  .composer textarea { font-size: 16px; min-height: 26px; padding: 3px 2px; }
+  .ctbar .btn { padding: 7px 14px; font-size: 15.5px; }
+  .ctbar .ctools, .ctbar .mchip, .ctbar #cAttach { height: 32px; border-radius: 9px; }
+  .ctbar #cAttach { width: 32px; }
+  .ctbar #cSend { height: auto; padding: 7px 14px; border-radius: 9px; box-shadow: none; }
+  .ctbar #cSend svg, .ctbar :is(#cSend, #cSteer)::after { display: none; }
+}
+/* Simple mode keeps its big, round controls (these rules outrank the ones above). */
+[data-simple] .ctbar #cSend { height: 48px; border-radius: 16px; font-size: 17px; padding: 0 20px 0 16px; }
+[data-simple] .ctbar #cAttach { width: 52px; height: 52px; border-radius: 16px; }
+[data-simple] .ctbar #cSend.empty:not(:hover) { opacity: .7; }
+@media (max-width: 760px) { [data-simple] .ctbar #cSend, [data-simple] .ctbar #cAttach { height: 46px; } [data-simple] .ctbar #cAttach { width: 46px; } }

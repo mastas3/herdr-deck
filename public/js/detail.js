@@ -30,12 +30,13 @@ function renderDetail() {
   const busy = (r.app ? codexView(r)?.status === "working" : r.status === "working") && isAgent(r);
   $("cSend").disabled = !!r.app && (codexSending.has(r.key) || codexConnecting.has(r.key));
   $("cSteer").disabled = $("cSend").disabled;
-  $("cSend").textContent = r.app && codexConnecting.has(r.key) ? "Connecting…" : r.app && busy ? "Queue" : "Send";
+  const sendLabel = r.app && codexConnecting.has(r.key) ? "Connecting…" : r.app && busy ? "Queue" : "Send";
+  if ($("cSend").textContent !== sendLabel) $("cSend").querySelector(".sl").textContent = sendLabel; // the arrow icon stays
   $("cSend").title = busy ? "Send now; the agent picks it up while it works (⌥Enter: hold it until it finishes)" : "Send (Enter)";
   $("cSteer").hidden = !(r.app && busy);
   if (r.app && busy) $("cSend").title = "Send after the current turn; Steer sends now";
   renderQueue(r);
-  renderPastes();
+  renderPastes(); // (it also sets how Send looks)
   renderStatusLine(r);
   syncDock(); // the frame's height settles before the chat restores its place (inspector.js)
   $("cText").placeholder = r.agent === "shell" ? "Run a command" : r.status === "blocked" ? r.app ? "Reply to Codex" : "Answer, or use the keys above" : `Message ${r.agent === "claude" ? "Claude" : r.agent === "codex" ? "Codex" : r.agent === "opencode" ? "OpenCode" : r.agent}`;
