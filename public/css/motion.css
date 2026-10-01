@@ -26,7 +26,7 @@
 
 /* ── press: anything you tap gives a little and springs back; hover lifts what opens something ── */
 :where(.btn, .ib, .chip, .seg button, .seg2 button, .views button, .machines button, .tile, .ropt, .ctools, .sec-h, .gapbtn,
-  .jumpbtm, .keys button, .askbox .ks button, .jevtog, .livebar, .menu button, .pal-list button, .slashpop .si, .pchip .pl,
+  .jumpbtm, .keys button, .askbox .ks button, .jevtog, .livebar, .menu button, .pal-list button, .slashpop .si, .achip .a-main, .afile, .aimg,
   .fold, .port, .sl-acct, .cbrun, .agent-card, .card, .row, .choice, .vclose, .newpill, .sugg button) {
   transition: transform var(--dur-3) var(--ease-spring), background-color var(--dur-1) linear, border-color var(--dur-1) linear,
     color var(--dur-1) linear, box-shadow var(--dur-2) var(--ease-out), opacity var(--dur-2) var(--ease-out), filter var(--dur-1) linear;
@@ -35,7 +35,7 @@
   :where(.card, .choices:is(.pickable, .can) .choice, .agent-card:not(:disabled), .jumpbtm):hover { transform: translateY(-1px); }
 }
 :where(.btn, .ib, .chip, .seg button, .seg2 button, .views button, .machines button, .tile, .ropt, .ctools, .gapbtn, .jumpbtm,
-  .keys button, .askbox .ks button, .jevtog, .pchip .pl, .fold, .port, .sl-acct, .cbrun, .vclose, .newpill, .sugg button):active:not(:disabled) {
+  .keys button, .askbox .ks button, .jevtog, .achip .a-main, .afile, .aimg, .fold, .port, .sl-acct, .cbrun, .vclose, .newpill, .sugg button):active:not(:disabled) {
   transform: scale(var(--press)); transition-duration: var(--dur-1); transition-timing-function: var(--ease-out);
 }
 :where(.row, .sec-h, .card, .choice, .agent-card, .livebar, .menu button, .pal-list button, .slashpop .si):active:not(:disabled) {
@@ -118,6 +118,8 @@
 @media (max-width: 760px) {
   .menu { animation-name: popup; }
   .toasts { left: 12px; right: 12px; bottom: calc(84px + env(safe-area-inset-bottom)); align-items: stretch; }
+  /* With attachments in the box, toasts float above it instead of over its chips. */
+  .app[data-mview="detail"]:has(#cAtt:not([hidden])) ~ .toasts { bottom: calc(max(84px, var(--dock-h, 0px) + 16px) + env(safe-area-inset-bottom)); }
 }
 /* Reduce motion: everything lands at once. (motion.js checks the same two switches before it animates.) */
 @media (prefers-reduced-motion: reduce) {
