@@ -62,6 +62,7 @@ html:not([data-simple]) .detail > .askbox { border: 1px solid color-mix(in srgb,
   .cmeta { padding: 5px 10px; gap: 10px; }
   .nowbar .prog, .nowbar .what { display: none; }
   .statusline { gap: 9px; }
+  .dock .qbar, .dock .catt { padding: 8px 12px 0; }
   .composer { padding: 6px 6px 6px 10px; gap: 2px; }
   .composer textarea { font-size: 16px; min-height: 26px; padding: 3px 2px; }
   .ctbar .btn { padding: 7px 14px; font-size: 15.5px; }
