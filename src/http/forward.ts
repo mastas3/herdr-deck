@@ -38,11 +38,13 @@ export function createForward(deps: Deps) {
       }
       return json({ results });
     }
-    if (["/api/new", "/api/new-options", "/api/codex-create", "/api/codex-archived", "/api/worktrees"].includes(path)) {
+    if (["/api/new", "/api/new-options", "/api/start", "/api/codex-create", "/api/codex-archived", "/api/worktrees"].includes(path)) {
       const remote = body.machine && body.machine !== deps.selfId ? remotes.get(body.machine) : undefined;
+      if (body.machine && body.machine !== deps.selfId && !remote) return json({ error: "That machine is no longer configured. Choose a machine again." }, 400);
       if (!remote) return;
       const r = await remote.post(path, { ...body, machine: undefined });
-      if (["/api/new", "/api/codex-create"].includes(path) && r.data?.key) r.data.key = `${remote.conf.id}|${r.data.key}`;
+      if (["/api/new", "/api/start", "/api/codex-create"].includes(path) && r.data?.key) r.data.key = `${remote.conf.id}|${r.data.key}`;
+      if (path === "/api/new-options" && Array.isArray(r.data?.starts)) r.data.starts = r.data.starts.map((s: any) => ({ ...s, key: s.key ? `${remote.conf.id}|${s.key}` : undefined }));
       if (path === "/api/codex-archived" && Array.isArray(r.data?.tasks)) r.data.tasks = r.data.tasks.map((t: any) => ({ ...t, key: `${remote.conf.id}|${t.key}` }));
       return json(r.data, r.status);
     }

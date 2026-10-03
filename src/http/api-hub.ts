@@ -1,3 +1,4 @@
+import { claudeProfileForFile } from "../claude-profiles";
 // The deck's own API, part 1: push and automations, history, tools, machines, decisions, Jev and MCP.
 // Each function answers the paths it knows and returns undefined for the rest (src/http/routes.ts tries them in turn).
 import { existsSync, readFileSync } from "node:fs";
@@ -101,7 +102,7 @@ export async function hubApi(hub: Hub, path: string, body: any): Promise<Respons
       const h = historySession(String(body.key));
       if (!h) return json({ error: "not in the history index" }, 404);
       if (!h.cwd || !existsSync(h.cwd)) return json({ error: `its folder is gone: ${h.cwd}` }, 400);
-      return json(await startSession({ kind: h.agent, cwd: h.cwd, args: h.agent === "claude" ? ["--resume", h.id] : ["resume", h.id], label: h.title.slice(0, 40), focus: !!body.focus }));
+      return json(await startSession({ kind: h.agent, cwd: h.cwd, claudeProfile: h.agent === "claude" ? claudeProfileForFile(h.file) : undefined, args: h.agent === "claude" ? ["--resume", h.id] : ["resume", h.id], label: h.title.slice(0, 40), focus: !!body.focus }));
     }
     case "/api/history-rescan":
       rescanHistory();

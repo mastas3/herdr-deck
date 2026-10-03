@@ -157,7 +157,17 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
       return json(body.hash === hash ? { same: true, hash } : { text, hash });
     }
     case "/api/new-options":
-      return json({ ...await newSessionOptions(deck, graves), codexApp: hub.codexLifecycle?.capabilities() });
+      return json({ ...await newSessionOptions(deck, graves), codexApp: hub.codexLifecycle?.capabilities(), starts: hub.sessions.starts.list(), startError: hub.sessions.starts.error() });
+    case "/api/start": {
+      const r = hub.sessions.starts.get(String(body.id));
+      if (!r) return json({ error: "Saved start not found" }, 404);
+      if (body.op === "dismiss") {
+        if (["creating", "starting", "sending"].includes(r.state)) return json({ error: "This session is still starting" }, 409);
+        hub.sessions.starts.update(r.id, { state: "dismissed" }); deck.refresh();
+      }
+      if (body.op === "restore" && r.state === "dismissed") { hub.sessions.starts.update(r.id, { state: "unknown" }); deck.refresh(); }
+      return json({ ...r, signature: undefined });
+    }
     case "/api/new":
       pluginHost.service<{ mkdirRun(b: unknown): void }>("game")?.mkdirRun(body); // a quest run's new folder, only now that you confirmed the dialog
       return json(await startSession(body));
@@ -229,7 +239,11 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
     case "/api/slash": {
       const row = localRow(body.key);
       if (!row) return json({ error: "gone" }, 404);
-      return json({ agent: row.agent, commands: await slashCommands(row.agent, row.projectRoot ?? row.cwd ?? "") });
+      const commands = [...await slashCommands(row.agent, row.projectRoot ?? row.cwd ?? "", row.claudeProfile)];
+      for (const c of pluginHost.contributions("slash.commands")) {
+        try { commands.push(...await c.get(row)); } catch {} // an unavailable plugin leaves native commands usable
+      }
+      return json({ agent: row.agent, commands: [...new Map(commands.map(c => [c.cmd, c])).values()] });
     }
     case "/api/reopen":
       return json(await reopen(body.id));

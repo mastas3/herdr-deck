@@ -11,6 +11,7 @@ import { claudeDetail, codexDetail, forgetTranscript, type Detail } from "./tran
 import { inferProject, projectRoot, displayName } from "./projects";
 import { HISTORY_DB, SCHEMA } from "./history-schema";
 import { isPrivatePath } from "./private-folder";
+import { claudeProjectDirs } from "./claude-profiles";
 
 const HOME = homedir();
 const db = new Database(HISTORY_DB, { create: true });
@@ -45,7 +46,7 @@ function walk(dir: string, out: string[], depth = 0) {
 function sources(): Src[] {
   const out: Src[] = [];
   const claude: string[] = [];
-  walk(`${HOME}/.claude/projects`, claude);
+  for (const dir of claudeProjectDirs()) walk(dir, claude);
   for (const f of claude) {
     const name = basename(f, ".jsonl");
     if (name.startsWith("agent-") || f.includes("/subagents/") || f.includes("claude-mem-observer")) continue; // sidechains belong to their parent; memory-plugin observers are noise

@@ -6,12 +6,14 @@ let newOpts = null, newKind = load("newKind", "claude"), newMachine = null, pend
 let nSel = { model: "", effort: "", mode: "" };
 let newCodexTarget = load("newCodexTarget", "app"), newOptionsSeq = 0;
 let newCodexReceipt = null;
+let newSessionReceipt = load("newSessionReceipt", null), newSubmitting = false;
 const newCodexApp = () => newKind === "codex" && newCodexTarget === "app" && !!newOpts?.codexApp?.create;
 async function loadNewOptions() {
   const seq = ++newOptionsSeq;
-  newOpts = null; renderKinds();
+  newOpts = null; renderKinds(); renderSavedStarts();
   try { const opts = await api("/api/new-options", { machine: newMachine }); if (seq !== newOptionsSeq) return; newOpts = opts; }
   catch (e) { if (seq !== newOptionsSeq) return; newOpts = { recent: [], projects: [], argHints: {}, choices: {} }; toast(e.message, true); }
+  renderSavedStarts();
   const cur = rowOf(S.sel);
   const saved = load("newCwd:" + newMachine, "");
   $("nCwd").value = saved || (cur && cur.machine === newMachine ? home(cur.projectRoot ?? cur.cwd) : "") || home(newOpts.recent[0] ?? "");
@@ -37,6 +39,7 @@ function ownFolder(r, name) {
   return { cwd: `${String(r.cwd).replace(/\/+$/, "")}/${slug}`, mkdir: true };
 }
 async function openNew(pre) {
+  pre = pre?.cwd ? pre : load("newSessionDraft", null) || pre;
   pre = pre && pre.cwd ? pre : undefined;
   newMkdir = pre?.mkdir ? pre.cwd : null; // quests: a new run's folder is made only when you confirm
   const cur = rowOf(S.sel);
@@ -48,13 +51,19 @@ async function openNew(pre) {
   $("nPrompt").value = pre?.prompt ?? ""; $("nLabel").value = pre?.label ?? "";
   newKind = pre?.kind ?? load("newKind", newKind); // Discover prefills Claude Code for that one session; your saved choice is untouched
   $("nFocus").checked = load("newFocus", false);
-  $("newDlg").querySelector("h3").textContent = pre?.title ?? (pre ? `New session in ${pre.project}` : "New session");
+  $("newDlg").querySelector("h3").textContent = pre?.title ?? (pre ? `New session in ${pre.project || pre.cwd.split("/").pop()}` : "New session");
   if (pre) $("nCwd").value = home(pre.cwd);
   $("newDlg").showModal();
   wtNewReset();
   renderKinds();
   await loadNewOptions();
-  if (pre) { $("nCwd").value = home(pre.cwd); renderCmd(); wtNewPlan(0); }
+  if (pre) {
+    $("nCwd").value = home(pre.cwd);
+    if (pre.model !== undefined) { nSel = { model: pre.model, effort: pre.effort || "", mode: pre.mode || "" }; renderAgentOpts(); }
+    if (pre.args !== undefined) $("nArgs").value = Array.isArray(pre.args) ? pre.args.join(" ") : pre.args;
+    for (const c of deckPlugins.contributions("new.fields")) c.restore?.(pre);
+    renderCmd(); wtNewPlan(0);
+  }
   if (!isPhone()) (newKind === "shell" ? $("nCwd") : $("nPrompt")).focus();
 }
 function renderKinds() {
@@ -131,23 +140,32 @@ $("nArgsSugg").addEventListener("click", (e) => { const b = e.target.closest("[d
 $("nCwdSugg").addEventListener("click", (e) => { const b = e.target.closest("[data-cwd]"); if (b) { $("nCwd").value = b.dataset.cwd; renderCmd(); } });
 $("nPrompt").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); $("nOk").click(); } });
 async function submitNewSession() {
+  if (newSubmitting) return;
+  newSubmitting = true;
   const body = { machine: newMachine, kind: newKind, cwd: $("nCwd").value.trim(), ...(newKind === "shell" ? {} : nSel), args: $("nArgs").value.trim(), prompt: newKind === "shell" ? "" : $("nPrompt").value, label: $("nLabel").value.trim(), focus: $("nFocus").checked };
   if (newMkdir && home(newMkdir) === body.cwd) body.mkdir = true; // quests: startRun
   wtNewApply(body);
   for (const c of deckPlugins.contributions("new.fields")) try { c.apply?.(body); } catch (e) { console.error("new.fields:", e); }
   store("newCwd:" + newMachine, body.cwd); store("args:" + newKind, body.args); store("newFocus", body.focus);
+  store("newSessionDraft", body);
   try {
     const native = newCodexApp();
     const nativeBody = { machine: body.machine, cwd: body.cwd, title: body.label, prompt: body.prompt, mkdir: body.mkdir };
     const signature = JSON.stringify(nativeBody);
     if (native && newCodexReceipt?.signature !== signature) newCodexReceipt = { signature, id: crypto.randomUUID() };
-    const result = native ? await api("/api/codex-create", { ...nativeBody, requestId: newCodexReceipt.id }) : await api("/api/new", body);
+    const sessionSignature = JSON.stringify(body);
+    if (!native && newSessionReceipt?.signature !== sessionSignature) newSessionReceipt = { signature: sessionSignature, id: crypto.randomUUID() };
+    if (!native) store("newSessionReceipt", newSessionReceipt);
+    const result = native ? await api("/api/codex-create", { ...nativeBody, requestId: newCodexReceipt.id }) : await api("/api/new", { ...body, requestId: newSessionReceipt.id });
+    if (!native) { newSessionReceipt = null; store("newSessionReceipt", null); }
+    store("newSessionDraft", null);
     if (native) newCodexReceipt = null;
     const { key } = result;
     if (native && key && result.promptSent === false && result.canRetryPrompt !== false && !result.deliveryUnknown && !result.promptPersisted && body.prompt) S.drafts.set(key, body.prompt);
     pendingSelect = key;
     if (S.rows.has(key)) { pendingSelect = null; select(key, { scroll: true, open: true }); }
     toast(native && result.deliveryUnknown ? "Task created. First-message delivery is uncertain; check its conversation before sending again." : native && result.canRetryPrompt === false ? `Task created; its conversation has changed. ${result.error ?? "Open it in Codex to continue."}` : native && result.promptSent === false && body.prompt ? `Task created; first message ${result.promptPersisted ? "saved in Codex" : "kept as a draft"}. ${result.error ?? "Reconnect to continue."}` : native ? "Created a Codex app task" : newKind === "shell" ? "Opened a shell" : result.worktree ? `Starting ${newKind} in a worktree on ${result.worktree.branch}…` : `Starting ${newKind}…`, !!(native && (result.error || result.deliveryUnknown)));
-  } catch (e) { if (e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") newCodexReceipt = null; toast("Couldn’t start: " + e.message, true); }
+  } catch (e) { if (e.code && e.code !== "CODEX_DELIVERY_UNKNOWN") newCodexReceipt = null; toast("Couldn’t start: " + e.message + " First message kept here. Check New session → Saved starts before retrying.", true); }
+  finally { newSubmitting = false; }
 }
 $("newDlg").addEventListener("close", () => { if ($("newDlg").returnValue === "ok") void submitNewSession(); });

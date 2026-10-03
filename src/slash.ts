@@ -90,10 +90,10 @@ async function claudeBuiltins(): Promise<Slash[]> {
   return list;
 }
 
-function claudePlugins(): Slash[] {
+function claudePlugins(configDir: string): Slash[] {
   const out: Slash[] = [];
-  const reg = (() => { try { return JSON.parse(readText(`${HOME}/.claude/plugins/installed_plugins.json`)).plugins ?? {}; } catch { return {}; } })();
-  const enabled = (() => { try { return JSON.parse(readText(`${HOME}/.claude/settings.json`)).enabledPlugins ?? {}; } catch { return {}; } })();
+  const reg = (() => { try { return JSON.parse(readText(`${configDir}/plugins/installed_plugins.json`)).plugins ?? {}; } catch { return {}; } })();
+  const enabled = (() => { try { return JSON.parse(readText(`${configDir}/settings.json`)).enabledPlugins ?? {}; } catch { return {}; } })();
   for (const [id, installs] of Object.entries<any>(reg)) {
     if (enabled[id] === false) continue;
     const inst = Array.isArray(installs) ? installs[installs.length - 1] : installs;
@@ -106,13 +106,13 @@ function claudePlugins(): Slash[] {
   return out;
 }
 
-async function claudeCommands(cwd: string): Promise<Slash[]> {
+async function claudeCommands(cwd: string, configDir: string): Promise<Slash[]> {
   return [
     ...mdCommands(join(cwd, ".claude/commands"), "project"),
     ...skillCommands(join(cwd, ".claude/skills"), "project"),
-    ...mdCommands(`${HOME}/.claude/commands`, "yours"),
-    ...skillCommands(`${HOME}/.claude/skills`, "skill"),
-    ...claudePlugins(),
+    ...mdCommands(`${configDir}/commands`, "yours"),
+    ...skillCommands(`${configDir}/skills`, "skill"),
+    ...claudePlugins(configDir),
     ...(await claudeBuiltins()),
   ];
 }
@@ -154,11 +154,11 @@ function opencodeCommands(cwd: string): Slash[] {
 }
 
 const memo = new Map<string, { at: number; list: Slash[] }>();
-export async function slashCommands(agent: string, cwd: string): Promise<Slash[]> {
-  const k = `${agent}|${cwd}`;
+export async function slashCommands(agent: string, cwd: string, configDir = process.env.CLAUDE_CONFIG_DIR || `${HOME}/.claude`): Promise<Slash[]> {
+  const k = `${agent}|${cwd}|${configDir}`;
   const m = memo.get(k);
   if (m && Date.now() - m.at < 60_000) return m.list;
-  const raw = agent === "claude" ? await claudeCommands(cwd) : agent === "codex" ? codexCommands() : agent === "opencode" ? opencodeCommands(cwd) : [];
+  const raw = agent === "claude" ? await claudeCommands(cwd, configDir) : agent === "codex" ? codexCommands() : agent === "opencode" ? opencodeCommands(cwd) : [];
   const seen = new Set<string>();
   const list = raw.filter((s) => (seen.has(s.cmd) ? false : (seen.add(s.cmd), true)));
   memo.set(k, { at: Date.now(), list });

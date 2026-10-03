@@ -37,6 +37,7 @@
     "js/notifications.js",
     "js/keymap.js",
     "js/palette.js",
+    "js/session-starts.js",
     "js/new-session.js",
     "js/worktree-new.js",
     "js/worktree-diff.js",

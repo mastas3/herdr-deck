@@ -1,0 +1,6 @@
+{
+  "deck": 1, "kind": "code", "id": "claude-mods", "name": "Claude Mods", "version": "1.0.0",
+  "description": "Claude plugins and Mods on each machine and profile, live context/cache/stall signals, and native mod commands and keyboard controls.",
+  "server": "server.ts", "client": ["claude-mods.js"], "styles": ["claude-mods.css"],
+  "machine": "any", "routes": ["claude-mods"], "extends": ["slash.commands"]
+}

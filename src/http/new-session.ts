@@ -3,6 +3,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import type { Deck } from "../deck";
+import { claudeProfiles } from "../claude-profiles";
 import type { Graves } from "./config";
 import { claudeProvider, codexProvider, flatModels, opencodeCatalog, type OpencodeCatalog } from "../model-catalog";
 
@@ -89,6 +90,7 @@ export async function newSessionOptions(deck: Deck, graves: Graves) {
     recent: [...recent.entries()].sort((a, b) => b[1] - a[1]).map(([p]) => p).slice(0, 30),
     projects: projects.map((p) => p.path).slice(0, 80),
     choices: await agentChoices(),
+    claudeProfiles: claudeProfiles(),
     argHints: Object.fromEntries(Object.entries(argHints).map(([k, v]) => [k, Object.entries(v).sort((a, b) => b[1] - a[1]).map(([a]) => a).filter(Boolean).slice(0, 3)])),
     workspaces,
   };

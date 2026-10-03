@@ -1,0 +1,15 @@
+.cm-inventory { max-width: 1000px; margin: auto; padding: 20px; }
+.cm-heading, .cm-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cm-heading { justify-content: space-between; }
+.cm-profile { margin: 18px 0; padding: 16px; border: 1px solid var(--line); border-radius: 10px; }
+.cm-profile h4 { margin: 0 0 6px; }
+.cm-plugin { padding: 12px 0; border-top: 1px solid var(--line); }
+.cm-plugin p { margin: 6px 0; overflow-wrap: anywhere; }
+.cm-profile code { overflow-wrap: anywhere; }
+.cm-signal { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--hover); color: var(--ink-3); font: 10px var(--mono); margin-right: 4px; }
+.cm-stall, .cm-error { color: var(--red, #dc6464); }
+.cm-session { min-width: 0; }
+.cm-session .cm-actions { margin: 12px 0; }
+.cm-actions .btn { min-height: 34px; }
+.cm-screen { white-space: pre; overflow: auto; max-height: 52vh; min-height: 160px; padding: 12px; background: var(--term-bg); color: var(--term-ink); font: 11px/1.45 var(--mono); border-radius: 8px; }
+@media (max-width: 700px) { .cm-inventory { padding: 12px; } .cm-actions .btn { min-height: 44px; } .cm-screen { max-height: 45vh; } }
