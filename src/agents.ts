@@ -4,9 +4,11 @@ import { Database } from "bun:sqlite";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { codexHome, codexStore } from "./codex-store";
+import { claudeProjectDirs, claudeProfileForFile, claudeShellQuote } from "./claude-profiles";
 
 export type AgentMeta = {
   sessionId?: string;
+  claudeProfile?: string;
   createdAt?: number;
   lastActiveAt?: number;
   model?: string;
@@ -155,28 +157,29 @@ export function parseClaudeTail(lines: string[]): Pick<AgentMeta, "lastActiveAt"
  *  its model; with neither, the page guesses. */
 const ctxCache = new Map<string, { at: number; window?: number }>();
 const modelWindow = new Map<string, number>();
-export function claudeWindow(id: string, model?: string, home = HOME, now = Date.now()): number | undefined {
-  let c = ctxCache.get(id);
+export function claudeWindow(id: string, model?: string, home = HOME, now = Date.now(), profile = `${home}/.claude`): number | undefined {
+  const key = `${profile}|${id}`, modelKey = `${profile}|${model}`;
+  let c = ctxCache.get(key);
   if (!c || now - c.at > 30_000) {
     let window: number | undefined;
     try {
-      const w = JSON.parse(readFileSync(`${home}/.claude/context-cache/${id}.json`, "utf8")).window;
+      const w = JSON.parse(readFileSync(`${profile}/context-cache/${id}.json`, "utf8")).window;
       if (Number.isFinite(w) && w > 0) window = w;
     } catch {}
-    ctxCache.set(id, (c = { at: now, window }));
+    ctxCache.set(key, (c = { at: now, window }));
   }
-  if (c.window && model) modelWindow.set(model, c.window);
-  return c.window ?? (model ? modelWindow.get(model) ?? settingsWindow(model, home, now) : undefined);
+  if (c.window && model) modelWindow.set(modelKey, c.window);
+  return c.window ?? (model ? modelWindow.get(modelKey) ?? settingsWindow(model, home, now, profile) : undefined);
 }
 
 /** Claude Code's default model, e.g. "opus[1m]": a session on that model family runs with the 1M window. */
 const settingsCache = new Map<string, { at: number; model?: string }>();
-export function settingsWindow(model: string, home = HOME, now = Date.now()): number | undefined {
-  let c = settingsCache.get(home);
+export function settingsWindow(model: string, home = HOME, now = Date.now(), profile = `${home}/.claude`): number | undefined {
+  let c = settingsCache.get(profile);
   if (!c || now - c.at > 60_000) {
     let m: string | undefined;
-    try { const v = JSON.parse(readFileSync(`${home}/.claude/settings.json`, "utf8")).model; if (typeof v === "string") m = v; } catch {}
-    settingsCache.set(home, (c = { at: now, model: m }));
+    try { const v = JSON.parse(readFileSync(`${profile}/settings.json`, "utf8")).model; if (typeof v === "string") m = v; } catch {}
+    settingsCache.set(profile, (c = { at: now, model: m }));
   }
   const d = c.model?.toLowerCase().match(/^(?:claude-)?([a-z]+)[^[]*\[1m\]$/);
   return d && model.toLowerCase().includes(d[1]) ? 1_000_000 : undefined;
@@ -188,12 +191,16 @@ const claudePathCache = new Map<string, string>();
 export function findClaudeFile(id: string): string | undefined {
   const cached = claudePathCache.get(id);
   if (cached && existsSync(cached)) return cached;
-  const root = `${HOME}/.claude/projects`;
+  if (!/^[a-z0-9_-]{1,128}$/i.test(id)) return;
   if (Date.now() - claudeDirs.at > 30_000) {
-    try { claudeDirs = { at: Date.now(), dirs: readdirSync(root) }; } catch { return; }
+    const dirs: string[] = [];
+    for (const root of claudeProjectDirs()) {
+      try { dirs.push(...readdirSync(root).map(d => `${root}/${d}`)); } catch {}
+    }
+    claudeDirs = { at: Date.now(), dirs };
   }
   for (const d of claudeDirs.dirs) {
-    const p = `${root}/${d}/${id}.jsonl`;
+    const p = `${d}/${id}.jsonl`;
     if (existsSync(p)) {
       claudePathCache.set(id, p);
       return p;
@@ -208,13 +215,13 @@ export async function claudeMeta(id: string, movedFrom: string[] = []): Promise<
   const meta = await cachedParse(path, async (size) => {
     const head = parseClaudeHead(await readHead(path, size));
     const tail = parseClaudeTail(await readTail(path, size));
-    return { sessionId: id, ...head, ...tail, empty: !head.firstPrompt && !tail.lastMessage && !tail.ctxTokens };
+    return { sessionId: id, claudeProfile: claudeProfileForFile(path), ...head, ...tail, empty: !head.firstPrompt && !tail.lastMessage && !tail.ctxTokens };
   });
   // herdr keeps reporting the first id, so follow the move or the chat stops where it happened.
   const next = meta.continuedIn;
   if (next && next !== id && !movedFrom.includes(next) && movedFrom.length < 8 && findClaudeFile(next)) return claudeMeta(next, [...movedFrom, id]);
   const out = movedFrom.length ? { ...meta, movedFrom } : meta;
-  const ctxWindow = claudeWindow(id, out.model);
+  const ctxWindow = claudeWindow(id, out.model, HOME, Date.now(), out.claudeProfile);
   return ctxWindow ? { ...out, ctxWindow } : out;
 }
 
@@ -411,10 +418,10 @@ export function opencodeMeta(opts: { id?: string; cwd: string; terminalTitle?: s
   } catch {}
 }
 
-export function resumeCommand(agent: string | undefined, id: string | undefined): string | undefined {
+export function resumeCommand(agent: string | undefined, id: string | undefined, profile?: string): string | undefined {
   if (!agent || !id) return;
   switch (agent) {
-    case "claude": return `claude --resume ${id}`;
+    case "claude": return `${profile ? `CLAUDE_CONFIG_DIR=${claudeShellQuote(profile)} ` : ""}claude --resume ${/^[a-z0-9_-]+$/i.test(id) ? id : claudeShellQuote(id)}`;
     case "codex": return `codex resume ${id}`;
     case "opencode": return `opencode -s ${id}`;
   }

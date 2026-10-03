@@ -19,6 +19,10 @@ describe("project header lights", () => {
 });
 
 describe("reason chip", () => {
+  test("failed and unconfirmed starts stay explicit even for old empty panes", () => {
+    expect(L.reasonOf(row({ empty: true, startup: { state: "failed" } }), undefined, NOW).text).toBe("start failed · message saved");
+    expect(L.reasonOf(row({ empty: true, startup: { state: "unknown" } }), undefined, NOW).text).toBe("check first-message delivery");
+  });
   test("a pending decision wins: permission, then question", () => {
     expect(L.reasonOf(row({ status: "blocked" }), "prompt", NOW).text).toBe("needs permission");
     expect(L.reasonOf(row({ status: "done" }), "question", NOW).text).toBe("asks you");

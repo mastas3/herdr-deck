@@ -15,6 +15,8 @@ import { RowFeed, type Usage } from "./row-feed";
 import { CachedJson, createLedgers, linkParents, parseNamesync, type LinkExtra, type ParentLink } from "./dispatch-links";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
+import { paneSignals, type PaneSignals } from "./pane-signals";
+import { showStart, type StartStore, type StartSummary } from "./session-starts";
 
 const HIDDEN_FILE = `${homedir()}/.config/herdr-deck/codex-app-hidden.json`;
 const VISIBLE_APP_FILE = `${homedir()}/.config/herdr-deck/codex-app-visible.json`;
@@ -59,6 +61,9 @@ export type Row = {
   modelName?: string; // a model Claude Code switched to since its last reply (display name)
   effort?: string; // reasoning effort, or OpenCode's variant
   provider?: string;
+  claudeProfile?: string;
+  signals?: PaneSignals;
+  startup?: StartSummary;
   ctxTokens?: number;
   ctxWindow?: number;
   cost?: number;
@@ -110,6 +115,7 @@ export class Deck {
   born = new Map<string, number>();
   private bornReady = false;
   rows = new Map<string, Row>();
+  starts?: StartStore;
   /** What the page has of each row (src/row-feed.ts). */
   private feed = new RowFeed();
   private listeners = new Set<(patch: Patch) => void>();
@@ -548,6 +554,8 @@ export class Deck {
           modelName: meta?.modelName,
           effort: meta?.effort,
           provider: meta?.provider,
+          claudeProfile: meta?.claudeProfile,
+          signals: paneSignals(tok),
           ctxTokens: meta?.ctxTokens,
           ctxWindow: meta?.ctxWindow,
           cost: meta?.cost,
@@ -557,7 +565,7 @@ export class Deck {
           command: p.agent ? agentProc?.cmdline : lead?.cmdline,
           sessionId: meta?.sessionId ?? p.agent_session?.value,
           movedFrom: meta?.movedFrom,
-          resume: resumeCommand(p.agent, meta?.sessionId ?? p.agent_session?.value),
+          resume: resumeCommand(p.agent, meta?.sessionId ?? p.agent_session?.value, meta?.claudeProfile),
           tail: s.tails.get(p.pane_id) ?? [],
           cols: rects.get(p.pane_id)?.width,
           rows: rects.get(p.pane_id)?.height ?? p.scroll?.viewport_rows,
@@ -607,6 +615,7 @@ export class Deck {
     this.attachPorts(rows);
     this.attachParents(rows, names, now);
 
+    if (this.starts) for (const [key, row] of rows) rows.set(key, showStart(row, this.starts.forRow(row)));
     this.rows = rows;
     this.bornReady = true;
     this.emit();

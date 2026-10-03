@@ -194,6 +194,10 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
 
 ## Daily use
 
+- **Saved starts** keep a new session's first message and options before opening its pane. Failed starts stay
+  visible; **New session → Saved starts** lets you recover the message after a reconnect or restart. Duplicate
+  requests reuse the same pane, and uncertain delivery is never replayed automatically. See [startup recovery](docs/session-start-reliability.md).
+
 - **Codex desktop threads** show their chat, nested commands and edits, subagents and their conversations,
   project changes, context usage and completion state. The deck reads Codex's state index (including moved
   transcripts and archive status), respecting `CODEX_HOME`. Connected desktop tasks accept replies, image/file
@@ -457,6 +461,10 @@ Everything the deck keeps (closed sessions, held messages, briefs, tools, the Hi
   moving over): a part that's off stops running and leaves the page. You can also add a code plugin from a folder or
   a git repo pinned to a commit; its red trust screen says plainly that it runs with your full permissions, and any
   file changed after you approved it turns it off until you review it again.
+- **Claude Mods**: Plugins → Claude Mods lists installed plugins and local mods on every machine and Claude profile. A
+  session’s Mods inspector shows native output, mod commands, and phone controls for buttons such as next-steps; context,
+  cache and stall signals appear in the list. New sessions can choose a Claude profile. See
+  [Claude Mods support](plugins-builtin/claude-mods/README.md) for capabilities and terminal-only limitations.
 - **Operator plugins** (built in, off until you switch them on in Plugins → Built in). Anything that starts a
   session, sends a message or deletes a file shows exactly what it will do and waits for your OK.
   - **Dual review** (Review): Claude and Codex review the same diff in two sessions; the Review view lines up

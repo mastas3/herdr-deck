@@ -18,3 +18,9 @@
 .ltime { display: inline-flex; align-items: center; gap: 2px; font: 12px var(--mono); color: var(--accent); text-decoration: none; white-space: nowrap; border-radius: 5px; padding: 0 3px; }
 .ltime svg { width: 9px; height: 9px; }
 .ltime:hover { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+/* Saved startup failures must stay readable on a phone and outside transient toasts. */
+.saved-start { padding: 12px 16px; margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }
+.saved-start p { margin: 6px 0; }
+.saved-start .btn { min-height: 44px; white-space: normal; }
+#nStarts summary { font-weight: 650; cursor: pointer; }
+#startNotice { flex-shrink: 0; max-height: 35vh; overflow: auto; }

@@ -25,6 +25,7 @@ import { createSse } from "./http/sse";
 import { createMachines } from "./http/machines";
 import { createChat } from "./http/chat";
 import { createSessions } from "./http/sessions";
+import { createStartStore } from "./session-starts";
 import { createToolRuns } from "./http/run-tools";
 import { createForward } from "./http/forward";
 import { startLive } from "./http/live";
@@ -41,8 +42,11 @@ loadWorktrees(`${DATA_DIR}/worktrees.json`);
 const API_TOKEN = loadApiToken();
 const { hostsConf, self: SELF } = loadHosts();
 const graves = loadGraves();
+const starts = createStartStore(`${DATA_DIR}/session-starts.json`);
+starts.load();
 
 const deck = new Deck();
+deck.starts = starts;
 await deck.start();
 
 // These parts only take shape here: none of them touches the disk, a socket or a timer until it's called.
@@ -68,7 +72,7 @@ const codex = createCodexControl({ receiptsFile: `${DATA_DIR}/codex-delivery.jso
 codex.start();
 const codexRecovery = createCodexRecovery({ control: codex });
 const codexLifecycle = createCodexLifecycle({ receiptsFile: `${DATA_DIR}/codex-lifecycle-delivery.json` });
-const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice, codex });
+const sessions = createSessions({ deck, graves, remotes, broadcastGraves, notice, codex, starts });
 const tools = createToolRuns({ deck, remotes, selfId: SELF.id, sendText: sessions.sendText, notice, extraTools: () => pluginHost.contributions("tools.entries") });
 const forwardToMachine = createForward({ remotes, selfId: SELF.id, briefKey: chat.briefKey, closeLocal: sessions.closeLocal });
 

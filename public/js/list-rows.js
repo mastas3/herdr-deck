@@ -3,12 +3,13 @@
 // ── inbox & projects ─────────────────────────────────────────────────────
 /** A finished session stops needing you once you've opened it (on any device). */
 const unseenDone = (r) => r.status === "done" && !r.seen;
-const needsYou = (r) => r.status === "blocked" || unseenDone(r);
+const needsYou = (r) => r.status === "blocked" || ["failed", "unknown"].includes(r.startup?.state) || unseenDone(r);
 /** herdr's "priority" order: an attention queue. Lower rank comes first. */
 /** Opened in the last 15 minutes: a new session stays in plain sight even before anything happens in it. */
 const fresh = (r) => !!r.bornAt && Date.now() - r.bornAt < 15 * 60_000;
 const act = (r) => r.lastActiveAt ?? r.bornAt ?? 0;
 function rank(r) {
+  if (["failed", "unknown"].includes(r.startup?.state)) return 0;
   if (r.status === "blocked") return 0;
   if (unseenDone(r)) return 1;
   if (r.status === "working") return 2;
@@ -38,6 +39,9 @@ function reasonLabel(k, t, now) {
     case "work": return s ? `working ${s}` : "working";
     case "new": return "new";
     case "empty": return "empty";
+    case "startfailed": return "start failed · message saved";
+    case "startunknown": return "check first-message delivery";
+    case "starting": return "starting · message saved";
     case "stale": return s ? `stale ${s}` : "stale";
     default: return s ? `idle ${s}` : "idle";
   }
@@ -45,7 +49,8 @@ function reasonLabel(k, t, now) {
 /** Why a row sits where it does in the priority list, mirroring rank(). `ask` is the pending decision's kind, if any. */
 function reasonOf(r, ask, now) {
   let k, t = 0;
-  if (ask === "prompt") k = "perm";
+  if (r.startup) k = r.startup.state === "failed" ? "startfailed" : r.startup.state === "unknown" ? "startunknown" : "starting";
+  else if (ask === "prompt") k = "perm";
   else if (ask === "question") k = "ask";
   else if (r.status === "blocked") k = "wait";
   else if (r.status === "done" && !r.seen) { k = "done"; t = r.lastActiveAt ?? 0; }
@@ -194,7 +199,7 @@ function srcLine(r) {
 /** Plugins' chips for a row ("row.chips": (row, "list" | "board") => html), at the start of its status line. */
 const rowChips = (r, where) => deckPlugins.each("row.chips", r, where).filter(Boolean).join("");
 function simpleRow(r) {
-  const [word, em] = SIMPLE_STATUS[r.status] ?? ["", ""];
+  const [word, em] = r.startup ? [reasonOf(r, undefined, Date.now()).text, "⚠"] : SIMPLE_STATUS[r.status] ?? ["", ""];
   return `<span class="dot" style="--c:${statusVar(r.status)}"></span><span class="tl"><b>${esc(r.title || "(untitled)")}</b></span><span class="ago"${r.status === "working" ? "" : ` data-t="${r.lastActiveAt ?? ""}"`}>${r.status === "working" ? em : esc(ago(r.lastActiveAt))}</span><span class="ln"><span class="pj" style="--pc:${pc(r.project)}">${esc(r.project)}</span>${treeChip(r)} · <span class="sw" data-s="${r.status}">${esc(word)}</span>${radarChip(r)}${rowChips(r, "list")}</span>${srcLine(r)}${rowAsk(r)}${treeToggle(r)}`;
 }
 /** The reason chip: why this row is ranked where it is ("needs permission", "finished 2m ago", "working 3m", "idle 3d"…). */

@@ -7,11 +7,14 @@ import { agentArgs } from "../args";
 import type { Deck, Row } from "../deck";
 import type { Graves } from "./config";
 import { AGENT_KINDS } from "./new-session";
+import { claudeProfileEnv } from "../claude-profiles";
 import type { CodexControl } from "../codex-control";
 import { codexUploadImages } from "./codex";
 import { isShellOnly } from "../tail";
 import { installCommand } from "../wt-git";
 import { discardWorktree, makeWorktree } from "../wt-create";
+import { createStartStore, type StartRecord, type StartStore } from "../session-starts";
+import { claudeRecordedPrompt } from "../claude-first-message";
 
 type SendOptions = { requestId?: string; onlyIdle?: boolean };
 /** Where to reopen a session (a graveyard entry, or a crash-guard snapshot's pane). */
@@ -21,10 +24,14 @@ type Deps = {
   deck: Deck; graves: Graves; remotes: Map<string, RemoteHost>; broadcastGraves: () => void;
   notice: (data: { key?: string; ok: boolean; message: string }) => void;
   codex?: CodexControl;
+  starts?: StartStore;
 };
 
 export function createSessions(o: Deps) {
   const { deck, graves, remotes, broadcastGraves, notice } = o;
+  const starts = o.starts ?? createStartStore();
+  const starting = new Map<string, Promise<any>>();
+  const noteStart = (id: string, patch: Partial<StartRecord>) => { const r = starts.update(id, patch); deck.refresh?.(); return r; };
 
   async function closeRow(key: string, whole: boolean) {
     const f = deck.find(key);
@@ -137,8 +144,31 @@ export function createSessions(o: Deps) {
   }
 
   async function startSession(body: any) {
+    const { record, fresh } = starts.begin(body);
+    if (!fresh) {
+      if (starting.has(record.id)) return starting.get(record.id);
+      if (record.result?.key) return { ...record.result, requestId: record.id, startState: record.state, error: record.error };
+      throw new Error(record.error || "This session start is already in progress. Check Saved starts.");
+    }
+    const work = runStart(body, record).catch(e => { noteStart(record.id, { state: ["timeout", "closed"].includes(e.code) ? "unknown" : "failed", error: e.message }); throw e; }).finally(() => starting.delete(record.id));
+    starting.set(record.id, work);
+    return work;
+  }
+
+  async function confirmClaude(socket: string, paneId: string, prompt: string, since: number) {
+    const until = Date.now() + 60_000;
+    do {
+      const a = await call(socket, "agent.get", { target: paneId }).then(r => r.agent).catch(() => null);
+      const id = a?.agent === "claude" && a.agent_session?.agent === "claude" ? a.agent_session.value : undefined;
+      if (id && await claudeRecordedPrompt(id, prompt, since)) return id as string;
+      await Bun.sleep(1000);
+    } while (Date.now() < until);
+  }
+
+  async function runStart(body: any, receipt: StartRecord) {
     const kind = String(body.kind ?? "claude");
     if (kind !== "shell" && !AGENT_KINDS.has(kind)) throw new Error(`unknown agent "${kind}"`);
+    const env = kind === "claude" ? claudeProfileEnv(body.claudeProfile) : undefined;
     let cwd = String(body.cwd ?? "").replace(/^~(?=\/|$)/, homedir());
     try {
       if (!statSync(cwd).isDirectory()) throw 0;
@@ -155,10 +185,17 @@ export function createSessions(o: Deps) {
     const ws = body.workspaceId ?? sess.snap?.focused_workspace_id ?? null;
     const label = String(body.label ?? "").trim() || cwd.split("/").pop() || kind;
     let r;
-    try { r = await call(sess.socket, "tab.create", { cwd, label, workspace_id: ws, focus: false }); }
-    catch (e) { if (wt) await discardWorktree(wt); throw e; }
+    try { r = await call(sess.socket, "tab.create", { cwd, label, workspace_id: ws, focus: false, ...(env ? { env } : {}) }); }
+    catch (e: any) {
+      // A lost reply can still have created the pane. Preserve its checkout until the user checks it.
+      if (wt && !["timeout", "closed"].includes(e.code)) await discardWorktree(wt);
+      throw e;
+    }
     const paneId: string = r.root_pane?.pane_id;
+    if (!paneId) throw new Error("herdr did not return the new pane. The first message is saved; check Saved starts before retrying.");
     const key = `${sess.name}/${paneId}`;
+    const result = { key, paneId, requestId: receipt.id, ...(wt ? { worktree: { path: wt.path, branch: wt.branch, base: wt.base, cwd: wt.cwd } } : {}) };
+    noteStart(receipt.id, { key, result, state: "starting" });
     await deck.kick(sess.name);
 
     // The rest waits on a slow shell and the agent's own startup; report progress over SSE.
@@ -177,18 +214,28 @@ export function createSessions(o: Deps) {
           const base = label.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^[^a-z]+/, "").slice(0, 24) || kind;
           const name = `${base}-${Math.random().toString(36).slice(2, 6)}`;
           const args = agentArgs(kind, body);
+          const prompt = String(body.prompt ?? "").trim();
+          // Claude accepts its first message as one positional argument. This avoids the separate named-agent
+          // handoff that herdr 0.7.5 can refuse after Claude has already opened successfully.
+          const initialArg = kind === "claude" && !!prompt;
+          if (initialArg) { args.push("--", prompt); noteStart(receipt.id, { state: "sending" }); }
           notice({ key, ok: true, message: `Starting ${kind}…` });
           let asked = false;
+          let launchError: Error | undefined;
           try { await call(sess.socket, "agent.start", { name, kind, pane_id: paneId, args, timeout_ms: 90_000 }, 95_000); }
           catch (e: any) {
+            if (initialArg) launchError = e;
             // The agent is up but opened on a question (Claude's "trust this folder?"): that's not a failure.
-            if (!/blocked|interactive input/i.test(String(e?.message ?? e))) throw e;
+            else if (!/blocked|interactive input/i.test(String(e?.message ?? e))) throw e;
             await deck.kick(sess.name);
-            asked = true;
-            notice({ key, ok: true, message: `“${label}” is asking something first. Answer it (in the list, Inbox or terminal)${String(body.prompt ?? "").trim() ? " and your message follows" : ""}.` });
+            asked = /blocked|interactive input/i.test(String(e?.message ?? e));
+            if (asked) notice({ key, ok: true, message: `“${label}” is asking something first. Answer it in the terminal; your first message is saved.` });
           }
-          const prompt = String(body.prompt ?? "").trim();
-          if (prompt) {
+          if (initialArg) {
+            const sessionId = await confirmClaude(sess.socket, paneId, prompt, receipt.createdAt);
+            if (!sessionId) throw new Error(`First-message delivery is unconfirmed. Check the terminal before using the saved message again.${launchError ? ` ${launchError.message}` : ""}`);
+            noteStart(receipt.id, { sessionId });
+          } else if (prompt) {
             // A new folder can open on a prompt (Claude's "trust this folder?"), and herdr only registers the
             // agent a moment after it starts. Hold the message until the agent can take it: while it's asking
             // you something, wait (up to 10 minutes); otherwise keep retrying until herdr is ready.
@@ -202,7 +249,7 @@ export function createSessions(o: Deps) {
                 await Bun.sleep(1500);
                 continue;
               }
-              try { await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000); break; }
+              try { noteStart(receipt.id, { state: "sending" }); await call(sess.socket, "agent.prompt", { target: paneId, text: prompt }, 15_000); break; }
               catch (e: any) {
                 if (Date.now() > until || !/not an active|not found|not ready|no agent/i.test(String(e?.message ?? e))) throw e;
                 await Bun.sleep(1000);
@@ -211,13 +258,15 @@ export function createSessions(o: Deps) {
           }
           notice({ key, ok: true, message: prompt ? `${kind} is running and has your first message` : `${kind} is ready` });
         }
+        noteStart(receipt.id, { state: "ready", error: undefined });
         if (body.focus) await call(sess.socket, "pane.focus", { pane_id: paneId });
       } catch (e: any) {
+        noteStart(receipt.id, { state: starts.get(receipt.id)?.state === "sending" ? "unknown" : "failed", error: e?.message ?? String(e) });
         notice({ key, ok: false, message: `Couldn’t start ${kind}: ${e?.message ?? e}` });
       }
       await deck.kick(sess.name);
     })();
-    return { key, paneId, ...(wt ? { worktree: { path: wt.path, branch: wt.branch, base: wt.base, cwd: wt.cwd } } : {}) };
+    return result;
   }
 
   async function sendText(key: string, text: string, options: SendOptions = {}) {
@@ -251,6 +300,6 @@ export function createSessions(o: Deps) {
     for (const h of new Set(keys.map((k) => k.split("/")[0]))) await deck.kick(h);
     return results;
   }
-  return { reopen, openTab, startSession, sendText, sendAny, closeLocal };
+  return { reopen, openTab, startSession, sendText, sendAny, closeLocal, starts };
 }
 export type Sessions = ReturnType<typeof createSessions>;

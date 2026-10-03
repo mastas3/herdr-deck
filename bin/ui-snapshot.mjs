@@ -34,6 +34,18 @@ const WORKTREE_SETUP = `for (const k of ["fake:working", "fake:blocked"]) Object
     lastActiveAt: Date.now() - 40 * 60_000, worktree: "billing-cache", branch: "feat/billing-cache", projectRoot: "$HOME/acme-api-billing-cache", cwd: "$HOME/acme-api-billing-cache", gitRoot: "$HOME/acme-api" });
   setGroup("project"); lastOrder = ""; renderNow()`;
 export const VIEWS = {
+  "start-failed": `Object.assign(rowOf("fake:working"), { status: "empty", empty: false, title: "Native mobile app", startup: { id: "fixture-start", state: "failed", title: "Native mobile app", createdAt: Date.now(), hasPrompt: true, error: "Claude opened, but the first message was not delivered. Your message is saved." } }); select("fake:working", { open: true });`,
+  "start-saved": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api" }); if (!$("nStarts").textContent.includes("Native mobile app")) throw new Error("Missing saved start"); })()`,
+  "start-recovery": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api" }); $("nStarts").querySelector("[data-start-review]").click(); for (let i=0; i<40 && $("nPrompt").value !== "Build the native mobile app"; i++) await new Promise(r=>setTimeout(r,50)); if ($("nPrompt").value !== "Build the native mobile app") throw new Error("Saved first message was lost"); })()`,
+  "start-double-submit": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api", prompt: "A single launch" }); await Promise.all([submitNewSession(),submitNewSession()]); })()`,
+  "claude-mods": `(async () => { cmOpen(); await cmLoad(); })()`,
+  "claude-mods-session": `Object.assign(rowOf("fake:working"), { status: "idle", sessionId: "fixture-claude", signals: { ctx: "ctx 31% of 50%", cache: "cache 43m", stall: "⚠ overloaded", acct_t: "Teams" } }); select("fake:working", { open: true }); openInspector("claude-mods")`,
+  "claude-mods-controls": `(async () => { Object.assign(rowOf("fake:working"), { status: "idle", sessionId: "fixture-claude" }); select("fake:working", { open: true }); openInspector("claude-mods");
+    for (let i = 0; i < 40 && !document.querySelector('[data-cm-command="/next"]'); i++) await new Promise(r => setTimeout(r, 50));
+    for (const sel of ['[data-cm-focus]', '[data-cm-key="b"]', '[data-cm-command="/next"]']) { const b = document.querySelector(sel); if (!b) throw new Error("Missing mod control " + sel); b.click(); for (let i = 0; i < 40 && b.disabled; i++) await new Promise(r => setTimeout(r, 50)); }
+  })()`,
+  "claude-mods-new": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api", project: "acme-api" }); const el = $("cmNewProfile"); if (!el || el.options.length !== 3) throw new Error("Missing Claude profiles"); el.value = "/fixture/.claude-max"; const body = { kind: "claude" }; for (const c of deckPlugins.contributions("new.fields")) c.apply?.(body); if (body.claudeProfile !== el.value) throw new Error("Profile selection lost"); })()`,
+  "claude-mods-off": `if (deckPlugins.has("claude-mods")) throw new Error("Claude Mods still loaded while off"); select("fake:working", { open: true }); if (inspTabs(rowOf(S.sel)).some(t => t.key === "claude-mods")) throw new Error("Mods inspector still registered");`,
   home: "",
   session: `select("fake:blocked", { scroll: true, open: true })`,
   "codex-session": `S.summary.machines.push({ id: "codex-app", kind: "app", label: "Codex app", local: true, online: true });
@@ -163,7 +175,10 @@ export const VIEWS = {
   palette: `openPalette()`,
 };
 /** Views that only exist once the deck has code plugins; --views all-but-new leaves them out (for older builds). */
-const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr", "review", "workers", "releases", "shipped", "private", "chat-sent"];
+const NEWER = ["plugins-builtin", "plugins-add", "plugins-trust", "by-project-worktree", "folder-view", "folder-view-filter", "folder-view-sub", "plugins-herdr", "review", "workers", "releases", "shipped", "private", "chat-sent", "claude-mods", "claude-mods-session", "claude-mods-controls", "claude-mods-new", "claude-mods-off"];
+// Disabled-plugin assertions are opt-in; the default run starts every built-in plugin.
+const DEFAULT_VIEWS = Object.keys(VIEWS).filter(n => n !== "claude-mods-off");
+NEWER.push("start-failed", "start-saved", "start-recovery", "start-double-submit");
 const VIEWPORTS = {
   desktop: { viewport: { width: 1400, height: 900 }, colorScheme: "dark" },
   phone: {
@@ -181,6 +196,8 @@ const BLOCK = [
 const BLOCK_OPS = {
   "/api/covers": (b) => (b?.op ?? "status") !== "status",
   // herdr plugins: reading each machine's herdr is fine; installing, switching or running a plugin never is.
+  "/api/claude-mods": (b) => ["keys", "command"].includes(b?.op),
+  "/api/start": (b) => ["dismiss", "restore"].includes(b?.op),
   "/api/herdr-plugins": (b) => ["enable", "remove", "restore", "install", "invoke"].includes(b?.op),
 };
 const blocked = (path, body) => BLOCK.some((re) => re.test(path)) || !!BLOCK_OPS[path]?.(body);
@@ -223,7 +240,7 @@ function nativeForkFixtureChat() {
 }
 
 function args(argv) {
-  const o = { port: 4771, repo: resolve(HERE, ".."), views: Object.keys(VIEWS), viewports: ["desktop", "phone"], env: {}, pluginsOff: [], keep: false };
+  const o = { port: 4771, repo: resolve(HERE, ".."), views: DEFAULT_VIEWS, viewports: ["desktop", "phone"], env: {}, pluginsOff: [], keep: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i], v = () => argv[++i];
     if (a === "--out") o.out = resolve(v());
@@ -342,6 +359,28 @@ async function snap(browser, o, deck, view, vp) {
     const req = r.request(), path = new URL(req.url()).pathname;
     let body;
     try { body = req.postDataJSON(); } catch {}
+    if (view.startsWith("start-")) {
+      const start = { id: "fixture-start", key: "fake:working", title: "Native mobile app", state: "failed", createdAt: NOW, hasPrompt: true, error: "The first message was not delivered. It is saved here." };
+      if (path === "/api/new-options") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ recent: ["/tmp/acme-api"], projects: [], argHints: {}, starts: [start], choices: {} }) });
+      if (path === "/api/start") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ ...start, body: { kind: "claude", cwd: "/tmp/acme-api", prompt: "Build the native mobile app", label: "Native mobile app", model: "opus" } }) });
+      if (path === "/api/new") { out.startSubmissions = (out.startSubmissions ?? 0) + 1; if (!body.requestId) out.errors.push("Missing startup request ID"); return r.fulfill({ contentType: "application/json", body: JSON.stringify({ key: "fake:working", requestId: body.requestId }) }); }
+    }
+    if (view.startsWith("claude-mods") && !view.endsWith("off")) {
+      const profiles = [{ id: "/fixture/.claude", dir: "/fixture/.claude", label: "Default (.claude)", hooksDisabled: false, plugins: [
+        { id: "next-steps@claude-mods", name: "next-steps", description: "Suggests useful next prompts.", version: "0.1.0", scope: "user", enabled: true, mod: true, commands: ["/next"] },
+        { id: "fable-guard@claude-mods", name: "fable-guard", description: "Guards child agent launches inside Claude.", version: "0.1.0", scope: "user", enabled: true, mod: true, commands: [] },
+      ] }, { id: "/fixture/.claude-max", dir: "/fixture/.claude-max", label: ".claude-max", hooksDisabled: false, plugins: [] }];
+      if (path === "/api/claude-mods") {
+        if (["keys", "command"].includes(body?.op)) {
+          (out.modActions ??= []).push({ op: body.op, keys: body.keys, command: body.command });
+          if (body.key !== "fake:working" || body.sessionId !== "fixture-claude") out.errors.push("Mod action lost session identity");
+          return r.fulfill({ contentType: "application/json", body: '{"ok":true}' });
+        }
+        return r.fulfill({ contentType: "application/json", body: JSON.stringify(body?.op === "machines" ? { machines: [{ id: "local", label: "Linux · work", profiles }] } : { profiles, profile: profiles[0].id, commands: ["/plugin", "/reload-plugins", "/progress", "/next", "/handoff-compact", "/links"] }) });
+      }
+      if (path === "/api/read" && body?.key === "fake:working") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ text: "Claude Code · Teams\n\nNext: [ a) Review changes ]\n      [ b) Run focused tests ]\n      [ c) Write the handoff ]\n\nctx 31% of 50% · cache 43m\n❯", hash: "mods-fixture" }) });
+      if (path === "/api/new-options") return r.fulfill({ contentType: "application/json", body: JSON.stringify({ recent: ["/tmp/acme-api"], projects: [], argHints: {}, claudeProfiles: profiles, choices: { claude: { models: [{ v: "", l: "Default" }], efforts: [], modes: [{ v: "", l: "Default" }] } } }) });
+    }
     // Native controls use only synthetic state in this harness, never the real desktop socket.
     const connectedState = { ...nativeFixtureState(view), ready: true, connectionIssue: undefined, error: undefined, status: view.endsWith("busy") ? "working" : "idle" };
     if (path === "/api/codex-state") return r.fulfill({ contentType: "application/json", body: JSON.stringify(nativeConnected ? connectedState : nativeFixtureState(view)) });
@@ -421,6 +460,8 @@ async function snap(browser, o, deck, view, vp) {
   }
   if (["codex-settings-managed-open", "codex-queue-open"].includes(view) && nativeOpenCount !== 1) out.errors.push("Native settings/queue handoff did not open Codex once");
   if (view === "codex-fork-point-view") await page.locator("[data-codex-fork-point]").first().focus();
+  if (view === "claude-mods-controls" && JSON.stringify(out.modActions) !== JSON.stringify([{ op: "keys", keys: ["ctrl+x", "tab"] }, { op: "keys", keys: ["b"] }, { op: "command", command: "/next" }])) out.errors.push("Mod controls sent the wrong actions");
+  if (view === "start-double-submit" && out.startSubmissions !== 1) out.errors.push("Duplicate session creation");
   const name = `${view}-${vp}`;
   await page.screenshot({ path: join(o.out, `${name}.png`), animations: "disabled", caret: "hide" });
   const text = await page.evaluate(() => document.body.innerText);

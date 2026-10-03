@@ -9,6 +9,7 @@ import type { PushStore } from "./push";
 import type { Automations } from "./automations";
 import type { Tool } from "./tools";
 import type { CheckResult } from "./verify";
+import type { Slash } from "./slash";
 import type { HistSession } from "./history";
 
 /** What a plugin's server entry exports. The returned function (if any) runs first when the plugin is turned off. */
@@ -26,7 +27,7 @@ export type Notice = { key?: string; ok: boolean; message: string };
 /** Where to reopen a session: its herdr server, workspace (by id, else by name; `createWorkspace` makes a missing one),
  *  folder, tab name and the command that resumes it. The Closed list's Reopen does exactly this. */
 export type ReopenSession = { herdr?: string; workspaceId?: string; workspace?: string; createWorkspace?: boolean; cwd: string; tab?: string; project?: string; resume?: string };
-export type StartSession = { kind: string; cwd: string; prompt?: string; args?: string[]; label?: string; model?: string; effort?: string; mode?: string; focus?: boolean };
+export type StartSession = { claudeProfile?: string; kind: string; cwd: string; prompt?: string; args?: string[]; label?: string; model?: string; effort?: string; mode?: string; focus?: boolean };
 
 /** Extension points the core reads. Plugins may also open their own (e.g. `discover.tabs`): any other name is free. */
 export type CorePoints = {
@@ -38,6 +39,8 @@ export type CorePoints = {
   "mcp.tools": { name: string; description: string; inputSchema: object; call: (args: any) => Promise<unknown> };
   /** A session tool (the Tools view and the "." menu); runs like the built-in prompt tools. */
   "tools.entries": Tool;
+  /** Additional commands declared by a session’s agent extensions. Read-only; never executes a command. */
+  "slash.commands": { get: (row: Row) => Slash[] | Promise<Slash[]> };
 };
 export type PointName = keyof CorePoints | (string & {});
 export type Contribution<P extends PointName> = P extends keyof CorePoints ? CorePoints[P] : unknown;
