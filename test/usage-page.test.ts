@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 const src = readFileSync(new URL("../public/js/usage.js", import.meta.url), "utf8");
 const a = src.indexOf("// ── usage logic (pure");
 const b = src.indexOf("// ── end usage logic");
-const L = new Function(`${src.slice(a, b)}; return { accountFor, usageState, windowNow, usageMachine };`)();
+const L = new Function(`${src.slice(a, b)}; return { accountFor, accountTag, usageState, windowNow, usageMachine };`)();
 
 const NOW = 1_790_602_400_000;
 const usage = {
@@ -52,6 +52,12 @@ describe("a machine with two Claude logins (a Max profile on the work machine)",
   test("no profile yet: the machine's default login; an unread profile: unknown, never the other account", () => {
     expect(L.accountFor({ agent: "claude", machine: "linux" }, two, "mac").id).toBe("claude:team");
     expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude-other" }, two, "mac")).toBeUndefined();
+  });
+  test("a row's account tag names the plan's kind, so a stale herdr tag can be replaced", () => {
+    expect(L.accountTag({ name: "Claude", label: "personal", plan: "Max 20x" })).toEqual({ text: "Max", title: "Claude · personal · Max 20x" });
+    expect(L.accountTag({ name: "Claude", label: "Corp LTD", plan: "Team (Max 5x seat)" }).text).toBe("Team");
+    expect(L.accountTag({ name: "Claude", label: "personal" }).text).toBe("personal");
+    expect(L.accountTag(undefined)).toBeUndefined();
   });
   test("an older node sends no profiles: its one login is the machine's", () => {
     expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude-mac" }, usage, "mac").id).toBe("claude:w");

@@ -23,6 +23,11 @@ function accountFor(r, u, selfId) {
   if (r.claudeProfile) return here.find((a) => a.profilesOn?.[m]?.includes(r.claudeProfile));
   return here.find((a) => a.defaultOn?.includes(m)) ?? here[0];
 }
+/** A row's short account tag: the plan's kind ("Max", "Team"), else the account's label. */
+function accountTag(a) {
+  if (!a) return undefined;
+  return { text: String(a.plan ?? "").match(/^(Max|Team|Pro|Enterprise)\b/)?.[1] ?? a.label ?? a.name, title: [a.name, a.label, a.plan].filter(Boolean).join(" · ") };
+}
 /** fresh, stale (older than 30 minutes), unknown (nothing read yet) or error (the provider refused, nothing older to show). */
 function usageState(a, now) {
   if (!a) return "unknown";

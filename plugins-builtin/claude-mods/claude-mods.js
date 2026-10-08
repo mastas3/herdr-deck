@@ -6,7 +6,13 @@ const cmOn = () => S.mode === "plugins" && S.plug.tab === "claude-mods";
 const cmLive = (r) => r?.agent === "claude" && !r.app && !r.hist;
 const cmOpen = () => { setMode("plugins"); plugTab("claude-mods"); };
 function cmSignals(r) {
-  return Object.entries(r.signals ?? {}).map(([k, v]) => `<span class="cm-signal${k === "stall" ? " cm-stall" : ""}" title="${esc(({ ctx: "Context usage", cache: "Prompt cache", stall: "Last turn problem", acct_t: "Claude account", acct_m: "Claude account", acct_o: "OpenAI account" })[k] ?? k)}">${esc(v)}</span>`).join("");
+  // herdr's account tags go stale when a pane switches Claude profile (the new tag is added, the old one never cleared),
+  // so where a pane has one, the account the deck reads from the session's own profile replaces them.
+  const sig = Object.entries(r.signals ?? {});
+  const acct = sig.some(([k]) => k.startsWith("acct_")) ? accountTag(accountFor(r, S.usage, S.self)) : undefined;
+  const chips = sig.filter(([k]) => !(acct && k.startsWith("acct_"))).map(([k, v]) => `<span class="cm-signal${k === "stall" ? " cm-stall" : ""}" title="${esc(({ ctx: "Context usage", cache: "Prompt cache", stall: "Last turn problem", acct_t: "Claude account", acct_m: "Claude account", acct_o: "OpenAI account" })[k] ?? k)}">${esc(v)}</span>`);
+  if (acct) chips.push(`<span class="cm-signal" title="${esc(acct.title)}">${esc(acct.text)}</span>`);
+  return chips.join("");
 }
 function cmProfileHTML(p) {
   return `<section class="cm-profile"><h4>${esc(p.label)}</h4><p class="hint"><code>${esc(p.dir)}</code></p>
