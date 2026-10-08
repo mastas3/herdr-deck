@@ -3,7 +3,8 @@
 // machines it's signed in on.
 import type { Account, MachineUsage } from "./usage-accounts";
 
-export type MergedAccount = Account & { machines: string[]; from?: string };
+/** `profilesOn`/`defaultOn`: per machine, the Claude profiles signed in to it and whether it is that machine's default. */
+export type MergedAccount = Omit<Account, "profiles" | "isDefault"> & { machines: string[]; from?: string; profilesOn?: Record<string, string[]>; defaultOn?: string[] };
 /** What the page gets as `usage`: `machines` holds each deck's own reading, so a hub can merge a node's again. */
 export type UsagePayload = { self: string; machines: Record<string, MachineUsage>; accounts: MergedAccount[] };
 
@@ -16,12 +17,17 @@ export function mergeUsage(self: string, byMachine: Record<string, MachineUsage 
   for (const [m, mu] of Object.entries(byMachine)) {
     if (!mu || !Array.isArray(mu.accounts)) continue;
     machines[m] = mu;
-    for (const a of mu.accounts) {
-      if (!a?.id) continue;
+    for (const raw of mu.accounts) {
+      if (!raw?.id) continue;
+      const { profiles, isDefault, ...a } = raw;
       const prev = map.get(a.id);
-      if (!prev) { map.set(a.id, { ...a, machines: [m], from: a.at ? m : undefined }); continue; }
-      if (!prev.machines.includes(m)) prev.machines.push(m);
-      if ((a.at ?? -1) > (prev.at ?? -1)) map.set(a.id, { ...a, machines: prev.machines, from: m });
+      const next: MergedAccount = !prev ? { ...a, machines: [m], from: a.at ? m : undefined }
+        : (a.at ?? -1) > (prev.at ?? -1) ? { ...a, machines: prev.machines, from: m, profilesOn: prev.profilesOn, defaultOn: prev.defaultOn } : prev;
+      if (!next.machines.includes(m)) next.machines.push(m);
+      // Which profiles on which machine spend this account (Claude): the page matches a session's own profile to it.
+      if (profiles?.length) next.profilesOn = { ...next.profilesOn, [m]: profiles };
+      if (isDefault && !next.defaultOn?.includes(m)) next.defaultOn = [...(next.defaultOn ?? []), m];
+      map.set(a.id, next);
     }
   }
   const accounts = [...map.values()].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name) || String(a.label).localeCompare(String(b.label)));

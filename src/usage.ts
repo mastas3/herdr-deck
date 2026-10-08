@@ -37,8 +37,9 @@ export function parseClaudeCache(rc: any, mtime?: number): Limits | undefined {
   return { at, windows: windows.some((w) => w.pct != null) ? windows : [] };
 }
 
-export function claudeLimits(home = homedir()): Limits | undefined {
-  const f = `${home}/.claude/rate-cache.json`;
+/** One Claude profile's cache: a statusline script run under CLAUDE_CONFIG_DIR writes it into that profile's folder. */
+export function claudeProfileLimits(dir: string): Limits | undefined {
+  const f = `${dir}/rate-cache.json`;
   let mtime: number | undefined;
   try { mtime = statSync(f).mtimeMs; } catch { return; }
   return parseClaudeCache(readJson(f), mtime);

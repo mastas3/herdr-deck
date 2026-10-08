@@ -36,6 +36,28 @@ describe("which account a session spends", () => {
   });
 });
 
+describe("a machine with two Claude logins (a Max profile on the work machine)", () => {
+  const two = {
+    self: "mac",
+    accounts: [
+      { id: "claude:max", provider: "claude", label: "personal", machines: ["mac", "linux"], profilesOn: { mac: ["/Users/me/.claude"], linux: ["/home/me/.claude-mac"] }, defaultOn: ["mac"] },
+      { id: "claude:team", provider: "claude", label: "Corp LTD", machines: ["linux"], profilesOn: { linux: ["/home/me/.claude"] }, defaultOn: ["linux"] },
+    ],
+  };
+  test("a session spends the login of its own profile, on either machine", () => {
+    expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude-mac" }, two, "mac").id).toBe("claude:max");
+    expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude" }, two, "mac").id).toBe("claude:team");
+    expect(L.accountFor({ agent: "claude", machine: "mac", claudeProfile: "/Users/me/.claude" }, two, "mac").id).toBe("claude:max");
+  });
+  test("no profile yet: the machine's default login; an unread profile: unknown, never the other account", () => {
+    expect(L.accountFor({ agent: "claude", machine: "linux" }, two, "mac").id).toBe("claude:team");
+    expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude-other" }, two, "mac")).toBeUndefined();
+  });
+  test("an older node sends no profiles: its one login is the machine's", () => {
+    expect(L.accountFor({ agent: "claude", machine: "linux", claudeProfile: "/home/me/.claude-mac" }, usage, "mac").id).toBe("claude:w");
+  });
+});
+
 describe("stale and unknown are never shown as current", () => {
   test("fresh within 30 minutes, stale after, unknown with no reading, error when refused with nothing older", () => {
     expect(L.usageState({ at: NOW - 29 * 60_000, windows: [{ pct: 1 }] }, NOW)).toBe("fresh");

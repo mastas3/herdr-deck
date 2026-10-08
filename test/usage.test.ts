@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { latestCodexLimits, parseClaudeCache, parseCodexLine } from "../src/usage";
-import { claudeAccount, claudePlan, codexAccount, geminiAccount, labelFor, localUsage } from "../src/usage-accounts";
+import { claudeAccount, claudeAccounts, claudePlan, codexAccount, geminiAccount, labelFor, localUsage } from "../src/usage-accounts";
 import { apiKeys, creditAccounts, refreshCredits } from "../src/usage-credits";
 import { mergeUsage, nodeUsage } from "../src/usage-merge";
 
@@ -86,6 +86,57 @@ describe("who each account is", () => {
     expect(geminiAccount({ active: null }, {})).toBeUndefined();
     expect(labelFor("a@gmail.com")).toBe("personal");
     expect(labelFor("a@corp.example", "Corp")).toBe("Corp");
+  });
+});
+
+describe("several Claude logins on one machine (CLAUDE_CONFIG_DIR profiles)", () => {
+  const team = { emailAddress: "me@corp.example", organizationUuid: "org-team", organizationType: "claude_team", organizationName: "Corp LTD" };
+  const max = { emailAddress: "me@gmail.com", organizationUuid: "org-max", organizationType: "claude_max", organizationRateLimitTier: "default_claude_max_20x" };
+  function twoLogins() {
+    const home = mkdtempSync(`${tmpdir()}/usage-profiles-`);
+    for (const d of [".claude/projects", ".claude-mac/projects"]) mkdirSync(`${home}/${d}`, { recursive: true });
+    writeFileSync(`${home}/.claude.json`, JSON.stringify({ oauthAccount: team }));
+    writeFileSync(`${home}/.claude/rate-cache.json`, JSON.stringify({ r5: 40, r7: 100, r5_resets_at: "1790607000", r7_resets_at: "1791039600", ts: 1790602000 }));
+    writeFileSync(`${home}/.claude-mac/.claude.json`, JSON.stringify({ oauthAccount: max }));
+    writeFileSync(`${home}/.claude-mac/rate-cache.json`, JSON.stringify({ r5: 3, r7: 9, r5_resets_at: "1790607000", r7_resets_at: "1791039600", ts: 1790602100 }));
+    return home;
+  }
+  test("each profile is its own account with its own limits; ~/.claude is the default", () => {
+    const home = twoLogins();
+    const list = claudeAccounts(home, { CLAUDE_CONFIG_DIR: "", DECK_CLAUDE_CONFIG_DIRS: "" });
+    expect(list.map((a) => [a.label, a.plan, a.profiles, a.isDefault, a.windows?.map((w) => w.pct)])).toEqual([
+      ["Corp LTD", "Team", [`${home}/.claude`], true, [40, 100]],
+      ["personal", "Max 20x", [`${home}/.claude-mac`], false, [3, 9]],
+    ]);
+  });
+  test("a profile with no limits of its own never borrows the other login's", () => {
+    const home = twoLogins();
+    rmSync(`${home}/.claude-mac/rate-cache.json`);
+    const max1 = claudeAccounts(home, { CLAUDE_CONFIG_DIR: "", DECK_CLAUDE_CONFIG_DIRS: "" }).find((a) => a.plan === "Max 20x")!;
+    expect(max1.windows).toBeUndefined();
+    expect(max1.note).toContain("statusline");
+  });
+  test("two profiles signed in to one account are one entry listing both", () => {
+    const home = twoLogins();
+    writeFileSync(`${home}/.claude-mac/.claude.json`, JSON.stringify({ oauthAccount: team }));
+    const list = claudeAccounts(home, { CLAUDE_CONFIG_DIR: "", DECK_CLAUDE_CONFIG_DIRS: "" });
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ profiles: [`${home}/.claude`, `${home}/.claude-mac`], isDefault: true, at: 1790602100 * S });
+  });
+  test("the hub keeps which profile on which machine spends each account", () => {
+    const home = twoLogins();
+    const linux = localUsage(home, { CLAUDE_CONFIG_DIR: "", DECK_CLAUDE_CONFIG_DIRS: "" });
+    const mac = { at: 1, accounts: [{ ...claudeAccount({ oauthAccount: max }, { at: 1790602200 * S, windows: [{ id: "week", label: "week", pct: 11 }] })!, profiles: ["/Users/me/.claude"], isDefault: true }] };
+    const u = mergeUsage("mac", { mac, linux });
+    const m = u.accounts.find((a) => a.plan === "Max 20x")!;
+    expect(m.machines).toEqual(["mac", "linux"]);
+    expect(m.profilesOn).toEqual({ mac: ["/Users/me/.claude"], linux: [`${home}/.claude-mac`] });
+    expect(m.defaultOn).toEqual(["mac"]);
+    expect(m.windows![0].pct).toBe(11); // the Mac's newer reading of the same account
+    expect(JSON.stringify(m)).not.toContain('"isDefault"');
+    const t = u.accounts.find((a) => a.label === "Corp LTD")!;
+    expect(t).toMatchObject({ machines: ["linux"], profilesOn: { linux: [`${home}/.claude`] }, defaultOn: ["linux"] });
+    expect(nodeUsage(u)).toEqual(mac); // a node's own reading is passed on untouched
   });
 });
 

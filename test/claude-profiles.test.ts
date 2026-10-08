@@ -39,6 +39,8 @@ test("finds an alternate account transcript and preserves it when reopening", as
 test("only public display signals survive, and live changes and clears produce SSE patches", () => {
   expect(paneSignals({ ctx: "\x1b[31mctx 28%\x1b[0m", cache: "cache 30m", stall: { secret: "hidden" }, api_key: "secret" })).toEqual({ ctx: "ctx 28%", cache: "cache 30m" });
   expect(paneSignals({ ctx: "" })).toBeUndefined();
+  // one account token per kind: a Max session on the work machine keeps its tag
+  expect(paneSignals({ acct_m: "Max", acct_o: "OpenAI", acct_t: "Teams" })).toEqual({ acct_t: "Teams", acct_m: "Max", acct_o: "OpenAI" });
   const feed = new RowFeed(), row: any = { key: "test", signals: paneSignals({ ctx: "ctx 28%" }) };
   expect(feed.diff([row]).upsert).toHaveLength(1);
   expect(feed.diff([{ ...row }]).upsert).toHaveLength(0);

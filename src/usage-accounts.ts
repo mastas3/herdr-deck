@@ -1,8 +1,11 @@
 // Every AI account signed in on this machine, with its limits or balance where the tool or provider gives one: Claude
 // Code, Codex, Gemini CLI, and OpenCode's providers. Identity is who you are (email, organisation, plan), read from the
 // tools' own files; tokens and keys are never kept, and account ids are one-way fingerprints.
+import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { claudeLimits, latestCodexLimits, readJson, type Limits, type Window } from "./usage";
+import { join } from "node:path";
+import { claudeProfiles } from "./claude-profiles";
+import { claudeProfileLimits, latestCodexLimits, readJson, type Limits, type Window } from "./usage";
 import { creditAccounts, fingerprint, otherSignIns } from "./usage-credits";
 
 export type Balance = { left?: number; total?: number; used?: number; currency: "USD" };
@@ -13,6 +16,9 @@ export type Account = {
   kind: "plan" | "credits" | "signin";
   /** When the reading (windows or balance) was taken. */
   at?: number; windows?: Window[]; balance?: Balance; error?: string; note?: string;
+  /** Claude only: the profile folders (CLAUDE_CONFIG_DIR) signed in to this account on the machine, and whether one of
+   *  them is the default, so a session is matched to the account its own profile spends. */
+  profiles?: string[]; isDefault?: boolean;
 };
 /** One machine's accounts, as its own deck reads them. */
 export type MachineUsage = { at: number; accounts: Account[] };
@@ -33,12 +39,12 @@ export function claudePlan(oa: any): string | undefined {
   return oa.billingType === "stripe_subscription" ? "subscription" : undefined;
 }
 
-export function claudeAccount(claudeJson: any, limits: Limits | undefined): Account | undefined {
+export function claudeAccount(claudeJson: any, limits: Limits | undefined, local = "local"): Account | undefined {
   const oa = claudeJson?.oauthAccount;
   if (!oa && !limits) return;
   const work = /team|enterprise/.test(String(oa?.organizationType ?? ""));
   const acct: Account = {
-    id: `claude:${fingerprint(String(oa?.organizationUuid ?? oa?.accountUuid ?? oa?.emailAddress ?? "local"))}`, provider: "claude", name: "Claude",
+    id: `claude:${fingerprint(String(oa?.organizationUuid ?? oa?.accountUuid ?? oa?.emailAddress ?? local))}`, provider: "claude", name: "Claude",
     label: oa ? labelFor(oa.emailAddress, work ? oa.organizationName : undefined) : undefined, email: oa?.emailAddress, plan: claudePlan(oa), kind: "plan",
   };
   if (limits?.windows.length) return { ...acct, at: limits.at, windows: limits.windows };
@@ -73,10 +79,32 @@ export function geminiAccount(accounts: any, settings: any): Account | undefined
   return { id: `gemini:${fingerprint(email)}`, provider: "gemini", name: "Gemini", label: labelFor(email), email, plan: how === "oauth-personal" ? "Google login" : cap(how), kind: "signin", note: "Gemini CLI writes no usage data" };
 }
 
+/**
+ * One Claude account per profile: ~/.claude signs in through ~/.claude.json, a CLAUDE_CONFIG_DIR profile (~/.claude-max)
+ * through its own <dir>/.claude.json, and each keeps its own rate-cache.json. So a Max login used on the work machine
+ * shows up next to that machine's Team login. Two profiles signed in to one account are one entry listing both.
+ */
+export function claudeAccounts(home = homedir(), env = process.env): Account[] {
+  const byId = new Map<string, Account>();
+  const homeDir = join(home, ".claude"), homeJson = join(home, ".claude.json");
+  const dirs = claudeProfiles(home, env).map((p) => p.dir);
+  // The home login counts even before Claude Code has made a projects folder.
+  if (!dirs.includes(homeDir)) dirs.splice(env.CLAUDE_CONFIG_DIR ? 1 : 0, 0, homeDir);
+  dirs.forEach((dir, i) => {
+    const file = dir === homeDir && existsSync(homeJson) ? homeJson : join(dir, ".claude.json");
+    const a = claudeAccount(readJson(file), claudeProfileLimits(dir), i ? `local:${dir}` : "local");
+    if (!a) return;
+    const prev = byId.get(a.id);
+    const fresher = !prev || (a.at ?? -1) > (prev.at ?? -1) ? a : prev;
+    byId.set(a.id, { ...fresher, profiles: [...(prev?.profiles ?? []), dir], isDefault: !!prev?.isDefault || i === 0 });
+  });
+  return [...byId.values()];
+}
+
 /** This machine's accounts, read now (credit balances come from the last refresh). */
 export function localUsage(home = homedir(), env = process.env): MachineUsage {
   const accounts = [
-    claudeAccount(readJson(`${home}/.claude.json`), claudeLimits(home)),
+    ...claudeAccounts(home, env),
     codexAccount(readJson(`${home}/.codex/auth.json`), latestCodexLimits(home)),
     geminiAccount(readJson(`${home}/.gemini/google_accounts.json`), readJson(`${home}/.gemini/settings.json`)),
     ...creditAccounts(home, env),

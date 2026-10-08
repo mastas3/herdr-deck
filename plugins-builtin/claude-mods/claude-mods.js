@@ -6,7 +6,7 @@ const cmOn = () => S.mode === "plugins" && S.plug.tab === "claude-mods";
 const cmLive = (r) => r?.agent === "claude" && !r.app && !r.hist;
 const cmOpen = () => { setMode("plugins"); plugTab("claude-mods"); };
 function cmSignals(r) {
-  return Object.entries(r.signals ?? {}).map(([k, v]) => `<span class="cm-signal${k === "stall" ? " cm-stall" : ""}" title="${esc(({ ctx: "Context usage", cache: "Prompt cache", stall: "Last turn problem", acct_t: "Claude account" })[k] ?? k)}">${esc(v)}</span>`).join("");
+  return Object.entries(r.signals ?? {}).map(([k, v]) => `<span class="cm-signal${k === "stall" ? " cm-stall" : ""}" title="${esc(({ ctx: "Context usage", cache: "Prompt cache", stall: "Last turn problem", acct_t: "Claude account", acct_m: "Claude account", acct_o: "OpenAI account" })[k] ?? k)}">${esc(v)}</span>`).join("");
 }
 function cmProfileHTML(p) {
   return `<section class="cm-profile"><h4>${esc(p.label)}</h4><p class="hint"><code>${esc(p.dir)}</code></p>

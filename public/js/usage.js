@@ -10,12 +10,18 @@ const USAGE_STALE_MS = 30 * 60_000;
 function usageMachine(r, selfId) { return !r?.machine || r.machine === "codex-app" ? selfId : r.machine; }
 /** The provider a session spends: Claude and Codex are their own; OpenCode says which provider its model is from. */
 function usageProvider(r) { return r?.agent === "opencode" ? r.provider : r?.agent; }
-/** The account a session spends: that machine's login for its provider. */
+/** The account a session spends: that machine's login for its provider. A machine can hold several Claude logins (a
+ *  Max profile next to a Team one), so a Claude session takes the one its own profile signs in with. */
 function accountFor(r, u, selfId) {
   const provider = usageProvider(r);
   if (!provider || !Array.isArray(u?.accounts)) return undefined;
   const m = usageMachine(r, selfId);
-  return u.accounts.find((a) => a.provider === provider && a.machines?.includes(m));
+  const here = u.accounts.filter((a) => a.provider === provider && a.machines?.includes(m));
+  // An older deck sends no profiles: its one login is the machine's.
+  if (provider !== "claude" || !here.some((a) => a.profilesOn?.[m])) return here[0];
+  // A profile with no login read yet is unknown, not the machine's other account.
+  if (r.claudeProfile) return here.find((a) => a.profilesOn?.[m]?.includes(r.claudeProfile));
+  return here.find((a) => a.defaultOn?.includes(m)) ?? here[0];
 }
 /** fresh, stale (older than 30 minutes), unknown (nothing read yet) or error (the provider refused, nothing older to show). */
 function usageState(a, now) {
@@ -33,9 +39,16 @@ function windowNow(w, now) {
 const usd = (n) => (n == null ? "" : `$${Number(n).toFixed(2)}`);
 // ── end usage logic
 
+/** Where an account is signed in: "MacBook, Linux · work (.claude-mac)" — a Claude profile other than ~/.claude is named. */
+function acctWhere(a) {
+  return (a.machines ?? []).map((m) => {
+    const extra = (a.profilesOn?.[m] ?? []).map((d) => d.split("/").pop()).filter((n) => n && n !== ".claude");
+    return machineLabel(m) + (extra.length ? ` (${extra.join(", ")})` : "");
+  }).join(", ");
+}
 function acctTip(a) {
   const st = usageState(a, Date.now());
-  const where = (a.machines ?? []).map(machineLabel).join(", ");
+  const where = acctWhere(a);
   return [
     `${a.name}${a.email ? ` · ${a.email}` : a.label ? ` · ${a.label}` : ""}${a.plan ? ` · ${a.plan}` : ""}`,
     a.at ? `${st === "stale" ? "stale: " : ""}as of ${agoText(a.at)}${a.from ? `, from ${machineLabel(a.from)}` : ""}` : a.error || a.note || "no reading yet",
@@ -79,7 +92,7 @@ function usageCard(a) {
   const foot = [a.at ? `as of ${agoText(a.at)}${a.from ? `, from ${machineLabel(a.from)}` : ""}` : "", a.error, !a.at && !a.error ? a.note : ""].filter(Boolean).join(" · ");
   return `<div class="ucard ${st}">
     <div class="uh"><b>${esc(a.name)}</b>${a.label ? `<span class="ulabel">${esc(a.label)}</span>` : ""}<span class="ust">${esc(badge)}</span></div>
-    <div class="um">${esc([a.email, a.plan, (a.machines ?? []).map(machineLabel).join(", ")].filter(Boolean).join(" · "))}</div>
+    <div class="um">${esc([a.email, a.plan, acctWhere(a)].filter(Boolean).join(" · "))}</div>
     ${bars}${bal}${foot ? `<div class="uf">${esc(foot)}</div>` : ""}</div>`;
 }
 function renderUsage() {
