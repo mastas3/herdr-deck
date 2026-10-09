@@ -13,6 +13,8 @@
     "js/folder-items.js",
     "js/folder-view.js",
     "js/explorer-model.js",
+    "js/explorer-projects.js",
+    "js/explorer-sessions.js",
     "js/explorer-dom.js",
     "js/explorer.js",
     "js/explorer-events.js",
@@ -86,6 +88,7 @@
     "css/nav.css",
     "css/simple.css",
     "css/plugins.css",
-    "css/explorer.css"
+    "css/explorer.css",
+    "css/explorer-projects.css"
   ]
 }

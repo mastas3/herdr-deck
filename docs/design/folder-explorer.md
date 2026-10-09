@@ -1,6 +1,6 @@
 # Folder explorer
 
-The default navigator is now a directory tree: machine → folders → sessions. Several branches can stay open at the same time, beside the existing chat. Priority and project grouping remain in the view switcher; `g` cycles through all three.
+The navigator offers Projects (the default: machine → active projects → sessions) and All folders (machine → folders → sessions). See [Project navigator](project-navigator.md) for the session overview and agent branches. Several branches can stay open at the same time, beside the existing chat. Priority and project grouping remain in the view switcher; `g` cycles through all three.
 
 - A machine is its home folder. Sessions outside that home appear under Filesystem.
 - A folder click opens or closes it. Explicitly opening a folder reads its immediate subdirectories; the initial view uses inlined session state and makes no directory requests.

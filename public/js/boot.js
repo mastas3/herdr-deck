@@ -72,12 +72,12 @@ function connect() {
     if (S.sel && p.upsert.some((r) => r.key === S.sel)) chatTick();
     render();
   });
-  // Memory, CPU and process counts, apart from the rows: only the footer shows them live.
-  on("procs", (u) => { for (const k in u) { const r = S.rows.get(k); if (r) [r.rssKB, r.cpu, r.procs] = u[k]; } renderFooter(); });
+  // Memory, CPU and process counts travel apart from the rows; refresh any open session facts too.
+  on("procs", (u) => { for (const k in u) { const r = S.rows.get(k); if (r) [r.rssKB, r.cpu, r.procs] = u[k]; } renderFooter(); exRefreshReadings(); });
   on("queue", (q) => { S.queue = q; const r = rowOf(S.sel); if (r) renderQueue(r); render(); });
   on("graveyard", (g) => { S.graveyard = g; render(); });
   on("history", (h) => { S.hist = h; if (S.mode === "history") renderHistStatus(); });
-  on("usage", (u) => { S.usage = u; const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); if (S.mode === "usage") renderUsage(); });
+  on("usage", (u) => { S.usage = u; const r = rowOf(S.sel); if (r && !S.mode) renderStatusLine(r); if (S.mode === "usage") renderUsage(); exRefreshReadings(); });
   on("jev", (j) => { S.jev = j; if (S.mode === "inbox") { if (S.jevOpen) loadJevStats(); else renderInbox(); } });
   on("radar", (r) => { S.radar = r; render(); });
   on("decisions", (d) => { S.decisions = d; renderViews(); if (S.mode === "inbox") { renderInbox(); if (S.jevOpen) loadJevStats(); } render(); const cur = S.sel && rowOf(S.sel); if (cur) renderAsk(cur); });

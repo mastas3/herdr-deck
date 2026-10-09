@@ -1,6 +1,6 @@
 "use strict";
 // Keep the same folder, controls and focus while live session state changes around them.
-const exDomKey = el => el.nodeType === 1 ? el.dataset.exNode || el.dataset.exFocus || (el.dataset.exAction ? "action:" + el.dataset.exAction : el.dataset.exGlobal ? "tool:" + el.dataset.exGlobal : el.classList[0] ? "part:" + el.classList[0] : "") : "";
+const exDomKey = el => el.nodeType === 1 ? el.dataset.exNode || el.dataset.exSession || el.dataset.exPanel || el.dataset.exFocus || (el.dataset.exAction ? "action:" + el.dataset.exAction : el.dataset.exGlobal ? "tool:" + el.dataset.exGlobal : el.classList[0] ? "part:" + el.classList[0] : "") : "";
 const exSameElement = (a, b) => a?.nodeType === b.nodeType && a?.nodeName === b.nodeName;
 function exPatchChildren(parent, next) {
   const old = [...parent.childNodes], keyed = new Map(old.filter(exDomKey).map(el => [exDomKey(el), el]));
@@ -30,7 +30,7 @@ function exRove(id) {
 function exPaint(box, html, first) {
   if (motion.reduced()) for (const animation of box.getAnimations({ subtree: true })) animation.cancel();
   const active = box.contains(document.activeElement) ? document.activeElement : null;
-  const before = !first && !motion.reduced() ? motion.rects(box.querySelectorAll('[data-ex-focus]')) : new Map();
+  const before = !first && !motion.reduced() ? motion.rects(box.querySelectorAll('.ex-tree [data-ex-focus]')) : new Map();
   const rects = new Map([...before].map(([el, r]) => [el.dataset.exFocus, r]));
   const next = document.createElement("div"); next.innerHTML = html;
   const incoming = new Set([...next.querySelectorAll('[data-ex-focus]')].map(el => el.dataset.exFocus));
@@ -43,7 +43,7 @@ function exPaint(box, html, first) {
   if (first) return motion.enter(box.querySelector(".ex-tree"), "fade");
   let entering = 0, moving = 0;
   const bounds = box.getBoundingClientRect();
-  for (const el of box.querySelectorAll('[data-ex-focus]')) {
+  for (const el of box.querySelectorAll('.ex-tree [data-ex-focus]')) {
     const was = rects.get(el.dataset.exFocus), now = el.getBoundingClientRect();
     if (!now.height || now.bottom < bounds.top || now.top > bounds.bottom) continue;
     if (was && Math.abs(was.top - now.top) > 1 && moving++ < 40) motion.run(el, [{ transform: `translateY(${was.top - now.top}px)` }, { transform: "none" }], { dur: 3 });

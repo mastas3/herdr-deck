@@ -20,6 +20,7 @@ export type AgentMeta = {
   provider?: string;
   ctxTokens?: number;
   ctxWindow?: number;
+  transcriptBytes?: number; // this session's JSONL on disk, not process memory
   cost?: number;
   firstPrompt?: string;
   lastMessage?: string;
@@ -76,6 +77,7 @@ async function cachedParse(path: string, parse: (size: number) => Promise<AgentM
   const hit = fileCache.get(path);
   if (hit?.key === key) return hit.meta;
   const meta = await parse(st.size);
+  meta.transcriptBytes = st.size;
   fileCache.set(path, { key, meta });
   return meta;
 }

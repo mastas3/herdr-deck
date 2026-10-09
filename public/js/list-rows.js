@@ -128,9 +128,9 @@ function parseQuery(q) {
 }
 const hayHit = (r) => { const q = parseQuery(S.q); return q.inc.length && q.inc.every((w) => hay(r).includes(w)); };
 function hay(r) {
-  return (r._hay ??= [r.title, r.project, r.launch, r.branch, r.cwd, r.agent, r.status, r.model, r.tab, r.workspace, machineLabel(r.machine), r.firstPrompt, r.lastMessage, r.now, r.tail.join(" ")].filter(Boolean).join(" \u0001 ").toLowerCase());
+  return (r._hay ??= [r.title, r.project, r.launch, r.branch, r.cwd, r.agent, r.status, r.model, r.tab, r.workspace, machineLabel(r.machine), r.firstPrompt, r.lastMessage, r.overview?.purpose, r.overview?.request, r.overview?.outcome, ...(r.subagents || []).map(s => s.description), r.now, r.tail.join(" ")].filter(Boolean).join(" \u0001 ").toLowerCase());
 }
-const inScope = (r) => S.machine === "all" || r.machine === S.machine;
+const inScope = (r) => S.machine === "all" || r.machine === S.machine || S.group === "folders" && S.machine === S.self && !!r.app;
 function visibleRows() {
   const q = parseQuery(S.q);
   const out = [];

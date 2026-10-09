@@ -3,6 +3,7 @@
 import { findClaudeFile, findCodexFile } from "./agents";
 import { inferProject, type Project } from "./projects";
 import { codexSubagents, codexSubFile } from "./codex-subagents";
+import { sessionOverview, type SessionOverview } from "./session-overview";
 import {
   attachGenerated, claudeDetail, claudeImage, claudeSubagents, claudeSubDetail, claudeSubFile, codexDetail, codexGeneratedImage, codexImage,
   opencodeDetail, opencodeImage, opencodeSubagents, type Detail, type Sub,
@@ -68,6 +69,7 @@ export async function subagentsFor(w: Who, d?: Detail): Promise<Sub[]> {
 }
 
 export type Insight = {
+  overview?: SessionOverview;
   project?: Project;
   now?: string; // the tool call in flight, or the todo item in progress
   turnStartedAt?: number;
@@ -97,5 +99,5 @@ export async function insightFor(w: Who): Promise<Insight | undefined> {
     if (m.role === "tool" && m.state === "running") { now = m.summary ? `${m.tool}: ${m.summary}` : String(m.tool); break; }
   }
   const subagents = await subagentsFor(w, d).catch(() => []);
-  return { project: pc.project, now, todo: d.todo, todos: d.todos, turnStartedAt: d.turnStartedAt, turnOpen: d.turnOpen, subagents, msgs: d.messages.length };
+  return { overview: sessionOverview(d), project: pc.project, now, todo: d.todo, todos: d.todos, turnStartedAt: d.turnStartedAt, turnOpen: d.turnOpen, subagents, msgs: d.messages.length };
 }

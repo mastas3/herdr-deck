@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, statSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { claudeMeta, claudeWindow, settingsWindow, contextLimit, parseClaudeHead, parseClaudeTail, parseCodex, resumeCommand } from "../src/agents";
 
@@ -30,6 +30,7 @@ describe("Claude transcripts", () => {
       const m = await claudeMeta(a);
       expect(m.sessionId).toBe(b);
       expect(m.movedFrom).toEqual([a]);
+      expect(m.transcriptBytes).toBe(statSync(`${dir}/${b}.jsonl`).size);
       expect(m.lastActiveAt).toBe(Date.parse("2026-09-20T10:06:00Z"));
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

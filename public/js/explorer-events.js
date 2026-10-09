@@ -1,14 +1,16 @@
 "use strict";
 $("rows").addEventListener("click", e => {
   if (S.group !== "folders" || S.view === "closed") return;
+  if (exSessionEvent(e)) return;
   const global = e.target.closest("[data-ex-global]")?.dataset.exGlobal;
   if (global) {
     e.stopPropagation();
+    if (global === "projects" || global === "folders") { exSwitchView(global); return; }
     if (global === "go") { explorer.go = !explorer.go; explorer.goRequest++; explorer.goBusy = false; renderExplorer(); if (explorer.go) $("rows").querySelector(".ex-location input").focus(); }
-    if (global === "collapse") { for (const n of explorer.nodes.values()) (S.q ? explorer.searchOpen : explorer.open)[n.id] = false; store("explorerOpen", explorer.open); renderExplorer(); }
+    if (global === "collapse") { for (const n of explorer.nodes.values()) (S.q ? explorer.searchOpen : explorer.open)[n.id] = false; exSaveOpen(); renderExplorer(); }
     if (global === "options") openMenu(e.target.closest("button"), [
-      { html: "Show hidden folders", on: explorer.hidden, run: () => { explorer.hidden = !explorer.hidden; explorer.listings.clear(); renderExplorer(); for (const n of explorer.nodes.values()) if (n.root && exExpanded(n)) exLoad(n); } },
-      { html: "Browse folders when opening", on: explorer.all, run: () => { explorer.all = !explorer.all; if (explorer.all) for (const n of explorer.nodes.values()) if (n.root && exExpanded(n)) exLoad(n); } },
+      { html: "Show hidden folders", on: explorer.hidden, run: () => { explorer.hidden = !explorer.hidden; explorer.listings.clear(); renderExplorer(); for (const n of explorer.nodes.values()) if (explorer.view === "folders" && n.root && exExpanded(n)) exLoad(n); } },
+      { html: "Browse folders when opening", on: explorer.all, run: () => { explorer.all = !explorer.all; if (explorer.all) for (const n of explorer.nodes.values()) if (explorer.view === "folders" && n.root && exExpanded(n)) exLoad(n); } },
       { html: "Show all machines", run: () => setMachine("all") },
     ], "Explorer");
     return;
@@ -31,7 +33,7 @@ $("rows").addEventListener("contextmenu", e => {
 $("rows").addEventListener("keydown", e => {
   if (S.group !== "folders" || e.target.closest("input, select") || e.altKey || e.ctrlKey || e.metaKey) return;
   const item = e.target.closest('[role="treeitem"]');
-  if (!item || e.target.closest("button")) return;
+  if (!item || e.target.closest("button") && !item.matches(".ex-native")) return;
   const items = [...$("rows").querySelectorAll('.ex-tree [role="treeitem"]')], i = items.indexOf(item);
   const n = explorer.nodes.get(item.dataset.exFocus);
   let next;
@@ -40,11 +42,16 @@ $("rows").addEventListener("keydown", e => {
   else if (e.key === "Home") next = items[0];
   else if (e.key === "End") next = items.at(-1);
   else if (e.key === "ArrowRight" && n) { if (!exExpanded(n)) exToggle(n, true); else next = item.parentElement.querySelector(':scope > .ex-contents [role="treeitem"]'); }
-  else if (e.key === "ArrowLeft") {
+  else if (e.key === "ArrowRight" && item.dataset.key) {
+    const r = rowOf(item.dataset.key), team = exAgentList(r, explorer.sessionTree?.get(r.key));
+    if (team.count && !exTeamOpen[r.key]) { exTeamOpen[r.key] = true; store("explorerTeams", exTeamOpen); renderExplorer(); }
+    else next = item.parentElement.querySelector(':scope > .ex-agents [role="treeitem"]');
+  } else if (e.key === "ArrowLeft") {
     if (n && exExpanded(n)) exToggle(n, false);
-    else next = item.closest(".ex-contents")?.parentElement.querySelector(":scope > .ex-line");
+    else if (item.dataset.key && exTeamOpen[item.dataset.key]) { exTeamOpen[item.dataset.key] = false; store("explorerTeams", exTeamOpen); renderExplorer(); }
+    else next = item.closest(".ex-agents")?.parentElement.querySelector(":scope > .ex-session") || item.closest(".ex-contents")?.parentElement.querySelector(":scope > .ex-line");
   } else if (e.key === "Enter" || e.key === " ") {
-    if (n) exToggle(n); else if (item.dataset.key) select(item.dataset.key, { open: true });
+    if (item.matches(".ex-native")) { item.click(); } else if (n) exToggle(n); else if (item.dataset.key) select(item.dataset.key, { open: true });
   } else return;
   e.preventDefault(); e.stopPropagation();
   if (next) { exRove(next.dataset.exFocus); next.focus({ preventScroll: true }); next.scrollIntoView({ block: "nearest" }); }
@@ -58,13 +65,14 @@ $("rows").addEventListener("submit", async e => {
   try {
     const data = await api("/api/browse-folders", { machine, path: raw, hidden: explorer.hidden });
     if (request !== explorer.goRequest || !explorer.go) return;
+    if (explorer.view !== "folders") exSwitchView("folders");
     explorer.homes.set(machine, data.home);
     explorer.listings.set(exId(machine, data.path === data.home ? "~" : data.path), { data });
     const f = exForest(S.summary.machines || [], [...S.rows.values()], S.self, explorer.listings, explorer.homes);
     let n = f.nodes.get(exId(machine, data.path)) || f.roots.find(n => n.machine === machine);
     explorer.selected = n.id;
     while (n) { explorer.open[n.id] = true; n = f.nodes.get(n.parent); }
-    store("explorerOpen", explorer.open); explorer.go = false; S.q = ""; $("q").value = ""; S.deep = null; S.machine = "all"; store("machine", "all");
+    exSaveOpen(); explorer.go = false; S.q = ""; $("q").value = ""; S.deep = null; S.machine = "all"; store("machine", "all");
     renderNow();
     const line = [...$("rows").querySelectorAll(".ex-line")].find(el => el.dataset.exFocus === explorer.selected);
     line?.focus({ preventScroll: true }); line?.scrollIntoView({ block: "nearest", behavior: motion.reduced() ? "instant" : "smooth" });

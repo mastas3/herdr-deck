@@ -39,6 +39,8 @@ export type Row = {
   title: string;
   firstPrompt?: string;
   lastMessage?: string;
+  overview?: Insight["overview"];
+  transcriptBytes?: number;
   cwd: string;
   project: string; // what the session is really about (from the work it did), else its folder's project
   projectRoot?: string;
@@ -534,6 +536,8 @@ export class Deck {
           title,
           firstPrompt: meta?.firstPrompt,
           lastMessage: meta?.lastMessage,
+          overview: ins?.overview,
+          transcriptBytes: meta?.transcriptBytes,
           cwd: p.cwd,
           project: basename(tree?.gitRoot ?? projRoot),
           projectRoot: projRoot,
@@ -593,6 +597,7 @@ export class Deck {
       rows.set(key, {
         key, herdr: "codex-app", workspaceId: "codex-app", workspace: "Codex app", tabId: t.id, tab: "", tabNumber: 0, tabPanes: 1, paneId: t.id,
         agent: "codex", status, appControl, focused: false, title: t.title, firstPrompt: meta?.firstPrompt, lastMessage: meta?.lastMessage,
+        overview: ins?.overview, transcriptBytes: meta?.transcriptBytes,
         cwd: t.cwd, project: basename(tree?.gitRoot ?? projRoot), projectRoot: scratch && projRoot === cwdRoot ? undefined : projRoot, launch: projRoot !== cwdRoot && !scratch ? basename(cwdRoot) : undefined,
         gitRoot: tree?.gitRoot ?? (g?.root && !scratch ? projRoot : undefined), worktree: tree?.worktree,
         now: t.status === "working" ? ins?.now : undefined, step: ins?.todo, todos: ins?.todos, turnStartedAt: t.turnStartedAt ?? ins?.turnStartedAt,

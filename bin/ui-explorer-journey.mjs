@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createServer } from 'node:net';
 import assert from 'node:assert/strict';
+import { checkProjectView } from './ui-projects-checks.mjs';
 const repo = resolve(new URL('..', import.meta.url).pathname), scratch = mkdtempSync(join(tmpdir(), 'deck-explorer-ui-'));
 const out = resolve(process.argv[2] || '/tmp/deck-explorer-ui'); mkdirSync(out, { recursive: true });
 const keep = process.argv.includes('--keep'), preview = process.argv.includes('--preview');
@@ -43,6 +44,7 @@ try {
     console.log('Checking', phone ? 'phone' : 'desktop');
     await page.goto(base); await page.waitForSelector('.ex-tree');
     assert.equal(browseReads.length, 0, 'The initial tree uses inlined state without directory scans');
+    await checkProjectView(page, { scratch, out, phone });
     await page.evaluate(home => { explorer.homes.set('test', home); renderNow(); }, scratch);
     const folder = path => page.locator(`[data-ex-node=${JSON.stringify(JSON.stringify(['test', path]))}] > .ex-line`);
     const project = join(scratch, 'Projects/herdr-deck'), src = project + '/src';
@@ -159,7 +161,7 @@ try {
     await page.evaluate(() => setGroup("project")); await page.waitForSelector("#rows .sec.proj");
     await page.evaluate(() => setGroup("folders")); await page.waitForSelector(".ex-tree");
     assert.deepEqual(errors, []); assert.deepEqual(unsafe, []);
-    results.push({ viewport, errors, unsafe, checks: 'nested branches, real folder listing, exact terminal cwd, focus-preserving updates, empty-folder search, contextual command, persistence, keyboard, arbitrary paths, remote routing, OS/deck reduced motion, overflow' });
+    results.push({ viewport, errors, unsafe, checks: 'project-only default, worktree grouping, session overview/facts/limits, native and fleet children, worker search context, independent view state, nested branches, real folder listing, exact terminal cwd, focus-preserving updates, empty-folder search, contextual command, persistence, keyboard, arbitrary paths, remote routing, OS/deck reduced motion, overflow' });
     await page.close();
   }
   writeFileSync(join(out, 'results.json'), JSON.stringify(results, null, 2)); console.log(JSON.stringify({ ok: true, port, scratch, results }));
