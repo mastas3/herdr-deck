@@ -1,0 +1,26 @@
+{
+  "deck": 1,
+  "kind": "code",
+  "id": "terminals",
+  "name": "Terminals",
+  "version": "1.0.0",
+  "description": "Quick disposable shells on your machines. Keep a terminal to return to it later, without starting an agent session.",
+  "server": "server.ts",
+  "machine": "hub",
+  "client": [
+    "terminals.js",
+    "terminals-launch.js"
+  ],
+  "styles": [
+    "terminals.css"
+  ],
+  "pages": [
+    "/terminals"
+  ],
+  "routes": [
+    "terminals"
+  ],
+  "extends": [
+    "folder.terminal"
+  ]
+}

@@ -11,6 +11,7 @@ import { call } from "../herdr";
 import { json } from "./page";
 import { readFileFor, resolveReal } from "./files";
 import { listDir } from "./dir";
+import { browseFolders } from "./explorer";
 import { newSessionOptions } from "./new-session";
 import type { Hub } from "./hub";
 import { codexApi } from "./codex";
@@ -30,6 +31,10 @@ export async function sessionsApi(hub: Hub, path: string, body: any): Promise<Re
   const { who, detailFor, chatSlice, chatFor, detailPayload, briefKey, searchLocal } = hub.chat;
   const { queues, saveQueues } = hub.queue;
   switch (path) {
+    case "/api/browse-folders": {
+      try { return json(await browseFolders(body.path, body.hidden === true)); }
+      catch (e: any) { return json({ error: e.message }, 400); }
+    }
     case "/api/share": {
       const row = deck.rows.get(body.key);
       if (!row) return json({ error: "gone" }, 404);

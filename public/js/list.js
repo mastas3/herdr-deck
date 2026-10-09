@@ -24,7 +24,7 @@ function renderNow() {
 /** The machine picker: one compact button in the filter row (1–9 switch too); its menu has the counts. */
 function renderMachines() {
   const ms = S.summary.machines ?? [], el = $("machines");
-  el.hidden = ms.length < 2;
+  el.hidden = ms.length < 2 || S.group === "folders" && S.machine === "all";
   const cur = ms.find((m) => m.id === S.machine), off = ms.some((m) => !m.online);
   if (!el.hidden) setHTML(el, `${cur ? SRC_ICON[cur.kind === "app" ? "app" : cur.local ? "mac" : "remote"] : SRC_ICON.all}<span>${esc(cur?.label ?? "All")}</span>${off ? '<span class="off" title="A machine is offline"></span>' : ""}${ICON.chev}`);
   el.setAttribute("aria-label", `Machine: ${cur?.label ?? "all"}`);
@@ -162,7 +162,9 @@ const lightsHTML = (rows) => { const n = projLights(rows); return LIGHTS.map(([k
 let selWas = null;
 let lastView = "";
 function renderList() {
+  if (S.group === "folders") return renderExplorer();
   const box = $("rows");
+  if (box.dataset.view === "explorer") rowCache.clear();
   // A worker the filter matched brings its dispatcher along (dimmed), so it never shows out of context.
   const { rows, ctx: ctxKeys } = treeWithContext(visibleRows(), S.rows);
   treeIndex();

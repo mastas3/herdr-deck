@@ -30,8 +30,10 @@ function syncUrl() {
 let briefTimer = null;
 function select(key, opts = {}) {
   if (!key || !rowOf(key)) return;
+  if (S.group === "folders") exReveal(key);
   const changed = S.sel !== key;
   S.tab = tabAfterSelect(S.sel, key, S.tab);
+  if (S.mode) deckPlugins.view(S.mode)?.leave?.();
   S.sel = key;
   S.board = false;
   S.mode = null;

@@ -36,7 +36,7 @@ const DECK_KEYS = [
   { sec: "Views", id: "usage", keys: ["U"], label: "Usage: every AI account’s limits and balance", run: () => setMode(S.mode === "usage" ? null : "usage") },
   { sec: "Views", id: "board", keys: ["l"], label: "Live board: everything working right now", run: () => setBoard(!S.board) },
   { sec: "Views", id: "closed", keys: ["c"], label: "Closed sessions, to reopen one", run: () => { S.view = S.view === "closed" ? "inbox" : "closed"; lastOrder = ""; render(); } },
-  { sec: "Views", id: "group", keys: ["g"], label: "Group the list by priority or by project", run: () => setGroup(S.group === "project" ? "priority" : "project") },
+  { sec: "Views", id: "group", keys: ["g"], label: "Switch between folders, priority and projects", run: () => setGroup(S.group === "folders" ? "priority" : S.group === "priority" ? "project" : "folders") },
   { sec: "Views", id: "foldAll", keys: ["G"], when: () => S.group === "project", label: "Collapse or expand every project (grouped by project)", run: () => foldAllProjects() },
 
   { sec: "Layout", id: "list", keys: ["["], label: "Collapse the list", run: () => $("listToggle").click() },

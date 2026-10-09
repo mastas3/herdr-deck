@@ -66,12 +66,13 @@ const dirtyText = (n) => (n ? `${n} uncommitted` : "");
 const S = {
   token: "", self: "", rows: new Map(), hrows: new Map(), summary: { herdr: [], machines: [] }, graveyard: [], tools: [], toolGroups: {},
   mode: null, usage: {}, hist: {}, decisions: [], jev: {}, canShare: false, done: new Map(),
-  machine: load("machine", "all"), q: "", sel: null, picked: new Set(), view: "inbox", group: load("group", "priority") === "project" ? "project" : "priority",
+  machine: load("machine", "all"), q: "", sel: null, picked: new Set(), view: "inbox", group: ["folders", "project", "priority"].includes(load("navigation3", "folders")) ? load("navigation3", "folders") : "folders",
   tab: load("tab2", "chat"), closedSecs: load("closedSecs", { stale: true, empty: true }), closedProj: load("closedProj", {}),
   notify: false, fit: load("fit", true), autoBrief: load("autoBrief", true),
   details: new Map(), board: false, sub: null,
   insp: inspState(),
 };
+if (S.group === "folders") S.machine = "all";
 /** The right-hand inspector on this device: open or not, and which tab. The old terminal places carry over: a
  *  terminal you kept visible (bottom, right, top) opens the inspector on Terminal; hidden or shared stays closed. */
 function inspState() {

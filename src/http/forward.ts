@@ -38,7 +38,7 @@ export function createForward(deps: Deps) {
       }
       return json({ results });
     }
-    if (["/api/new", "/api/new-options", "/api/start", "/api/codex-create", "/api/codex-archived", "/api/worktrees"].includes(path)) {
+    if (["/api/browse-folders", "/api/new", "/api/new-options", "/api/start", "/api/codex-create", "/api/codex-archived", "/api/worktrees"].includes(path)) {
       const remote = body.machine && body.machine !== deps.selfId ? remotes.get(body.machine) : undefined;
       if (body.machine && body.machine !== deps.selfId && !remote) return json({ error: "That machine is no longer configured. Choose a machine again." }, 400);
       if (!remote) return;

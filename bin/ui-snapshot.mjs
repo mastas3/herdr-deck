@@ -34,6 +34,8 @@ const WORKTREE_SETUP = `for (const k of ["fake:working", "fake:blocked"]) Object
     lastActiveAt: Date.now() - 40 * 60_000, worktree: "billing-cache", branch: "feat/billing-cache", projectRoot: "$HOME/acme-api-billing-cache", cwd: "$HOME/acme-api-billing-cache", gitRoot: "$HOME/acme-api" });
   setGroup("project"); lastOrder = ""; renderNow()`;
 export const VIEWS = {
+  explorer: `setGroup("folders"); renderNow()`,
+  "explorer-off": `setGroup("folders"); renderNow(); if (document.querySelector('[data-ex-action="terminal"]')) throw new Error("Terminal controls still shown while the plugin is off")`,
   "start-failed": `Object.assign(rowOf("fake:working"), { status: "empty", empty: false, title: "Native mobile app", startup: { id: "fixture-start", state: "failed", title: "Native mobile app", createdAt: Date.now(), hasPrompt: true, error: "Claude opened, but the first message was not delivered. Your message is saved." } }); select("fake:working", { open: true });`,
   "start-saved": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api" }); if (!$("nStarts").textContent.includes("Native mobile app")) throw new Error("Missing saved start"); })()`,
   "start-recovery": `(async () => { await openNew({ kind: "claude", cwd: "/tmp/acme-api" }); $("nStarts").querySelector("[data-start-review]").click(); for (let i=0; i<40 && $("nPrompt").value !== "Build the native mobile app"; i++) await new Promise(r=>setTimeout(r,50)); if ($("nPrompt").value !== "Build the native mobile app") throw new Error("Saved first message was lost"); })()`,

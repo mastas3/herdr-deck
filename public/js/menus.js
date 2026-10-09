@@ -71,7 +71,7 @@ function openMenu(anchor, items, heading, cls = "") {
     if (e.key === "Escape") { e.preventDefault(); closeMenu(); anchor.focus?.(); }
   });
 }
-function closeMenu() { if (menuEl) motion.leave(menuEl, "fade"); menuEl = null; }
+function closeMenu() { if (menuEl) { menuEl.inert = true; menuEl.setAttribute("aria-hidden", "true"); motion.leave(menuEl, "fade"); } menuEl = null; }
 addEventListener("pointerdown", (e) => { if (menuEl && !menuEl.contains(e.target)) closeMenu(); }, true);
 function moreMenu(anchor) {
   const r = rowOf(S.sel);

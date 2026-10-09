@@ -1,6 +1,7 @@
 // This deck and the machines it mirrors (hosts.json): their sessions, graveyards and summary as one list, and
 // whether this deck is a hub (it has machines, or nobody calls it) or a node (a hub talks to it).
 import { writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { RemoteHost, type Machine, type RemoteConf } from "../federation";
 import { historySession, type HistSession } from "../history";
 import { codexAppInstalled, codexAppRunning } from "../codexapp";
@@ -49,7 +50,7 @@ export function createMachines(o: Deps) {
   const tagLocal = (r: Row): Row => ({ ...r, machine: r.app ? "codex-app" : SELF.id });
   function machines(): Machine[] {
     const app: Machine[] = codexAppInstalled() ? [{ id: "codex-app", label: "Codex app", local: true, online: codexAppRunning(), kind: "app" } as Machine] : [];
-    return [{ id: SELF.id, label: SELF.label, local: true, online: true, herdr: deck.summary().herdr }, ...[...remotes.values()].map((h) => h.machine()), ...app];
+    return [{ id: SELF.id, label: SELF.label, local: true, online: true, home: homedir(), herdr: deck.summary().herdr }, ...[...remotes.values()].map((h) => h.machine()), ...app];
   }
   /** Any local row: a pane, a Codex app thread, or a past session from the history index ("h:<agent>:<id>"). */
   const localRow = (key: string): Row | undefined => deck.rows.get(key) ?? (key?.startsWith("h:") ? histRow(historySession(key)) : undefined);

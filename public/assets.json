@@ -12,6 +12,10 @@
     "js/list.js",
     "js/folder-items.js",
     "js/folder-view.js",
+    "js/explorer-model.js",
+    "js/explorer-dom.js",
+    "js/explorer.js",
+    "js/explorer-events.js",
     "js/session.js",
     "js/chat.js",
     "js/chat-scroll.js",
@@ -81,6 +85,7 @@
     "css/motion.css",
     "css/nav.css",
     "css/simple.css",
-    "css/plugins.css"
+    "css/plugins.css",
+    "css/explorer.css"
   ]
 }

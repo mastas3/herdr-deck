@@ -1,0 +1,56 @@
+.qt-root { max-width:1100px; margin:0 auto; }
+.qt-intro { margin-bottom:24px; }
+.qt-intro h2 { margin:0 0 8px; }
+.qt-machines { margin-bottom:24px; border-top:1px solid var(--line); }
+.qt-machine { padding:14px 0; border-bottom:1px solid var(--line); }
+.qt-machine-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.qt-machine-head .btn svg { width:16px; height:16px; }
+.qt-machine > p { margin:8px 0 0 18px; font-size:12px; }
+.qt-saved { margin:8px 0 0 18px; display:flex; flex-wrap:wrap; gap:8px 24px; }
+.qt-saved > div { display:flex; align-items:center; gap:10px; }
+.qt-saved small { color:var(--ink-2); }
+.qt-saved .link { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.qt-shell { border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+.qt-shell-head { display:flex; align-items:center; gap:8px; padding:12px 16px; flex-wrap:wrap; }
+.qt-shell-head strong { display:block; font-size:14px; overflow-wrap:anywhere; }
+.qt-shell-head small { display:block; color:var(--ink-2); margin-top:4px; font-size:11px; }
+.qt-screen { margin:0; background:var(--term-bg); color:var(--term-ink); font:13px/1.55 var(--mono); padding:16px; height:clamp(250px,42vh,550px); overflow:auto; white-space:pre; tab-size:8; outline-offset:-3px; }
+.qt-screen:focus-visible { outline:2px solid var(--accent); }
+.qt-keys { display:flex; gap:2px; padding:6px 10px; overflow-x:auto; border-bottom:1px solid var(--line); }
+.qt-keys .btn { min-height:36px; flex-shrink:0; font-size:12px; }
+.qt-input { display:flex; gap:8px; padding:12px 16px 6px; }
+.qt-input .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.qt-input input { min-width:0; flex:1; font-family:var(--mono); background:var(--code-bg); color:var(--ink); border:1px solid var(--line-2); border-radius:6px; padding:9px 12px; }
+.qt-input input:focus { outline:2px solid var(--accent); outline-offset:1px; }
+.qt-tip { margin:4px 16px 12px; font-size:11px; }
+.qt-status:empty { display:none; }
+.qt-status, .qt-error { color:var(--blocked); font-size:12px; margin:0; padding:8px 16px; }
+.qt-note { max-width:580px; line-height:1.65; }
+.qt-opening { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:12px 18px; }
+.qt-dock { position:fixed; z-index:80; right:12px; bottom:30px; width:min(1000px, calc(100vw - 24px)); background:var(--bg); border:1px solid var(--line-2); border-radius:10px; box-shadow:0 -8px 36px #0004; }
+.qt-dock .qt-shell { border:0; }
+.qt-dock .qt-screen { height:clamp(160px, 32vh, 370px); }
+.qt-dock .qt-tip { display:none; }
+.qt-dock .qt-input { padding-bottom:12px; }
+.qt-picker .qt-pick-title { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:10px 18px 0; color:var(--ink-2); font-weight:600; }
+.qt-picker input { color:var(--ink); }
+.qt-picker .hint { padding:10px; }
+@media(max-width:700px) {
+  .qt-picker.palette { margin:10dvh 12px auto; width:calc(100vw - 24px); height:auto; max-height:70dvh; border-radius:14px; }
+  .qt-picker.palette .pal-list { flex:initial; max-height:45dvh; }
+  .qt-picker .pal-list button, .qt-picker [data-qt-cancel] { min-height:44px; }
+  .qt-dock { right:4px; bottom:30px; width:calc(100vw - 8px); max-height:calc(100dvh - 70px); overflow:auto; }
+  .qt-dock .qt-screen { height:30dvh; min-height:140px; }
+  .qt-intro { margin-bottom:16px; }
+  .qt-machine-head { gap:7px; }
+  .qt-machine-head > .hint { display:none; }
+  .qt-machine-head .btn { min-height:44px; }
+  .qt-shell-head { padding:12px; }
+  .qt-shell-head > div { flex:1 1 100%; }
+  .qt-shell-head > .spacer { display:none; }
+  .qt-shell-head .btn { min-height:40px; }
+  .qt-screen { height:35dvh; min-height:200px; }
+  .qt-input { padding:10px; }
+  .qt-input input { font-size:16px; }
+  .qt-keys .btn { min-height:44px; padding:7px 10px; }
+}

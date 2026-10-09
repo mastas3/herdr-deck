@@ -9,7 +9,7 @@ import { RowFeed, type Usage } from "./row-feed";
 import { seqStep } from "./http/sse";
 
 export type RemoteConf = { id: string; label: string; ssh: string; remotePort?: number; localPort?: number };
-export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app" };
+export type Machine = { id: string; label: string; local: boolean; online: boolean; error?: string; herdr?: any[]; kind?: "app"; home?: string };
 
 type Listener = {
   /** Rows that changed or went (both empty: only this machine's summary or online state changed). */
@@ -43,7 +43,8 @@ export class RemoteHost {
   constructor(readonly conf: RemoteConf, private on: Listener) {}
 
   machine(): Machine {
-    return { id: this.conf.id, label: this.conf.label, local: false, online: this.online, error: this.error, herdr: this.summary?.herdr };
+    const home = this.summary?.machines?.find((m: any) => m.local && m.kind !== "app")?.home;
+    return { ...(typeof home === "string" ? { home } : {}), id: this.conf.id, label: this.conf.label, local: false, online: this.online, error: this.error, herdr: this.summary?.herdr };
   }
 
   start() {

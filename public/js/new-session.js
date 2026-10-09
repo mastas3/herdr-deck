@@ -39,6 +39,7 @@ function ownFolder(r, name) {
   return { cwd: `${String(r.cwd).replace(/\/+$/, "")}/${slug}`, mkdir: true };
 }
 async function openNew(pre) {
+  if (!pre?.cwd && S.group === "folders" && explorer.selected) { const n = exContext(); if (n) pre = { machine: n.machine, cwd: n.root ? explorer.homes.get(n.machine) || "~" : n.path, project: n.name }; }
   pre = pre?.cwd ? pre : load("newSessionDraft", null) || pre;
   pre = pre && pre.cwd ? pre : undefined;
   newMkdir = pre?.mkdir ? pre.cwd : null; // quests: a new run's folder is made only when you confirm

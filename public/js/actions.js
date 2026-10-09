@@ -136,7 +136,7 @@ async function standup() {
   const tool = S.tools.find((x) => x.id === "status");
   if (tool) await runTool(tool, rows.map((r) => r.key));
 }
-function setGroup(g) { S.group = g; store("group", g); lastOrder = ""; render(); }
+function setGroup(g) { if (g === "folders") { S.machine = "all"; store("machine", "all"); } S.group = g; store("group", g); store("navigation3", g); lastOrder = ""; render(); }
 function focusTerminal() {
   openInspector("term");
   requestAnimationFrame(() => $("screen").focus());

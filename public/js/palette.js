@@ -37,12 +37,13 @@ function paletteItems(q) {
     const tools = S.tools.filter((t) => t.action !== "upload").map((t) => ({ t, s: fuzzy(`${t.label} ${t.hint ?? ""} tool`, q) })).filter((x) => x.s).slice(0, q ? 6 : 4);
     if (tools.length) out.push({ head: n > 1 ? `Tools for ${n} selected` : `Tools for “${cur?.title ?? "session"}”` }, ...tools.map(({ t }) => ({ html: `<span>${esc(t.label)}</span><small>${esc(t.hint ?? "")}</small>`, run: () => runTool(t) })));
   }
-  // Plugins' commands go in the list at two places, "views" (next to the core's go-to commands) and "more"
+  // Plugins' commands go in "quick" (everyday actions), "views" (go-to commands) and "more"
   // (after Plugins); a `section` entry gets a heading of its own below, once you've typed something.
   const plug = deckPlugins.each("palette.entries", q, cur).flat().filter(Boolean);
   const slot = (name) => plug.filter((c) => !c.section && (c.slot ?? "more") === name).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   // Commands: `id` takes its key hint from keymap.js; `ctx` ones act on the selected session (their own heading).
   const all = [
+    ...slot("quick"),
     { t: "New session", id: "new", run: () => openNew() },
     cur && projectHome(cur.project) && { t: `New session in ${cur.project}`, ctx: true, run: () => openNew(projectHome(cur.project)) },
     { t: "Next session waiting on you", id: "needs", run: nextNeedsMe },
@@ -65,6 +66,7 @@ function paletteItems(q) {
     n > 1 && { t: `Message ${n} selected sessions…`, run: messagePicked },
     n > 1 && { t: `Close ${n} selected sessions…`, run: () => askClose(targets()) },
     S.picked.size > 0 && { t: "Clear the selection", run: () => { S.picked.clear(); render(); } },
+    { t: "Browse machines and folders", run: () => setGroup("folders") },
     { t: S.group === "project" ? "Sort the list by priority" : "Group the list by project", id: "group", run: () => setGroup(S.group === "project" ? "priority" : "project") },
     { t: `${app.classList.contains("insp-on") ? "Hide" : "Show"} the inspector`, id: "insp", run: () => toggleInspector() },
     ...(cur ? inspTabs(cur).map((t) => ({ t: `Inspector: ${t.label}`, ctx: true, run: () => openInspector(t.key) })) : []),
