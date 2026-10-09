@@ -29,7 +29,7 @@ Terminals exposes `folder.terminal` through the client registry. The core import
 - `node bin/ui-explorer-journey.mjs /tmp/deck-explorer-ui`: isolated HOME, synthetic sessions, real directory reads and tmux shells, desktop/phone dark/light screenshots, branch persistence, keyboard navigation, search, empty folders, remote routing fixture, and reduced motion.
 - `node bin/ui-explorer-journey.mjs /tmp/deck-explorer-preview --preview --keep`: leaves an isolated interactive demo on loopback port 4776 (`--port` overrides it). No real agent sessions or personal data are loaded.
 
-Remote routing is checked with a fixture; a real remote-machine shell was not launched for this change. The production deck on port 8448 is not modified by the preview.
+The isolated journey uses a fixture for remote routing. Live Mac/Linux browsing and shell checks were also completed during the production rollout below. The preview never changes the production deck or its tailnet route.
 
 ## Validation in this checkout, 2026-10-09
 
@@ -41,4 +41,14 @@ The existing prototype was integrated into this checkout with its unrelated chan
 - Terminal plugin disabled: desktop and phone explorer snapshots have zero page errors and no terminal buttons.
 - Reviewed screenshots: `/tmp/deck-explorer-validated/`; test logs: `/tmp/deck-explorer-all-final.log` and `/tmp/deck-explorer-browser-final.log`.
 
-Private sample-data preview: https://stas-2s-macbook-pro.tail2a005b.ts.net:4776/ (a separate scratch HOME; this is not the production deck). Preview process metadata is under `/tmp/deck-explorer-preview-v2/`. To stop the preview, terminate the process group whose leader is recorded in `process.pid`, then run `tailscale serve --https=4776 off`. Production port 8448 was not changed. The remote node must include the new browsing endpoint to list previously unknown remote folders; live remote browsing was not tested in this task.
+The sample-data preview on port 4776 used a separate scratch HOME with one configured machine. It was stopped after production verification; the earlier preview on port 4774 was left alone.
+
+## Production rollout, 2026-10-09
+
+Explorer commit `28e5f4b` was merged into `main` and pushed. Existing local changes, including the concurrent visual identity work, were preserved. The isolated committed release passed 1,367 tests; the integrated production checkout passed 1,406 tests with zero failures. The combined desktop/phone explorer journey also passed.
+
+The Linux node received the six backend files required for directory browsing, with source-hash checks and a rollback copy. The existing Mac launchd and Linux systemd services were restarted. The production tailnet route and configuration were unchanged.
+
+Live verification at https://stas-2s-macbook-pro.tail2a005b.ts.net:8448/ confirmed both MacBook and Linux · work, nested directory browsing, and real terminal working directories on both machines. Only the temporary verification shells were closed. Tokenless directory requests returned 403. Desktop and phone viewport checks showed both computers, remote browsing, no horizontal overflow, and zero page errors. These are browser viewport checks; physical-device testing was not performed.
+
+Evidence: `/tmp/deck-explorer-integrated-tests.log`, `/tmp/deck-explorer-integrated-ui/`, `/tmp/deck-explorer-live-browser.log`, and `/tmp/deck-explorer-live-smoke.log`.
